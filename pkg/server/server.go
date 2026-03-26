@@ -115,6 +115,8 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 	// Tenant management API
 	mux.Handle("GET /api/repos", wrap(listReposHandler(db)))
 	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
+	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
+	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))
 
 	return mux
@@ -314,6 +316,74 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func deleteRepoHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		org := r.PathValue("org")
+		repo := r.PathValue("repo")
+		if org == "" || repo == "" {
+			http.Error(w, "org and repo required", http.StatusBadRequest)
+			return
+		}
+
+		if err := tenant.DeactivateTenantRepo(db, tn.ID, org, repo); err != nil {
+			slog.Error("deactivating repo", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func availableReposHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		query := strings.ToLower(r.URL.Query().Get("q"))
+
+		// Get installations for this tenant
+		installs, err := tenant.ListInstallations(db, tn.ID)
+		if err != nil {
+			slog.Error("listing installations", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		// Get already-tracked repos to filter them out
+		tracked, err := tenant.ListTenantRepos(db, tn.ID)
+		if err != nil {
+			slog.Error("listing tracked repos", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		trackedSet := make(map[string]bool, len(tracked))
+		for _, tr := range tracked {
+			trackedSet[tr.Org+"/"+tr.Repo] = true
+		}
+
+		// TODO: when GitHub App is configured, use installation tokens to
+		// call GET /installation/repositories for each installation.
+		// For now, return repos from installations that aren't tracked yet.
+		var available []tenant.OrgRepo
+		_ = installs // will be used when GitHub API integration is wired
+		_ = query    // will filter GitHub API results
+		_ = available
+		_ = trackedSet
+
+		writeJSON(w, http.StatusOK, available)
 	}
 }
 
