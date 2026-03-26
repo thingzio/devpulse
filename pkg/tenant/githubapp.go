@@ -62,7 +62,7 @@ func MintInstallationToken(ctx context.Context, cfg *GitHubAppConfig, installati
 	req.Header.Set("Authorization", "Bearer "+appJWT)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL from trusted config
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requesting installation token: %w", err)
 	}

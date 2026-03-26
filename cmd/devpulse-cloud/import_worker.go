@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -77,7 +78,7 @@ func cmdImportWorker(ctx context.Context, cmd *urfave.Command) error {
 	return nil
 }
 
-func importTenant(ctx context.Context, db interface{}, store data.Store, t tenant.ActiveTenant) error {
+func importTenant(_ context.Context, _ any, _ data.Store, t tenant.ActiveTenant) error {
 	slog.Info("importing tenant", "tenant_id", t.ID, "username", t.Username)
 
 	// TODO: full implementation
@@ -89,5 +90,5 @@ func importTenant(ctx context.Context, db interface{}, store data.Store, t tenan
 	// 6. Call existing Store.ImportEvents, ImportRepoMeta, etc.
 	// 7. Log sync_summary with tenant context
 
-	return nil
+	return fmt.Errorf("import not yet implemented for tenant %s", t.ID)
 }

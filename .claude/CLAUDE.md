@@ -100,25 +100,36 @@ When choosing between approaches, prioritize in this order:
 ## Architecture
 
 ```
-cmd/devpulse/       Main entrypoint (thin wrapper)
-pkg/cli/            CLI commands, HTTP handlers, templates, static assets
-pkg/data/           Store interface, shared types, helpers
-pkg/data/sqlite/    SQLite Store implementation + migrations
-pkg/data/postgres/  PostgreSQL Store implementation + migrations
-pkg/data/ghutil/    Shared GitHub API helpers (rate limiting, user mapping)
+cmd/devpulse/           CLI entrypoint (self-hosted, unchanged)
+cmd/devpulse-cloud/     SaaS entrypoint (serve, import subcommands)
+pkg/cli/                CLI commands, HTTP handlers, templates, static assets
+pkg/data/               Store interface, shared types, helpers
+pkg/data/sqlite/        SQLite Store implementation + migrations
+pkg/data/postgres/      PostgreSQL Store implementation + migrations
+pkg/data/ghutil/        Shared GitHub API helpers (rate limiting, user mapping)
 pkg/data/insights_gen.go  LLM insights generation
-pkg/auth/           GitHub OAuth token management (OS keychain)
-pkg/net/            HTTP client utilities
-config/             Sync config files (YAML, org/repo lists)
-infra/gcp/          Terraform for GCP infrastructure
-tools/              Dev scripts (version bump, shared helpers)
+pkg/auth/               GitHub OAuth token management (OS keychain, CLI only)
+pkg/oauth/              GitHub OAuth web flow (SaaS sign-in)
+pkg/tenant/             Tenant CRUD, sessions, GitHub App, installations
+pkg/middleware/         Auth middleware, tenant scope injection (RLS)
+pkg/net/                HTTP client utilities
+config/                 Sync config files (YAML, org/repo lists)
+infra/gcp/              Terraform for self-hosted GCP infrastructure
+infra/saas/             Terraform for SaaS GCP infrastructure
+tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-CLI commands: `auth`, `import`, `delete`, `score`, `substitute`, `query`, `server`, `sync` (per-repo reputation/insight config in YAML), `reset`
+**Self-hosted CLI** commands: `auth`, `import`, `delete`, `score`, `substitute`, `query`, `server`, `sync`, `reset`
+
+**SaaS binary** (`devpulse-cloud`) modes: `serve` (HTTP server with OAuth, webhooks, dashboard), `import` (scheduled tenant data import worker)
 
 Key data flow: GitHub API → EventImporter (concurrent, batched) → SQLite/PostgreSQL → HTTP API → Chart.js dashboard
 
+SaaS data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
+
 Dashboard is full-width with a summary banner and seven lazy-loaded tabs (Health, Activity, Velocity, Quality, Community, Events, Insights). Top bar has search, period selector, and theme toggle on one line. Search supports `org:` and `repo:` prefix syntax.
+
+Tenant isolation: PostgreSQL Row-Level Security (RLS) policies filter data via `app.tenant_id` session variable set by middleware. Global tables (event, developer, etc.) join through `tenant_repo`; tenant-scoped tables have direct `tenant_id` columns.
 
 ## Environment Variables
 
@@ -126,6 +137,13 @@ Dashboard is full-width with a summary banner and seven lazy-loaded tabs (Health
 - `ANTHROPIC_API_KEY` — optional, enables LLM insights generation
 - `ANTHROPIC_BASE_URL` — optional, custom Anthropic API endpoint
 - `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`
+- `DATABASE_URL` — SaaS only, PostgreSQL connection URI
+- `GITHUB_OAUTH_CLIENT_ID` — SaaS only, GitHub OAuth App client ID
+- `GITHUB_OAUTH_CLIENT_SECRET` — SaaS only, GitHub OAuth App client secret
+- `GITHUB_WEBHOOK_SECRET` — SaaS only, GitHub App webhook HMAC secret
+- `GITHUB_APP_ID` — SaaS only, GitHub App ID for installation tokens
+- `GITHUB_APP_KEY_PATH` — SaaS only, path to GitHub App private key PEM
+- `BASE_URL` — SaaS only, public base URL (e.g. https://devpulse.thingz.io)
 
 ## CI/CD
 
@@ -136,6 +154,7 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, cosign signing, SBOM, attestations, Homebrew tap, AR copy, Cloud Run deploy |
+| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse-cloud to Cloud Run |
 | `codeql-analysis.yml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 
 ## Release Process

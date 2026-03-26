@@ -239,28 +239,42 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 func signoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if cookie, err := r.Cookie("__Host-session"); err == nil {
-			tenant.DestroySession(db, cookie.Value)
+			if derr := tenant.DestroySession(db, cookie.Value); derr != nil {
+				slog.Debug("destroying session", "error", derr)
+			}
 		}
 		middleware.ClearSessionCookie(w)
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }
 
-func listReposHandler(db *sql.DB) http.HandlerFunc {
+func tenantListHandler(db *sql.DB, label string, queryFn func(*sql.DB, string) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		repos, err := tenant.ListTenantRepos(db, tn.ID)
+		result, err := queryFn(db, tn.ID)
 		if err != nil {
-			slog.Error("listing repos", "error", err)
+			slog.Error("listing "+label, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, repos)
+		writeJSON(w, http.StatusOK, result)
 	}
+}
+
+func listReposHandler(db *sql.DB) http.HandlerFunc {
+	return tenantListHandler(db, "repos", func(d *sql.DB, id string) (any, error) {
+		return tenant.ListTenantRepos(d, id)
+	})
+}
+
+func listInstallationsHandler(db *sql.DB) http.HandlerFunc {
+	return tenantListHandler(db, "installations", func(d *sql.DB, id string) (any, error) {
+		return tenant.ListInstallations(d, id)
+	})
 }
 
 func addRepoHandler(db *sql.DB) http.HandlerFunc {
@@ -271,6 +285,7 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		org := r.FormValue("org")
 		repo := r.FormValue("repo")
 		if org == "" || repo == "" {
@@ -285,23 +300,6 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusCreated)
-	}
-}
-
-func listInstallationsHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tn := middleware.TenantFromContext(r.Context())
-		if tn == nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		installs, err := tenant.ListInstallations(db, tn.ID)
-		if err != nil {
-			slog.Error("listing installations", "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, http.StatusOK, installs)
 	}
 }
 

@@ -13,10 +13,7 @@ type contextKey string
 
 const tenantContextKey contextKey = "tenant"
 
-const (
-	sessionCookieName = "__Host-session"
-	sessionMaxAge     = 7 * 24 * 60 * 60 // 7 days in seconds
-)
+const sessionCookieName = "__Host-session"
 
 // RequireAuth validates the session cookie and injects the tenant into context.
 // Redirects to loginURL if no valid session is found.

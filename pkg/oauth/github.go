@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultAuthURL  = "https://github.com/login/oauth/authorize"
-	defaultTokenURL = "https://github.com/login/oauth/access_token"
+	defaultTokenURL = "https://github.com/login/oauth/access_token" //nolint:gosec // not a credential
 	defaultUserURL  = "https://api.github.com/user"
 	oauthScope      = "read:user user:email"
 )
@@ -73,7 +73,7 @@ func ExchangeCode(ctx context.Context, cfg *Config, code string) (string, error)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL from config
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("exchanging code: %w", err)
 	}
@@ -110,7 +110,7 @@ func FetchUser(ctx context.Context, cfg *Config, token string) (*GitHubUser, err
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL from config
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
