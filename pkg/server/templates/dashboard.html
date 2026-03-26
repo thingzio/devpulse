@@ -9,30 +9,31 @@
 <h2>Tracked Repos</h2>
 <div id="tracked-repos"><em>Loading...</em></div>
 
-<h2>Add Repo</h2>
-<form id="add-repo-form" style="display:flex;gap:8px;align-items:center;max-width:500px">
-  <input type="text" id="repo-input" placeholder="org/repo (e.g. kubernetes/kubernetes)" autocomplete="off" style="flex:1;padding:6px" required>
-  <button type="submit">Add</button>
-</form>
-<p id="add-status"></p>
+<h2>Add Repos</h2>
+<div style="position:relative;max-width:500px">
+  <input type="text" id="repo-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/airc)..." autocomplete="off" style="width:100%;padding:6px;box-sizing:border-box">
+  <div id="search-results" style="position:absolute;background:#fff;border:1px solid #ccc;max-height:250px;overflow-y:auto;width:100%;display:none;z-index:10"></div>
+</div>
+<p id="search-status" style="color:#666;font-size:0.9em"></p>
 
 {{if .GitHubAppURL}}
-<p><a href="{{.GitHubAppURL}}" target="_blank">Connect more repos via GitHub App &rarr;</a></p>
+<p><a href="{{.GitHubAppURL}}" target="_blank">Connect private repos via GitHub App &rarr;</a></p>
 {{end}}
 
 <script>
 (function() {
   const trackedEl = document.getElementById('tracked-repos');
-  const formEl = document.getElementById('add-repo-form');
-  const inputEl = document.getElementById('repo-input');
-  const statusEl = document.getElementById('add-status');
+  const searchEl = document.getElementById('repo-search');
+  const resultsEl = document.getElementById('search-results');
+  const statusEl = document.getElementById('search-status');
+  let debounceTimer;
 
   function loadTracked() {
     fetch('/api/repos')
       .then(r => r.json())
       .then(repos => {
         if (!repos || repos.length === 0) {
-          trackedEl.innerHTML = '<p>No repos tracked yet. Add one above.</p>';
+          trackedEl.innerHTML = '<p>No repos tracked yet. Search above to add one.</p>';
           return;
         }
         const items = repos.map(r =>
@@ -49,25 +50,61 @@
       .then(r => { if (r.ok) loadTracked(); });
   };
 
-  formEl.addEventListener('submit', function(e) {
-    e.preventDefault();
-    statusEl.textContent = '';
-    const val = inputEl.value.trim();
-    const parts = val.split('/');
-    if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      statusEl.textContent = 'Format: org/repo';
-      return;
-    }
-    const body = new URLSearchParams({org: parts[0], repo: parts[1]});
+  window.addRepo = function(org, repo) {
+    statusEl.textContent = 'Adding...';
+    const body = new URLSearchParams({org: org, repo: repo});
     fetch('/api/repos', {method:'POST', body: body})
       .then(r => {
         if (r.ok) {
           loadTracked();
-          inputEl.value = '';
+          searchEl.value = '';
+          resultsEl.style.display = 'none';
+          statusEl.textContent = '';
         } else {
           r.text().then(t => { statusEl.textContent = t; });
         }
       });
+  };
+
+  searchEl.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    const q = searchEl.value.trim();
+    if (q.length < 2) {
+      resultsEl.style.display = 'none';
+      statusEl.textContent = '';
+      return;
+    }
+    statusEl.textContent = 'Searching...';
+    debounceTimer = setTimeout(function() {
+      fetch('/api/repos/available?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(repos => {
+          statusEl.textContent = '';
+          if (!repos || repos.length === 0) {
+            resultsEl.innerHTML = '<div style="padding:8px;color:#666">No repos found</div>';
+            resultsEl.style.display = 'block';
+            return;
+          }
+          const items = repos.map(r =>
+            '<div style="padding:8px;cursor:pointer;border-bottom:1px solid #eee" ' +
+            'onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'#fff\'" ' +
+            'onclick="addRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">' +
+            esc(r.Org) + '/' + esc(r.Repo) + '</div>'
+          ).join('');
+          resultsEl.innerHTML = items;
+          resultsEl.style.display = 'block';
+        })
+        .catch(() => {
+          statusEl.textContent = '';
+          resultsEl.style.display = 'none';
+        });
+    }, 400);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!resultsEl.contains(e.target) && e.target !== searchEl) {
+      resultsEl.style.display = 'none';
+    }
   });
 
   function esc(s) {

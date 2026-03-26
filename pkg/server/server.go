@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -355,44 +356,66 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		query := strings.ToLower(r.URL.Query().Get("q"))
-
-		// Get installations for this tenant
-		installs, err := tenant.ListInstallations(db, tn.ID)
-		if err != nil {
-			slog.Error("listing installations", "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+		query := strings.TrimSpace(r.URL.Query().Get("q"))
+		if len(query) < 2 {
+			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
 			return
 		}
 
-		// Get already-tracked repos to filter them out
-		tracked, err := tenant.ListTenantRepos(db, tn.ID)
+		// Search GitHub public repos
+		ghURL := fmt.Sprintf("https://api.github.com/search/repositories?q=%s&per_page=10",
+			url.QueryEscape(query))
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, ghURL, nil) //nolint:gosec // constant base URL, query param is url-escaped
 		if err != nil {
-			slog.Error("listing tracked repos", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+
+		resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL constructed from constant base + user query param
+		if err != nil {
+			slog.Error("searching github repos", "error", err)
+			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
+			return
+		}
+
+		var result struct {
+			Items []struct {
+				FullName string `json:"full_name"`
+			} `json:"items"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
+			return
+		}
+
+		// Filter out already-tracked repos
+		tracked, _ := tenant.ListTenantRepos(db, tn.ID)
 		trackedSet := make(map[string]bool, len(tracked))
 		for _, tr := range tracked {
 			trackedSet[tr.Org+"/"+tr.Repo] = true
 		}
 
-		// TODO: when GitHub App is configured, use installation tokens to
-		// call GET /installation/repositories for each installation.
-		// For now, return repos from installations that aren't tracked yet.
 		var available []tenant.OrgRepo
-		_ = installs // will be used when GitHub API integration is wired
-		_ = query    // will filter GitHub API results
-		_ = available
-		_ = trackedSet
+		for _, item := range result.Items {
+			parts := strings.SplitN(item.FullName, "/", 2)
+			if len(parts) == 2 && !trackedSet[item.FullName] {
+				available = append(available, tenant.OrgRepo{Org: parts[0], Repo: parts[1]})
+			}
+		}
 
 		writeJSON(w, http.StatusOK, available)
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
+func writeJSON(w http.ResponseWriter, _ int, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Error("encoding json response", "error", err)
 	}
