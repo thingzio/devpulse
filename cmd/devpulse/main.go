@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/importer"
 	"github.com/thingzio/devpulse/pkg/logging"
+	"github.com/thingzio/devpulse/pkg/server"
 )
 
 var (
@@ -29,13 +31,22 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	var err error
-	if os.Getenv("PORT") != "" {
-		err = runServe(ctx)
-	} else {
-		err = runImport(ctx)
+	store, err := openStore()
+	if err != nil {
+		stop()
+		slog.Error("fatal error", "error", err)
+		os.Exit(1)
 	}
 
+	db := store.DB()
+
+	if os.Getenv("PORT") != "" {
+		err = server.Run(ctx, db)
+	} else {
+		err = importer.Run(ctx, db)
+	}
+
+	store.Close()
 	stop()
 
 	if err != nil {
