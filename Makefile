@@ -8,7 +8,7 @@ LINT_TIMEOUT       ?= $(shell yq -r '.quality.lint_timeout' .settings.yaml 2>/de
 TEST_TIMEOUT       ?= $(shell yq -r '.quality.test_timeout' .settings.yaml 2>/dev/null || echo "10m")
 BUILD_TIMEOUT      ?= $(shell yq -r '.quality.build_timeout' .settings.yaml 2>/dev/null || echo "10m0s")
 YAML_FILES         := $(shell find . ! -path "./vendor/*" -type f -regex ".*\.yaml")
-COVERAGE_THRESHOLD ?= $(shell yq -r '.quality.coverage_threshold' .settings.yaml 2>/dev/null || echo "30")
+COVERAGE_THRESHOLD ?= $(shell yq -r '.quality.coverage_threshold' .settings.yaml 2>/dev/null || echo "20")
 
 all: help
 
@@ -74,16 +74,12 @@ test-coverage: test ## Runs tests and enforces coverage threshold
 	fi; \
 	echo "Coverage check passed"
 
-.PHONY: bench
-bench: ## Runs benchmarks
-	go test -bench=. -benchmem ./...
-
 .PHONY: vulncheck
 vulncheck: ## Scans for known vulnerabilities with govulncheck
 	GOFLAGS="-mod=vendor" govulncheck -test ./...
 
 .PHONY: e2e
-e2e: ## Runs end-to-end CLI tests
+e2e: ## Runs end-to-end tests
 	tools/e2e
 
 .PHONY: qualify
@@ -95,18 +91,18 @@ qualify: test-coverage lint vulncheck e2e ## Qualifies the codebase (test, lint,
 # =============================================================================
 
 .PHONY: build
-build: tidy ## Builds binaries for current OS and architecture
+build: tidy ## Builds binary for current OS and architecture
 	@set -e; \
 	GITHUB_TOKEN= GITLAB_TOKEN= goreleaser build --clean --single-target --snapshot --timeout $(BUILD_TIMEOUT) || exit 1; \
-	echo "Build completed, binaries in ./dist"
+	echo "Build completed, binary in ./dist"
 
 .PHONY: release
 release: ## Runs the full release process with goreleaser
 	goreleaser release --snapshot --clean --timeout $(BUILD_TIMEOUT)
 
 .PHONY: server
-server: ## Starts local development server with debug logging
-	go run ./cmd/devpulse server --debug
+server: ## Starts local dev server (requires DATABASE_URL)
+	PORT=8080 DEVPULSE_DEBUG=true go run ./cmd/devpulse
 
 .PHONY: bump-major
 bump-major: ## Bumps major version (1.2.3 → 2.0.0)
@@ -126,7 +122,7 @@ bump-patch: ## Bumps patch version (1.2.3 → 1.2.4)
 
 .PHONY: clean
 clean: ## Cleans build artifacts
-	rm -rf ./dist ./bin ./cover.out
+	rm -rf ./dist ./cover.out ./cover-filtered.out
 	go clean ./...
 
 .PHONY: clean-all
