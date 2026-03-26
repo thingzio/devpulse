@@ -10,7 +10,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-ONLY", "pg_isready", "-U", "devpulse"]
+      test: ["CMD", "pg_isready", "-U", "devpulse"]
       interval: 2s
       timeout: 5s
       retries: 5
