@@ -22,11 +22,12 @@ type Installation struct {
 
 // TenantRepo represents a repo tracked by a tenant.
 type TenantRepo struct {
-	ID       string
-	TenantID string
-	Org      string
-	Repo     string
-	Active   bool
+	ID           string  `json:"id"`
+	TenantID     string  `json:"tenant_id"`
+	Org          string  `json:"org"`
+	Repo         string  `json:"repo"`
+	Active       bool    `json:"active"`
+	LastImportAt *string `json:"last_import_at"`
 }
 
 // OrgRepo is a simple org/repo pair.
@@ -57,8 +58,10 @@ const addTenantRepoSQL = `
 	ON CONFLICT (tenant_id, org, repo) DO UPDATE SET active = TRUE`
 
 const listTenantReposSQL = `
-	SELECT id, tenant_id, org, repo, active
-	FROM tenant_repo WHERE tenant_id = $1 AND active = TRUE ORDER BY org, repo`
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, tr.active, rm.last_import_at
+	FROM tenant_repo tr
+	LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
+	WHERE tr.tenant_id = $1 AND tr.active = TRUE ORDER BY tr.org, tr.repo`
 
 const deactivateTenantRepoSQL = `
 	UPDATE tenant_repo SET active = FALSE WHERE tenant_id = $1 AND org = $2 AND repo = $3`
@@ -146,7 +149,7 @@ func ListTenantRepos(db *sql.DB, tenantID string) ([]TenantRepo, error) {
 	var result []TenantRepo
 	for rows.Next() {
 		var r TenantRepo
-		if err := rows.Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo, &r.Active); err != nil {
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo, &r.Active, &r.LastImportAt); err != nil {
 			return nil, fmt.Errorf("scanning repo: %w", err)
 		}
 		result = append(result, r)

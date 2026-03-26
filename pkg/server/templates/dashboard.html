@@ -36,10 +36,16 @@
           trackedEl.innerHTML = '<p>No repos tracked yet. Search above to add one.</p>';
           return;
         }
-        const items = repos.map(r =>
-          '<li>' + esc(r.Org) + '/' + esc(r.Repo) +
-          ' <button onclick="removeRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">Remove</button></li>'
-        ).join('');
+        const items = repos.map(r => {
+          let status = '<em>Pending import</em>';
+          if (r.last_import_at) {
+            const d = new Date(r.last_import_at);
+            status = isNaN(d.getTime()) ? esc(r.last_import_at) : d.toLocaleString();
+          }
+          return '<li>' + esc(r.Org) + '/' + esc(r.Repo) +
+            ' <span style="color:#666;font-size:0.9em">(' + status + ')</span>' +
+            ' <button onclick="removeRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">Remove</button></li>';
+        }).join('');
         trackedEl.innerHTML = '<ul>' + items + '</ul>';
       })
       .catch(() => { trackedEl.innerHTML = '<p>Failed to load repos.</p>'; });
