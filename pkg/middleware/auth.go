@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
@@ -13,14 +15,24 @@ type contextKey string
 
 const tenantContextKey contextKey = "tenant"
 
-const sessionCookieName = "__Host-session"
+func isSecure() bool {
+	return strings.HasPrefix(os.Getenv("BASE_URL"), "https://")
+}
+
+// SessionCookieName returns the session cookie name based on the BASE_URL scheme.
+func SessionCookieName() string {
+	if isSecure() {
+		return "__Host-session"
+	}
+	return "session"
+}
 
 // RequireAuth validates the session cookie and injects the tenant into context.
 // Redirects to loginURL if no valid session is found.
 func RequireAuth(db *sql.DB, loginURL string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(sessionCookieName)
+			cookie, err := r.Cookie(SessionCookieName())
 			if err != nil {
 				http.Redirect(w, r, loginURL, http.StatusFound)
 				return
@@ -50,14 +62,19 @@ func TenantFromContext(ctx context.Context) *tenant.Tenant {
 
 // SetSessionCookie sets the session cookie with security attributes.
 func SetSessionCookie(w http.ResponseWriter, token string, maxAge int) {
+	secure := isSecure()
+	sameSite := http.SameSiteStrictMode
+	if !secure {
+		sameSite = http.SameSiteLaxMode
+	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     SessionCookieName(),
 		Value:    token,
 		Path:     "/",
 		MaxAge:   maxAge,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 	})
 }
 

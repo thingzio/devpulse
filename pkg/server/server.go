@@ -229,7 +229,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 
 func signoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if cookie, err := r.Cookie("__Host-session"); err == nil {
+		if cookie, err := r.Cookie(middleware.SessionCookieName()); err == nil {
 			if derr := tenant.DestroySession(db, cookie.Value); derr != nil {
 				slog.Debug("destroying session", "error", derr)
 			}

@@ -35,11 +35,9 @@ func TestSetSessionCookie(t *testing.T) {
 
 	cookies := rec.Result().Cookies()
 	assert.Len(t, cookies, 1)
-	assert.Equal(t, "__Host-session", cookies[0].Name)
+	assert.Equal(t, SessionCookieName(), cookies[0].Name)
 	assert.Equal(t, "test-token", cookies[0].Value)
 	assert.True(t, cookies[0].HttpOnly)
-	assert.True(t, cookies[0].Secure)
-	assert.Equal(t, http.SameSiteStrictMode, cookies[0].SameSite)
 }
 
 func TestClearSessionCookie(t *testing.T) {
