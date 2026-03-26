@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/subtle"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +21,11 @@ import (
 	"github.com/thingzio/devpulse/pkg/oauth"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
+
+//go:embed templates/*.html
+var templateFS embed.FS
+
+var templates = template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/*.html"))
 
 const (
 	sessionTTL              = 7 * 24 * time.Hour
@@ -91,6 +98,8 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 	}
 
 	// Authenticated routes
+	mux.Handle("GET /tos", wrap(tosPageHandler()))
+	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
 	mux.Handle("GET /dashboard", wrap(dashboardHandler()))
 	mux.Handle("POST /auth/signout", wrap(signoutHandler(db)))
 
@@ -102,12 +111,22 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 	return mux
 }
 
+func renderTemplate(w http.ResponseWriter, name string, data any) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := templates.ExecuteTemplate(w, name, data); err != nil {
+		slog.Error("rendering template", "name", name, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+type pageData struct {
+	Title    string
+	Username string
+}
+
 func landingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>DevPulse</title></head>
-<body><h1>DevPulse</h1><p>GitHub project analytics.</p>
-<a href="/auth/github">Sign in with GitHub</a></body></html>`)
+		renderTemplate(w, "landing.html", pageData{Title: "Home"})
 	}
 }
 
@@ -118,12 +137,10 @@ func dashboardHandler() http.HandlerFunc {
 			http.Redirect(w, r, "/auth/github", http.StatusFound)
 			return
 		}
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>DevPulse Dashboard</title></head>
-<body><h1>Dashboard</h1><p>Welcome, %s</p>
-<a href="/api/repos">Your repos</a> |
-<form method="POST" action="/auth/signout" style="display:inline"><button>Sign out</button></form>
-</body></html>`, tn.Username)
+		renderTemplate(w, "dashboard.html", pageData{
+			Title:    "Dashboard",
+			Username: tn.Username,
+		})
 	}
 }
 
@@ -205,6 +222,29 @@ func signoutHandler(db *sql.DB) http.HandlerFunc {
 		}
 		middleware.ClearSessionCookie(w)
 		http.Redirect(w, r, "/", http.StatusFound)
+	}
+}
+
+func tosPageHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		renderTemplate(w, "tos.html", pageData{Title: "Terms of Service"})
+	}
+}
+
+func tosAcceptHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if err := tenant.AcceptToS(db, tn.ID); err != nil {
+			slog.Error("accepting tos", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		slog.Info("tos accepted", "tenant_id", tn.ID, "username", tn.Username)
+		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	}
 }
 

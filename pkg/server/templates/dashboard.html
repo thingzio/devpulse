@@ -1,0 +1,8 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+<p>Welcome, {{.Username}}</p>
+<a href="/api/repos">Your repos</a> |
+<form method="POST" action="/auth/signout" style="display:inline">
+<button>Sign out</button>
+</form>
+{{end}}
