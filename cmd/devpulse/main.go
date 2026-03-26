@@ -38,12 +38,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	db := store.DB()
-
 	if os.Getenv("PORT") != "" {
-		err = server.Run(ctx, db)
+		err = server.Run(ctx, store.DB())
 	} else {
-		err = importer.Run(ctx, db)
+		err = importer.Run(ctx, store.DB(), store)
 	}
 
 	store.Close()
