@@ -3,7 +3,8 @@ version: 2
 project_name: devpulse
 
 builds:
-  - binary: "{{.ProjectName}}"
+  - id: devpulse
+    binary: "{{.ProjectName}}"
     dir: ./cmd/devpulse
     env:
       - CGO_ENABLED=0
@@ -22,9 +23,27 @@ builds:
       - amd64
       - arm64
 
+  - id: devpulse-cloud
+    binary: devpulse-cloud
+    dir: ./cmd/devpulse-cloud
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+        -X main.version={{.Version}}
+        -X main.commit={{.ShortCommit}}
+        -X main.date={{.CommitDate}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
 release:
   github:
-    owner: mchmarny
+    owner: thingzio
     name: devpulse
   prerelease: auto
   draft: true
@@ -33,7 +52,20 @@ kos:
   - id: devpulse
     build: devpulse
     repositories:
-      - ghcr.io/mchmarny/devpulse
+      - ghcr.io/thingzio/devpulse
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - latest
+      - "{{.Tag}}"
+    preserve_import_paths: false
+    bare: true
+
+  - id: devpulse-cloud
+    build: devpulse-cloud
+    repositories:
+      - ghcr.io/thingzio/devpulse-cloud
     platforms:
       - linux/amd64
       - linux/arm64
@@ -108,7 +140,7 @@ brews:
       email: github-actions@github.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
     directory: Formula
-    homepage: "https://github.com/mchmarny/devpulse"
+    homepage: "https://github.com/thingzio/devpulse"
     description: "Community health analytics for GitHub organizations and repositories"
     license: "Apache-2.0"
     install: |
