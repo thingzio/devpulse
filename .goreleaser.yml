@@ -1,0 +1,117 @@
+version: 2
+
+project_name: devpulse
+
+builds:
+  - binary: "{{.ProjectName}}"
+    dir: ./cmd/devpulse
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+        -X github.com/mchmarny/devpulse/pkg/cli.version={{.Version}}
+        -X github.com/mchmarny/devpulse/pkg/cli.commit={{.ShortCommit}}
+        -X github.com/mchmarny/devpulse/pkg/cli.date={{.CommitDate}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+release:
+  github:
+    owner: mchmarny
+    name: devpulse
+  prerelease: auto
+  draft: true
+
+kos:
+  - id: devpulse
+    build: devpulse
+    repositories:
+      - ghcr.io/mchmarny/devpulse
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - latest
+      - "{{.Tag}}"
+    preserve_import_paths: false
+    bare: true
+
+archives:
+  - id: tar
+    formats:
+      - tar.gz
+    name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+  - id: bin
+    formats:
+      - binary
+    name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+
+checksum:
+  name_template: "checksums-sha256.txt"
+
+sboms:
+  - artifacts: binary
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+
+report_sizes: true
+
+snapshot:
+  version_template: "{{.Tag}}-next"
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^build:"
+      - "^ci:"
+      - "^style:"
+      - typo
+      - readme
+
+brews:
+  - ids:
+      - tar
+    repository:
+      owner: mchmarny
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: github-actions
+      email: github-actions@github.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/mchmarny/devpulse"
+    description: "Community health analytics for GitHub organizations and repositories"
+    license: "Apache-2.0"
+    install: |
+      bin.install "devpulse"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/devpulse version")

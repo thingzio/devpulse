@@ -1,0 +1,69 @@
+name: 'Setup Build Tools'
+description: 'Install build and release tools (ko, syft, cosign, goreleaser)'
+
+inputs:
+  install_ko:
+    description: 'Install ko (true/false)'
+    required: false
+    default: 'true'
+  ko_version:
+    description: 'ko version (e.g. v0.18.0)'
+    required: false
+    default: 'v0.18.0'
+  install_syft:
+    description: 'Install syft (true/false)'
+    required: false
+    default: 'true'
+  install_cosign:
+    description: 'Install cosign (true/false)'
+    required: false
+    default: 'true'
+  install_goreleaser:
+    description: 'Install goreleaser (true/false)'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install ko
+      if: inputs.install_ko == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        KO_VERSION="${{ inputs.ko_version }}"
+        KO_VERSION="${KO_VERSION#v}"
+        KO_BASE="https://github.com/ko-build/ko/releases/download/v${KO_VERSION}"
+        KO_OS="$(uname -s)"
+        KO_ARCH="$(uname -m)"
+        KO_TAR="ko_${KO_VERSION}_${KO_OS}_${KO_ARCH}.tar.gz"
+        KO_TMP="$(mktemp -d)"
+        curl -fsSL -o "${KO_TMP}/${KO_TAR}" "${KO_BASE}/${KO_TAR}"
+        # NOTE: checksums.txt is fetched from the same release; a compromised
+        # release could serve a matching pair. ko does not publish signed checksums.
+        curl -fsSL -o "${KO_TMP}/checksums.txt" "${KO_BASE}/checksums.txt"
+        EXPECTED=$(grep "${KO_TAR}" "${KO_TMP}/checksums.txt" | head -1 | awk '{print $1}')
+        ACTUAL=$(sha256sum "${KO_TMP}/${KO_TAR}" | awk '{print $1}')
+        if [[ "${ACTUAL}" != "${EXPECTED}" ]]; then
+          echo "::error::ko checksum mismatch: expected ${EXPECTED}, got ${ACTUAL}"
+          exit 1
+        fi
+        tar -xzf "${KO_TMP}/${KO_TAR}" -C "${KO_TMP}"
+        sudo mv "$KO_TMP/ko" /usr/local/bin/ko
+        sudo chmod +x /usr/local/bin/ko
+        rm -rf "$KO_TMP"
+        echo "ko installed: $(ko version)"
+
+    - name: Install Syft
+      if: inputs.install_syft == 'true'
+      uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+
+    - name: Install Cosign
+      if: inputs.install_cosign == 'true'
+      uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
+
+    - name: Install GoReleaser
+      if: inputs.install_goreleaser == 'true'
+      uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29  # v7.0.0
+      with:
+        install-only: true

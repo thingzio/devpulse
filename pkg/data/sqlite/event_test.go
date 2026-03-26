@@ -1,0 +1,72 @@
+package sqlite
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestUnique(t *testing.T) {
+	tests := []struct {
+		input    []string
+		expected int
+	}{
+		{[]string{"@a", "@b", "@a"}, 2},
+		{[]string{" x ", "@y"}, 2},
+		{[]string{}, 0},
+		{nil, 0},
+	}
+	for _, tc := range tests {
+		result := unique(tc.input)
+		assert.Len(t, result, tc.expected)
+	}
+}
+
+func TestIsEventBatchValidAge(t *testing.T) {
+	minTime := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	imp := &eventImporter{minEventTime: minTime}
+
+	recent := time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC)
+	old := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	assert.True(t, imp.isEventBatchValidAge(&recent, &recent))
+	assert.True(t, imp.isEventBatchValidAge(&recent, &old))
+	assert.False(t, imp.isEventBatchValidAge(&old, &old))
+	assert.False(t, imp.isEventBatchValidAge(nil, nil))
+}
+
+func TestQualifyTypeKey(t *testing.T) {
+	imp := &eventImporter{owner: "org", repo: "repo"}
+	assert.Equal(t, "org/repo/pr", imp.qualifyTypeKey("pr"))
+}
+
+func TestTimestampToTime_Nil(t *testing.T) {
+	assert.Nil(t, timestampToTime(nil))
+}
+
+func TestGetStrPtr(t *testing.T) {
+	assert.Nil(t, getStrPtr(""))
+	ptr := getStrPtr("hello")
+	assert.NotNil(t, ptr)
+	assert.Equal(t, "hello", *ptr)
+}
+
+func TestParseIssueNumberFromURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want int
+	}{
+		{"valid", "https://github.com/org/repo/issues/123#issuecomment-456", 123},
+		{"no_fragment", "https://github.com/org/repo/issues/42", 42},
+		{"pull_url", "https://github.com/org/repo/pull/99#issuecomment-789", 0},
+		{"empty", "", 0},
+		{"no_issues_segment", "https://github.com/org/repo/discussions/5", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, parseIssueNumberFromURL(tt.url))
+		})
+	}
+}

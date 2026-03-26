@@ -1,0 +1,25 @@
+# Scores PR author reputation using mchmarny/reputer action.
+name: reputation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reputation:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: mchmarny/reputer@2f59fb7cb3a64dc2f6653b7a76cc9ba644bdfed0  # v0.5.1
+        with:
+          trusted-orgs: |
+            mchmarny
