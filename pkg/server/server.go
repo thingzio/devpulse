@@ -136,8 +136,9 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 }
 
 type pageData struct {
-	Title    string
-	Username string
+	Title        string
+	Username     string
+	GitHubAppURL string
 }
 
 func landingHandler() http.HandlerFunc {
@@ -153,9 +154,11 @@ func dashboardHandler() http.HandlerFunc {
 			http.Redirect(w, r, "/auth/github", http.StatusFound)
 			return
 		}
+		appURL := os.Getenv("GITHUB_APP_URL")
 		renderTemplate(w, "dashboard.html", pageData{
-			Title:    "Dashboard",
-			Username: tn.Username,
+			Title:        "Dashboard",
+			Username:     tn.Username,
+			GitHubAppURL: appURL,
 		})
 	}
 }

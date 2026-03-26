@@ -9,29 +9,30 @@
 <h2>Tracked Repos</h2>
 <div id="tracked-repos"><em>Loading...</em></div>
 
-<h2>Add Repos</h2>
-<div style="position:relative">
-  <input type="text" id="repo-search" placeholder="Search available repos..." autocomplete="off" style="width:100%;max-width:400px;padding:6px">
-  <div id="search-results" style="position:absolute;background:#fff;border:1px solid #ccc;max-height:200px;overflow-y:auto;width:400px;display:none;z-index:10"></div>
-</div>
-<p id="search-status"></p>
+<h2>Add Repo</h2>
+<form id="add-repo-form" style="display:flex;gap:8px;align-items:center;max-width:500px">
+  <input type="text" id="repo-input" placeholder="org/repo (e.g. kubernetes/kubernetes)" autocomplete="off" style="flex:1;padding:6px" required>
+  <button type="submit">Add</button>
+</form>
+<p id="add-status"></p>
 
-<p><a href="https://github.com/apps/devpulse/installations/new" target="_blank">Connect more repos via GitHub App &rarr;</a></p>
+{{if .GitHubAppURL}}
+<p><a href="{{.GitHubAppURL}}" target="_blank">Connect more repos via GitHub App &rarr;</a></p>
+{{end}}
 
 <script>
 (function() {
   const trackedEl = document.getElementById('tracked-repos');
-  const searchEl = document.getElementById('repo-search');
-  const resultsEl = document.getElementById('search-results');
-  const statusEl = document.getElementById('search-status');
-  let debounceTimer;
+  const formEl = document.getElementById('add-repo-form');
+  const inputEl = document.getElementById('repo-input');
+  const statusEl = document.getElementById('add-status');
 
   function loadTracked() {
     fetch('/api/repos')
       .then(r => r.json())
       .then(repos => {
         if (!repos || repos.length === 0) {
-          trackedEl.innerHTML = '<p>No repos tracked yet. Search below or connect repos via GitHub App.</p>';
+          trackedEl.innerHTML = '<p>No repos tracked yet. Add one above.</p>';
           return;
         }
         const items = repos.map(r =>
@@ -48,52 +49,25 @@
       .then(r => { if (r.ok) loadTracked(); });
   };
 
-  window.addRepo = function(org, repo) {
-    const body = new URLSearchParams({org: org, repo: repo});
+  formEl.addEventListener('submit', function(e) {
+    e.preventDefault();
+    statusEl.textContent = '';
+    const val = inputEl.value.trim();
+    const parts = val.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      statusEl.textContent = 'Format: org/repo';
+      return;
+    }
+    const body = new URLSearchParams({org: parts[0], repo: parts[1]});
     fetch('/api/repos', {method:'POST', body: body})
       .then(r => {
         if (r.ok) {
           loadTracked();
-          searchEl.value = '';
-          resultsEl.style.display = 'none';
+          inputEl.value = '';
         } else {
           r.text().then(t => { statusEl.textContent = t; });
         }
       });
-  };
-
-  searchEl.addEventListener('input', function() {
-    clearTimeout(debounceTimer);
-    const q = searchEl.value.trim();
-    if (q.length < 2) {
-      resultsEl.style.display = 'none';
-      return;
-    }
-    debounceTimer = setTimeout(function() {
-      fetch('/api/repos/available?q=' + encodeURIComponent(q))
-        .then(r => r.json())
-        .then(repos => {
-          if (!repos || repos.length === 0) {
-            resultsEl.innerHTML = '<div style="padding:6px">No repos found</div>';
-            resultsEl.style.display = 'block';
-            return;
-          }
-          const items = repos.map(r =>
-            '<div style="padding:6px;cursor:pointer;border-bottom:1px solid #eee" onclick="addRepo(\'' +
-            esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">' +
-            esc(r.Org) + '/' + esc(r.Repo) + '</div>'
-          ).join('');
-          resultsEl.innerHTML = items;
-          resultsEl.style.display = 'block';
-        })
-        .catch(() => { resultsEl.style.display = 'none'; });
-    }, 300);
-  });
-
-  document.addEventListener('click', function(e) {
-    if (!resultsEl.contains(e.target) && e.target !== searchEl) {
-      resultsEl.style.display = 'none';
-    }
   });
 
   function esc(s) {
