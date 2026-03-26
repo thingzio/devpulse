@@ -1516,12 +1516,18 @@ function loadRepoOverview(url) {
         }
         $.each(data, function (i, r) {
             var name = r.org + '/' + r.repo;
-            var $link = $('<a href="#"></a>').text(name).on('click', function (e) {
-                e.preventDefault();
-                applySelection('repo', { value: name, label: name });
-            });
+            var $nameCell = $('<td></td>');
+            if (r.last_import) {
+                var $link = $('<a href="#"></a>').text(name).on('click', function (e) {
+                    e.preventDefault();
+                    applySelection('repo', { value: name, label: name });
+                });
+                $nameCell.append($link);
+            } else {
+                $nameCell.text(name).css('color', 'var(--gray)');
+            }
             var $row = $('<tr></tr>');
-            $row.append($('<td></td>').append($link));
+            $row.append($nameCell);
             $row.append($('<td class="num"></td>').text(r.stars.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.forks.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.open_issues.toLocaleString()));
