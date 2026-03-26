@@ -86,6 +86,27 @@ e2e: ## Runs end-to-end tests
 qualify: test-coverage lint vulncheck e2e ## Qualifies the codebase (test, lint, vulncheck, e2e)
 	@echo "Codebase qualification completed"
 
+DEV_DB := postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable
+
+# =============================================================================
+# Local Development
+# =============================================================================
+
+.PHONY: up
+up: ## Starts local Postgres (docker compose)
+	docker compose up -d
+	@echo "Waiting for Postgres..."
+	@until docker compose exec -T db pg_isready -U devpulse >/dev/null 2>&1; do sleep 1; done
+	@echo "Postgres ready: $(DEV_DB)"
+
+.PHONY: down
+down: ## Stops local Postgres
+	docker compose down
+
+.PHONY: db
+db: ## Opens psql shell to local Postgres
+	psql "$(DEV_DB)"
+
 # =============================================================================
 # Build & Release
 # =============================================================================
@@ -101,12 +122,12 @@ release: ## Runs the full release process with goreleaser
 	goreleaser release --snapshot --clean --timeout $(BUILD_TIMEOUT)
 
 .PHONY: server
-server: ## Starts local dev server (requires DATABASE_URL)
-	PORT=8080 DEVPULSE_DEBUG=true go run ./cmd/devpulse
+server: ## Starts local dev server
+	DATABASE_URL="$(DEV_DB)" PORT=8080 DEVPULSE_DEBUG=true go run ./cmd/devpulse
 
 .PHONY: import
-import: ## Runs local import worker (requires DATABASE_URL)
-	DEVPULSE_DEBUG=true go run ./cmd/devpulse
+import: ## Runs local import worker
+	DATABASE_URL="$(DEV_DB)" DEVPULSE_DEBUG=true go run ./cmd/devpulse
 
 .PHONY: bump-major
 bump-major: ## Bumps major version (1.2.3 → 2.0.0)
