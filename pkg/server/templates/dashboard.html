@@ -6,12 +6,12 @@
   </form>
 </p>
 
-<h2>Tracked Repos</h2>
-<div id="tracked-repos"><em>Loading...</em></div>
+<h2>Repository Overview</h2>
+<div id="repo-overview"><em>Loading...</em></div>
 
 <h2>Add Repos</h2>
 <div style="position:relative;max-width:500px">
-  <input type="text" id="repo-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/airc)..." autocomplete="off" style="width:100%;padding:6px;box-sizing:border-box">
+  <input type="text" id="repo-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/aicr)..." autocomplete="off" style="width:100%;padding:6px;box-sizing:border-box">
   <div id="search-results" style="position:absolute;background:#fff;border:1px solid #ccc;max-height:250px;overflow-y:auto;width:100%;display:none;z-index:10"></div>
 </div>
 <p id="search-status" style="color:#666;font-size:0.9em"></p>
@@ -22,38 +22,61 @@
 
 <script>
 (function() {
-  const trackedEl = document.getElementById('tracked-repos');
+  const overviewEl = document.getElementById('repo-overview');
   const searchEl = document.getElementById('repo-search');
   const resultsEl = document.getElementById('search-results');
   const statusEl = document.getElementById('search-status');
   let debounceTimer;
 
-  function loadTracked() {
-    fetch('/api/repos')
+  function loadOverview() {
+    fetch('/api/repos/overview')
       .then(r => r.json())
       .then(repos => {
         if (!repos || repos.length === 0) {
-          trackedEl.innerHTML = '<p>No repos tracked yet. Search above to add one.</p>';
+          overviewEl.innerHTML = '<p>No repos tracked yet. Search below to add one.</p>';
           return;
         }
-        const items = repos.map(r => {
-          let status = '<em>Pending import</em>';
-          if (r.last_import_at) {
-            const d = new Date(r.last_import_at);
-            status = isNaN(d.getTime()) ? esc(r.last_import_at) : d.toLocaleString();
-          }
-          return '<li>' + esc(r.Org) + '/' + esc(r.Repo) +
-            ' <span style="color:#666;font-size:0.9em">(' + status + ')</span>' +
-            ' <button onclick="removeRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">Remove</button></li>';
-        }).join('');
-        trackedEl.innerHTML = '<ul>' + items + '</ul>';
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em">';
+        html += '<tr style="border-bottom:2px solid #ccc;text-align:left">' +
+          '<th style="padding:6px">Repository</th>' +
+          '<th style="padding:6px;text-align:right">Stars</th>' +
+          '<th style="padding:6px;text-align:right">Forks</th>' +
+          '<th style="padding:6px;text-align:right">Issues</th>' +
+          '<th style="padding:6px;text-align:right">Events</th>' +
+          '<th style="padding:6px;text-align:right">Contributors</th>' +
+          '<th style="padding:6px;text-align:right">Scored</th>' +
+          '<th style="padding:6px">Language</th>' +
+          '<th style="padding:6px">License</th>' +
+          '<th style="padding:6px">Last Import</th>' +
+          '<th style="padding:6px"></th></tr>';
+        repos.forEach(r => {
+          const imported = r.last_import
+            ? new Date(r.last_import).toLocaleDateString()
+            : '<em>Pending</em>';
+          const scored = r.scored > 0 ? r.scored + '/' + r.contributors : '';
+          html += '<tr style="border-bottom:1px solid #eee">' +
+            '<td style="padding:6px">' + esc(r.org) + '/' + esc(r.repo) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + num(r.stars) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + num(r.forks) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + num(r.open_issues) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + num(r.events) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + num(r.contributors) + '</td>' +
+            '<td style="padding:6px;text-align:right">' + scored + '</td>' +
+            '<td style="padding:6px">' + esc(r.language) + '</td>' +
+            '<td style="padding:6px">' + esc(r.license) + '</td>' +
+            '<td style="padding:6px">' + imported + '</td>' +
+            '<td style="padding:6px"><button onclick="removeRepo(\'' +
+              esc(r.org) + '\',\'' + esc(r.repo) + '\')">Remove</button></td></tr>';
+        });
+        html += '</table>';
+        overviewEl.innerHTML = html;
       })
-      .catch(() => { trackedEl.innerHTML = '<p>Failed to load repos.</p>'; });
+      .catch(() => { overviewEl.innerHTML = '<p>Failed to load repos.</p>'; });
   }
 
   window.removeRepo = function(org, repo) {
     fetch('/api/repos/' + encodeURIComponent(org) + '/' + encodeURIComponent(repo), {method:'DELETE'})
-      .then(r => { if (r.ok) loadTracked(); });
+      .then(r => { if (r.ok) loadOverview(); });
   };
 
   window.addRepo = function(org, repo) {
@@ -62,7 +85,7 @@
     fetch('/api/repos', {method:'POST', body: body})
       .then(r => {
         if (r.ok) {
-          loadTracked();
+          loadOverview();
           searchEl.value = '';
           resultsEl.style.display = 'none';
           statusEl.textContent = '';
@@ -113,13 +136,14 @@
     }
   });
 
+  function num(n) { return (n || 0).toLocaleString(); }
   function esc(s) {
     const d = document.createElement('div');
-    d.textContent = s;
+    d.textContent = s || '';
     return d.innerHTML;
   }
 
-  loadTracked();
+  loadOverview();
 })();
 </script>
 {{end}}

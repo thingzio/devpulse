@@ -115,6 +115,7 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 
 	// Tenant management API
 	mux.Handle("GET /api/repos", wrap(listReposHandler(db)))
+	mux.Handle("GET /api/repos/overview", wrap(repoOverviewHandler(db)))
 	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
@@ -320,6 +321,23 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		overview, err := tenant.GetRepoOverview(db, tn.ID, 6)
+		if err != nil {
+			slog.Error("getting repo overview", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, overview)
 	}
 }
 
