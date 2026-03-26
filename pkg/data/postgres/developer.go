@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/data/ghutil"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
 )
 
 const (

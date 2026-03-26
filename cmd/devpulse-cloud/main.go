@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mchmarny/devpulse/pkg/data/postgres"
-	"github.com/mchmarny/devpulse/pkg/logging"
+	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/logging"
 	urfave "github.com/urfave/cli/v3"
 )
 

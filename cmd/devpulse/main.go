@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mchmarny/devpulse/pkg/cli"
+import "github.com/thingzio/devpulse/pkg/cli"
 
 func main() {
 	cli.Execute()

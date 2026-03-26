@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/urfave/cli/v3"
 )
 

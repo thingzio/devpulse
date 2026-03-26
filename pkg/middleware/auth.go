@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/mchmarny/devpulse/pkg/tenant"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 type contextKey string

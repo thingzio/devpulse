@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mchmarny/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data"
 	_ "modernc.org/sqlite"
 )
 

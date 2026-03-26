@@ -13,10 +13,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/data/postgres"
-	"github.com/mchmarny/devpulse/pkg/data/sqlite"
-	"github.com/mchmarny/devpulse/pkg/logging"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/data/sqlite"
+	"github.com/thingzio/devpulse/pkg/logging"
 	urfave "github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )

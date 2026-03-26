@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/go-github/v83/github"
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/data/ghutil"
-	"github.com/mchmarny/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const (

@@ -1,45 +1,46 @@
 # Architecture
 
-`devpulse` is a Go CLI that imports GitHub contribution data into a SQLite or PostgreSQL database and serves a browser-based analytics dashboard. Backend is selected by the `--db` flag: file path → SQLite (default), `postgres://` URI → PostgreSQL.
+Multi-tenant SaaS for GitHub project health analytics. Two binaries from one repo: `devpulse` (CLI) and `devpulse-cloud` (SaaS server + import worker). Data stored in SQLite (CLI) or PostgreSQL (SaaS, with RLS for tenant isolation).
 
 ## High-Level Data Flow
 
 ```
-GitHub API ──→ devpulse import ──→ SQLite (~/.devpulse/data.db) or PostgreSQL
-                                       │
-CNCF gitdm ──→ affiliations ──────────┘
-                                       │
-                                       ├──→ devpulse server ──→ localhost:8080 (Chart.js dashboard)
-                                       ├──→ devpulse query  ──→ JSON (stdout)
-                                       ├──→ devpulse score  ──→ GitHub API (deep reputation)
-                                       └──→ devpulse sync   ──→ scheduled import + score (round-robin)
+CLI mode:
+  GitHub API ──→ devpulse import ──→ SQLite/PostgreSQL ──→ devpulse server ──→ dashboard
+
+SaaS mode:
+  GitHub App webhook ──→ devpulse-cloud serve ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
+  Cloud Scheduler ──→ devpulse-cloud import ──→ per-tenant GitHub App tokens ──→ PostgreSQL
+  Browser ──→ devpulse-cloud serve ──→ OAuth ──→ RLS-scoped dashboard
 ```
 
 ## Directory Structure
 
 ```
 devpulse/
-├── cmd/devpulse/       Main entrypoint (thin wrapper, delegates to pkg/cli)
+├── cmd/devpulse/           CLI entrypoint (delegates to pkg/cli)
+├── cmd/devpulse-cloud/     SaaS entrypoint (serve, import subcommands)
 ├── pkg/
-│   ├── cli/            CLI commands, HTTP handlers, templates, static assets
-│   │   ├── assets/     Frontend: CSS, JS, images (embedded via go:embed)
-│   │   └── templates/  HTML templates: header, home (tabbed dashboard), footer
-│   ├── data/           Store interface, shared types, helpers
-│   │   │               includes insights_gen.go (LLM-based insight generation)
-│   │   ├── sqlite/     SQLite Store implementation + migrations
-│   │   │               includes repo_insights.go
-│   │   ├── postgres/   PostgreSQL Store implementation + migrations
-│   │   │               includes repo_insights.go
-│   │   └── ghutil/     Shared GitHub API helpers (rate limiting, user mapping)
-│   ├── auth/           GitHub OAuth device flow + OS keychain token storage
-│   ├── logging/        Structured logging setup (slog)
-│   └── net/            HTTP client utilities with rate limit handling
-├── config/             Sync config files (YAML, org/repo lists)
-├── infra/gcp/          Terraform for GCP infrastructure
-├── tools/              Dev scripts (version bump, shared helpers)
-├── docs/               Documentation
-├── .github/            CI/CD workflows and composite actions
-└── .settings.yaml      Centralized tool versions and quality thresholds
+│   ├── cli/                CLI commands, HTTP handlers, templates, static assets
+│   │   ├── assets/         Frontend: CSS, JS, images (embedded via go:embed)
+│   │   └── templates/      HTML templates: header, home (tabbed dashboard), footer
+│   ├── data/               Store interface, shared types, helpers
+│   │   ├── sqlite/         SQLite Store implementation + migrations
+│   │   ├── postgres/       PostgreSQL Store implementation + migrations
+│   │   └── ghutil/         Shared GitHub API helpers (rate limiting, user mapping)
+│   ├── tenant/             Tenant CRUD, sessions, GitHub App JWT, installations
+│   ├── middleware/         Auth middleware, tenant scope injection (RLS)
+│   ├── oauth/              GitHub OAuth web flow (SaaS sign-in)
+│   ├── auth/               GitHub OAuth device flow + OS keychain (CLI only)
+│   ├── logging/            Structured logging setup (slog)
+│   └── net/                HTTP client utilities with rate limit handling
+├── config/                 Sync config files (YAML, org/repo lists)
+├── infra/gcp/              Terraform for self-hosted GCP infrastructure
+├── infra/saas/             Terraform for SaaS GCP infrastructure
+├── tools/                  Dev scripts (version bump, shared helpers)
+├── docs/                   Documentation
+├── .github/                CI/CD workflows and composite actions
+└── .settings.yaml          Centralized tool versions and quality thresholds
 ```
 
 ## CLI Commands
@@ -170,7 +171,8 @@ GitHub Actions workflows in `.github/workflows/`:
 |----------|---------|---------|
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
-| `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, cosign signing, SBOM, attestations, Homebrew tap, Cloud Run deploy |
+| `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
+| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse-cloud to SaaS Cloud Run |
 | `codeql-analysis.yaml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 | `scan-on-schedule.yaml` | schedule | Vulnerability scanning |
 | `score-on-schedule.yaml` | schedule | Scheduled reputation scoring |
@@ -178,10 +180,7 @@ GitHub Actions workflows in `.github/workflows/`:
 
 ## Supply Chain Security
 
-Releases are built and signed in CI (GitHub Actions):
-- **Binary signing** — keyless Sigstore/cosign via GitHub OIDC
-- **Build provenance** — GitHub build attestations
-- **SBOM** — SPDX JSON generated by syft for each binary
+- **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`, `ghcr.io/thingzio/devpulse-cloud`)
 - **Vulnerability scanning** — govulncheck in CI, Trivy on schedule
 - **Dependency pinning** — all GitHub Actions pinned by commit hash
 

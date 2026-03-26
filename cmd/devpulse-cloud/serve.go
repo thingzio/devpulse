@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/middleware"
-	"github.com/mchmarny/devpulse/pkg/oauth"
-	"github.com/mchmarny/devpulse/pkg/tenant"
+	"github.com/thingzio/devpulse/pkg/middleware"
+	"github.com/thingzio/devpulse/pkg/oauth"
+	"github.com/thingzio/devpulse/pkg/tenant"
 	urfave "github.com/urfave/cli/v3"
 )
 

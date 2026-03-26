@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v83/github"
-	"github.com/mchmarny/devpulse/pkg/data/ghutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
 )
 
 func TestGetAllOrgRepos(t *testing.T) {

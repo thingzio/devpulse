@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/mchmarny/devpulse.git && cd devpulse
+git clone https://github.com/thingzio/devpulse.git && cd devpulse
 make tidy           # format code and vendor dependencies
 make test           # unit tests with race detector
 make lint           # go vet + golangci-lint + yamllint
@@ -99,7 +99,7 @@ This must pass before any PR is submitted.
 | `make bump-minor` | Bump minor version (0.10.1 → 0.11.0) and push tag |
 | `make bump-major` | Bump major version (0.10.1 → 1.0.0) and push tag |
 
-Pushing a version tag triggers the CI release workflow (goreleaser build, cosign signing, SBOM, attestations, Homebrew tap update).
+Pushing a version tag triggers the CI release workflow (goreleaser build, container image push, Cloud Run deploy).
 
 ### Maintenance
 

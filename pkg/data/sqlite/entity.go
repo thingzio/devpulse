@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/mchmarny/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 const (

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/data/ghutil"
-	pnet "github.com/mchmarny/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
+	pnet "github.com/thingzio/devpulse/pkg/net"
 	urfave "github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )

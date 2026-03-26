@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 func TestGetRepoMetricHistory_NilDB(t *testing.T) {

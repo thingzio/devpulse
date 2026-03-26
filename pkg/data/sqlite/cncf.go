@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const (

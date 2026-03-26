@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mchmarny/devpulse/pkg/tenant"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func webhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {

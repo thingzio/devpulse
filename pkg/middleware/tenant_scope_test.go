@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mchmarny/devpulse/pkg/tenant"
 	"github.com/stretchr/testify/assert"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func TestInjectTenantScope_NoTenant(t *testing.T) {

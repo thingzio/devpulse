@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/data/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/thingzio/devpulse/pkg/data/postgres"
 )
 
 var sharedDSN string

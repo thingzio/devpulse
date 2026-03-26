@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/mchmarny/devpulse/pkg/data"
-	"github.com/mchmarny/devpulse/pkg/data/ghutil"
-	"github.com/mchmarny/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
+	"github.com/thingzio/devpulse/pkg/net"
 	"github.com/urfave/cli/v3"
 )
 

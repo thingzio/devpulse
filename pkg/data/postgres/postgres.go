@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/mchmarny/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 // Compile-time check that Store implements data.Store.

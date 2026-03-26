@@ -12,7 +12,7 @@ import (
 	"log/slog"
 
 	"github.com/google/go-github/v83/github"
-	"github.com/mchmarny/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 var usernameRegEx = regexp.MustCompile(`@([A-Za-z0-9_]+)`)

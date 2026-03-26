@@ -20,14 +20,14 @@ This project follows a commitment to fostering an open and welcoming environment
 Before contributing:
 
 1. Read the [README.md](README.md) to understand the project
-2. Check existing [issues](https://github.com/mchmarny/devpulse/issues) to avoid duplicates
+2. Check existing [issues](https://github.com/thingzio/devpulse/issues) to avoid duplicates
 3. Set up your development environment following [DEVELOPMENT.md](DEVELOPMENT.md)
 
 ## How to Contribute
 
 ### Reporting Bugs
 
-- Use [GitHub Issues](https://github.com/mchmarny/devpulse/issues/new) to report bugs
+- Use [GitHub Issues](https://github.com/thingzio/devpulse/issues/new) to report bugs
 - Describe the issue clearly with steps to reproduce
 - Include system information (OS, Go version)
 - Attach logs or screenshots if applicable
@@ -35,7 +35,7 @@ Before contributing:
 
 ### Suggesting Enhancements
 
-- Open a [GitHub Issue](https://github.com/mchmarny/devpulse/issues/new) describing the feature
+- Open a [GitHub Issue](https://github.com/thingzio/devpulse/issues/new) describing the feature
 - Clearly describe the proposed feature and its use case
 - Explain how it benefits the project and users
 
@@ -88,7 +88,7 @@ Default to proven, simple technologies.
 
 Every released artifact carries verifiable proof of origin and build process.
 
-**What:** All releases include SBOM, Sigstore signatures, and GitHub attestations. Users can verify exactly which commit and workflow produced any binary.
+**What:** Container images are built in CI from pinned dependencies and pushed to GHCR. Vulnerability scanning runs on every push.
 
 **Why:** "Trust us" is not a security model.
 
@@ -121,7 +121,7 @@ Every released artifact carries verifiable proof of origin and build process.
 1. **Automated checks** run via GitHub Actions:
    - Go tests with race detector
    - golangci-lint
-   - Vulnerability scan (grype)
+   - Vulnerability scan (govulncheck)
 
 2. **Maintainer review** covers:
    - Correctness and functionality
@@ -178,7 +178,7 @@ Explain the problem being solved and why this approach was chosen.
 
 ### Getting Help
 
-- **GitHub Issues**: [Create an issue](https://github.com/mchmarny/devpulse/issues/new) with the "question" label
+- **GitHub Issues**: [Create an issue](https://github.com/thingzio/devpulse/issues/new) with the "question" label
 - **Existing Issues**: Search for similar questions first
 
 ## Additional Resources

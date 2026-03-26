@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mchmarny/devpulse/pkg/auth"
+	"github.com/thingzio/devpulse/pkg/auth"
 	"github.com/urfave/cli/v3"
 	"github.com/zalando/go-keyring"
 )

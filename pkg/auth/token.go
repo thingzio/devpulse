@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mchmarny/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const (

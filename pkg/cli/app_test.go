@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mchmarny/devpulse/pkg/data/sqlite"
+	"github.com/thingzio/devpulse/pkg/data/sqlite"
 )
 
 const (

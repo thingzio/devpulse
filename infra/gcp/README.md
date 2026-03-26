@@ -74,7 +74,7 @@ For other platforms see the [AlloyDB Auth Proxy releases](https://github.com/Goo
 
 ```shell
 gcloud run deploy devpulse \
-    --image us-docker.pkg.dev/${PROJECT_ID}/devpulse-remote/mchmarny/devpulse:latest \
+    --image us-docker.pkg.dev/${PROJECT_ID}/devpulse-remote/thingzio/devpulse:latest \
     --service-account $SERVICE_ACCOUNT \
     --set-secrets DEVPULSE_DB=devpulse-db:latest,GITHUB_TOKEN=devpulse-github-token:latest \
     --set-env-vars DEVPULSE_DEBUG=true,DEVPULSE_LOG_JSON=true \
@@ -88,9 +88,9 @@ gcloud run deploy devpulse \
 
 ```shell
 gcloud run jobs create devpulse-sync \
-    --image us-docker.pkg.dev/${PROJECT_ID}/devpulse-remote/mchmarny/devpulse:latest \
+    --image us-docker.pkg.dev/${PROJECT_ID}/devpulse-remote/thingzio/devpulse:latest \
     --command /ko-app/devpulse \
-    --args "sync,--config,https://raw.githubusercontent.com/mchmarny/devpulse/main/config/<config-name>.yaml" \
+    --args "sync,--config,https://raw.githubusercontent.com/thingzio/devpulse/main/config/<config-name>.yaml" \
     --service-account $SERVICE_ACCOUNT \
     --set-secrets DEVPULSE_DB=devpulse-db:latest,GITHUB_TOKEN=devpulse-github-token:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest \
     --set-env-vars DEVPULSE_DEBUG=true,DEVPULSE_LOG_JSON=true,ANTHROPIC_MODEL=claude-haiku-4-5-20251001 \

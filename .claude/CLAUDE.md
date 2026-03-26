@@ -153,7 +153,7 @@ GitHub Actions workflows in `.github/workflows/`:
 |----------|---------|---------|
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
-| `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, cosign signing, SBOM, attestations, Homebrew tap, AR copy, Cloud Run deploy |
+| `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse-cloud to Cloud Run |
 | `codeql-analysis.yml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 
@@ -161,8 +161,6 @@ GitHub Actions workflows in `.github/workflows/`:
 
 Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`, or `make bump-major` to tag and push.
 
-- **Build**: goreleaser v2 cross-compiles for darwin/linux/windows × amd64/arm64
-- **Signing**: cosign v3 keyless signing via Sigstore OIDC; produces `.sigstore.json` bundles (not separate .sig/.pem)
-- **SBOM**: syft generates SPDX JSON for each binary
-- **Attestations**: GitHub build provenance attestations via `actions/attest-build-provenance`
-- **Homebrew**: goreleaser pushes formula to `mchmarny/homebrew-tap` tap
+- **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
+- **Images**: pushed to `ghcr.io/thingzio/devpulse` and `ghcr.io/thingzio/devpulse-cloud`
+- **Deploy**: Cloud Run service + job updated via `deploy-saas.yaml` or `release-on-tag.yaml`
