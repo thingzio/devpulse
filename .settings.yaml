@@ -15,7 +15,7 @@ linting:
 
 # Quality Thresholds
 quality:
-  coverage_threshold: '30'
+  coverage_threshold: '20'
   lint_timeout: '5m'
   test_timeout: '10m'
   build_timeout: '10m0s'

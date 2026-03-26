@@ -154,10 +154,6 @@ go run ./cmd/devpulse server --debug --log-json
 
 ## Related Documentation
 
-- [README.md](README.md) — project overview and quick start
+- [README.md](README.md) — project overview
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture and design
-- [docs/IMPORT.md](docs/IMPORT.md) — import command details
-- [docs/SCORE.md](docs/SCORE.md) — reputation scoring
-- [docs/SERVER.md](docs/SERVER.md) — dashboard and server
-- [docs/QUERY.md](docs/QUERY.md) — CLI query interface

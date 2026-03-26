@@ -80,7 +80,7 @@ Design for partitions, timeouts, and bounded retries.
 
 Default to proven, simple technologies.
 
-**What:** SQLite for storage, `net/http` for the server, `log/slog` for logging. No frameworks, no ORMs, no unnecessary abstractions.
+**What:** PostgreSQL for storage, `net/http` for the server, `log/slog` for logging. No frameworks, no ORMs, no unnecessary abstractions.
 
 **Why:** Simplicity reduces bugs, makes debugging easier, and keeps the project accessible to new contributors.
 

@@ -12,24 +12,6 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-        -X github.com/thingzio/devpulse/pkg/cli.version={{.Version}}
-        -X github.com/thingzio/devpulse/pkg/cli.commit={{.ShortCommit}}
-        -X github.com/thingzio/devpulse/pkg/cli.date={{.CommitDate}}
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
-
-  - id: devpulse-cloud
-    binary: devpulse-cloud
-    dir: ./cmd/devpulse-cloud
-    env:
-      - CGO_ENABLED=0
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
         -X main.version={{.Version}}
         -X main.commit={{.ShortCommit}}
         -X main.date={{.CommitDate}}
@@ -51,19 +33,6 @@ kos:
     build: devpulse
     repositories:
       - ghcr.io/thingzio/devpulse
-    platforms:
-      - linux/amd64
-      - linux/arm64
-    tags:
-      - latest
-      - "{{.Tag}}"
-    preserve_import_paths: false
-    bare: true
-
-  - id: devpulse-cloud
-    build: devpulse-cloud
-    repositories:
-      - ghcr.io/thingzio/devpulse-cloud
     platforms:
       - linux/amd64
       - linux/arm64
@@ -99,4 +68,3 @@ changelog:
       - "^style:"
       - typo
       - readme
-

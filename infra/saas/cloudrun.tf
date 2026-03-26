@@ -12,7 +12,7 @@ resource "google_cloud_run_v2_service" "serve" {
     }
 
     containers {
-      image = "ghcr.io/thingzio/devpulse-cloud:latest"
+      image = "ghcr.io/thingzio/devpulse:latest"
       args  = ["serve"]
 
       env {
@@ -83,7 +83,7 @@ resource "google_cloud_run_v2_job" "import" {
       timeout         = "3600s"
 
       containers {
-        image = "ghcr.io/thingzio/devpulse-cloud:latest"
+        image = "ghcr.io/thingzio/devpulse:latest"
         args  = ["import"]
 
         env {

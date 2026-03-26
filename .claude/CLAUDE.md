@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`devpulse` is a Go CLI that imports GitHub contribution data into a SQLite or PostgreSQL database and serves a browser-based analytics dashboard. Backend is selected by the `--db` flag: file path → SQLite (default), `postgres://` URI → PostgreSQL.
+`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Single Go binary with `serve` (HTTP server) and `import` (scheduled worker) subcommands. PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
 
 ## Build & Test
 
@@ -59,8 +59,8 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
 - GitHub API via `github.com/google/go-github/v83/github`
 - CLI via `github.com/urfave/cli/v3`
 - Testing via `github.com/stretchr/testify` (assert + require)
-- SQLite via `modernc.org/sqlite` (pure Go, no CGO)
 - PostgreSQL via `github.com/lib/pq`
+- JWT via `github.com/golang-jwt/jwt/v5`
 
 **Testing:**
 - `setupTestDB(t)` helper creates temp DB with all migrations
@@ -100,50 +100,36 @@ When choosing between approaches, prioritize in this order:
 ## Architecture
 
 ```
-cmd/devpulse/           CLI entrypoint (self-hosted, unchanged)
-cmd/devpulse-cloud/     SaaS entrypoint (serve, import subcommands)
-pkg/cli/                CLI commands, HTTP handlers, templates, static assets
+cmd/devpulse/           Entrypoint (serve, import subcommands)
 pkg/data/               Store interface, shared types, helpers
-pkg/data/sqlite/        SQLite Store implementation + migrations
-pkg/data/postgres/      PostgreSQL Store implementation + migrations
+pkg/data/postgres/      PostgreSQL Store implementation + migrations (base + SaaS)
 pkg/data/ghutil/        Shared GitHub API helpers (rate limiting, user mapping)
 pkg/data/insights_gen.go  LLM insights generation
-pkg/auth/               GitHub OAuth token management (OS keychain, CLI only)
-pkg/oauth/              GitHub OAuth web flow (SaaS sign-in)
+pkg/oauth/              GitHub OAuth web flow
 pkg/tenant/             Tenant CRUD, sessions, GitHub App, installations
 pkg/middleware/         Auth middleware, tenant scope injection (RLS)
 pkg/net/                HTTP client utilities
-config/                 Sync config files (YAML, org/repo lists)
-infra/gcp/              Terraform for self-hosted GCP infrastructure
-infra/saas/             Terraform for SaaS GCP infrastructure
+infra/saas/             Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-**Self-hosted CLI** commands: `auth`, `import`, `delete`, `score`, `substitute`, `query`, `server`, `sync`, `reset`
+Subcommands: `serve` (HTTP server with OAuth, webhooks, dashboard), `import` (scheduled tenant data import worker)
 
-**SaaS binary** (`devpulse-cloud`) modes: `serve` (HTTP server with OAuth, webhooks, dashboard), `import` (scheduled tenant data import worker)
-
-Key data flow: GitHub API → EventImporter (concurrent, batched) → SQLite/PostgreSQL → HTTP API → Chart.js dashboard
-
-SaaS data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
-
-Dashboard is full-width with a summary banner and seven lazy-loaded tabs (Health, Activity, Velocity, Quality, Community, Events, Insights). Top bar has search, period selector, and theme toggle on one line. Search supports `org:` and `repo:` prefix syntax.
+Data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
 
 Tenant isolation: PostgreSQL Row-Level Security (RLS) policies filter data via `app.tenant_id` session variable set by middleware. Global tables (event, developer, etc.) join through `tenant_repo`; tenant-scoped tables have direct `tenant_id` columns.
 
 ## Environment Variables
 
-- `GITHUB_TOKEN` — required, comma-separated for token pool rotation
+- `DATABASE_URL` — PostgreSQL connection URI (required)
+- `GITHUB_OAUTH_CLIENT_ID` — GitHub OAuth App client ID
+- `GITHUB_OAUTH_CLIENT_SECRET` — GitHub OAuth App client secret
+- `GITHUB_WEBHOOK_SECRET` — GitHub App webhook HMAC secret
+- `GITHUB_APP_ID` — GitHub App ID for installation tokens
+- `GITHUB_APP_KEY_PATH` — path to GitHub App private key PEM
+- `BASE_URL` — public base URL (e.g. https://devpulse.thingz.io)
 - `ANTHROPIC_API_KEY` — optional, enables LLM insights generation
-- `ANTHROPIC_BASE_URL` — optional, custom Anthropic API endpoint
 - `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`
-- `DATABASE_URL` — SaaS only, PostgreSQL connection URI
-- `GITHUB_OAUTH_CLIENT_ID` — SaaS only, GitHub OAuth App client ID
-- `GITHUB_OAUTH_CLIENT_SECRET` — SaaS only, GitHub OAuth App client secret
-- `GITHUB_WEBHOOK_SECRET` — SaaS only, GitHub App webhook HMAC secret
-- `GITHUB_APP_ID` — SaaS only, GitHub App ID for installation tokens
-- `GITHUB_APP_KEY_PATH` — SaaS only, path to GitHub App private key PEM
-- `BASE_URL` — SaaS only, public base URL (e.g. https://devpulse.thingz.io)
 
 ## CI/CD
 
@@ -154,7 +140,7 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
-| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse-cloud to Cloud Run |
+| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
 | `codeql-analysis.yml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 
 ## Release Process
