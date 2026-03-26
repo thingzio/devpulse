@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/oauth"
 	"github.com/thingzio/devpulse/pkg/tenant"
@@ -32,12 +33,16 @@ var staticFS embed.FS
 var pageTemplates map[string]*template.Template
 
 func init() {
-	pages := []string{"landing.html", "tos.html", "dashboard.html"}
-	pageTemplates = make(map[string]*template.Template, len(pages))
-	for _, p := range pages {
+	// Simple pages using layout.html
+	simplePages := []string{"landing.html", "tos.html"}
+	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
+	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.ParseFS(templateFS,
 			"templates/layout.html", "templates/"+p))
 	}
+	// Dashboard uses the old header/home/footer pattern
+	pageTemplates["home.html"] = template.Must(template.ParseFS(templateFS,
+		"templates/header.html", "templates/home.html", "templates/footer.html"))
 }
 
 const (
@@ -49,8 +54,19 @@ const (
 	serverMaxHeaderBytes    = 20
 )
 
+var (
+	version = "dev"
+	commit  = ""
+	date    = ""
+)
+
+// SetVersion sets build info for templates.
+func SetVersion(v, c, d string) {
+	version, commit, date = v, c, d
+}
+
 // Run starts the HTTP server. It blocks until a shutdown signal is received.
-func Run(_ context.Context, db *sql.DB) error {
+func Run(_ context.Context, db *sql.DB, store data.Store) error {
 	port := os.Getenv("PORT")
 	baseURL := strings.TrimRight(os.Getenv("BASE_URL"), "/")
 
@@ -61,7 +77,7 @@ func Run(_ context.Context, db *sql.DB) error {
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 
-	mux := makeRouter(db, oauthCfg, webhookSecret)
+	mux := makeRouter(db, store, oauthCfg, webhookSecret)
 
 	address := fmt.Sprintf("0.0.0.0:%s", port)
 	s := &http.Server{
@@ -95,7 +111,7 @@ func Run(_ context.Context, db *sql.DB) error {
 	return nil
 }
 
-func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.ServeMux {
+func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -126,6 +142,41 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))
+
+	// Data API (chart endpoints)
+	mux.HandleFunc("GET /data/min-date", minDateAPIHandler(store))
+	mux.HandleFunc("GET /data/query", queryAPIHandler(store))
+	mux.HandleFunc("GET /data/type", eventDataAPIHandler(store))
+	mux.HandleFunc("GET /data/entity", entityDataAPIHandler(store))
+	mux.HandleFunc("GET /data/developer", developerDataAPIHandler(store))
+	mux.HandleFunc("POST /data/search", eventSearchAPIHandler(store))
+	mux.HandleFunc("GET /data/entity/developers", entityDevelopersAPIHandler(store))
+	mux.HandleFunc("GET /data/developer/search", developerSearchAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/summary", insightsSummaryAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/daily-activity", insightsDailyActivityAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/retention", insightsRetentionAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/pr-ratio", insightsPRRatioAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/time-to-merge", insightsTimeToMergeAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/time-to-close", insightsTimeToCloseAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/time-to-restore", insightsTimeToRestoreAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/review-latency", insightsReviewLatencyAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/forks-and-activity", insightsForksAndActivityAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/repo-meta", insightsRepoMetaAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/repo-overview", insightsRepoOverviewAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/repo-metric-history", insightsRepoMetricHistoryAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/change-failure-rate", insightsChangeFailureRateAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/pr-size", insightsPRSizeAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/contributor-momentum", insightsContributorMomentumAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/contributor-funnel", insightsContributorFunnelAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/contributor-profile", insightsContributorProfileAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/release-cadence", insightsReleaseCadenceAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/release-downloads", insightsReleaseDownloadsAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/release-downloads-by-tag", insightsReleaseDownloadsByTagAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/container-activity", insightsContainerActivityAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/reputation", insightsReputationAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/issue-ratio", insightsIssueRatioAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/time-to-first-response", insightsTimeToFirstResponseAPIHandler(store))
+	mux.HandleFunc("GET /data/insights/generated", insightsGeneratedAPIHandler(store))
 
 	return mux
 }
@@ -162,12 +213,18 @@ func dashboardHandler() http.HandlerFunc {
 			http.Redirect(w, r, "/auth/github", http.StatusFound)
 			return
 		}
-		appURL := os.Getenv("GITHUB_APP_URL")
-		renderTemplate(w, "dashboard.html", pageData{
-			Title:        "Dashboard",
-			Username:     tn.Username,
-			GitHubAppURL: appURL,
-		})
+		t := pageTemplates["home.html"]
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := t.ExecuteTemplate(w, "home", map[string]any{
+			"base_path":     "",
+			"version":       version,
+			"commit":        commit,
+			"build_date":    date,
+			"period_months": 6,
+			"username":      tn.Username,
+		}); err != nil {
+			slog.Error("rendering dashboard", "error", err)
+		}
 	}
 }
 

@@ -39,7 +39,8 @@ func main() {
 	}
 
 	if os.Getenv("PORT") != "" {
-		err = server.Run(ctx, store.DB())
+		server.SetVersion(version, commit, date)
+		err = server.Run(ctx, store.DB(), store)
 	} else {
 		err = importer.Run(ctx, store.DB(), store)
 	}
