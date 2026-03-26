@@ -1,12 +1,14 @@
 {{define "content"}}
-<h1>Terms of Service</h1>
-<p>By using DevPulse, you agree to the following:</p>
-<ul>
-<li>DevPulse accesses only the GitHub repositories you explicitly authorize via GitHub App installation.</li>
-<li>Imported data (events, metadata, releases) is stored in our database and used to generate analytics.</li>
-<li>You can revoke access at any time by uninstalling the GitHub App.</li>
-</ul>
-<form method="POST" action="/tos/accept">
-<button type="submit">I Accept</button>
-</form>
+<div class="auth-page">
+  <h1>Terms of Service</h1>
+  <p>By using DevPulse, you agree to the following:</p>
+  <ul class="tos-list">
+    <li>DevPulse accesses only the GitHub repositories you explicitly authorize via GitHub App installation.</li>
+    <li>Imported data (events, metadata, releases) is stored in our database and used to generate analytics.</li>
+    <li>You can revoke access at any time by uninstalling the GitHub App.</li>
+  </ul>
+  <form method="POST" action="/tos/accept">
+    <button type="submit" class="btn">I Accept</button>
+  </form>
+</div>
 {{end}}

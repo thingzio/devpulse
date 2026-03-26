@@ -1,24 +1,35 @@
 {{define "content"}}
-<h1>Dashboard</h1>
-<p>Welcome, {{.Username}}
-  <form method="POST" action="/auth/signout" style="display:inline">
-    <button type="submit">Sign out</button>
-  </form>
-</p>
-
-<h2>Repository Overview</h2>
-<div id="repo-overview"><em>Loading...</em></div>
-
-<h2>Add Repos</h2>
-<div style="position:relative;max-width:500px">
-  <input type="text" id="repo-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/aicr)..." autocomplete="off" style="width:100%;padding:6px;box-sizing:border-box">
-  <div id="search-results" style="position:absolute;background:#fff;border:1px solid #ccc;max-height:250px;overflow-y:auto;width:100%;display:none;z-index:10"></div>
+<div class="top-bar">
+  <h1>DevPulse</h1>
+  <div class="user">
+    {{.Username}}
+    <form method="POST" action="/auth/signout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
 </div>
-<p id="search-status" style="color:#666;font-size:0.9em"></p>
+<div class="page-content">
+<div class="grid">
 
-{{if .GitHubAppURL}}
-<p><a href="{{.GitHubAppURL}}" target="_blank">Connect private repos via GitHub App &rarr;</a></p>
-{{end}}
+<article>
+  <h3>Repository Overview</h3>
+  <div id="repo-overview"></div>
+</article>
+
+<article>
+  <h3>Add Repos</h3>
+  <div class="search-box">
+    <input type="text" id="repo-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/aicr)..." autocomplete="off">
+    <div id="search-results" class="search-dropdown"></div>
+  </div>
+  <p id="search-status" class="status"></p>
+  {{if .GitHubAppURL}}
+  <p style="margin-top:12px"><a href="{{.GitHubAppURL}}" target="_blank">Connect private repos via GitHub App &rarr;</a></p>
+  {{end}}
+</article>
+
+</div>
+</div>
 
 <script>
 (function() {
@@ -33,45 +44,46 @@
       .then(r => r.json())
       .then(repos => {
         if (!repos || repos.length === 0) {
-          overviewEl.innerHTML = '<p>No repos tracked yet. Search below to add one.</p>';
+          overviewEl.innerHTML = '<p class="status">No repos tracked yet. Search below to add one.</p>';
           return;
         }
-        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.95em">';
-        html += '<tr style="border-bottom:2px solid #ccc;text-align:left">' +
-          '<th style="padding:6px">Repository</th>' +
-          '<th style="padding:6px;text-align:right">Stars</th>' +
-          '<th style="padding:6px;text-align:right">Forks</th>' +
-          '<th style="padding:6px;text-align:right">Issues</th>' +
-          '<th style="padding:6px;text-align:right">Events</th>' +
-          '<th style="padding:6px;text-align:right">Contributors</th>' +
-          '<th style="padding:6px;text-align:right">Scored</th>' +
-          '<th style="padding:6px">Language</th>' +
-          '<th style="padding:6px">License</th>' +
-          '<th style="padding:6px">Last Import</th>' +
-          '<th style="padding:6px"></th></tr>';
+        let html = '<table id="repo-overview-table"><tr>' +
+          '<th>Repository</th>' +
+          '<th class="num">Stars</th>' +
+          '<th class="num">Forks</th>' +
+          '<th class="num">Issues</th>' +
+          '<th class="num">Events</th>' +
+          '<th class="num">Contributors</th>' +
+          '<th class="num">Scored</th>' +
+          '<th>Language</th>' +
+          '<th>License</th>' +
+          '<th>Last Import</th>' +
+          '<th></th></tr>';
         repos.forEach(r => {
+          const name = esc(r.org) + '/' + esc(r.repo);
+          const url = 'https://github.com/' + encodeURIComponent(r.org) + '/' + encodeURIComponent(r.repo);
           const imported = r.last_import
             ? new Date(r.last_import).toLocaleDateString()
-            : '<em>Pending</em>';
+            : '<span class="pending">Pending</span>';
           const scored = r.scored > 0 ? r.scored + '/' + r.contributors : '';
-          html += '<tr style="border-bottom:1px solid #eee">' +
-            '<td style="padding:6px">' + esc(r.org) + '/' + esc(r.repo) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + num(r.stars) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + num(r.forks) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + num(r.open_issues) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + num(r.events) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + num(r.contributors) + '</td>' +
-            '<td style="padding:6px;text-align:right">' + scored + '</td>' +
-            '<td style="padding:6px">' + esc(r.language) + '</td>' +
-            '<td style="padding:6px">' + esc(r.license) + '</td>' +
-            '<td style="padding:6px">' + imported + '</td>' +
-            '<td style="padding:6px"><button onclick="removeRepo(\'' +
-              esc(r.org) + '\',\'' + esc(r.repo) + '\')">Remove</button></td></tr>';
+          html += '<tr>' +
+            '<td><a href="' + url + '" target="_blank">' + name + '</a></td>' +
+            '<td class="num">' + num(r.stars) + '</td>' +
+            '<td class="num">' + num(r.forks) + '</td>' +
+            '<td class="num">' + num(r.open_issues) + '</td>' +
+            '<td class="num">' + num(r.events) + '</td>' +
+            '<td class="num">' + num(r.contributors) + '</td>' +
+            '<td class="num">' + scored + '</td>' +
+            '<td>' + esc(r.language) + '</td>' +
+            '<td>' + esc(r.license) + '</td>' +
+            '<td>' + imported + '</td>' +
+            '<td><button onclick="removeRepo(\'' + esc(r.org) + '\',\'' + esc(r.repo) + '\')">Remove</button></td></tr>';
         });
         html += '</table>';
+        html += '<div class="table-footer">Overview of tracked repositories.</div>';
         overviewEl.innerHTML = html;
       })
-      .catch(() => { overviewEl.innerHTML = '<p>Failed to load repos.</p>'; });
+      .catch(() => { overviewEl.innerHTML = '<p class="status">Failed to load repos.</p>'; });
   }
 
   window.removeRepo = function(org, repo) {
@@ -110,17 +122,14 @@
         .then(repos => {
           statusEl.textContent = '';
           if (!repos || repos.length === 0) {
-            resultsEl.innerHTML = '<div style="padding:8px;color:#666">No repos found</div>';
+            resultsEl.innerHTML = '<div>No repos found</div>';
             resultsEl.style.display = 'block';
             return;
           }
-          const items = repos.map(r =>
-            '<div style="padding:8px;cursor:pointer;border-bottom:1px solid #eee" ' +
-            'onmouseover="this.style.background=\'#f0f0f0\'" onmouseout="this.style.background=\'#fff\'" ' +
-            'onclick="addRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">' +
+          resultsEl.innerHTML = repos.map(r =>
+            '<div onclick="addRepo(\'' + esc(r.Org) + '\',\'' + esc(r.Repo) + '\')">' +
             esc(r.Org) + '/' + esc(r.Repo) + '</div>'
           ).join('');
-          resultsEl.innerHTML = items;
           resultsEl.style.display = 'block';
         })
         .catch(() => {

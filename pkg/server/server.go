@@ -26,6 +26,9 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
+//go:embed static/*
+var staticFS embed.FS
+
 var pageTemplates map[string]*template.Template
 
 func init() {
@@ -94,6 +97,9 @@ func Run(_ context.Context, db *sql.DB) error {
 
 func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.ServeMux {
 	mux := http.NewServeMux()
+
+	// Static assets
+	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
 	// Public routes
 	mux.HandleFunc("GET /{$}", landingHandler())
