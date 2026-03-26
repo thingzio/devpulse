@@ -11,9 +11,10 @@ tmp
 # Binaries
 bin
 dist
+devpulse
+devpulse-cloud
 
-# Keys 
-cosign.*
+# Keys
 *.pem
 
 
