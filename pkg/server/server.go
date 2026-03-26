@@ -25,7 +25,16 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
-var templates = template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/*.html"))
+var pageTemplates map[string]*template.Template
+
+func init() {
+	pages := []string{"landing.html", "tos.html", "dashboard.html"}
+	pageTemplates = make(map[string]*template.Template, len(pages))
+	for _, p := range pages {
+		pageTemplates[p] = template.Must(template.ParseFS(templateFS,
+			"templates/layout.html", "templates/"+p))
+	}
+}
 
 const (
 	sessionTTL              = 7 * 24 * time.Hour
@@ -112,10 +121,15 @@ func makeRouter(db *sql.DB, oauthCfg *oauth.Config, webhookSecret string) *http.
 }
 
 func renderTemplate(w http.ResponseWriter, name string, data any) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := templates.ExecuteTemplate(w, name, data); err != nil {
-		slog.Error("rendering template", "name", name, "error", err)
+	t, ok := pageTemplates[name]
+	if !ok {
+		slog.Error("template not found", "name", name)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := t.ExecuteTemplate(w, "layout.html", data); err != nil {
+		slog.Error("rendering template", "name", name, "error", err)
 	}
 }
 
