@@ -160,12 +160,25 @@
                                     <th>Language</th>
                                     <th>License</th>
                                     <th>Last Import</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
                     </div>
                     <span class="insight-desc">Overview of all repositories in the selected scope and period.</span>
+                </div>
+            </article>
+            <article class="grid-full-width">
+                <div class="tbl">
+                    <div class="content-header">Add Repos</div>
+                    <div class="tbl-content" style="padding:12px 15px">
+                        <div style="position:relative;max-width:500px">
+                            <input type="text" id="repo-search" class="contributor-search" placeholder="Search repos (e.g. kubernetes, NVIDIA/aicr)..." autocomplete="off">
+                            <div id="repo-search-results" class="contributor-suggestions"></div>
+                        </div>
+                        <p id="repo-search-status" style="color:var(--gray);font-size:0.85em;margin-top:6px"></p>
+                    </div>
                 </div>
             </article>
         </section>

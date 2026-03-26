@@ -1511,7 +1511,7 @@ function loadRepoOverview(url) {
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
-            $tbody.append('<tr><td colspan="10" style="text-align:center">No repository data available</td></tr>');
+            $tbody.append('<tr><td colspan="11" style="text-align:center">No repository data available. Search below to add repos.</td></tr>');
             return;
         }
         $.each(data, function (i, r) {
@@ -1531,6 +1531,9 @@ function loadRepoOverview(url) {
             $row.append($('<td></td>').text(r.language || '—'));
             $row.append($('<td></td>').text(r.license || '—'));
             $row.append($('<td></td>').text(formatImportDate(r.last_import, false)));
+            var $removeBtn = $('<button style="color:var(--gray);font-size:0.85em;padding:2px 8px;border:1px solid var(--border-color);border-radius:var(--border-radius);cursor:pointer">Remove</button>');
+            $removeBtn.on('click', function() { removeTrackedRepo(r.org, r.repo); });
+            $row.append($('<td></td>').append($removeBtn));
             $tbody.append($row);
         });
     });
@@ -2277,3 +2280,72 @@ function loadGeneratedInsights(url) {
         metaContainer.text('Generated ' + item.generated_at + ' for ' + item.period_months + ' month period');
     });
 }
+
+// --- Repo Management (add/remove/search) ---
+
+function removeTrackedRepo(org, repo) {
+    $.ajax({
+        url: '/api/repos/' + encodeURIComponent(org) + '/' + encodeURIComponent(repo),
+        method: 'DELETE',
+        success: function() { loadRepoOverview('/data/insights/repo-overview?months=6'); }
+    });
+}
+
+function addTrackedRepo(org, repo) {
+    var $status = $('#repo-search-status');
+    $status.text('Adding...');
+    $.post('/api/repos', { org: org, repo: repo }, function() {
+        loadRepoOverview('/data/insights/repo-overview?months=6');
+        $('#repo-search').val('');
+        $('#repo-search-results').removeClass('visible');
+        $status.text('');
+    }).fail(function(xhr) {
+        $status.text(xhr.responseText || 'Failed to add repo');
+    });
+}
+
+$(function() {
+    var searchTimer;
+    var $search = $('#repo-search');
+    var $results = $('#repo-search-results');
+    var $status = $('#repo-search-status');
+
+    if (!$search.length) return;
+
+    $search.on('input', function() {
+        clearTimeout(searchTimer);
+        var q = $search.val().trim();
+        if (q.length < 2) {
+            $results.removeClass('visible');
+            $status.text('');
+            return;
+        }
+        $status.text('Searching...');
+        searchTimer = setTimeout(function() {
+            $.get('/api/repos/available?q=' + encodeURIComponent(q), function(repos) {
+                $status.text('');
+                $results.empty();
+                if (!repos || repos.length === 0) {
+                    $results.append('<li style="color:var(--gray)">No repos found</li>');
+                    $results.addClass('visible');
+                    return;
+                }
+                $.each(repos, function(i, r) {
+                    var $li = $('<li></li>').text(r.Org + '/' + r.Repo);
+                    $li.on('click', function() { addTrackedRepo(r.Org, r.Repo); });
+                    $results.append($li);
+                });
+                $results.addClass('visible');
+            }).fail(function() {
+                $status.text('');
+                $results.removeClass('visible');
+            });
+        }, 400);
+    });
+
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#repo-search, #repo-search-results').length) {
+            $results.removeClass('visible');
+        }
+    });
+});
