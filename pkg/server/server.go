@@ -377,6 +377,14 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Verify the repo is publicly accessible before adding.
+		// This prevents users from gaining access to private repo data
+		// imported by another tenant.
+		if !isPublicRepo(r.Context(), org, repo) {
+			http.Error(w, "repo not found or not public", http.StatusForbidden)
+			return
+		}
+
 		if err := tenant.AddTenantRepos(db, tn.ID, []tenant.OrgRepo{{Org: org, Repo: repo}}); err != nil {
 			slog.Error("adding repo", "error", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -385,6 +393,25 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 	}
+}
+
+// isPublicRepo checks if a GitHub repo is publicly accessible.
+func isPublicRepo(ctx context.Context, org, repo string) bool {
+	ghURL := fmt.Sprintf("https://api.github.com/repos/%s/%s",
+		url.PathEscape(org), url.PathEscape(repo))
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, ghURL, nil) //nolint:gosec // constant base URL
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // constant base URL
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK
 }
 
 func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
