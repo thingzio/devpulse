@@ -343,7 +343,7 @@ function loadTabCharts(tab, months, org, repo, entity) {
                 $("#stars-trend-panel").hide();
                 $("#forks-trend-panel").hide();
                 $("#repo-overview-panel").show();
-                loadRepoOverview('/data/insights/repo-overview?' + q);
+                loadRepoOverview('/api/repos/overview');
             }
             break;
         case 'activity':
@@ -2287,7 +2287,7 @@ function removeTrackedRepo(org, repo) {
     $.ajax({
         url: '/api/repos/' + encodeURIComponent(org) + '/' + encodeURIComponent(repo),
         method: 'DELETE',
-        success: function() { loadRepoOverview('/data/insights/repo-overview?months=6'); }
+        success: function() { loadRepoOverview('/api/repos/overview'); }
     });
 }
 
@@ -2295,7 +2295,7 @@ function addTrackedRepo(org, repo) {
     var $status = $('#repo-search-status');
     $status.text('Adding...');
     $.post('/api/repos', { org: org, repo: repo }, function() {
-        loadRepoOverview('/data/insights/repo-overview?months=6');
+        loadRepoOverview('/api/repos/overview');
         $('#repo-search').val('');
         $('#repo-search-results').removeClass('visible');
         $status.text('');
