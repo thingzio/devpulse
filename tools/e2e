@@ -19,48 +19,29 @@ go build -mod=vendor -o "$BIN" ./cmd/devpulse
 FAILURES=0
 
 # --------------------------------------------------------------------------
-# Test: --version
+# Test: missing DATABASE_URL starts import mode and fails with clear error
 # --------------------------------------------------------------------------
-if output=$("$BIN" --version 2>&1) && echo "$output" | grep -q "devpulse"; then
-  pass "--version"
+if output=$(DATABASE_URL="" "$BIN" 2>&1); then
+  echo "FAIL: missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
 else
-  echo "FAIL: --version"; FAILURES=$((FAILURES + 1))
+  if echo "$output" | grep -qi "DATABASE_URL"; then
+    pass "missing-database-url (import mode)"
+  else
+    echo "FAIL: missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
+  fi
 fi
 
 # --------------------------------------------------------------------------
-# Test: --help
+# Test: missing DATABASE_URL with PORT set starts serve mode and fails
 # --------------------------------------------------------------------------
-if output=$("$BIN" --help 2>&1) && echo "$output" | grep -q "COMMANDS"; then
-  pass "--help"
+if output=$(DATABASE_URL="" PORT=8080 "$BIN" 2>&1); then
+  echo "FAIL: missing-database-url-serve (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
 else
-  echo "FAIL: --help"; FAILURES=$((FAILURES + 1))
-fi
-
-# --------------------------------------------------------------------------
-# Test: invalid subcommand (should fail)
-# --------------------------------------------------------------------------
-if "$BIN" nonexistent >/dev/null 2>&1; then
-  echo "FAIL: invalid-subcommand (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
-else
-  pass "invalid-subcommand"
-fi
-
-# --------------------------------------------------------------------------
-# Test: serve --help (no DB required)
-# --------------------------------------------------------------------------
-if output=$("$BIN" serve --help 2>&1) && echo "$output" | grep -q "serve"; then
-  pass "serve --help"
-else
-  echo "FAIL: serve --help"; FAILURES=$((FAILURES + 1))
-fi
-
-# --------------------------------------------------------------------------
-# Test: import --help (no DB required)
-# --------------------------------------------------------------------------
-if output=$("$BIN" import --help 2>&1) && echo "$output" | grep -q "import"; then
-  pass "import --help"
-else
-  echo "FAIL: import --help"; FAILURES=$((FAILURES + 1))
+  if echo "$output" | grep -qi "DATABASE_URL"; then
+    pass "missing-database-url (serve mode)"
+  else
+    echo "FAIL: missing-database-url-serve (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
+  fi
 fi
 
 # --------------------------------------------------------------------------

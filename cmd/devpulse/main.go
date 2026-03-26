@@ -10,7 +10,6 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/logging"
-	urfave "github.com/urfave/cli/v3"
 )
 
 var (
@@ -22,25 +21,27 @@ var (
 func main() {
 	logging.SetupLogger()
 
+	slog.Info("starting",
+		"version", version,
+		"commit", commit,
+		"date", date,
+	)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	app := &urfave.Command{
-		Name:            "devpulse",
-		Version:         fmt.Sprintf("%s (%s - %s)", version, commit, date),
-		Usage:           "DevPulse multi-tenant SaaS service",
-		HideHelpCommand: true,
-		Commands: []*urfave.Command{
-			serveCmd,
-			importWorkerCmd,
-		},
+	var err error
+	if os.Getenv("PORT") != "" {
+		err = runServe(ctx)
+	} else {
+		err = runImport(ctx)
 	}
 
-	if err := app.Run(ctx, os.Args); err != nil {
-		stop()
+	stop()
+
+	if err != nil {
 		slog.Error("fatal error", "error", err)
 		os.Exit(1)
 	}
-	stop()
 }
 
 func openStore() (*postgres.Store, error) {
