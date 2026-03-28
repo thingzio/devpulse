@@ -9,7 +9,7 @@ inputs:
   ko_version:
     description: 'ko version (e.g. v0.18.0)'
     required: false
-    default: 'v0.18.0'
+    default: 'v0.18.0'  # keep in sync with project tooling (.settings.yaml)
   install_goreleaser:
     description: 'Install goreleaser (true/false)'
     required: false

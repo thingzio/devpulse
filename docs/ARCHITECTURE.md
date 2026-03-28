@@ -1,31 +1,26 @@
 # Architecture
 
-Multi-tenant SaaS for GitHub project health analytics. Two binaries from one repo: `devpulse` (CLI) and `devpulse-cloud` (SaaS server + import worker). Data stored in SQLite (CLI) or PostgreSQL (SaaS, with RLS for tenant isolation).
+Multi-tenant SaaS for GitHub project health analytics. Single `devpulse` binary, mode selected by `PORT` env var. PostgreSQL with Row-Level Security for tenant isolation.
 
 ## High-Level Data Flow
 
 ```
-CLI mode:
-  GitHub API ──→ devpulse import ──→ SQLite/PostgreSQL ──→ devpulse server ──→ dashboard
-
-SaaS mode:
-  GitHub App webhook ──→ devpulse-cloud serve ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
-  Cloud Scheduler ──→ devpulse-cloud import ──→ per-tenant GitHub App tokens ──→ PostgreSQL
-  Browser ──→ devpulse-cloud serve ──→ OAuth ──→ RLS-scoped dashboard
+GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
+Cloud Scheduler ──→ devpulse (import) ──→ per-tenant GitHub API tokens ──→ PostgreSQL
+Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
 ```
 
 ## Directory Structure
 
 ```
 devpulse/
-├── cmd/devpulse/           CLI entrypoint (delegates to pkg/cli)
-├── cmd/devpulse-cloud/     SaaS entrypoint (serve, import subcommands)
+├── cmd/devpulse/           Thin entrypoint (logging, store, mode dispatch)
 ├── pkg/
-│   ├── cli/                CLI commands, HTTP handlers, templates, static assets
-│   │   ├── assets/         Frontend: CSS, JS, images (embedded via go:embed)
+│   ├── server/             HTTP server, handlers, templates, static assets
+│   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
 │   │   └── templates/      HTML templates: header, home (tabbed dashboard), footer
+│   ├── importer/           Tenant import worker
 │   ├── data/               Store interface, shared types, helpers
-│   │   ├── sqlite/         SQLite Store implementation + migrations
 │   │   ├── postgres/       PostgreSQL Store implementation + migrations
 │   │   └── ghutil/         Shared GitHub API helpers (rate limiting, user mapping)
 │   ├── tenant/             Tenant CRUD, sessions, GitHub App JWT, installations
@@ -172,7 +167,7 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
-| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse-cloud to SaaS Cloud Run |
+| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to SaaS Cloud Run |
 | `codeql-analysis.yaml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 | `scan-on-schedule.yaml` | schedule | Vulnerability scanning |
 | `score-on-schedule.yaml` | schedule | Scheduled reputation scoring |
@@ -180,7 +175,7 @@ GitHub Actions workflows in `.github/workflows/`:
 
 ## Supply Chain Security
 
-- **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`, `ghcr.io/thingzio/devpulse-cloud`)
+- **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`)
 - **Vulnerability scanning** — govulncheck in CI, Trivy on schedule
 - **Dependency pinning** — all GitHub Actions pinned by commit hash
 

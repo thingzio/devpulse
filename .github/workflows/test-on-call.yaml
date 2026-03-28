@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      id-token: write
+      id-token: write  # required for Codecov OIDC upload
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -44,7 +44,9 @@ jobs:
         uses: ./.github/actions/setup-go-env
 
       - name: Load Settings
+        shell: bash
         run: |
+          set -euo pipefail
           echo "GOLANGCI_LINT_VERSION=$(yq -r '.linting.golangci_lint' .settings.yaml)" >> "$GITHUB_ENV"
 
       - name: Lint Go

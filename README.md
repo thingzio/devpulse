@@ -43,7 +43,7 @@ Tenant isolation uses PostgreSQL Row-Level Security. See [docs/ARCHITECTURE.md](
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and [DEVELOPMENT.md](DEVELOPMENT.md) for setup.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup.
 
 1. Fork and clone
 2. Create a feature branch
