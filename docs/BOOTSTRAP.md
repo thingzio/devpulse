@@ -156,7 +156,19 @@ In the GitHub repo settings, create an environment called `saas` with these vari
 | `JOB_NAME` | `devpulse-saas-import` |
 | `REGION` | `us-west1` |
 
-## 10. Verify
+## 10. Create Monitoring Dashboard
+
+```shell
+gcloud monitoring dashboards create \
+    --project=$PROJECT_ID \
+    --config-from-file=infra/saas/dashboard.json
+```
+
+This creates a Cloud Monitoring dashboard with 12 widgets: service request count, latency percentiles, instance count, CPU/memory utilization, billable time, sign-ins, import tenant count, import duration, Cloud SQL CPU/memory/connections.
+
+View at: https://console.cloud.google.com/monitoring/dashboards?project=$PROJECT_ID
+
+## 11. Verify
 
 ```shell
 # Check Cloud Run service is running

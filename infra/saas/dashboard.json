@@ -1,0 +1,253 @@
+{
+  "displayName": "devpulse-saas",
+  "gridLayout": {
+    "columns": "3",
+    "widgets": [
+      {
+        "title": "Service: Request Count",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/request_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.response_code_class"]
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Service: Request Latency (p50/p95/p99)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/request_latencies\"",
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_50",
+                    "crossSeriesReducer": "REDUCE_MEAN"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p50"
+            },
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/request_latencies\"",
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_95",
+                    "crossSeriesReducer": "REDUCE_MEAN"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p95"
+            },
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/request_latencies\"",
+                  "aggregation": {
+                    "alignmentPeriod": "300s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_99",
+                    "crossSeriesReducer": "REDUCE_MEAN"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p99"
+            }
+          ]
+        }
+      },
+      {
+        "title": "Service: Instance Count",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/container/instance_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_MEAN",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Service: CPU Utilization",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/container/cpu/utilizations\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_PERCENTILE_99",
+                  "crossSeriesReducer": "REDUCE_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Service: Memory Utilization",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/container/memory/utilizations\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_PERCENTILE_99",
+                  "crossSeriesReducer": "REDUCE_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Service: Billable Instance Time",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"run.googleapis.com/container/billable_instance_time\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Sign-ins",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-sign-ins\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Import: Tenant Count",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-tenant-count\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Import: Duration",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-duration\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: CPU Utilization",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: Memory Utilization",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: Connections",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      }
+    ]
+  }
+}
