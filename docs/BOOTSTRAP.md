@@ -228,3 +228,42 @@ terraform apply -var="project_id=$PROJECT_ID" -var="db_tier=db-g1-small"
 ```
 
 See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the full scaling plan.
+
+### Tenant plan management
+
+Tenant plans are managed via SQL. Connect to the database and update directly.
+
+**View current tenants and their limits:**
+```sql
+SELECT username, plan, max_repos, max_events_per_week, created_at
+FROM tenant ORDER BY created_at;
+```
+
+**Promote a tenant to pro:**
+```sql
+UPDATE tenant
+SET plan = 'pro', max_repos = 25, max_events_per_week = 20000, updated_at = NOW()
+WHERE username = 'their-github-username';
+```
+
+**Plan tier defaults:**
+
+| Plan | Repos | Events/Week |
+|------|-------|-------------|
+| free | 5 | 2,000 |
+| pro | 25 | 20,000 |
+| enterprise | 100 | 100,000 |
+
+**Check a tenant's current weekly usage:**
+```sql
+SELECT t.username, t.plan, t.max_repos, t.max_events_per_week,
+    COUNT(DISTINCT tr.id) AS active_repos,
+    (SELECT COUNT(*) FROM event e
+     JOIN tenant_repo tr2 ON tr2.org = e.org AND tr2.repo = e.repo
+     WHERE tr2.tenant_id = t.id AND tr2.active = TRUE
+       AND e.date >= date_trunc('week', NOW())::text) AS weekly_events
+FROM tenant t
+LEFT JOIN tenant_repo tr ON tr.tenant_id = t.id AND tr.active = TRUE
+GROUP BY t.id
+ORDER BY t.username;
+```

@@ -62,6 +62,34 @@ func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.Ac
 		return nil
 	}
 
+	// Check weekly event limit
+	tn, err := tenant.GetTenantByID(ctx, db, t.ID)
+	if err != nil {
+		return fmt.Errorf("getting tenant: %w", err)
+	}
+
+	weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, t.ID)
+	if err != nil {
+		return fmt.Errorf("getting weekly events: %w", err)
+	}
+
+	slog.Info("tenant usage",
+		"tenant_id", t.ID,
+		"username", t.Username,
+		"weekly_events", weeklyEvents,
+		"max_events_per_week", tn.MaxEventsPerWeek,
+		"weekly_pct", float64(weeklyEvents)/float64(tn.MaxEventsPerWeek)*100,
+	)
+
+	if weeklyEvents >= tn.MaxEventsPerWeek {
+		slog.Warn("weekly event limit reached, skipping import",
+			"tenant_id", t.ID,
+			"weekly_events", weeklyEvents,
+			"max_events_per_week", tn.MaxEventsPerWeek,
+		)
+		return nil
+	}
+
 	token, err := resolveToken(ctx, db, t.ID)
 	if err != nil {
 		return err

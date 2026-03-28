@@ -39,6 +39,8 @@ Key log messages to watch:
 | `user signed in` | OAuth callback | username, tenant_id |
 | `tos accepted` | ToS flow | tenant_id, username |
 | `import worker starting` | Import begins | tenants |
+| `tenant usage` | Per-tenant usage check | tenant_id, username, weekly_events, max_events_per_week, weekly_pct |
+| `weekly event limit reached` | Tenant hit limit | tenant_id, weekly_events, max_events_per_week |
 | `importing repo` | Per-repo import | org, repo |
 | `repo import complete` | Per-repo done | org, repo, errors, duration |
 | `import worker complete` | Full run done | tenants, errors, duration |
@@ -56,6 +58,8 @@ Created by Terraform (`infra/saas/monitoring.tf`). These are free — no additio
 | `devpulse-saas-tos-accepted` | `jsonPayload.msg="tos accepted"` | Counter |
 | `devpulse-saas-import-duration` | `jsonPayload.msg="import worker complete"` | Distribution |
 | `devpulse-saas-import-tenant-count` | `jsonPayload.msg="import worker complete"` | Distribution |
+| `devpulse-saas-tenant-weekly-events` | `jsonPayload.msg="tenant usage"` | Distribution (by tenant_id) |
+| `devpulse-saas-event-limit-reached` | `jsonPayload.msg="weekly event limit reached"` | Counter (by tenant_id) |
 
 Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>`.
 

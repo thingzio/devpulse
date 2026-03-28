@@ -84,6 +84,45 @@ resource "google_logging_metric" "import_tenant_count" {
   }
 }
 
+resource "google_logging_metric" "tenant_weekly_events" {
+  name    = "${var.prefix}-tenant-weekly-events"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"tenant usage\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
+    unit        = "1"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.weekly_events)"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [100, 500, 1000, 2000, 5000, 10000, 20000]
+    }
+  }
+
+  label_extractors = {
+    "tenant_id" = "EXTRACT(jsonPayload.tenant_id)"
+  }
+}
+
+resource "google_logging_metric" "event_limit_reached" {
+  name    = "${var.prefix}-event-limit-reached"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"weekly event limit reached\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+
+  label_extractors = {
+    "tenant_id" = "EXTRACT(jsonPayload.tenant_id)"
+  }
+}
+
 # Alert policies
 
 resource "google_monitoring_alert_policy" "error_rate" {

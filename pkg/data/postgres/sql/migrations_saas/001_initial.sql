@@ -8,8 +8,9 @@ CREATE TABLE IF NOT EXISTS tenant (
     username        TEXT NOT NULL,
     email           TEXT,
     avatar_url      TEXT,
-    max_repos       INT NOT NULL DEFAULT 25,
-    plan            TEXT NOT NULL DEFAULT 'free',
+    max_repos            INT NOT NULL DEFAULT 5,
+    max_events_per_week  INT NOT NULL DEFAULT 2000,
+    plan                 TEXT NOT NULL DEFAULT 'free',
     tos_accepted_at TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()

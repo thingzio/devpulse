@@ -9,16 +9,17 @@ import (
 
 // Tenant represents a registered SaaS tenant.
 type Tenant struct {
-	ID            string
-	GitHubID      int64
-	Username      string
-	Email         string
-	AvatarURL     string
-	MaxRepos      int
-	Plan          string
-	ToSAcceptedAt *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID               string
+	GitHubID         int64
+	Username         string
+	Email            string
+	AvatarURL        string
+	MaxRepos         int
+	MaxEventsPerWeek int
+	Plan             string
+	ToSAcceptedAt    *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 const upsertTenantSQL = `
@@ -29,28 +30,28 @@ const upsertTenantSQL = `
 		email = EXCLUDED.email,
 		avatar_url = EXCLUDED.avatar_url,
 		updated_at = NOW()
-	RETURNING id, github_id, username, email, avatar_url, max_repos, plan,
+	RETURNING id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
 	          tos_accepted_at, created_at, updated_at`
 
 const getTenantByGitHubIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, max_repos, plan,
+	SELECT id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
 	       tos_accepted_at, created_at, updated_at
 	FROM tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, max_repos, plan,
+	SELECT id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
 	       tos_accepted_at, created_at, updated_at
 	FROM tenant WHERE id = $1`
 
 const acceptToSSQL = `UPDATE tenant SET tos_accepted_at = NOW(), updated_at = NOW() WHERE id = $1`
 
-const updatePlanSQL = `UPDATE tenant SET plan = $2, max_repos = $3, updated_at = NOW() WHERE id = $1`
+const updatePlanSQL = `UPDATE tenant SET plan = $2, max_repos = $3, max_events_per_week = $4, updated_at = NOW() WHERE id = $1`
 
 func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	var t Tenant
 	err := row.Scan(
 		&t.ID, &t.GitHubID, &t.Username, &t.Email, &t.AvatarURL,
-		&t.MaxRepos, &t.Plan, &t.ToSAcceptedAt, &t.CreatedAt, &t.UpdatedAt,
+		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.ToSAcceptedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -94,9 +95,9 @@ func AcceptToS(ctx context.Context, db *sql.DB, tenantID string) error {
 	return nil
 }
 
-// UpdatePlan sets a tenant's plan and repo limit.
-func UpdatePlan(ctx context.Context, db *sql.DB, tenantID, plan string, maxRepos int) error {
-	_, err := db.ExecContext(ctx, updatePlanSQL, tenantID, plan, maxRepos)
+// UpdatePlan sets a tenant's plan, repo limit, and event limit.
+func UpdatePlan(ctx context.Context, db *sql.DB, tenantID, plan string, maxRepos, maxEventsPerWeek int) error {
+	_, err := db.ExecContext(ctx, updatePlanSQL, tenantID, plan, maxRepos, maxEventsPerWeek)
 	if err != nil {
 		return fmt.Errorf("updating plan: %w", err)
 	}

@@ -428,7 +428,7 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		months := queryParamInt(r, "m", 6)
-		overview, err := tenant.GetRepoOverview(r.Context(), db, tn.ID, months)
+		overview, err := tenant.GetOverview(r.Context(), db, tn.ID, months)
 		if err != nil {
 			slog.Error("getting repo overview", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)

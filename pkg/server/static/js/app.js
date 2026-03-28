@@ -1507,11 +1507,32 @@ function loadForksTrendChart(url) {
 }
 
 function loadRepoOverview(url) {
-    $.get(url, function (data) {
+    $.get(url, function (resp) {
+        // Update usage banner
+        var u = resp.usage || {};
+        var $banner = $('#usage-banner');
+        if ($banner.length) {
+            var pct = Math.min(u.weekly_pct || 0, 100).toFixed(1);
+            var color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#d29a00' : 'var(--accent)';
+            var reposPct = u.max_repos > 0 ? Math.round(u.active_repos / u.max_repos * 100) : 0;
+            $banner.html(
+                '<div class="banner-stat"><span class="banner-val" style="color:' + color + '">' +
+                (u.weekly_events || 0).toLocaleString() + ' / ' + (u.max_events_per_week || 0).toLocaleString() +
+                '</span><span class="banner-label">Events This Week (' + pct + '%)</span></div>' +
+                '<div class="banner-stat"><span class="banner-val">' +
+                (u.active_repos || 0) + ' / ' + (u.max_repos || 0) +
+                '</span><span class="banner-label">Repos (' + reposPct + '%)</span></div>'
+            );
+            if (u.limit_reached) {
+                $banner.append('<div class="banner-stat"><span class="banner-val" style="color:var(--red)">LIMIT REACHED</span><span class="banner-label">Imports paused until next week</span></div>');
+            }
+        }
+
+        var data = resp.repos || [];
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
-            $tbody.append('<tr><td colspan="11" style="text-align:center">No repository data available. Search below to add repos.</td></tr>');
+            $tbody.append('<tr><td colspan="13" style="text-align:center">No repository data available. Search below to add repos.</td></tr>');
             return;
         }
         $.each(data, function (i, r) {
@@ -1532,6 +1553,14 @@ function loadRepoOverview(url) {
             $row.append($('<td class="num"></td>').text(r.forks.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.open_issues.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.events.toLocaleString()));
+
+            // Weekly events with percentage
+            var wpct = (r.weekly_pct || 0).toFixed(1);
+            var wcolor = r.limit_reached ? 'var(--red)' : wpct >= 80 ? '#d29a00' : '';
+            var $weeklyCell = $('<td class="num"></td>').text(r.weekly_events.toLocaleString() + ' (' + wpct + '%)');
+            if (wcolor) $weeklyCell.css('color', wcolor);
+            $row.append($weeklyCell);
+
             $row.append($('<td class="num"></td>').text(r.contributors.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.scored + '/' + r.contributors));
             $row.append($('<td></td>').text(r.language || '—'));
