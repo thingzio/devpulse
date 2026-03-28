@@ -15,16 +15,23 @@ type contextKey string
 
 const tenantContextKey contextKey = "tenant"
 
-func isSecure() bool {
-	return strings.HasPrefix(os.Getenv("BASE_URL"), "https://")
+var (
+	secure     bool
+	cookieName string
+)
+
+func init() {
+	secure = strings.HasPrefix(os.Getenv("BASE_URL"), "https://")
+	if secure {
+		cookieName = "__Host-session"
+	} else {
+		cookieName = "session"
+	}
 }
 
 // SessionCookieName returns the session cookie name based on the BASE_URL scheme.
 func SessionCookieName() string {
-	if isSecure() {
-		return "__Host-session"
-	}
-	return "session"
+	return cookieName
 }
 
 // RequireAuth validates the session cookie and injects the tenant into context.
@@ -62,7 +69,6 @@ func TenantFromContext(ctx context.Context) *tenant.Tenant {
 
 // SetSessionCookie sets the session cookie with security attributes.
 func SetSessionCookie(w http.ResponseWriter, token string, maxAge int) {
-	secure := isSecure()
 	sameSite := http.SameSiteStrictMode
 	if !secure {
 		sameSite = http.SameSiteLaxMode

@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-var errSessionInvalid = errors.New("session expired or not found")
+// ErrSessionInvalid is returned when a session is expired or not found.
+var ErrSessionInvalid = errors.New("session expired or not found")
 
 const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES ($1, $2, $3)`
 
@@ -48,7 +49,7 @@ func ValidateSession(ctx context.Context, db *sql.DB, rawToken string) (*Tenant,
 	hashed := HashToken(rawToken)
 	t, err := scanTenant(db.QueryRowContext(ctx, validateSessionSQL, hashed))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errSessionInvalid
+		return nil, ErrSessionInvalid
 	}
 	if err != nil {
 		return nil, fmt.Errorf("validating session: %w", err)

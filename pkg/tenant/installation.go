@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-var errRepoLimitExceeded = errors.New("repo limit exceeded for plan")
+// ErrRepoLimitExceeded is returned when adding repos would exceed the tenant's plan limit.
+var ErrRepoLimitExceeded = errors.New("repo limit exceeded for plan")
 
 // Installation represents a GitHub App installation for a tenant.
 type Installation struct {
@@ -130,7 +131,7 @@ func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []Or
 
 	if currentCount+len(repos) > maxRepos {
 		_ = tx.Rollback()
-		return fmt.Errorf("%w: %d + %d > %d", errRepoLimitExceeded, currentCount, len(repos), maxRepos)
+		return fmt.Errorf("%w: %d + %d > %d", ErrRepoLimitExceeded, currentCount, len(repos), maxRepos)
 	}
 
 	for _, r := range repos {

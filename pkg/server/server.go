@@ -427,7 +427,8 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		overview, err := tenant.GetRepoOverview(r.Context(), db, tn.ID, 6)
+		months := queryParamInt(r, "m", 6)
+		overview, err := tenant.GetRepoOverview(r.Context(), db, tn.ID, months)
 		if err != nil {
 			slog.Error("getting repo overview", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
