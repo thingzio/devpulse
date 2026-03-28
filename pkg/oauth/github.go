@@ -10,7 +10,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 const (
 	defaultAuthURL  = "https://github.com/login/oauth/authorize"
@@ -73,7 +76,7 @@ func ExchangeCode(ctx context.Context, cfg *Config, code string) (string, error)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("exchanging code: %w", err)
 	}
@@ -110,7 +113,7 @@ func FetchUser(ctx context.Context, cfg *Config, token string) (*GitHubUser, err
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
@@ -129,6 +132,8 @@ func FetchUser(ctx context.Context, cfg *Config, token string) (*GitHubUser, err
 
 func randomState() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand failed: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }

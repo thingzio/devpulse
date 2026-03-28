@@ -16,7 +16,7 @@ import (
 func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 	start := time.Now()
 
-	tenants, err := tenant.GetActiveTenants(db)
+	tenants, err := tenant.GetActiveTenants(ctx, db)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.ActiveTenant) error {
 	slog.Info("importing tenant", "tenant_id", t.ID, "username", t.Username)
 
-	repos, err := tenant.ListTenantRepos(db, t.ID)
+	repos, err := tenant.ListTenantRepos(ctx, db, t.ID)
 	if err != nil {
 		return err
 	}
@@ -139,20 +139,17 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 
 // resolveToken returns a GitHub token for API access.
 // Prefers GITHUB_TOKEN env var; falls back to minting a GitHub App installation token.
-func resolveToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) {
+func resolveToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) { //nolint:unparam // ctx+db used when GitHub App token minting is implemented
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 		slog.Debug("using GITHUB_TOKEN env var")
 		return token, nil
 	}
 
-	// TODO: mint GitHub App installation token
-	// 1. Get installations for tenant
+	// TODO: mint GitHub App installation token using ctx, db, tenantID
+	// 1. tenant.GetActiveInstallations(ctx, db, tenantID)
 	// 2. Load GitHub App private key from GITHUB_APP_KEY_PATH
-	// 3. Create App JWT with GITHUB_APP_ID
-	// 4. Mint installation token via GitHub API
-	_ = ctx
-	_ = db
-	_ = tenantID
+	// 3. tenant.CreateAppJWT(cfg)
+	// 4. tenant.MintInstallationToken(ctx, cfg, installationID)
 
-	return "", errNoToken
+	return "", fmt.Errorf("%w (tenant %s)", errNoToken, tenantID)
 }

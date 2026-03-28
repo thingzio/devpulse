@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
@@ -17,6 +18,13 @@ import (
 // WebhookHandler handles GitHub App webhook events.
 func WebhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if webhookSecret == "" {
+			slog.Error("webhook secret not configured")
+			http.Error(w, "webhook not configured", http.StatusServiceUnavailable)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "bad request", http.StatusBadRequest)
@@ -84,15 +92,17 @@ func handleInstallationEvent(db *sql.DB, body []byte) {
 		"sender_id", payload.Sender.ID,
 	)
 
+	ctx := context.Background()
+
 	switch payload.Action {
 	case "created":
-		tn, err := tenant.GetTenantByGitHubID(db, payload.Sender.ID)
+		tn, err := tenant.GetTenantByGitHubID(ctx, db, payload.Sender.ID)
 		if err != nil {
 			slog.Error("tenant not found for installation", "sender_id", payload.Sender.ID, "error", err)
 			return
 		}
 
-		if err := tenant.SaveInstallation(db, tn.ID, payload.Installation.ID,
+		if err := tenant.SaveInstallation(ctx, db, tn.ID, payload.Installation.ID,
 			payload.Installation.Account.Type, payload.Installation.Account.Login, nil); err != nil {
 			slog.Error("saving installation", "error", err)
 			return
@@ -100,13 +110,13 @@ func handleInstallationEvent(db *sql.DB, body []byte) {
 
 		repos := parseRepoNames(payload.Repositories)
 		if len(repos) > 0 {
-			if err := tenant.AddTenantRepos(db, tn.ID, repos); err != nil {
+			if err := tenant.AddTenantRepos(ctx, db, tn.ID, repos); err != nil {
 				slog.Error("adding repos from installation", "error", err)
 			}
 		}
 
 	case "deleted", "suspend":
-		if err := tenant.SuspendInstallation(db, payload.Installation.ID); err != nil {
+		if err := tenant.SuspendInstallation(ctx, db, payload.Installation.ID); err != nil {
 			slog.Error("suspending installation", "error", err)
 		}
 	}
@@ -132,7 +142,9 @@ func handleInstallationReposEvent(db *sql.DB, body []byte) {
 		return
 	}
 
-	tn, err := tenant.GetTenantByGitHubID(db, payload.Sender.ID)
+	ctx := context.Background()
+
+	tn, err := tenant.GetTenantByGitHubID(ctx, db, payload.Sender.ID)
 	if err != nil {
 		slog.Error("tenant not found", "sender_id", payload.Sender.ID, "error", err)
 		return
@@ -140,7 +152,7 @@ func handleInstallationReposEvent(db *sql.DB, body []byte) {
 
 	if len(payload.RepositoriesAdded) > 0 {
 		repos := parseRepoNames(payload.RepositoriesAdded)
-		if err := tenant.AddTenantRepos(db, tn.ID, repos); err != nil {
+		if err := tenant.AddTenantRepos(ctx, db, tn.ID, repos); err != nil {
 			slog.Error("adding repos", "error", err)
 		}
 	}
@@ -148,7 +160,7 @@ func handleInstallationReposEvent(db *sql.DB, body []byte) {
 	for _, r := range payload.RepositoriesRemoved {
 		parts := strings.SplitN(r.FullName, "/", 2)
 		if len(parts) == 2 {
-			if err := tenant.DeactivateTenantRepo(db, tn.ID, parts[0], parts[1]); err != nil {
+			if err := tenant.DeactivateTenantRepo(ctx, db, tn.ID, parts[0], parts[1]); err != nil {
 				slog.Error("deactivating repo", "repo", r.FullName, "error", err)
 			}
 		}

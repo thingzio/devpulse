@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -27,7 +28,7 @@ const cleanExpiredSessionsSQL = `DELETE FROM session WHERE expires_at <= NOW()`
 
 // CreateSession generates a random 256-bit token, stores its SHA-256 hash
 // in the database, and returns the raw token for the cookie.
-func CreateSession(db *sql.DB, tenantID string, ttl time.Duration) (string, error) {
+func CreateSession(ctx context.Context, db *sql.DB, tenantID string, ttl time.Duration) (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("generating session token: %w", err)
@@ -35,7 +36,7 @@ func CreateSession(db *sql.DB, tenantID string, ttl time.Duration) (string, erro
 	rawToken := hex.EncodeToString(raw)
 	hashed := HashToken(rawToken)
 
-	_, err := db.Exec(createSessionSQL, hashed, tenantID, time.Now().Add(ttl))
+	_, err := db.ExecContext(ctx, createSessionSQL, hashed, tenantID, time.Now().Add(ttl))
 	if err != nil {
 		return "", fmt.Errorf("creating session: %w", err)
 	}
@@ -43,9 +44,9 @@ func CreateSession(db *sql.DB, tenantID string, ttl time.Duration) (string, erro
 }
 
 // ValidateSession checks the session token and returns the associated tenant.
-func ValidateSession(db *sql.DB, rawToken string) (*Tenant, error) {
+func ValidateSession(ctx context.Context, db *sql.DB, rawToken string) (*Tenant, error) {
 	hashed := HashToken(rawToken)
-	t, err := scanTenant(db.QueryRow(validateSessionSQL, hashed))
+	t, err := scanTenant(db.QueryRowContext(ctx, validateSessionSQL, hashed))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errSessionInvalid
 	}
@@ -56,8 +57,8 @@ func ValidateSession(db *sql.DB, rawToken string) (*Tenant, error) {
 }
 
 // DestroySession removes a session by its raw token.
-func DestroySession(db *sql.DB, rawToken string) error {
-	_, err := db.Exec(destroySessionSQL, HashToken(rawToken))
+func DestroySession(ctx context.Context, db *sql.DB, rawToken string) error {
+	_, err := db.ExecContext(ctx, destroySessionSQL, HashToken(rawToken))
 	if err != nil {
 		return fmt.Errorf("destroying session: %w", err)
 	}
@@ -65,8 +66,8 @@ func DestroySession(db *sql.DB, rawToken string) error {
 }
 
 // CleanExpiredSessions removes all expired sessions.
-func CleanExpiredSessions(db *sql.DB) (int64, error) {
-	res, err := db.Exec(cleanExpiredSessionsSQL)
+func CleanExpiredSessions(ctx context.Context, db *sql.DB) (int64, error) {
+	res, err := db.ExecContext(ctx, cleanExpiredSessionsSQL)
 	if err != nil {
 		return 0, fmt.Errorf("cleaning expired sessions: %w", err)
 	}

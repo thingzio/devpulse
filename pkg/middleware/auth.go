@@ -38,7 +38,7 @@ func RequireAuth(db *sql.DB, loginURL string) func(http.Handler) http.Handler {
 				return
 			}
 
-			tn, err := tenant.ValidateSession(db, cookie.Value)
+			tn, err := tenant.ValidateSession(r.Context(), db, cookie.Value)
 			if err != nil {
 				slog.Debug("invalid session", "error", err)
 				ClearSessionCookie(w)

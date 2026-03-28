@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -58,8 +59,8 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 }
 
 // UpsertTenant creates or updates a tenant by GitHub ID.
-func UpsertTenant(db *sql.DB, githubID int64, username, email, avatarURL string) (*Tenant, error) {
-	t, err := scanTenant(db.QueryRow(upsertTenantSQL, githubID, username, email, avatarURL))
+func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL string) (*Tenant, error) {
+	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL))
 	if err != nil {
 		return nil, fmt.Errorf("upserting tenant: %w", err)
 	}
@@ -67,8 +68,8 @@ func UpsertTenant(db *sql.DB, githubID int64, username, email, avatarURL string)
 }
 
 // GetTenantByGitHubID returns a tenant by their GitHub user ID.
-func GetTenantByGitHubID(db *sql.DB, githubID int64) (*Tenant, error) {
-	t, err := scanTenant(db.QueryRow(getTenantByGitHubIDSQL, githubID))
+func GetTenantByGitHubID(ctx context.Context, db *sql.DB, githubID int64) (*Tenant, error) {
+	t, err := scanTenant(db.QueryRowContext(ctx, getTenantByGitHubIDSQL, githubID))
 	if err != nil {
 		return nil, fmt.Errorf("getting tenant by github_id: %w", err)
 	}
@@ -76,8 +77,8 @@ func GetTenantByGitHubID(db *sql.DB, githubID int64) (*Tenant, error) {
 }
 
 // GetTenantByID returns a tenant by their internal ID.
-func GetTenantByID(db *sql.DB, tenantID string) (*Tenant, error) {
-	t, err := scanTenant(db.QueryRow(getTenantByIDSQL, tenantID))
+func GetTenantByID(ctx context.Context, db *sql.DB, tenantID string) (*Tenant, error) {
+	t, err := scanTenant(db.QueryRowContext(ctx, getTenantByIDSQL, tenantID))
 	if err != nil {
 		return nil, fmt.Errorf("getting tenant by id: %w", err)
 	}
@@ -85,8 +86,8 @@ func GetTenantByID(db *sql.DB, tenantID string) (*Tenant, error) {
 }
 
 // AcceptToS records that a tenant has accepted the Terms of Service.
-func AcceptToS(db *sql.DB, tenantID string) error {
-	_, err := db.Exec(acceptToSSQL, tenantID)
+func AcceptToS(ctx context.Context, db *sql.DB, tenantID string) error {
+	_, err := db.ExecContext(ctx, acceptToSSQL, tenantID)
 	if err != nil {
 		return fmt.Errorf("accepting ToS: %w", err)
 	}
@@ -94,8 +95,8 @@ func AcceptToS(db *sql.DB, tenantID string) error {
 }
 
 // UpdatePlan sets a tenant's plan and repo limit.
-func UpdatePlan(db *sql.DB, tenantID, plan string, maxRepos int) error {
-	_, err := db.Exec(updatePlanSQL, tenantID, plan, maxRepos)
+func UpdatePlan(ctx context.Context, db *sql.DB, tenantID, plan string, maxRepos int) error {
+	_, err := db.ExecContext(ctx, updatePlanSQL, tenantID, plan, maxRepos)
 	if err != nil {
 		return fmt.Errorf("updating plan: %w", err)
 	}

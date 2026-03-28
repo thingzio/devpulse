@@ -11,6 +11,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 // GitHubAppConfig holds the GitHub App credentials for minting installation tokens.
 type GitHubAppConfig struct {
 	AppID      int64
@@ -62,7 +64,7 @@ func MintInstallationToken(ctx context.Context, cfg *GitHubAppConfig, installati
 	req.Header.Set("Authorization", "Bearer "+appJWT)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requesting installation token: %w", err)
 	}

@@ -103,7 +103,9 @@ func setupTestDB(t *testing.T) *sql.DB {
 func TestUpsertAndGetTenant(t *testing.T) {
 	db := setupTestDB(t)
 
-	tn, err := UpsertTenant(db, 12345, "testuser", "test@example.com", "https://avatar.url")
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 12345, "testuser", "test@example.com", "https://avatar.url")
 	require.NoError(t, err)
 	require.NotEmpty(t, tn.ID)
 	assert.Equal(t, int64(12345), tn.GitHubID)
@@ -111,12 +113,12 @@ func TestUpsertAndGetTenant(t *testing.T) {
 	assert.Equal(t, 3, tn.MaxRepos)
 	assert.Equal(t, "free", tn.Plan)
 
-	got, err := GetTenantByGitHubID(db, 12345)
+	got, err := GetTenantByGitHubID(ctx, db, 12345)
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, got.ID)
 
 	// Upsert updates profile fields
-	tn2, err := UpsertTenant(db, 12345, "newname", "new@example.com", "https://new.url")
+	tn2, err := UpsertTenant(ctx, db, 12345, "newname", "new@example.com", "https://new.url")
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, tn2.ID)
 	assert.Equal(t, "newname", tn2.Username)
@@ -124,42 +126,45 @@ func TestUpsertAndGetTenant(t *testing.T) {
 
 func TestGetTenantByID(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 33333, "iduser", "", "")
+	tn, err := UpsertTenant(ctx, db, 33333, "iduser", "", "")
 	require.NoError(t, err)
 
-	got, err := GetTenantByID(db, tn.ID)
+	got, err := GetTenantByID(ctx, db, tn.ID)
 	require.NoError(t, err)
 	assert.Equal(t, tn.GitHubID, got.GitHubID)
 }
 
 func TestAcceptToS(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 99999, "tosuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 99999, "tosuser", "", "")
 	require.NoError(t, err)
 	require.Nil(t, tn.ToSAcceptedAt)
 
-	err = AcceptToS(db, tn.ID)
+	err = AcceptToS(ctx, db, tn.ID)
 	require.NoError(t, err)
 
-	got, err := GetTenantByGitHubID(db, 99999)
+	got, err := GetTenantByGitHubID(ctx, db, 99999)
 	require.NoError(t, err)
 	require.NotNil(t, got.ToSAcceptedAt)
 }
 
 func TestUpdatePlan(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 44444, "planuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 44444, "planuser", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, "free", tn.Plan)
 	assert.Equal(t, 3, tn.MaxRepos)
 
-	err = UpdatePlan(db, tn.ID, "pro", 20)
+	err = UpdatePlan(ctx, db, tn.ID, "pro", 20)
 	require.NoError(t, err)
 
-	got, err := GetTenantByID(db, tn.ID)
+	got, err := GetTenantByID(ctx, db, tn.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "pro", got.Plan)
 	assert.Equal(t, 20, got.MaxRepos)
@@ -167,53 +172,56 @@ func TestUpdatePlan(t *testing.T) {
 
 func TestSessionLifecycle(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 55555, "sessuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55555, "sessuser", "", "")
 	require.NoError(t, err)
 
-	rawToken, err := CreateSession(db, tn.ID, 7*24*time.Hour)
+	rawToken, err := CreateSession(ctx, db, tn.ID, 7*24*time.Hour)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawToken)
 
-	got, err := ValidateSession(db, rawToken)
+	got, err := ValidateSession(ctx, db, rawToken)
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, got.ID)
 
-	err = DestroySession(db, rawToken)
+	err = DestroySession(ctx, db, rawToken)
 	require.NoError(t, err)
 
-	_, err = ValidateSession(db, rawToken)
+	_, err = ValidateSession(ctx, db, rawToken)
 	require.Error(t, err)
 }
 
 func TestExpiredSession(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 55556, "expuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55556, "expuser", "", "")
 	require.NoError(t, err)
 
-	rawToken, err := CreateSession(db, tn.ID, -1*time.Hour)
+	rawToken, err := CreateSession(ctx, db, tn.ID, -1*time.Hour)
 	require.NoError(t, err)
 
-	_, err = ValidateSession(db, rawToken)
+	_, err = ValidateSession(ctx, db, rawToken)
 	require.Error(t, err)
 }
 
 func TestCleanExpiredSessions(t *testing.T) {
 	db := setupTestDB(t)
+	ctx := context.Background()
 
-	tn, err := UpsertTenant(db, 55557, "cleanuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55557, "cleanuser", "", "")
 	require.NoError(t, err)
 
 	// Create expired session
-	_, err = CreateSession(db, tn.ID, -1*time.Hour)
+	_, err = CreateSession(ctx, db, tn.ID, -1*time.Hour)
 	require.NoError(t, err)
 
 	// Create valid session
-	_, err = CreateSession(db, tn.ID, 7*24*time.Hour)
+	_, err = CreateSession(ctx, db, tn.ID, 7*24*time.Hour)
 	require.NoError(t, err)
 
-	cleaned, err := CleanExpiredSessions(db)
+	cleaned, err := CleanExpiredSessions(ctx, db)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), cleaned)
 }

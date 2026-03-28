@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -71,8 +72,8 @@ const countTenantReposSQL = `SELECT COUNT(*) FROM tenant_repo WHERE tenant_id = 
 const getTenantMaxReposSQL = `SELECT max_repos FROM tenant WHERE id = $1`
 
 // SaveInstallation stores or updates a GitHub App installation for a tenant.
-func SaveInstallation(db *sql.DB, tenantID string, installationID int64, targetType, targetLogin string, permissions []byte) error {
-	_, err := db.Exec(saveInstallationSQL, tenantID, installationID, targetType, targetLogin, permissions)
+func SaveInstallation(ctx context.Context, db *sql.DB, tenantID string, installationID int64, targetType, targetLogin string, permissions []byte) error {
+	_, err := db.ExecContext(ctx, saveInstallationSQL, tenantID, installationID, targetType, targetLogin, permissions)
 	if err != nil {
 		return fmt.Errorf("saving installation: %w", err)
 	}
@@ -80,8 +81,8 @@ func SaveInstallation(db *sql.DB, tenantID string, installationID int64, targetT
 }
 
 // ListInstallations returns all installations for a tenant.
-func ListInstallations(db *sql.DB, tenantID string) ([]Installation, error) {
-	rows, err := db.Query(listInstallationsSQL, tenantID)
+func ListInstallations(ctx context.Context, db *sql.DB, tenantID string) ([]Installation, error) {
+	rows, err := db.QueryContext(ctx, listInstallationsSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("listing installations: %w", err)
 	}
@@ -99,8 +100,8 @@ func ListInstallations(db *sql.DB, tenantID string) ([]Installation, error) {
 }
 
 // SuspendInstallation marks an installation as suspended.
-func SuspendInstallation(db *sql.DB, installationID int64) error {
-	_, err := db.Exec(suspendInstallationSQL, installationID)
+func SuspendInstallation(ctx context.Context, db *sql.DB, installationID int64) error {
+	_, err := db.ExecContext(ctx, suspendInstallationSQL, installationID)
 	if err != nil {
 		return fmt.Errorf("suspending installation: %w", err)
 	}
@@ -108,28 +109,32 @@ func SuspendInstallation(db *sql.DB, installationID int64) error {
 }
 
 // AddTenantRepos adds repos to a tenant's tracking list, enforcing the plan limit.
-func AddTenantRepos(db *sql.DB, tenantID string, repos []OrgRepo) error {
-	var maxRepos int
-	if err := db.QueryRow(getTenantMaxReposSQL, tenantID).Scan(&maxRepos); err != nil {
-		return fmt.Errorf("getting max repos: %w", err)
-	}
-
-	var currentCount int
-	if err := db.QueryRow(countTenantReposSQL, tenantID).Scan(&currentCount); err != nil {
-		return fmt.Errorf("counting repos: %w", err)
-	}
-
-	if currentCount+len(repos) > maxRepos {
-		return fmt.Errorf("%w: %d + %d > %d", errRepoLimitExceeded, currentCount, len(repos), maxRepos)
-	}
-
-	tx, err := db.Begin()
+// The count check and inserts are in the same transaction to prevent races.
+func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []OrgRepo) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning tx: %w", err)
 	}
 
+	var maxRepos int
+	if err := tx.QueryRowContext(ctx, getTenantMaxReposSQL, tenantID).Scan(&maxRepos); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("getting max repos: %w", err)
+	}
+
+	var currentCount int
+	if err := tx.QueryRowContext(ctx, countTenantReposSQL, tenantID).Scan(&currentCount); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("counting repos: %w", err)
+	}
+
+	if currentCount+len(repos) > maxRepos {
+		_ = tx.Rollback()
+		return fmt.Errorf("%w: %d + %d > %d", errRepoLimitExceeded, currentCount, len(repos), maxRepos)
+	}
+
 	for _, r := range repos {
-		if _, err := tx.Exec(addTenantRepoSQL, tenantID, r.Org, r.Repo); err != nil {
+		if _, err := tx.ExecContext(ctx, addTenantRepoSQL, tenantID, r.Org, r.Repo); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("adding repo %s/%s: %w", r.Org, r.Repo, err)
 		}
@@ -139,8 +144,8 @@ func AddTenantRepos(db *sql.DB, tenantID string, repos []OrgRepo) error {
 }
 
 // ListTenantRepos returns all active repos for a tenant.
-func ListTenantRepos(db *sql.DB, tenantID string) ([]TenantRepo, error) {
-	rows, err := db.Query(listTenantReposSQL, tenantID)
+func ListTenantRepos(ctx context.Context, db *sql.DB, tenantID string) ([]TenantRepo, error) {
+	rows, err := db.QueryContext(ctx, listTenantReposSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repos: %w", err)
 	}
@@ -158,8 +163,8 @@ func ListTenantRepos(db *sql.DB, tenantID string) ([]TenantRepo, error) {
 }
 
 // DeactivateTenantRepo marks a repo as inactive.
-func DeactivateTenantRepo(db *sql.DB, tenantID, org, repo string) error {
-	_, err := db.Exec(deactivateTenantRepoSQL, tenantID, org, repo)
+func DeactivateTenantRepo(ctx context.Context, db *sql.DB, tenantID, org, repo string) error {
+	_, err := db.ExecContext(ctx, deactivateTenantRepoSQL, tenantID, org, repo)
 	if err != nil {
 		return fmt.Errorf("deactivating repo: %w", err)
 	}

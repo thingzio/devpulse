@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -42,10 +43,10 @@ const tenantRepoOverviewSQL = `
 	ORDER BY tr.org, tr.repo`
 
 // GetRepoOverview returns repo overview data scoped to a tenant's tracked repos.
-func GetRepoOverview(db *sql.DB, tenantID string, months int) ([]RepoOverview, error) {
+func GetRepoOverview(ctx context.Context, db *sql.DB, tenantID string, months int) ([]RepoOverview, error) {
 	since := time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
 
-	rows, err := db.Query(tenantRepoOverviewSQL, tenantID, since)
+	rows, err := db.QueryContext(ctx, tenantRepoOverviewSQL, tenantID, since)
 	if err != nil {
 		return nil, fmt.Errorf("querying tenant repo overview: %w", err)
 	}

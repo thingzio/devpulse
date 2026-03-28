@@ -22,8 +22,8 @@ const (
 
 // SeriesData is a generic type for chart series responses.
 type SeriesData[T any] struct {
-	Labels []string `json:"labels" yaml:"labels"`
-	Data   []T      `json:"data" yaml:"data"`
+	Labels []string `json:"labels"`
+	Data   []T      `json:"data"`
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

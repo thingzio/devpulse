@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
@@ -41,8 +42,8 @@ type ActiveInstallation struct {
 }
 
 // GetActiveTenants returns all tenants that have accepted ToS and have active repos.
-func GetActiveTenants(db *sql.DB) ([]ActiveTenant, error) {
-	rows, err := db.Query(getActiveTenantsSQL)
+func GetActiveTenants(ctx context.Context, db *sql.DB) ([]ActiveTenant, error) {
+	rows, err := db.QueryContext(ctx, getActiveTenantsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("querying active tenants: %w", err)
 	}
@@ -60,8 +61,8 @@ func GetActiveTenants(db *sql.DB) ([]ActiveTenant, error) {
 }
 
 // GetActiveInstallations returns non-suspended installations for a tenant.
-func GetActiveInstallations(db *sql.DB, tenantID string) ([]ActiveInstallation, error) {
-	rows, err := db.Query(getActiveInstallationsSQL, tenantID)
+func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string) ([]ActiveInstallation, error) {
+	rows, err := db.QueryContext(ctx, getActiveInstallationsSQL, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("querying installations: %w", err)
 	}
@@ -79,8 +80,8 @@ func GetActiveInstallations(db *sql.DB, tenantID string) ([]ActiveInstallation, 
 }
 
 // GetActiveReposForInstall returns active repos for a tenant's installation.
-func GetActiveReposForInstall(db *sql.DB, tenantID string, installationID int64) ([]ActiveRepo, error) {
-	rows, err := db.Query(getActiveReposForInstallSQL, tenantID, installationID)
+func GetActiveReposForInstall(ctx context.Context, db *sql.DB, tenantID string, installationID int64) ([]ActiveRepo, error) {
+	rows, err := db.QueryContext(ctx, getActiveReposForInstallSQL, tenantID, installationID)
 	if err != nil {
 		return nil, fmt.Errorf("querying repos: %w", err)
 	}

@@ -13,9 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -52,7 +50,11 @@ const (
 	serverWriteTimeout      = 60 * time.Second
 	serverIdleTimeout       = 120 * time.Second
 	serverMaxHeaderBytes    = 20
+	externalHTTPTimeout     = 10 * time.Second
 )
+
+// httpClient is used for all outbound HTTP calls (GitHub API, etc.)
+var httpClient = &http.Client{Timeout: externalHTTPTimeout}
 
 var (
 	version = "dev"
@@ -65,8 +67,8 @@ func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
 }
 
-// Run starts the HTTP server. It blocks until a shutdown signal is received.
-func Run(_ context.Context, db *sql.DB, store data.Store) error {
+// Run starts the HTTP server. It blocks until the context is canceled.
+func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 	port := os.Getenv("PORT")
 	baseURL := strings.TrimRight(os.Getenv("BASE_URL"), "/")
 
@@ -90,17 +92,20 @@ func Run(_ context.Context, db *sql.DB, store data.Store) error {
 		MaxHeaderBytes:    1 << serverMaxHeaderBytes,
 	}
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
+	errCh := make(chan error, 1)
 	go func() {
 		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("failed to start", "error", err)
+			errCh <- err
 		}
 	}()
 
 	slog.Info("server started", "address", address)
-	<-done
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("server failed: %w", err)
+	case <-ctx.Done():
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -271,7 +276,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 			return
 		}
 
-		tn, err := tenant.UpsertTenant(db, user.ID, user.Login, user.Email, user.AvatarURL)
+		tn, err := tenant.UpsertTenant(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL)
 		if err != nil {
 			slog.Error("upserting tenant", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -280,7 +285,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 
 		slog.Info("user signed in", "username", tn.Username, "tenant_id", tn.ID)
 
-		sessionToken, err := tenant.CreateSession(db, tn.ID, sessionTTL)
+		sessionToken, err := tenant.CreateSession(r.Context(), db, tn.ID, sessionTTL)
 		if err != nil {
 			slog.Error("creating session", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -301,7 +306,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 func signoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if cookie, err := r.Cookie(middleware.SessionCookieName()); err == nil {
-			if derr := tenant.DestroySession(db, cookie.Value); derr != nil {
+			if derr := tenant.DestroySession(r.Context(), db, cookie.Value); derr != nil {
 				slog.Debug("destroying session", "error", derr)
 			}
 		}
@@ -323,7 +328,7 @@ func tosAcceptHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		if err := tenant.AcceptToS(db, tn.ID); err != nil {
+		if err := tenant.AcceptToS(r.Context(), db, tn.ID); err != nil {
 			slog.Error("accepting tos", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -333,14 +338,14 @@ func tosAcceptHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func tenantListHandler(db *sql.DB, label string, queryFn func(*sql.DB, string) (any, error)) http.HandlerFunc {
+func tenantListHandler(db *sql.DB, label string, queryFn func(context.Context, *sql.DB, string) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		result, err := queryFn(db, tn.ID)
+		result, err := queryFn(r.Context(), db, tn.ID)
 		if err != nil {
 			slog.Error("listing "+label, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -351,14 +356,14 @@ func tenantListHandler(db *sql.DB, label string, queryFn func(*sql.DB, string) (
 }
 
 func listReposHandler(db *sql.DB) http.HandlerFunc {
-	return tenantListHandler(db, "repos", func(d *sql.DB, id string) (any, error) {
-		return tenant.ListTenantRepos(d, id)
+	return tenantListHandler(db, "repos", func(ctx context.Context, d *sql.DB, id string) (any, error) {
+		return tenant.ListTenantRepos(ctx, d, id)
 	})
 }
 
 func listInstallationsHandler(db *sql.DB) http.HandlerFunc {
-	return tenantListHandler(db, "installations", func(d *sql.DB, id string) (any, error) {
-		return tenant.ListInstallations(d, id)
+	return tenantListHandler(db, "installations", func(ctx context.Context, d *sql.DB, id string) (any, error) {
+		return tenant.ListInstallations(ctx, d, id)
 	})
 }
 
@@ -386,7 +391,7 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := tenant.AddTenantRepos(db, tn.ID, []tenant.OrgRepo{{Org: org, Repo: repo}}); err != nil {
+		if err := tenant.AddTenantRepos(r.Context(), db, tn.ID, []tenant.OrgRepo{{Org: org, Repo: repo}}); err != nil {
 			slog.Error("adding repo", "error", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -406,7 +411,7 @@ func isPublicRepo(ctx context.Context, org, repo string) bool {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // constant base URL
+	resp, err := httpClient.Do(req) //nolint:gosec // constant base URL
 	if err != nil {
 		return false
 	}
@@ -422,7 +427,7 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		overview, err := tenant.GetRepoOverview(db, tn.ID, 6)
+		overview, err := tenant.GetRepoOverview(r.Context(), db, tn.ID, 6)
 		if err != nil {
 			slog.Error("getting repo overview", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -447,7 +452,7 @@ func deleteRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := tenant.DeactivateTenantRepo(db, tn.ID, org, repo); err != nil {
+		if err := tenant.DeactivateTenantRepo(r.Context(), db, tn.ID, org, repo); err != nil {
 			slog.Error("deactivating repo", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
@@ -481,7 +486,7 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 		}
 		req.Header.Set("Accept", "application/vnd.github+json")
 
-		resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL constructed from constant base + user query param
+		resp, err := httpClient.Do(req) //nolint:gosec // URL constructed from constant base + user query param
 		if err != nil {
 			slog.Error("searching github repos", "error", err)
 			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
@@ -505,7 +510,7 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Filter out already-tracked repos
-		tracked, _ := tenant.ListTenantRepos(db, tn.ID)
+		tracked, _ := tenant.ListTenantRepos(r.Context(), db, tn.ID)
 		trackedSet := make(map[string]bool, len(tracked))
 		for _, tr := range tracked {
 			trackedSet[tr.Org+"/"+tr.Repo] = true
@@ -523,8 +528,9 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, _ int, v any) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Error("encoding json response", "error", err)
 	}
