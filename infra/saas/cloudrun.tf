@@ -13,7 +13,15 @@ resource "google_cloud_run_v2_service" "serve" {
 
     containers {
       image = "ghcr.io/thingzio/devpulse:latest"
-      args  = ["serve"]
+
+      ports {
+        container_port = 8080
+      }
+
+      env {
+        name  = "PORT"
+        value = "8080"
+      }
 
       env {
         name  = "DATABASE_URL"
@@ -51,6 +59,15 @@ resource "google_cloud_run_v2_service" "serve" {
           memory = "512Mi"
         }
       }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+        }
+        initial_delay_seconds = 2
+        period_seconds        = 3
+        failure_threshold     = 5
+      }
     }
 
     volumes {
@@ -84,7 +101,6 @@ resource "google_cloud_run_v2_job" "import" {
 
       containers {
         image = "ghcr.io/thingzio/devpulse:latest"
-        args  = ["import"]
 
         env {
           name  = "DATABASE_URL"
