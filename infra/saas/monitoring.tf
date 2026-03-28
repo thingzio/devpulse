@@ -20,6 +20,72 @@ resource "google_monitoring_uptime_check_config" "serve" {
   }
 }
 
+# Log-based metrics (free tier)
+
+resource "google_logging_metric" "sign_ins" {
+  name    = "${var.prefix}-sign-ins"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"user signed in\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
+resource "google_logging_metric" "tos_accepted" {
+  name    = "${var.prefix}-tos-accepted"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"tos accepted\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
+resource "google_logging_metric" "import_duration" {
+  name    = "${var.prefix}-import-duration"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"import worker complete\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
+    unit        = "s"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.duration)"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [60, 300, 600, 1800, 3600]
+    }
+  }
+}
+
+resource "google_logging_metric" "import_tenant_count" {
+  name    = "${var.prefix}-import-tenant-count"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"import worker complete\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
+    unit        = "1"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.tenants)"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [10, 50, 100, 200, 500, 1000]
+    }
+  }
+}
+
+# Alert policies
+
 resource "google_monitoring_alert_policy" "error_rate" {
   display_name = "${var.prefix}-error-rate"
   project      = var.project_id
