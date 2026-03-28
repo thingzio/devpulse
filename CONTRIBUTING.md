@@ -21,7 +21,7 @@ Before contributing:
 
 1. Read the [README.md](README.md) to understand the project
 2. Check existing [issues](https://github.com/thingzio/devpulse/issues) to avoid duplicates
-3. Set up your development environment following [DEVELOPMENT.md](DEVELOPMENT.md)
+3. Set up your development environment following [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## How to Contribute
 
@@ -48,7 +48,7 @@ Before contributing:
 ### Contributing Code
 
 - Fix bugs, add features, or improve performance
-- Follow the development workflow in [DEVELOPMENT.md](DEVELOPMENT.md)
+- Follow the development workflow in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 - Ensure all tests pass and code meets quality standards
 - Write tests for new functionality
 
@@ -103,7 +103,7 @@ Every released artifact carries verifiable proof of origin and build process.
 
 2. **Update documentation if needed:**
    - README.md for user-facing changes
-   - DEVELOPMENT.md for developer workflow changes
+   - docs/DEVELOPMENT.md for developer workflow changes
 
 3. **Sign your commits:**
    ```bash
@@ -183,7 +183,7 @@ Explain the problem being solved and why this approach was chosen.
 
 ## Additional Resources
 
-- [DEVELOPMENT.md](DEVELOPMENT.md) - Development setup, architecture, and tooling
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development setup, architecture, and tooling
 - [README.md](README.md) - Project overview and quick start
 
 Thank you for contributing to devpulse!

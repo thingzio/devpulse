@@ -4,10 +4,9 @@
 
 ```bash
 git clone https://github.com/thingzio/devpulse.git && cd devpulse
-make tidy           # format code and vendor dependencies
-make test           # unit tests with race detector
-make lint           # go vet + golangci-lint + yamllint
-make build          # build binary for current platform
+make up             # start local Postgres
+make server         # run HTTP server on :8080
+make import         # run import worker (needs GITHUB_TOKEN)
 make qualify        # full check: test + lint + vulncheck + e2e
 ```
 
@@ -18,58 +17,77 @@ make qualify        # full check: test + lint + vulncheck + e2e
 | Tool | Purpose | Installation |
 |------|---------|--------------|
 | **Go 1.26+** | Language runtime | [golang.org/dl](https://golang.org/dl/) |
+| **Docker** | Local Postgres via docker-compose | [docker.com](https://docs.docker.com/get-docker/) |
 | **make** | Build automation | Pre-installed on macOS; `apt install make` on Ubuntu/Debian |
-| **git** | Version control | Pre-installed on most systems |
 
 ### Development Tools
 
 | Tool | Purpose | Installation |
 |------|---------|--------------|
 | golangci-lint | Go linting | [golangci-lint.run](https://golangci-lint.run/welcome/install/) |
-| yamllint | YAML linting | `pip install yamllint` or `brew install yamllint` |
+| yamllint | YAML linting | `pip install yamllint` |
 | govulncheck | Vulnerability scanning | `go install golang.org/x/vuln/cmd/govulncheck@latest` |
 | goreleaser | Release builds | [goreleaser.com](https://goreleaser.com/install/) |
-| jq | JSON processing (e2e tests) | `brew install jq` or `apt install jq` |
-| yq | YAML processing (.settings.yaml) | `brew install yq` or [github.com/mikefarah/yq](https://github.com/mikefarah/yq) |
+| yq | YAML processing | [github.com/mikefarah/yq](https://github.com/mikefarah/yq) |
+| psql | Database shell | Included with PostgreSQL client tools |
 
 Tool versions and quality thresholds are centralized in `.settings.yaml`.
 
-## Development Workflow
+## Local Development
 
-### 1. Create a branch
+### Environment
 
-```bash
-git checkout -b feat/my-feature
+All configuration is via env vars. The Makefile defaults to the local docker-compose Postgres:
+
+```
+DATABASE_URL=postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable
 ```
 
-### 2. Make changes
-
-- Read existing code in the package before modifying it
-- Write tests alongside your code
-- Small, focused commits — each addresses one logical change
-
-### 3. Test and lint
+For OAuth sign-in, set these before running `make server`:
 
 ```bash
-make test           # unit tests with race detector
-make lint           # go vet + golangci-lint + yamllint
+export GITHUB_OAUTH_CLIENT_ID="your-client-id"
+export GITHUB_OAUTH_CLIENT_SECRET="your-client-secret"
+export BASE_URL="http://localhost:8080"
 ```
 
-### 4. Run locally
+For the import worker:
 
 ```bash
-make server         # start dashboard with debug logging
+export GITHUB_TOKEN="ghp_..."
 ```
 
-### 5. Qualify before submitting
+### Workflow
 
 ```bash
-make qualify        # test + lint + vulncheck + e2e
+make up             # start Postgres (data persists in pgdata volume)
+make server         # serve mode: PORT=8080, opens http://localhost:8080
+make import         # import mode: no PORT, runs once and exits
+make stats          # show tenant count, repos, recent sign-ins
+make db             # open psql shell
+make down           # stop Postgres (data preserved)
 ```
 
-This must pass before any PR is submitted.
+### Mode Selection
+
+The binary has no subcommands or flags. Mode is determined by the `PORT` env var:
+- `PORT` set → HTTP server (dashboard, API, OAuth, webhooks)
+- `PORT` unset → import worker (iterates tenants, imports repos, exits)
+
+Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
 ## Make Targets
+
+### Local Development
+
+| Target | Description |
+|--------|-------------|
+| `make up` | Start local Postgres (docker compose) |
+| `make down` | Stop local Postgres |
+| `make server` | Run HTTP server on :8080 |
+| `make import` | Run import worker |
+| `make db` | Open psql shell to local Postgres |
+| `make stats` | Show tenant and repo stats |
 
 ### Quality
 
@@ -80,24 +98,17 @@ This must pass before any PR is submitted.
 | `make test-coverage` | Tests with coverage threshold enforcement |
 | `make lint` | Go + YAML linting |
 | `make vulncheck` | Vulnerability scanning with govulncheck |
-| `make e2e` | End-to-end CLI tests |
-| `make bench` | Run benchmarks |
+| `make e2e` | End-to-end tests |
 
-### Build
+### Build & Release
 
 | Target | Description |
 |--------|-------------|
 | `make build` | Build binary for current OS/arch (output in `./dist`) |
 | `make release` | Full release with goreleaser (snapshot) |
-| `make local` | Build and install binary to `/usr/local/bin` |
-
-### Release
-
-| Target | Description |
-|--------|-------------|
-| `make bump-patch` | Bump patch version (0.10.1 → 0.10.2) and push tag |
-| `make bump-minor` | Bump minor version (0.10.1 → 0.11.0) and push tag |
-| `make bump-major` | Bump major version (0.10.1 → 1.0.0) and push tag |
+| `make bump-patch` | Bump patch version and push tag |
+| `make bump-minor` | Bump minor version and push tag |
+| `make bump-major` | Bump major version and push tag |
 
 Pushing a version tag triggers the CI release workflow (goreleaser build, container image push, Cloud Run deploy).
 
@@ -110,7 +121,6 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | `make clean` | Clean build artifacts |
 | `make clean-all` | Deep clean including Go module cache |
 | `make info` | Print version, commit, branch, Go version, linter version |
-| `make server` | Start dev server with debug logging |
 | `make help` | Show all available targets |
 
 ## Debugging
@@ -123,18 +133,13 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | Linter errors | Run `make lint` and fix reported issues |
 | Build failures | Run `make tidy` to update dependencies |
 | Import hits rate limit | Re-run; the importer uses jitter backoff automatically |
-| `make server` fails | Ensure you have imported data first (`devpulse import --org <org>`) |
+| `make server` fails | Ensure Postgres is running (`make up`) and `DATABASE_URL` is set |
 
 ### Running Specific Tests
 
 ```bash
-# Single test with verbose output
-go test -v ./pkg/data/... -run TestSpecificFunction
-
-# Tests with race detector
+go test -v ./pkg/tenant/... -run TestSpecificFunction
 go test -race ./...
-
-# Coverage report
 go test -coverprofile=cover.out ./...
 go tool cover -html=cover.out
 ```
@@ -142,18 +147,24 @@ go tool cover -html=cover.out
 ### Debug Logging
 
 ```bash
-# Via make
+# Via make (already sets DEVPULSE_DEBUG=true)
 make server
 
 # Directly
-go run ./cmd/devpulse server --debug
+DEVPULSE_DEBUG=true DATABASE_URL="postgres://..." PORT=8080 go run ./cmd/devpulse
+```
 
-# JSON format (useful for cloud environments or log aggregators)
-go run ./cmd/devpulse server --debug --log-json
+All logs are JSON to stderr. Use `jq` for local filtering:
+
+```bash
+make server 2>&1 | jq 'select(.level=="ERROR")'
 ```
 
 ## Related Documentation
 
-- [README.md](README.md) — project overview
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture and design
+- [README.md](../README.md) — project overview
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — contribution guidelines
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and design
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — GCP scaling plan
+- [BOOTSTRAP.md](BOOTSTRAP.md) — GCP deployment guide
+- [MONITORING.md](MONITORING.md) — metrics, alerts, scaling signals

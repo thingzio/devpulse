@@ -15,7 +15,7 @@ make lint       # go vet + golangci-lint
 make qualify    # test + lint + govulncheck + e2e
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for prerequisites, make targets, and debugging.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites, make targets, and debugging.
 
 ## Architecture
 

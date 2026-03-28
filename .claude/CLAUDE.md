@@ -86,7 +86,7 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
 - Boring first — default to proven, simple technologies
 - Observability is mandatory — structured logging
 - Correctness must be reproducible — same inputs, same outputs
-- Trust requires verifiable provenance — SBOM, Sigstore, GitHub attestations
+- Trust requires verifiable provenance — container images built in CI, govulncheck, dependency pinning
 
 ## Decision Framework
 

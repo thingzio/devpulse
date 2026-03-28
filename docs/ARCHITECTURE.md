@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for GitHub project health analytics. Single `devpulse` binary, mode selected by `PORT` env var. PostgreSQL with Row-Level Security for tenant isolation.
 
-## High-Level Data Flow
+## Data Flow
 
 ```
 GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
@@ -18,107 +18,96 @@ devpulse/
 ├── pkg/
 │   ├── server/             HTTP server, handlers, templates, static assets
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
-│   │   └── templates/      HTML templates: header, home (tabbed dashboard), footer
+│   │   └── templates/      HTML templates: header, home, footer, landing, tos
 │   ├── importer/           Tenant import worker
 │   ├── data/               Store interface, shared types, helpers
 │   │   ├── postgres/       PostgreSQL Store implementation + migrations
 │   │   └── ghutil/         Shared GitHub API helpers (rate limiting, user mapping)
 │   ├── tenant/             Tenant CRUD, sessions, GitHub App JWT, installations
-│   ├── middleware/         Auth middleware, tenant scope injection (RLS)
-│   ├── oauth/              GitHub OAuth web flow (SaaS sign-in)
-│   ├── auth/               GitHub OAuth device flow + OS keychain (CLI only)
-│   ├── logging/            Structured logging setup (slog)
+│   ├── middleware/         Auth middleware, tenant scope (RLS via dedicated conn)
+│   ├── oauth/              GitHub OAuth web flow
+│   ├── logging/            JSON structured logging setup
 │   └── net/                HTTP client utilities with rate limit handling
-├── config/                 Sync config files (YAML, org/repo lists)
-├── infra/gcp/              Terraform for self-hosted GCP infrastructure
-├── infra/saas/             Terraform for SaaS GCP infrastructure
+├── infra/saas/             Terraform for GCP infrastructure
 ├── tools/                  Dev scripts (version bump, shared helpers)
 ├── docs/                   Documentation
-├── .github/                CI/CD workflows and composite actions
+├── .github/                CI/CD workflows, composite actions, CODEOWNERS
 └── .settings.yaml          Centralized tool versions and quality thresholds
 ```
 
-## CLI Commands
+## Mode Selection
 
-| Command | Purpose |
-|---------|---------|
-| `auth` | GitHub OAuth device flow, stores token in OS keychain |
-| `import` | Fetch events, affiliations, metadata, releases, reputation from GitHub API |
-| `score` | Deep-score lowest-reputation contributors via GitHub API |
-| `sync` | Scheduled import + score for one repo from a config file (round-robin by hour) |
-| `delete` | Remove imported data for an org or repo |
-| `substitute` | Normalize entity names (e.g., rename company aliases) |
-| `query` | Export data as JSON for scripting |
-| `server` | Start local dashboard HTTP server |
-| `reset` | Delete all data and start fresh |
+Single binary, env var driven:
+- `PORT` set → `pkg/server.Run()` — HTTP server (dashboard, API, OAuth, webhooks)
+- `PORT` unset → `pkg/importer.Run()` — batch import worker
 
 ## Data Layer
 
-### Database
-
-Two backends, selected by the `--db` flag or `DEVPULSE_DB` env var:
-
-- **SQLite** (default) — via [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), pure Go, no CGO. Database file at `~/.devpulse/data.db`.
-- **PostgreSQL** — via [`github.com/lib/pq`](https://pkg.go.dev/github.com/lib/pq). Pass a `postgres://` connection URI.
-
-Both backends implement the `data.Store` interface. Schema migrations are applied automatically on startup from `pkg/data/{sqlite,postgres}/sql/migrations/`.
+**PostgreSQL only** — via [`github.com/lib/pq`](https://pkg.go.dev/github.com/lib/pq). Connection URI via `DATABASE_URL` env var. Migrations run automatically on startup.
 
 ### Key Tables
 
 | Table | Purpose |
 |-------|---------|
-| `event` | Contribution events (PRs, reviews, issues, comments, forks) with timing metadata |
-| `developer` | Developer profiles, entity affiliations, reputation scores (shallow + deep) |
-| `repo_meta` | Repository metadata (stars, forks, language, license, last import timestamp, community profile: has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct) |
+| `event` | Contribution events (PRs, reviews, issues, comments, forks) |
+| `developer` | Developer profiles, entity affiliations, reputation scores |
+| `repo_meta` | Repository metadata (stars, forks, language, license, community profile) |
 | `repo_metric_history` | Daily star/fork counts for trend charts |
-| `release` | Release tags, dates, and download counts |
+| `release` | Release tags, dates |
 | `release_asset` | Per-asset download counts |
-| `container_package` | Container image versions |
+| `container_version` | Container image versions |
 | `state` | Import pagination state for incremental fetches |
 | `sub` | Entity name substitution rules |
-| `repo_insights` | LLM-generated observations per repo (org, repo, insights_json, period_months, model, generated_at) |
-| `schema_version` | Migration tracking |
+| `repo_insights` | LLM-generated observations per repo |
+| `tenant` | Registered tenants (GitHub identity, plan, ToS) |
+| `tenant_repo` | Repos tracked per tenant |
+| `tenant_member` | Multi-user tenant membership |
+| `session` | Server-side sessions (SHA-256 hashed tokens) |
+| `github_app_installation` | GitHub App installations per tenant |
 
 ### Query Patterns
 
-- **Optional filters**: `WHERE col = COALESCE(?, col)` — pass `nil` for no filter, a value to filter
-- **Entity filter on nullable column**: `IFNULL(d.entity, '') = COALESCE(?, IFNULL(d.entity, ''))` (SQLite) / `COALESCE(d.entity, '') = COALESCE(?, COALESCE(d.entity, ''))` (PostgreSQL)
-- **Upserts**: `INSERT ... ON CONFLICT(...) DO UPDATE SET` for idempotent imports
+- **Optional filters**: `WHERE col = COALESCE(?, col)`
+- **Upserts**: `INSERT ... ON CONFLICT(...) DO UPDATE SET`
 - **Transactions**: Explicit `BEGIN`/`COMMIT` with rollback on error
+- **Repo limit**: Count check inside transaction to prevent races
+
+### Migrations
+
+Two migration sets, both using `applyMigrations()` in `pkg/data/postgres/migrate.go`:
+- `sql/migrations/001_initial.sql` — base tables (schema_version, advisory lock 1)
+- `sql/migrations_saas/001_initial.sql` — tenant tables + RLS policies (saas_schema_version, advisory lock 2)
+
+## Tenant Isolation
+
+PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
+- Middleware acquires a dedicated `db.Conn()` per request
+- Sets `app.tenant_id` via parameterized `set_config($1, false)`
+- Global tables (event, developer, etc.) filtered via JOIN to `tenant_repo`
+- Tenant-scoped tables filtered by direct `tenant_id` column
 
 ## Import Pipeline
 
-The import command runs these steps sequentially:
+The import worker (`pkg/importer/`) iterates active tenants and runs per-repo:
 
-1. **Events** — fetch PRs, reviews, issues, comments, forks from GitHub API (concurrent, batched, with rate limit backoff and pagination state)
-2. **Affiliations** — match developers to companies via CNCF gitdm data and GitHub profiles
-3. **Substitutions** — apply user-defined entity name normalizations
-4. **Metadata** — fetch repo stars, forks, open issues, language, license (updates `last_import_at` timestamp)
-5. **Releases** — fetch release tags, dates, asset downloads
-6. **Metric history** — backfill daily star/fork counts (30-day window)
-7. **Reputation** — compute shallow reputation scores from local data (no API calls). Skips contributors who already have deep scores.
+1. **Metadata** — repo stars, forks, language, license (skips if fresh < 24h)
+2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)
+3. **Releases** — tags, dates, asset downloads
+4. **Metric history** — daily star/fork counts
+5. **Container versions** — image version tracking
+6. **Reputation** — shallow scores from local data
 
-Running `import` with no flags re-runs all steps for every previously imported org/repo. Pagination state enables incremental imports — only new data since the last run is fetched.
-
-### Sync Pipeline
-
-The `sync` command is designed for scheduled (e.g., hourly) execution:
-
-1. Loads a config file listing org/repo targets
-2. Picks one repo via round-robin (`UTC hour % total repos`)
-3. Runs the full import pipeline for that repo
-4. Deep-scores lowest-reputation contributors (per-repo `reputation.scoreCount`)
-5. Insights — generates LLM-based observations via Anthropic API (if `ANTHROPIC_API_KEY` is set)
-6. Logs a structured `sync_summary` with timing metrics
+Token resolution: `GITHUB_TOKEN` env var (fallback) or GitHub App installation tokens (planned).
 
 ## Dashboard
 
 ### Server
 
-The HTTP server (`pkg/cli/server.go`) serves:
+The HTTP server (`pkg/server/server.go`) serves:
 - **Static assets** — CSS, JS, images via `go:embed` filesystem
 - **HTML templates** — Go `html/template` with header/home/footer structure
-- **Data API** — 20+ JSON endpoints under `/data/` for chart data, including `/data/insights/issue-ratio`, `/data/insights/time-to-first-response`, `/data/insights/generated`
+- **Data API** — 30+ JSON endpoints under `/data/` for chart data (all authenticated)
+- **Tenant API** — `/api/repos/*` for repo management (overview, add, remove, search)
 
 ### Frontend
 
@@ -130,26 +119,21 @@ The HTTP server (`pkg/cli/server.go`) serves:
 
 The dashboard is organized into:
 1. **Top bar** — search input (`org:` / `repo:` prefix), period selector, theme toggle
-2. **Summary banner** — global counts (orgs, repos, events, contributors, last import timestamp in GMT). Shows datetime when a repo is selected, date-only otherwise.
+2. **Summary banner** — global counts (orgs, repos, events, contributors, last import)
 3. **Seven tabs** — Health, Activity, Velocity, Quality, Community, Events, Insights
+4. **Repository Overview** — table with add/remove, search autocomplete via GitHub API
 
-Charts load lazily per tab — only the active tab's API calls are made. Tab state persists in the URL hash (`#health`, `#activity`, etc.) for browser navigation.
-
-The Health tab includes a **Repository Overview** table showing all repos with stars, forks, events, contributors, scored count, language, license, and last import date.
-
-### Theme
-
-Dark/light mode toggle with CSS custom properties. Theme preference saved to `localStorage`. Chart colors adapt via `Chart.defaults` overrides.
+Charts load lazily per tab. Tab state persists in the URL hash.
 
 ## Authentication
 
-GitHub OAuth device flow (`pkg/auth/`):
-1. Request device code from GitHub
-2. User authorizes in browser
-3. Poll for access token
-4. Store token in OS keychain (macOS Keychain, Linux secret service, Windows Credential Manager)
-
-Alternatively, set `GITHUB_TOKEN` environment variable to skip the auth flow. Multiple comma-separated tokens are supported for round-robin rotation in the `sync` command.
+GitHub OAuth web flow (`pkg/oauth/`):
+1. User clicks "Sign in with GitHub"
+2. Redirect to GitHub OAuth authorize endpoint
+3. Callback exchanges code for token, fetches user profile
+4. OAuth token discarded immediately — not stored
+5. Tenant upserted, session created (SHA-256 hashed, stored in DB)
+6. Session cookie set (`__Host-session` on HTTPS, `session` on HTTP)
 
 ## Rate Limit Handling
 
@@ -167,7 +151,7 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
-| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to SaaS Cloud Run |
+| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
 | `codeql-analysis.yaml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 | `scan-on-schedule.yaml` | schedule | Vulnerability scanning |
 | `score-on-schedule.yaml` | schedule | Scheduled reputation scoring |
@@ -178,5 +162,6 @@ GitHub Actions workflows in `.github/workflows/`:
 - **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`)
 - **Vulnerability scanning** — govulncheck in CI, Trivy on schedule
 - **Dependency pinning** — all GitHub Actions pinned by commit hash
+- **CODEOWNERS** — `.github/` directory protected
 
 Tool versions and quality thresholds are centralized in `.settings.yaml`.
