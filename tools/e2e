@@ -1,65 +1,138 @@
 #!/bin/bash
 set -euo pipefail
 
-err() { echo "FAIL: $*" >&2; exit 1; }
+err() { echo "FAIL: $*" >&2; FAILURES=$((FAILURES + 1)); }
 pass() { echo "PASS: $*"; }
 
-# Require dependencies
-command -v go >/dev/null 2>&1 || err "go is required"
+command -v go >/dev/null 2>&1 || { echo "FAIL: go is required" >&2; exit 1; }
+command -v curl >/dev/null 2>&1 || { echo "FAIL: curl is required" >&2; exit 1; }
 
-# Build binaries to temp directory, clean up on exit
 TMPDIR_E2E=$(mktemp -d)
-trap 'rm -rf "$TMPDIR_E2E"' EXIT
+trap 'kill "$SITE_PID" 2>/dev/null; docker compose down 2>/dev/null; rm -rf "$TMPDIR_E2E"' EXIT
 
 FAILURES=0
+DEV_DB="postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable"
+SITE_PORT=18080
 
-# --------------------------------------------------------------------------
-# Build devpulse-site
-# --------------------------------------------------------------------------
+# ==========================================================================
+# Build
+# ==========================================================================
 echo "==> Building devpulse-site..."
 SITE="$TMPDIR_E2E/devpulse-site"
 go build -mod=vendor -o "$SITE" ./cmd/devpulse-site
-[[ -x "$SITE" ]] || err "devpulse-site binary not found after build"
+[[ -x "$SITE" ]] || { echo "FAIL: devpulse-site binary not found" >&2; exit 1; }
 
-# --------------------------------------------------------------------------
-# Build devpulse-import
-# --------------------------------------------------------------------------
 echo "==> Building devpulse-import..."
 IMPORT="$TMPDIR_E2E/devpulse-import"
 go build -mod=vendor -o "$IMPORT" ./cmd/devpulse-import
-[[ -x "$IMPORT" ]] || err "devpulse-import binary not found after build"
+[[ -x "$IMPORT" ]] || { echo "FAIL: devpulse-import binary not found" >&2; exit 1; }
 
-# --------------------------------------------------------------------------
-# Test: devpulse-site missing DATABASE_URL fails with clear error
-# --------------------------------------------------------------------------
+# ==========================================================================
+# Smoke tests (no DB)
+# ==========================================================================
 if output=$(DATABASE_URL="" "$SITE" 2>&1); then
-  echo "FAIL: site-missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
+  err "site-missing-database-url (expected non-zero exit)"
 else
-  if echo "$output" | grep -qi "DATABASE_URL"; then
-    pass "site-missing-database-url"
-  else
-    echo "FAIL: site-missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
-  fi
+  echo "$output" | grep -qi "DATABASE_URL" && pass "site-missing-database-url" || err "site-missing-database-url (expected DATABASE_URL in error)"
 fi
 
-# --------------------------------------------------------------------------
-# Test: devpulse-import missing DATABASE_URL fails with clear error
-# --------------------------------------------------------------------------
 if output=$(DATABASE_URL="" "$IMPORT" 2>&1); then
-  echo "FAIL: import-missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
+  err "import-missing-database-url (expected non-zero exit)"
 else
-  if echo "$output" | grep -qi "DATABASE_URL"; then
-    pass "import-missing-database-url"
-  else
-    echo "FAIL: import-missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
-  fi
+  echo "$output" | grep -qi "DATABASE_URL" && pass "import-missing-database-url" || err "import-missing-database-url (expected DATABASE_URL in error)"
 fi
 
-# --------------------------------------------------------------------------
+# ==========================================================================
+# Start Postgres
+# ==========================================================================
+echo "==> Starting Postgres..."
+docker compose up -d 2>/dev/null
+for i in $(seq 1 30); do
+  docker compose exec -T db pg_isready -U devpulse >/dev/null 2>&1 && break
+  sleep 1
+done
+docker compose exec -T db pg_isready -U devpulse >/dev/null 2>&1 || { echo "FAIL: Postgres not ready" >&2; exit 1; }
+echo "==> Postgres ready"
+
+# ==========================================================================
+# Start site server
+# ==========================================================================
+echo "==> Starting devpulse-site on port $SITE_PORT..."
+DATABASE_URL="$DEV_DB" PORT="$SITE_PORT" DEVPULSE_DEBUG=true BASE_URL="http://localhost:$SITE_PORT" \
+  "$SITE" >"$TMPDIR_E2E/site.log" 2>&1 &
+SITE_PID=$!
+
+# Wait for site to be ready
+for i in $(seq 1 15); do
+  curl -sf "http://localhost:$SITE_PORT/health" >/dev/null 2>&1 && break
+  sleep 1
+done
+curl -sf "http://localhost:$SITE_PORT/health" >/dev/null 2>&1 || { echo "FAIL: site not ready"; cat "$TMPDIR_E2E/site.log"; exit 1; }
+echo "==> Site ready"
+
+# ==========================================================================
+# HTTP tests
+# ==========================================================================
+
+# Health endpoint
+STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/health")
+[[ "$STATUS" == "200" ]] && pass "GET /health → 200" || err "GET /health → $STATUS (expected 200)"
+
+# Landing page
+STATUS=$(curl -sf -o "$TMPDIR_E2E/landing.html" -w "%{http_code}" "http://localhost:$SITE_PORT/")
+if [[ "$STATUS" == "200" ]] && grep -q "DevPulse" "$TMPDIR_E2E/landing.html"; then
+  pass "GET / → 200 with DevPulse content"
+else
+  err "GET / → $STATUS (expected 200 with DevPulse)"
+fi
+
+# Help page
+STATUS=$(curl -sf -o "$TMPDIR_E2E/help.html" -w "%{http_code}" "http://localhost:$SITE_PORT/help")
+if [[ "$STATUS" == "200" ]] && grep -q "Help" "$TMPDIR_E2E/help.html"; then
+  pass "GET /help → 200 with Help content"
+else
+  err "GET /help → $STATUS (expected 200 with Help)"
+fi
+
+# Auth reset clears cookie and redirects
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/auth/reset")
+[[ "$STATUS" == "302" ]] && pass "GET /auth/reset → 302 redirect" || err "GET /auth/reset → $STATUS (expected 302)"
+
+# Unauthenticated /dashboard redirects to auth
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/dashboard")
+[[ "$STATUS" == "302" ]] && pass "GET /dashboard (unauth) → 302 redirect" || err "GET /dashboard (unauth) → $STATUS (expected 302)"
+
+# Unauthenticated /data/* redirects to auth
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/data/min-date")
+[[ "$STATUS" == "302" ]] && pass "GET /data/min-date (unauth) → 302 redirect" || err "GET /data/min-date (unauth) → $STATUS (expected 302)"
+
+# Unauthenticated /api/repos redirects to auth
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/api/repos")
+[[ "$STATUS" == "302" ]] && pass "GET /api/repos (unauth) → 302 redirect" || err "GET /api/repos (unauth) → $STATUS (expected 302)"
+
+# Static assets served
+STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:$SITE_PORT/static/css/app.css")
+[[ "$STATUS" == "200" ]] && pass "GET /static/css/app.css → 200" || err "GET /static/css/app.css → $STATUS (expected 200)"
+
+# Webhook rejects without signature
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:$SITE_PORT/webhook/github" -d '{}')
+[[ "$STATUS" == "401" || "$STATUS" == "503" ]] && pass "POST /webhook/github (no sig) → $STATUS" || err "POST /webhook/github (no sig) → $STATUS (expected 401 or 503)"
+
+# ==========================================================================
+# Import smoke test (with DB, no token)
+# ==========================================================================
+if output=$(DATABASE_URL="$DEV_DB" GITHUB_TOKEN="" "$IMPORT" 2>&1); then
+  err "import-no-token (expected non-zero exit)"
+else
+  echo "$output" | grep -qi "token\|no.*tenant" && pass "import-no-token (fails gracefully)" || err "import-no-token (unexpected error: $output)"
+fi
+
+# ==========================================================================
 # Summary
-# --------------------------------------------------------------------------
+# ==========================================================================
 echo ""
 if [[ $FAILURES -gt 0 ]]; then
-  err "$FAILURES test(s) failed"
+  echo "FAIL: $FAILURES test(s) failed" >&2
+  exit 1
 fi
 echo "==> All e2e tests passed"
