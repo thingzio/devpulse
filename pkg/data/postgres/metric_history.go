@@ -44,7 +44,7 @@ const (
 	backfillDays = 30
 )
 
-func (s *Store) GetRepoMetricHistory(org, repo *string, months int) ([]*data.RepoMetricHistory, error) {
+func (s *Store) GetRepoMetricHistory(ctx context.Context, org, repo *string, months int) ([]*data.RepoMetricHistory, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -54,9 +54,9 @@ func (s *Store) GetRepoMetricHistory(org, repo *string, months int) ([]*data.Rep
 	var rows *sql.Rows
 	var err error
 	if repo == nil {
-		rows, err = s.db.QueryContext(context.Background(), selectRepoMetricHistoryAggSQL, org, org, since)
+		rows, err = s.db.QueryContext(ctx, selectRepoMetricHistoryAggSQL, org, org, since)
 	} else {
-		rows, err = s.db.QueryContext(context.Background(), selectRepoMetricHistorySQL, org, repo, since)
+		rows, err = s.db.QueryContext(ctx, selectRepoMetricHistorySQL, org, repo, since)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo metric history: %w", err)
@@ -106,7 +106,7 @@ func (s *Store) ImportRepoMetricHistory(ctx context.Context, token, owner, repo 
 
 	history := buildDailyTotals(currentStars, currentForks, starsByDay, forksByDay, backfillDays)
 
-	return s.upsertMetricHistory(owner, repo, history)
+	return s.upsertMetricHistory(ctx, owner, repo, history)
 }
 
 func countRecentStarsByDay(ctx context.Context, client *github.Client, owner, repo string, cutoff time.Time) (map[string]int, error) {
@@ -234,8 +234,8 @@ func buildDailyTotals(currentStars, currentForks int, starsByDay, forksByDay map
 	return result
 }
 
-func (s *Store) upsertMetricHistory(owner, repo string, history []*data.RepoMetricHistory) error {
-	tx, err := s.db.BeginTx(context.Background(), nil)
+func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, history []*data.RepoMetricHistory) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -262,7 +262,7 @@ func (s *Store) upsertMetricHistory(owner, repo string, history []*data.RepoMetr
 }
 
 func (s *Store) ImportAllRepoMetricHistory(ctx context.Context, token string) error {
-	list, err := s.GetAllOrgRepos()
+	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)
 	}

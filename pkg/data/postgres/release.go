@@ -114,17 +114,17 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	var latestPublishedAt string
-	if scanErr := s.db.QueryRowContext(context.Background(), selectLatestReleaseSQL, owner, repo).Scan(&latestPublishedAt); scanErr != nil {
+	if scanErr := s.db.QueryRowContext(ctx, selectLatestReleaseSQL, owner, repo).Scan(&latestPublishedAt); scanErr != nil {
 		return fmt.Errorf("querying latest release for %s/%s: %w", owner, repo, scanErr)
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), insertReleaseSQL)
+	stmt, err := s.db.PrepareContext(ctx, insertReleaseSQL)
 	if err != nil {
 		return fmt.Errorf("error preparing release insert: %w", err)
 	}
 	defer stmt.Close()
 
-	assetStmt, err := s.db.PrepareContext(context.Background(), insertReleaseAssetSQL)
+	assetStmt, err := s.db.PrepareContext(ctx, insertReleaseAssetSQL)
 	if err != nil {
 		return fmt.Errorf("error preparing release asset insert: %w", err)
 	}
@@ -219,7 +219,7 @@ func upsertReleasePage(db DBTX, stmt, assetStmt *sql.Stmt, owner, repo string, r
 }
 
 func (s *Store) ImportAllReleases(ctx context.Context, token string) error {
-	list, err := s.GetAllOrgRepos()
+	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)
 	}
@@ -233,14 +233,14 @@ func (s *Store) ImportAllReleases(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *Store) GetReleaseCadence(org, repo, entity *string, months int) (*data.ReleaseCadenceSeries, error) {
+func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string, months int) (*data.ReleaseCadenceSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectReleaseCadenceSQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, selectReleaseCadenceSQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release cadence: %w", err)
 	}
@@ -273,7 +273,7 @@ func (s *Store) GetReleaseCadence(org, repo, entity *string, months int) (*data.
 		return sr, nil
 	}
 
-	fallbackRows, err := s.db.QueryContext(context.Background(), selectMergedPRDeploymentsSQL, org, repo, entity, since)
+	fallbackRows, err := s.db.QueryContext(ctx, selectMergedPRDeploymentsSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query merged PR deployments: %w", err)
 	}
@@ -296,14 +296,14 @@ func (s *Store) GetReleaseCadence(org, repo, entity *string, months int) (*data.
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloads(org, repo *string, months int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint // different types and SQL than GetContainerActivity
+func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectReleaseDownloadsSQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsSQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads: %w", err)
 	}
@@ -331,14 +331,14 @@ func (s *Store) GetReleaseDownloads(org, repo *string, months int) (*data.Releas
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloadsByTag(org, repo *string, months int) (*data.ReleaseDownloadsByTagSeries, error) {
+func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsByTagSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads by tag: %w", err)
 	}

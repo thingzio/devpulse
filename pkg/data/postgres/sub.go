@@ -17,7 +17,7 @@ const (
 	updateDeveloperPropertySQL = `UPDATE developer SET %s = $1 WHERE %s = $2`
 )
 
-func (s *Store) applyDeveloperSub(sub *data.Substitution) error {
+func (s *Store) applyDeveloperSub(ctx context.Context, sub *data.Substitution) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
@@ -30,7 +30,7 @@ func (s *Store) applyDeveloperSub(sub *data.Substitution) error {
 		return fmt.Errorf("invalid property: %s (permitted options: %v)", sub.Prop, data.UpdatableProperties)
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), fmt.Sprintf(updateDeveloperPropertySQL, sub.Prop, sub.Prop))
+	stmt, err := s.db.PrepareContext(ctx, fmt.Sprintf(updateDeveloperPropertySQL, sub.Prop, sub.Prop))
 	if err != nil {
 		return fmt.Errorf("failed to prepare sql statement: %w", err)
 	}
@@ -51,7 +51,7 @@ func (s *Store) applyDeveloperSub(sub *data.Substitution) error {
 	return nil
 }
 
-func (s *Store) SaveAndApplyDeveloperSub(prop, old, new string) (*data.Substitution, error) {
+func (s *Store) SaveAndApplyDeveloperSub(ctx context.Context, prop, old, new string) (*data.Substitution, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -62,11 +62,11 @@ func (s *Store) SaveAndApplyDeveloperSub(prop, old, new string) (*data.Substitut
 		New:  new,
 	}
 
-	if err := s.applyDeveloperSub(sub); err != nil {
+	if err := s.applyDeveloperSub(ctx, sub); err != nil {
 		return nil, fmt.Errorf("failed to apply developer sub: %w", err)
 	}
 
-	subStmt, err := s.db.PrepareContext(context.Background(), insertSubSQL)
+	subStmt, err := s.db.PrepareContext(ctx, insertSubSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
@@ -79,12 +79,12 @@ func (s *Store) SaveAndApplyDeveloperSub(prop, old, new string) (*data.Substitut
 	return sub, nil
 }
 
-func (s *Store) ApplySubstitutions() ([]*data.Substitution, error) {
+func (s *Store) ApplySubstitutions(ctx context.Context) ([]*data.Substitution, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectSubSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectSubSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare sql statement: %w", err)
 	}
@@ -110,7 +110,7 @@ func (s *Store) ApplySubstitutions() ([]*data.Substitution, error) {
 	}
 
 	for _, sub := range list {
-		if err := s.applyDeveloperSub(sub); err != nil {
+		if err := s.applyDeveloperSub(ctx, sub); err != nil {
 			return nil, fmt.Errorf("failed to apply developer sub: %w", err)
 		}
 	}

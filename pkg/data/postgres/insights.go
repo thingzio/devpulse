@@ -512,7 +512,7 @@ const (
 	`
 )
 
-func (s *Store) GetInsightsSummary(org, repo, entity *string, months int) (*data.InsightsSummary, error) {
+func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *string, months int) (*data.InsightsSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -520,15 +520,15 @@ func (s *Store) GetInsightsSummary(org, repo, entity *string, months int) (*data
 	since := sinceDate(months)
 	summary := &data.InsightsSummary{}
 
-	if err := s.db.QueryRowContext(context.Background(), selectBusFactorSQL, org, repo, entity, since).Scan(&summary.BusFactor); err != nil {
+	if err := s.db.QueryRowContext(ctx, selectBusFactorSQL, org, repo, entity, since).Scan(&summary.BusFactor); err != nil {
 		return nil, fmt.Errorf("failed to query bus factor: %w", err)
 	}
 
-	if err := s.db.QueryRowContext(context.Background(), selectPonyFactorSQL, org, repo, entity, since).Scan(&summary.PonyFactor); err != nil {
+	if err := s.db.QueryRowContext(ctx, selectPonyFactorSQL, org, repo, entity, since).Scan(&summary.PonyFactor); err != nil {
 		return nil, fmt.Errorf("failed to query pony factor: %w", err)
 	}
 
-	if err := s.db.QueryRowContext(context.Background(), selectBannerStatsSQL, org, repo, entity, since).Scan(
+	if err := s.db.QueryRowContext(ctx, selectBannerStatsSQL, org, repo, entity, since).Scan(
 		&summary.Orgs, &summary.Repos, &summary.Events, &summary.Contributors, &summary.LastImport,
 	); err != nil {
 		return nil, fmt.Errorf("failed to query banner stats: %w", err)
@@ -537,14 +537,14 @@ func (s *Store) GetInsightsSummary(org, repo, entity *string, months int) (*data
 	return summary, nil
 }
 
-func (s *Store) GetDailyActivity(org, repo, entity *string, months int) (*data.DailyActivitySeries, error) {
+func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string, months int) (*data.DailyActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectDailyActivitySQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectDailyActivitySQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query daily activity: %w", err)
 	}
@@ -568,14 +568,14 @@ func (s *Store) GetDailyActivity(org, repo, entity *string, months int) (*data.D
 	return series, nil
 }
 
-func getMonthDualSeries[T int | float64](db DBTX, query string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
+func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
 	if db == nil {
 		return nil, nil, nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := db.QueryContext(context.Background(), query, org, repo, entity, since, org, repo, entity, since)
+	rows, err := db.QueryContext(ctx, query, org, repo, entity, since, org, repo, entity, since)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to query month dual series: %w", err)
 	}
@@ -602,22 +602,22 @@ func getMonthDualSeries[T int | float64](db DBTX, query string, org, repo, entit
 	return ms, a, b, nil
 }
 
-func (s *Store) GetContributorRetention(org, repo, entity *string, months int) (*data.RetentionSeries, error) {
-	ms, newC, retC, err := getMonthDualSeries[int](s.db, selectRetentionSQL, org, repo, entity, months)
+func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, months int) (*data.RetentionSeries, error) {
+	ms, newC, retC, err := getMonthDualSeries[int](ctx, s.db, selectRetentionSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}
 	return &data.RetentionSeries{Months: ms, New: newC, Returning: retC}, nil
 }
 
-func (s *Store) GetPRReviewRatio(org, repo, entity *string, months int) (*data.PRReviewRatioSeries, error) {
+func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, months int) (*data.PRReviewRatioSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectPRReviewRatioSQL,
+	rows, err := s.db.QueryContext(ctx, selectPRReviewRatioSQL,
 		data.EventTypePR, data.EventTypePRReview,
 		org, repo, entity, since,
 		data.EventTypePR, data.EventTypePRReview)
@@ -657,7 +657,7 @@ func (s *Store) GetPRReviewRatio(org, repo, entity *string, months int) (*data.P
 	return sr, nil
 }
 
-func (s *Store) GetChangeFailureRate(org, repo, entity *string, months int) (*data.ChangeFailureRateSeries, error) {
+func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *string, months int) (*data.ChangeFailureRateSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -666,7 +666,7 @@ func (s *Store) GetChangeFailureRate(org, repo, entity *string, months int) (*da
 
 	failureMap := make(map[string]int)
 
-	rows, err := s.db.QueryContext(context.Background(), selectChangeFailuresSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectChangeFailuresSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query change failures: %w", err)
 	}
@@ -687,7 +687,7 @@ func (s *Store) GetChangeFailureRate(org, repo, entity *string, months int) (*da
 
 	deployMap := make(map[string]int)
 
-	dRows, err := s.db.QueryContext(context.Background(), selectDeploymentCountSQL, org, repo, since)
+	dRows, err := s.db.QueryContext(ctx, selectDeploymentCountSQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deployment count: %w", err)
 	}
@@ -743,14 +743,14 @@ func (s *Store) GetChangeFailureRate(org, repo, entity *string, months int) (*da
 	return sr, nil
 }
 
-func (s *Store) GetReviewLatency(org, repo, entity *string, months int) (*data.ReviewLatencySeries, error) {
+func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string, months int) (*data.ReviewLatencySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectReviewLatencySQL, since, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectReviewLatencySQL, since, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query review latency: %w", err)
 	}
@@ -781,14 +781,14 @@ func (s *Store) GetReviewLatency(org, repo, entity *string, months int) (*data.R
 	return sr, nil
 }
 
-func (s *Store) getVelocitySeries(query string, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), query, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query velocity series: %w", err)
 	}
@@ -819,26 +819,26 @@ func (s *Store) getVelocitySeries(query string, org, repo, entity *string, month
 	return sr, nil
 }
 
-func (s *Store) GetTimeToMerge(org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(selectTimeToMergeSQL, org, repo, entity, months)
+func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToMergeSQL, org, repo, entity, months)
 }
 
-func (s *Store) GetTimeToClose(org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(selectTimeToCloseSQL, org, repo, entity, months)
+func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToCloseSQL, org, repo, entity, months)
 }
 
-func (s *Store) GetTimeToRestoreBugs(org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(selectTimeToRestoreBugsSQL, org, repo, entity, months)
+func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsSQL, org, repo, entity, months)
 }
 
-func (s *Store) GetPRSizeDistribution(org, repo, entity *string, months int) (*data.PRSizeSeries, error) {
+func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, months int) (*data.PRSizeSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectPRSizeDistributionSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectPRSizeDistributionSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query PR size distribution: %w", err)
 	}
@@ -872,14 +872,14 @@ func (s *Store) GetPRSizeDistribution(org, repo, entity *string, months int) (*d
 	return sr, nil
 }
 
-func (s *Store) GetForksAndActivity(org, repo, entity *string, months int) (*data.ForksAndActivitySeries, error) {
+func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *string, months int) (*data.ForksAndActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectForksAndActivitySQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectForksAndActivitySQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query forks and activity: %w", err)
 	}
@@ -909,14 +909,14 @@ func (s *Store) GetForksAndActivity(org, repo, entity *string, months int) (*dat
 	return sr, nil
 }
 
-func (s *Store) GetContributorFunnel(org, repo, entity *string, months int) (*data.ContributorFunnelSeries, error) {
+func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *string, months int) (*data.ContributorFunnelSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectContributorFunnelSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, selectContributorFunnelSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor funnel: %w", err)
 	}
@@ -948,14 +948,14 @@ func (s *Store) GetContributorFunnel(org, repo, entity *string, months int) (*da
 	return sr, nil
 }
 
-func (s *Store) GetContributorMomentum(org, repo, entity *string, months int) (*data.MomentumSeries, error) {
+func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *string, months int) (*data.MomentumSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectContributorMomentumSQL, since, org, repo, entity)
+	rows, err := s.db.QueryContext(ctx, selectContributorMomentumSQL, since, org, repo, entity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor momentum: %w", err)
 	}
@@ -992,7 +992,7 @@ func (s *Store) GetContributorMomentum(org, repo, entity *string, months int) (*
 	return sr, nil
 }
 
-func (s *Store) GetContributorProfile(username string, org, repo, entity *string, months int) (*data.ContributorProfileSeries, error) {
+func (s *Store) GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, months int) (*data.ContributorProfileSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -1008,7 +1008,7 @@ func (s *Store) GetContributorProfile(username string, org, repo, entity *string
 	var avgPrs, avgMerged, avgReviews, avgIssues, avgComments float64
 	var avgSmall, avgMedium, avgLarge, avgXLarge float64
 
-	err := s.db.QueryRowContext(context.Background(), selectContributorProfileSQL,
+	err := s.db.QueryRowContext(ctx, selectContributorProfileSQL,
 		username, org, repo, entity, since,
 		org, repo, entity, since,
 	).Scan(
@@ -1029,23 +1029,23 @@ func (s *Store) GetContributorProfile(username string, org, repo, entity *string
 	}
 
 	var rep sql.NullFloat64
-	if scanErr := s.db.QueryRowContext(context.Background(), `SELECT reputation FROM developer WHERE username = $1`, username).Scan(&rep); scanErr == nil && rep.Valid {
+	if scanErr := s.db.QueryRowContext(ctx, `SELECT reputation FROM developer WHERE username = $1`, username).Scan(&rep); scanErr == nil && rep.Valid {
 		result.Reputation = &rep.Float64
 	}
 
 	return result, nil
 }
 
-func (s *Store) GetTimeToFirstResponse(org, repo, entity *string, months int) (*data.FirstResponseSeries, error) {
-	ms, issueAvg, prAvg, err := getMonthDualSeries[float64](s.db, selectTimeToFirstResponseSQL, org, repo, entity, months)
+func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*data.FirstResponseSeries, error) {
+	ms, issueAvg, prAvg, err := getMonthDualSeries[float64](ctx, s.db, selectTimeToFirstResponseSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}
 	return &data.FirstResponseSeries{Months: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
 }
 
-func (s *Store) GetIssueOpenCloseRatio(org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
-	ms, opened, closed, err := getMonthDualSeries[int](s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
+func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
+	ms, opened, closed, err := getMonthDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}

@@ -64,7 +64,7 @@ const (
 func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) error {
 	var lastUpdated string
 	var healthPct int
-	if scanErr := s.db.QueryRowContext(context.Background(), selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct); scanErr != nil && scanErr != sql.ErrNoRows {
+	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct); scanErr != nil && scanErr != sql.ErrNoRows {
 		return fmt.Errorf("querying repo meta updated_at for %s/%s: %w", owner, repo, scanErr)
 	}
 	if lastUpdated != "" && healthPct > 0 {
@@ -72,7 +72,7 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 			if time.Since(t) < 24*time.Hour {
 				slog.Debug("metadata fresh, skipping", "org", owner, "repo", repo, "updated_at", lastUpdated)
 				now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-				_, _ = s.db.ExecContext(context.Background(), updateLastImportAtSQL, now, owner, repo)
+				_, _ = s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo)
 				return nil
 			}
 		}
@@ -104,7 +104,7 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 		archived = 1
 	}
 
-	_, err = s.db.ExecContext(context.Background(), upsertRepoMetaSQL,
+	_, err = s.db.ExecContext(ctx, upsertRepoMetaSQL,
 		owner, repo, r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
 		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now,
 		r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
@@ -115,7 +115,7 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 	}
 
 	today := time.Now().UTC().Format("2006-01-02")
-	_, err = s.db.ExecContext(context.Background(), upsertRepoMetricHistorySQL,
+	_, err = s.db.ExecContext(ctx, upsertRepoMetricHistorySQL,
 		owner, repo, today, r.GetStargazersCount(), r.GetForksCount(),
 		r.GetStargazersCount(), r.GetForksCount(),
 	)
@@ -172,7 +172,7 @@ func fetchCommunityProfile(ctx context.Context, client *github.Client, owner, re
 }
 
 func (s *Store) ImportAllRepoMeta(ctx context.Context, token string) error {
-	list, err := s.GetAllOrgRepos()
+	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)
 	}
@@ -186,12 +186,12 @@ func (s *Store) ImportAllRepoMeta(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *Store) GetRepoMetas(org, repo *string) ([]*data.RepoMeta, error) {
+func (s *Store) GetRepoMetas(ctx context.Context, org, repo *string) ([]*data.RepoMeta, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(context.Background(), selectRepoMetaSQL, org, repo)
+	rows, err := s.db.QueryContext(ctx, selectRepoMetaSQL, org, repo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo meta: %w", err)
 	}
@@ -223,14 +223,14 @@ func (s *Store) GetRepoMetas(org, repo *string) ([]*data.RepoMeta, error) {
 	return list, nil
 }
 
-func (s *Store) GetRepoOverview(org *string, months int) ([]*data.RepoOverview, error) {
+func (s *Store) GetRepoOverview(ctx context.Context, org *string, months int) ([]*data.RepoOverview, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectRepoOverviewSQL, since, org)
+	rows, err := s.db.QueryContext(ctx, selectRepoOverviewSQL, since, org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo overview: %w", err)
 	}

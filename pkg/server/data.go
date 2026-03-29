@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -114,7 +115,7 @@ func mapCountedItemsToSeries(res []*data.CountedItem) *SeriesData[int] {
 	return d
 }
 
-type percentageProvider func(entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error)
+type percentageProvider func(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error)
 
 func percentageAPIHandler(w http.ResponseWriter, r *http.Request, fn percentageProvider) {
 	months := queryParamInt(r, "m", data.EventAgeMonthsDefault)
@@ -133,7 +134,7 @@ func percentageAPIHandler(w http.ResponseWriter, r *http.Request, fn percentageP
 		repo = *repoStr
 	}
 
-	res, err := fn(optional(entity), optional(org), optional(repo), exclude, months)
+	res, err := fn(r.Context(), optional(entity), optional(org), optional(repo), exclude, months)
 	if err != nil {
 		slog.Error("failed to get event type series", "error", err)
 		writeError(w, http.StatusInternalServerError, "error querying event type series")
@@ -147,7 +148,7 @@ func minDateAPIHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		minDate, err := s.GetMinEventDate(p.org, p.repo)
+		minDate, err := s.GetMinEventDate(r.Context(), p.org, p.repo)
 		if err != nil {
 			slog.Error("failed to get min event date", "error", err)
 			writeError(w, http.StatusInternalServerError, "failed to get min date")
@@ -171,16 +172,17 @@ func queryAPIHandler(store data.Store) http.HandlerFunc {
 			scopeRepo = "repo"
 		)
 
+		ctx := r.Context()
 		switch v {
 		case scopeOrg:
-			items, err = s.GetOrgLike(q, queryResultLimitDefault)
+			items, err = s.GetOrgLike(ctx, q, queryResultLimitDefault)
 		case scopeRepo:
-			items, err = s.GetRepoLike(q, queryResultLimitDefault)
+			items, err = s.GetRepoLike(ctx, q, queryResultLimitDefault)
 		case "entity":
-			items, err = s.GetEntityLike(q, queryResultLimitDefault)
+			items, err = s.GetEntityLike(ctx, q, queryResultLimitDefault)
 		case "all":
 			half := queryResultLimitDefault / 2
-			orgs, orgErr := s.GetOrgLike(q, half)
+			orgs, orgErr := s.GetOrgLike(ctx, q, half)
 			if orgErr != nil {
 				err = orgErr
 				break
@@ -188,7 +190,7 @@ func queryAPIHandler(store data.Store) http.HandlerFunc {
 			for _, o := range orgs {
 				o.Type = scopeOrg
 			}
-			repos, repoErr := s.GetRepoLike(q, half)
+			repos, repoErr := s.GetRepoLike(ctx, q, half)
 			if repoErr != nil {
 				err = repoErr
 				break
@@ -231,7 +233,7 @@ func eventDataAPIHandler(store data.Store) http.HandlerFunc {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
 		entity := r.URL.Query().Get("e")
-		res, err := s.GetEventTypeSeries(p.org, p.repo, optional(entity), p.months)
+		res, err := s.GetEventTypeSeries(r.Context(), p.org, p.repo, optional(entity), p.months)
 		if err != nil {
 			slog.Error("failed to get event type series", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying event type series")
@@ -280,7 +282,7 @@ func eventSearchAPIHandler(store data.Store) http.HandlerFunc {
 
 		slog.Debug("event search query", "query", q)
 
-		res, err := s.SearchEvents(&q)
+		res, err := s.SearchEvents(r.Context(), &q)
 		if err != nil {
 			slog.Error("failed to execute event search", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying event type series")
@@ -300,7 +302,7 @@ func entityDevelopersAPIHandler(store data.Store) http.HandlerFunc {
 			return
 		}
 
-		res, err := s.GetEntity(entity)
+		res, err := s.GetEntity(r.Context(), entity)
 		if err != nil {
 			slog.Error("failed to get entity developers", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying entity developers")
@@ -319,12 +321,12 @@ func storeFromRequest(r *http.Request, fallback data.Store) data.Store {
 	return fallback
 }
 
-func insightWithEntityHandler(defaultStore data.Store, label string, fn func(data.Store, *string, *string, *string, int) (any, error)) http.HandlerFunc {
+func insightWithEntityHandler(defaultStore data.Store, label string, fn func(context.Context, data.Store, *string, *string, *string, int) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
 		entity := optional(r.URL.Query().Get("e"))
-		res, err := fn(s, p.org, p.repo, entity, p.months)
+		res, err := fn(r.Context(), s, p.org, p.repo, entity, p.months)
 		if err != nil {
 			slog.Error("failed to get "+label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
@@ -334,11 +336,11 @@ func insightWithEntityHandler(defaultStore data.Store, label string, fn func(dat
 	}
 }
 
-func insightHandler(defaultStore data.Store, label string, fn func(data.Store, *string, *string, int) (any, error)) http.HandlerFunc {
+func insightHandler(defaultStore data.Store, label string, fn func(context.Context, data.Store, *string, *string, int) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
-		res, err := fn(s, p.org, p.repo, p.months)
+		res, err := fn(r.Context(), s, p.org, p.repo, p.months)
 		if err != nil {
 			slog.Error("failed to get "+label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
@@ -349,74 +351,74 @@ func insightHandler(defaultStore data.Store, label string, fn func(data.Store, *
 }
 
 func insightsSummaryAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "insights summary", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetInsightsSummary(o, r, e, m)
+	return insightWithEntityHandler(store, "insights summary", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetInsightsSummary(ctx, o, r, e, m)
 	})
 }
 
 func insightsDailyActivityAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "daily activity", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetDailyActivity(o, r, e, m)
+	return insightWithEntityHandler(store, "daily activity", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetDailyActivity(ctx, o, r, e, m)
 	})
 }
 
 func insightsRetentionAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "contributor retention", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetContributorRetention(o, r, e, m)
+	return insightWithEntityHandler(store, "contributor retention", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetContributorRetention(ctx, o, r, e, m)
 	})
 }
 
 func insightsPRRatioAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "PR review ratio", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetPRReviewRatio(o, r, e, m)
+	return insightWithEntityHandler(store, "PR review ratio", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetPRReviewRatio(ctx, o, r, e, m)
 	})
 }
 
 func insightsTimeToMergeAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "time to merge", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetTimeToMerge(o, r, e, m)
+	return insightWithEntityHandler(store, "time to merge", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetTimeToMerge(ctx, o, r, e, m)
 	})
 }
 
 func insightsTimeToCloseAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "time to close", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetTimeToClose(o, r, e, m)
+	return insightWithEntityHandler(store, "time to close", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetTimeToClose(ctx, o, r, e, m)
 	})
 }
 
 func insightsTimeToRestoreAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "time to restore", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetTimeToRestoreBugs(o, r, e, m)
+	return insightWithEntityHandler(store, "time to restore", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetTimeToRestoreBugs(ctx, o, r, e, m)
 	})
 }
 
 func insightsChangeFailureRateAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "change failure rate", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetChangeFailureRate(o, r, e, m)
+	return insightWithEntityHandler(store, "change failure rate", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetChangeFailureRate(ctx, o, r, e, m)
 	})
 }
 
 func insightsReviewLatencyAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "review latency", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetReviewLatency(o, r, e, m)
+	return insightWithEntityHandler(store, "review latency", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetReviewLatency(ctx, o, r, e, m)
 	})
 }
 
 func insightsPRSizeAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "PR size distribution", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetPRSizeDistribution(o, r, e, m)
+	return insightWithEntityHandler(store, "PR size distribution", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetPRSizeDistribution(ctx, o, r, e, m)
 	})
 }
 
 func insightsContributorMomentumAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "contributor momentum", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetContributorMomentum(o, r, e, m)
+	return insightWithEntityHandler(store, "contributor momentum", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetContributorMomentum(ctx, o, r, e, m)
 	})
 }
 
 func insightsContributorFunnelAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "contributor funnel", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetContributorFunnel(o, r, e, m)
+	return insightWithEntityHandler(store, "contributor funnel", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetContributorFunnel(ctx, o, r, e, m)
 	})
 }
 
@@ -430,7 +432,7 @@ func insightsContributorProfileAPIHandler(store data.Store) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "username parameter (u) is required")
 			return
 		}
-		res, err := s.GetContributorProfile(username, p.org, p.repo, entity, p.months)
+		res, err := s.GetContributorProfile(r.Context(), username, p.org, p.repo, entity, p.months)
 		if err != nil {
 			slog.Error("failed to get contributor profile", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying contributor profile")
@@ -449,7 +451,7 @@ func developerSearchAPIHandler(store data.Store) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "query parameter (q) is required")
 			return
 		}
-		res, err := s.SearchDeveloperUsernames(q, p.org, p.repo, p.months, 10)
+		res, err := s.SearchDeveloperUsernames(r.Context(), q, p.org, p.repo, p.months, 10)
 		if err != nil {
 			slog.Error("failed to search developers", "error", err)
 			writeError(w, http.StatusInternalServerError, "error searching developers")
@@ -460,26 +462,26 @@ func developerSearchAPIHandler(store data.Store) http.HandlerFunc {
 }
 
 func insightsTimeToFirstResponseAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "time to first response", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetTimeToFirstResponse(o, r, e, m)
+	return insightWithEntityHandler(store, "time to first response", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetTimeToFirstResponse(ctx, o, r, e, m)
 	})
 }
 
 func insightsIssueRatioAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "issue open/close ratio", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetIssueOpenCloseRatio(o, r, e, m)
+	return insightWithEntityHandler(store, "issue open/close ratio", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetIssueOpenCloseRatio(ctx, o, r, e, m)
 	})
 }
 
 func insightsForksAndActivityAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "forks and activity", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetForksAndActivity(o, r, e, m)
+	return insightWithEntityHandler(store, "forks and activity", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetForksAndActivity(ctx, o, r, e, m)
 	})
 }
 
 func insightsReputationAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "reputation distribution", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetReputationDistribution(o, r, e, m)
+	return insightWithEntityHandler(store, "reputation distribution", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetReputationDistribution(ctx, o, r, e, m)
 	})
 }
 
@@ -487,7 +489,7 @@ func insightsRepoMetaAPIHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetRepoMetas(p.org, p.repo)
+		res, err := s.GetRepoMetas(r.Context(), p.org, p.repo)
 		if err != nil {
 			slog.Error("failed to get repo metadata", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying repo metadata")
@@ -501,7 +503,7 @@ func insightsRepoOverviewAPIHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetRepoOverview(p.org, p.months)
+		res, err := s.GetRepoOverview(r.Context(), p.org, p.months)
 		if err != nil {
 			slog.Error("failed to get repo overview", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying repo overview")
@@ -512,32 +514,32 @@ func insightsRepoOverviewAPIHandler(store data.Store) http.HandlerFunc {
 }
 
 func insightsRepoMetricHistoryAPIHandler(store data.Store) http.HandlerFunc {
-	return insightHandler(store, "repo metric history", func(s data.Store, o, r *string, m int) (any, error) {
-		return s.GetRepoMetricHistory(o, r, m)
+	return insightHandler(store, "repo metric history", func(ctx context.Context, s data.Store, o, r *string, m int) (any, error) {
+		return s.GetRepoMetricHistory(ctx, o, r, m)
 	})
 }
 
 func insightsReleaseCadenceAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "release cadence", func(s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetReleaseCadence(o, r, e, m)
+	return insightWithEntityHandler(store, "release cadence", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetReleaseCadence(ctx, o, r, e, m)
 	})
 }
 
 func insightsReleaseDownloadsAPIHandler(store data.Store) http.HandlerFunc {
-	return insightHandler(store, "release downloads", func(s data.Store, o, r *string, m int) (any, error) {
-		return s.GetReleaseDownloads(o, r, m)
+	return insightHandler(store, "release downloads", func(ctx context.Context, s data.Store, o, r *string, m int) (any, error) {
+		return s.GetReleaseDownloads(ctx, o, r, m)
 	})
 }
 
 func insightsReleaseDownloadsByTagAPIHandler(store data.Store) http.HandlerFunc {
-	return insightHandler(store, "release downloads by tag", func(s data.Store, o, r *string, m int) (any, error) {
-		return s.GetReleaseDownloadsByTag(o, r, m)
+	return insightHandler(store, "release downloads by tag", func(ctx context.Context, s data.Store, o, r *string, m int) (any, error) {
+		return s.GetReleaseDownloadsByTag(ctx, o, r, m)
 	})
 }
 
 func insightsContainerActivityAPIHandler(store data.Store) http.HandlerFunc {
-	return insightHandler(store, "container activity", func(s data.Store, o, r *string, m int) (any, error) {
-		return s.GetContainerActivity(o, r, m)
+	return insightHandler(store, "container activity", func(ctx context.Context, s data.Store, o, r *string, m int) (any, error) {
+		return s.GetContainerActivity(ctx, o, r, m)
 	})
 }
 
@@ -545,7 +547,7 @@ func insightsGeneratedAPIHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetRepoInsights(p.org, p.repo)
+		res, err := s.GetRepoInsights(r.Context(), p.org, p.repo)
 		if err != nil {
 			slog.Error("failed to get generated insights", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying generated insights")

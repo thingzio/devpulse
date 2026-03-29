@@ -18,7 +18,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 
 	tenants, err := tenant.GetActiveTenants(ctx, db)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing active tenants: %w", err)
 	}
 
 	slog.Info("import worker starting", "tenants", len(tenants))
@@ -26,7 +26,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 	var totalErrors int
 	for _, t := range tenants {
 		if err := ctx.Err(); err != nil {
-			return err
+			return fmt.Errorf("import canceled: %w", err)
 		}
 
 		if importErr := importTenant(ctx, db, store, t); importErr != nil {
@@ -46,6 +46,10 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 		"duration", time.Since(start).String(),
 	)
 
+	if totalErrors > 0 && totalErrors == len(tenants) {
+		return fmt.Errorf("all %d tenant imports failed", totalErrors)
+	}
+
 	return nil
 }
 
@@ -54,7 +58,7 @@ func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.Ac
 
 	repos, err := tenant.ListTenantRepos(ctx, db, t.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing repos for tenant %s: %w", t.ID, err)
 	}
 
 	if len(repos) == 0 {
@@ -92,13 +96,13 @@ func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.Ac
 
 	token, err := resolveToken(ctx, db, t.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolving token for tenant %s: %w", t.ID, err)
 	}
 
 	var repoErrors int
 	for _, r := range repos {
 		if err := ctx.Err(); err != nil {
-			return err
+			return fmt.Errorf("repo import canceled: %w", err)
 		}
 
 		if importErr := importRepo(ctx, store, token, r.Org, r.Repo); importErr != nil {
@@ -152,7 +156,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 		errs++
 	}
 
-	if _, err := store.ImportReputation(&org, &repo); err != nil {
+	if _, err := store.ImportReputation(ctx, &org, &repo); err != nil {
 		slog.Error("importing reputation", "org", org, "repo", repo, "error", err)
 		errs++
 	}
@@ -176,7 +180,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 const insightsPeriodMonths = 3
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
-	metrics, err := data.GatherInsightsMetrics(store, org, repo, insightsPeriodMonths)
+	metrics, err := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
 	if err != nil {
 		return fmt.Errorf("gathering metrics: %w", err)
 	}
@@ -195,7 +199,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 	}
 
-	if err := store.SaveRepoInsights(org, repo, ri); err != nil {
+	if err := store.SaveRepoInsights(ctx, org, repo, ri); err != nil {
 		return fmt.Errorf("saving insights: %w", err)
 	}
 

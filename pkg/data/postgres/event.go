@@ -89,7 +89,7 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 		concurrency = 1
 	}
 
-	list, err := s.GetAllOrgRepos()
+	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting org/repo list: %w", err)
 	}
@@ -290,7 +290,7 @@ func (e *eventImporter) add(eType, url string, usr *github.User, updated *time.T
 
 func (e *eventImporter) loadState() error {
 	for _, t := range EventTypes {
-		state, err := e.store.GetState(t, e.owner, e.repo, e.minEventTime)
+		state, err := e.store.GetState(context.Background(), t, e.owner, e.repo, e.minEventTime)
 		if err != nil {
 			return fmt.Errorf("error getting last page: %s/%s - %s: %w", e.owner, e.repo, t, err)
 		}

@@ -20,7 +20,10 @@ const (
 	insightsMaxTokens    = 4096
 	insightsMaxRetries   = 3
 	insightsRetryDelay   = 5 * time.Second
+	insightsHTTPTimeout  = 30 * time.Second
 )
+
+var insightsHTTPClient = &http.Client{Timeout: insightsHTTPTimeout}
 
 // LLMConfig holds configuration for the Claude API.
 type LLMConfig struct {
@@ -65,54 +68,54 @@ type InsightsMetrics struct {
 // GatherInsightsMetrics calls Store methods to collect all metrics for a repo.
 // Individual metric failures are logged as warnings; the function always returns
 // whatever metrics were successfully gathered.
-func GatherInsightsMetrics(store Store, org, repo string, months int) (*InsightsMetrics, error) {
+func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, months int) (*InsightsMetrics, error) {
 	o, r := &org, &repo
 	m := &InsightsMetrics{}
 	var err error
 
-	if m.Summary, err = store.GetInsightsSummary(o, r, nil, months); err != nil {
+	if m.Summary, err = store.GetInsightsSummary(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get summary", "error", err)
 	}
-	if m.Momentum, err = store.GetContributorMomentum(o, r, nil, months); err != nil {
+	if m.Momentum, err = store.GetContributorMomentum(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get momentum", "error", err)
 	}
-	if m.PRRatio, err = store.GetPRReviewRatio(o, r, nil, months); err != nil {
+	if m.PRRatio, err = store.GetPRReviewRatio(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get pr review ratio", "error", err)
 	}
-	if m.TimeToMerge, err = store.GetTimeToMerge(o, r, nil, months); err != nil {
+	if m.TimeToMerge, err = store.GetTimeToMerge(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get time to merge", "error", err)
 	}
-	if m.Retention, err = store.GetContributorRetention(o, r, nil, months); err != nil {
+	if m.Retention, err = store.GetContributorRetention(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get retention", "error", err)
 	}
-	if m.Funnel, err = store.GetContributorFunnel(o, r, nil, months); err != nil {
+	if m.Funnel, err = store.GetContributorFunnel(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get funnel", "error", err)
 	}
-	if m.ChangeFailure, err = store.GetChangeFailureRate(o, r, nil, months); err != nil {
+	if m.ChangeFailure, err = store.GetChangeFailureRate(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get change failure rate", "error", err)
 	}
-	if m.ReviewLatency, err = store.GetReviewLatency(o, r, nil, months); err != nil {
+	if m.ReviewLatency, err = store.GetReviewLatency(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get review latency", "error", err)
 	}
-	if m.PRSize, err = store.GetPRSizeDistribution(o, r, nil, months); err != nil {
+	if m.PRSize, err = store.GetPRSizeDistribution(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get pr size distribution", "error", err)
 	}
-	if m.ForksAndActivity, err = store.GetForksAndActivity(o, r, nil, months); err != nil {
+	if m.ForksAndActivity, err = store.GetForksAndActivity(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get forks and activity", "error", err)
 	}
-	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(o, r, nil, months); err != nil {
+	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get issue ratio", "error", err)
 	}
-	if m.FirstResponse, err = store.GetTimeToFirstResponse(o, r, nil, months); err != nil {
+	if m.FirstResponse, err = store.GetTimeToFirstResponse(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get first response", "error", err)
 	}
-	if m.ReleaseCadence, err = store.GetReleaseCadence(o, r, nil, months); err != nil {
+	if m.ReleaseCadence, err = store.GetReleaseCadence(ctx, o, r, nil, months); err != nil {
 		slog.Warn("insights: failed to get release cadence", "error", err)
 	}
-	if m.ReleaseDownloads, err = store.GetReleaseDownloads(o, r, months); err != nil {
+	if m.ReleaseDownloads, err = store.GetReleaseDownloads(ctx, o, r, months); err != nil {
 		slog.Warn("insights: failed to get release downloads", "error", err)
 	}
-	if m.RepoMeta, err = store.GetRepoMetas(o, r); err != nil {
+	if m.RepoMeta, err = store.GetRepoMetas(ctx, o, r); err != nil {
 		slog.Warn("insights: failed to get repo metas", "error", err)
 	}
 
@@ -209,7 +212,7 @@ func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetr
 		req.Header.Set("anthropic-version", claudeAPIVersion)
 
 		var resp *http.Response
-		resp, err = http.DefaultClient.Do(req) //nolint:gosec,nolintlint // G704: URL from trusted config
+		resp, err = insightsHTTPClient.Do(req) //nolint:gosec,nolintlint // URL from trusted config
 		if err != nil {
 			return nil, model, fmt.Errorf("api call: %w", err)
 		}

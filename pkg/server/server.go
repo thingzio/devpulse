@@ -49,7 +49,7 @@ const (
 	serverReadHeaderTimeout = 5 * time.Second
 	serverWriteTimeout      = 60 * time.Second
 	serverIdleTimeout       = 120 * time.Second
-	serverMaxHeaderBytes    = 20
+	serverMaxHeaderBytes    = 64 * 1024 // 64KB
 	externalHTTPTimeout     = 10 * time.Second
 )
 
@@ -63,6 +63,7 @@ var (
 )
 
 // SetVersion sets build info for templates.
+// Must be called once before Run() — not safe for concurrent use.
 func SetVersion(v, c, d string) {
 	version, commit, date = v, c, d
 }
@@ -89,7 +90,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		WriteTimeout:      serverWriteTimeout,
 		IdleTimeout:       serverIdleTimeout,
-		MaxHeaderBytes:    1 << serverMaxHeaderBytes,
+		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
 
 	errCh := make(chan error, 1)

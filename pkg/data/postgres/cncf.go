@@ -27,7 +27,7 @@ func UpdateDevelopersWithCNCFEntityAffiliations(ctx context.Context, store data.
 		return nil, fmt.Errorf("client is required")
 	}
 
-	dbDevs, err := store.GetDeveloperUsernames()
+	dbDevs, err := store.GetDeveloperUsernames(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting developers from db: %w", err)
 	}
@@ -88,7 +88,7 @@ func UpdateDevelopersWithCNCFEntityAffiliations(ctx context.Context, store data.
 	wg.Wait()
 
 	if len(merged) > 0 {
-		if err := store.SaveDevelopers(merged); err != nil {
+		if err := store.SaveDevelopers(ctx, merged); err != nil {
 			return nil, fmt.Errorf("saving merged developers: %w", err)
 		}
 	}
@@ -96,7 +96,7 @@ func UpdateDevelopersWithCNCFEntityAffiliations(ctx context.Context, store data.
 	res.MappedDevs = len(merged)
 	res.SkippedDevs = skipped
 
-	if err := entityStore.CleanEntities(); err != nil {
+	if err := entityStore.CleanEntities(ctx); err != nil {
 		return nil, fmt.Errorf("error cleaning entities: %w", err)
 	}
 

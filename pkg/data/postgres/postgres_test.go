@@ -105,10 +105,11 @@ func setupTestDB(t *testing.T) *Store {
 }
 
 func TestNew_ConnectsAndMigrates(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 
 	var version int
-	err := store.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
+	err := store.db.QueryRowContext(ctx, "SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
 	assert.NoError(t, err)
 	assert.Greater(t, version, 0)
 }

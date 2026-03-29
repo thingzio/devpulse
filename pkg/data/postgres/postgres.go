@@ -19,48 +19,13 @@ var _ data.Store = (*Store)(nil)
 var migrationsFS embed.FS
 
 // DBTX is the common interface between *sql.DB and *sql.Conn.
-// It includes both context and non-context variants so that *sql.DB
-// satisfies it directly. For *sql.Conn (which lacks the non-context
-// methods) use connAdapter via NewFromConn.
+// Both satisfy this interface natively — no adapter needed.
 type DBTX interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
-
-	// Non-context variants — present on *sql.DB, bridged for *sql.Conn.
-	Exec(query string, args ...any) (sql.Result, error)
-	Query(query string, args ...any) (*sql.Rows, error)
-	QueryRow(query string, args ...any) *sql.Row
-	Prepare(query string) (*sql.Stmt, error)
-	Begin() (*sql.Tx, error)
-}
-
-// connAdapter wraps *sql.Conn to satisfy the full DBTX interface by
-// delegating non-context methods to their context counterparts.
-type connAdapter struct {
-	*sql.Conn
-}
-
-func (c *connAdapter) Exec(query string, args ...any) (sql.Result, error) {
-	return c.Conn.ExecContext(context.Background(), query, args...)
-}
-
-func (c *connAdapter) Query(query string, args ...any) (*sql.Rows, error) {
-	return c.Conn.QueryContext(context.Background(), query, args...)
-}
-
-func (c *connAdapter) QueryRow(query string, args ...any) *sql.Row {
-	return c.Conn.QueryRowContext(context.Background(), query, args...)
-}
-
-func (c *connAdapter) Prepare(query string) (*sql.Stmt, error) {
-	return c.Conn.PrepareContext(context.Background(), query)
-}
-
-func (c *connAdapter) Begin() (*sql.Tx, error) {
-	return c.Conn.BeginTx(context.Background(), nil)
 }
 
 // Store implements data.Store for PostgreSQL.
@@ -108,7 +73,7 @@ func New(dsn string) (*Store, error) {
 // NewFromConn creates a Store backed by a dedicated connection.
 // Used for tenant-scoped requests where RLS requires set_config on a specific connection.
 func NewFromConn(conn *sql.Conn) *Store {
-	return &Store{db: &connAdapter{Conn: conn}}
+	return &Store{db: conn}
 }
 
 // Close closes the underlying database connection pool.

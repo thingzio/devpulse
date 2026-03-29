@@ -76,12 +76,12 @@ const (
 	`
 )
 
-func (s *Store) GetAllOrgRepos() ([]*data.OrgRepoItem, error) {
+func (s *Store) GetAllOrgRepos(ctx context.Context) ([]*data.OrgRepoItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectAllOrgReposSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectAllOrgReposSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer percentages statement: %w", err)
 	}
@@ -109,7 +109,7 @@ func (s *Store) GetAllOrgRepos() ([]*data.OrgRepoItem, error) {
 	return list, nil
 }
 
-func (s *Store) getPercentages(sqlStr, exColumn string, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
+func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -134,7 +134,7 @@ func (s *Store) getPercentages(sqlStr, exColumn string, entity, org, repo *strin
 		formattedSQL = fmt.Sprintf(sqlStr, clause)
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), formattedSQL)
+	stmt, err := s.db.PrepareContext(ctx, formattedSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare percentages statement: %w", err)
 	}
@@ -162,15 +162,15 @@ func (s *Store) getPercentages(sqlStr, exColumn string, entity, org, repo *strin
 	return list, nil
 }
 
-func (s *Store) GetDeveloperPercentages(entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
-	return s.getPercentages(selectDeveloperPercentSQL, "d.username", entity, org, repo, ex, months)
+func (s *Store) GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
+	return s.getPercentages(ctx, selectDeveloperPercentSQL, "d.username", entity, org, repo, ex, months)
 }
 
-func (s *Store) GetEntityPercentages(entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
-	return s.getPercentages(selectOrgEntityPercentSQL, "d.entity", entity, org, repo, ex, months)
+func (s *Store) GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
+	return s.getPercentages(ctx, selectOrgEntityPercentSQL, "d.entity", entity, org, repo, ex, months)
 }
 
-func (s *Store) SearchDeveloperUsernames(query string, org, repo *string, months, limit int) ([]string, error) {
+func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org, repo *string, months, limit int) ([]string, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -182,7 +182,7 @@ func (s *Store) SearchDeveloperUsernames(query string, org, repo *string, months
 	since := sinceDate(months)
 	pattern := fmt.Sprintf("%%%s%%", query)
 
-	rows, err := s.db.QueryContext(context.Background(), selectDeveloperSearchSQL, pattern, org, repo, since, limit)
+	rows, err := s.db.QueryContext(ctx, selectDeveloperSearchSQL, pattern, org, repo, since, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search developers: %w", err)
 	}
@@ -204,7 +204,7 @@ func (s *Store) SearchDeveloperUsernames(query string, org, repo *string, months
 	return list, nil
 }
 
-func (s *Store) GetOrgLike(query string, limit int) ([]*data.ListItem, error) {
+func (s *Store) GetOrgLike(ctx context.Context, query string, limit int) ([]*data.ListItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -213,7 +213,7 @@ func (s *Store) GetOrgLike(query string, limit int) ([]*data.ListItem, error) {
 		return nil, errors.New("query is required")
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectOrgLikeSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectOrgLikeSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare org like statement: %w", err)
 	}

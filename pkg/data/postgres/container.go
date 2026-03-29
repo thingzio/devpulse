@@ -188,7 +188,7 @@ func fetchAndStoreVersions(ctx context.Context, client *github.Client, stmt *sql
 }
 
 func (s *Store) ImportAllContainerVersions(ctx context.Context, token string) error {
-	list, err := s.GetAllOrgRepos()
+	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("getting org/repo list: %w", err)
 	}
@@ -202,14 +202,14 @@ func (s *Store) ImportAllContainerVersions(ctx context.Context, token string) er
 	return nil
 }
 
-func (s *Store) GetContainerActivity(org, repo *string, months int) (*data.ContainerActivitySeries, error) { //nolint:dupl,nolintlint // different types and SQL than GetReleaseDownloads
+func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, months int) (*data.ContainerActivitySeries, error) { //nolint:dupl,nolintlint
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(context.Background(), selectContainerActivitySQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, selectContainerActivitySQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("querying container activity: %w", err)
 	}

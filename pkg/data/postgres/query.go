@@ -91,12 +91,12 @@ func optionalLike(s *string) *string {
 	return &v
 }
 
-func (s *Store) SearchEvents(q *data.EventSearchCriteria) ([]*data.EventDetails, error) {
+func (s *Store) SearchEvents(ctx context.Context, q *data.EventSearchCriteria) ([]*data.EventDetails, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectEventSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectEventSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare event search statement: %w", err)
 	}
@@ -134,25 +134,25 @@ func (s *Store) SearchEvents(q *data.EventSearchCriteria) ([]*data.EventDetails,
 	return list, nil
 }
 
-func (s *Store) GetMinEventDate(org, repo *string) (string, error) {
+func (s *Store) GetMinEventDate(ctx context.Context, org, repo *string) (string, error) {
 	if s.db == nil {
 		return "", data.ErrDBNotInitialized
 	}
 
 	var minDate string
-	if err := s.db.QueryRowContext(context.Background(), selectMinEventDateSQL, org, repo).Scan(&minDate); err != nil {
+	if err := s.db.QueryRowContext(ctx, selectMinEventDateSQL, org, repo).Scan(&minDate); err != nil {
 		return "", fmt.Errorf("failed to query min event date: %w", err)
 	}
 
 	return minDate, nil
 }
 
-func (s *Store) GetEventTypeSeries(org, repo, entity *string, months int) (*data.EventTypeSeries, error) {
+func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *string, months int) (*data.EventTypeSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectEventTypesSinceSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectEventTypesSinceSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare repo events statement: %w", err)
 	}

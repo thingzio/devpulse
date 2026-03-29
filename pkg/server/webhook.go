@@ -42,9 +42,9 @@ func WebhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {
 
 		switch event {
 		case "installation":
-			handleInstallationEvent(db, body)
+			handleInstallationEvent(r.Context(), db, body)
 		case "installation_repositories":
-			handleInstallationReposEvent(db, body)
+			handleInstallationReposEvent(r.Context(), db, body)
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -64,7 +64,7 @@ func verifyWebhookSignature(payload []byte, signature, secret string) bool {
 	return hmac.Equal(sig, mac.Sum(nil))
 }
 
-func handleInstallationEvent(db *sql.DB, body []byte) {
+func handleInstallationEvent(ctx context.Context, db *sql.DB, body []byte) {
 	var payload struct {
 		Action       string `json:"action"`
 		Installation struct {
@@ -91,8 +91,6 @@ func handleInstallationEvent(db *sql.DB, body []byte) {
 		"installation_id", payload.Installation.ID,
 		"sender_id", payload.Sender.ID,
 	)
-
-	ctx := context.Background()
 
 	switch payload.Action {
 	case "created":
@@ -122,7 +120,7 @@ func handleInstallationEvent(db *sql.DB, body []byte) {
 	}
 }
 
-func handleInstallationReposEvent(db *sql.DB, body []byte) {
+func handleInstallationReposEvent(ctx context.Context, db *sql.DB, body []byte) {
 	var payload struct {
 		Installation struct {
 			ID int64 `json:"id"`
@@ -141,8 +139,6 @@ func handleInstallationReposEvent(db *sql.DB, body []byte) {
 		slog.Error("parsing installation_repositories webhook", "error", err)
 		return
 	}
-
-	ctx := context.Background()
 
 	tn, err := tenant.GetTenantByGitHubID(ctx, db, payload.Sender.ID)
 	if err != nil {

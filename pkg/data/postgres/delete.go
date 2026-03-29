@@ -15,7 +15,7 @@ const (
 	deleteStateSQL         = `DELETE FROM state WHERE org = $1 AND repo = $2`
 )
 
-func (s *Store) DeleteRepoData(org, repo string) (*data.DeleteResult, error) {
+func (s *Store) DeleteRepoData(ctx context.Context, org, repo string) (*data.DeleteResult, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -24,7 +24,7 @@ func (s *Store) DeleteRepoData(org, repo string) (*data.DeleteResult, error) {
 		return nil, fmt.Errorf("org and repo are required (got org=%q, repo=%q)", org, repo)
 	}
 
-	tx, err := s.db.BeginTx(context.Background(), nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("beginning delete transaction: %w", err)
 	}

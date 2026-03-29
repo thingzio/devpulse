@@ -29,7 +29,7 @@ const (
 	`
 )
 
-func (s *Store) SaveRepoInsights(org, repo string, ri *data.RepoInsights) error {
+func (s *Store) SaveRepoInsights(ctx context.Context, org, repo string, ri *data.RepoInsights) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
@@ -40,7 +40,7 @@ func (s *Store) SaveRepoInsights(org, repo string, ri *data.RepoInsights) error 
 	}
 	j := string(b)
 
-	_, err = s.db.ExecContext(context.Background(), upsertRepoInsightsSQL,
+	_, err = s.db.ExecContext(ctx, upsertRepoInsightsSQL,
 		org, repo, j, ri.PeriodMonths, ri.Model, ri.GeneratedAt,
 		j, ri.PeriodMonths, ri.Model, ri.GeneratedAt,
 	)
@@ -51,12 +51,12 @@ func (s *Store) SaveRepoInsights(org, repo string, ri *data.RepoInsights) error 
 	return nil
 }
 
-func (s *Store) GetRepoInsights(org, repo *string) ([]*data.RepoInsights, error) {
+func (s *Store) GetRepoInsights(ctx context.Context, org, repo *string) ([]*data.RepoInsights, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(context.Background(), selectRepoInsightsSQL, org, repo)
+	rows, err := s.db.QueryContext(ctx, selectRepoInsightsSQL, org, repo)
 	if err != nil {
 		return nil, fmt.Errorf("querying repo insights: %w", err)
 	}
@@ -83,13 +83,13 @@ func (s *Store) GetRepoInsights(org, repo *string) ([]*data.RepoInsights, error)
 	return list, nil
 }
 
-func (s *Store) GetRepoInsightsGeneratedAt(org, repo string) (string, error) {
+func (s *Store) GetRepoInsightsGeneratedAt(ctx context.Context, org, repo string) (string, error) {
 	if s.db == nil {
 		return "", data.ErrDBNotInitialized
 	}
 
 	var ts string
-	if err := s.db.QueryRowContext(context.Background(), selectRepoInsightsGeneratedAtSQL, org, repo).Scan(&ts); err != nil {
+	if err := s.db.QueryRowContext(ctx, selectRepoInsightsGeneratedAtSQL, org, repo).Scan(&ts); err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil
 		}

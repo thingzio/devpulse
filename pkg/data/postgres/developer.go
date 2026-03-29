@@ -65,20 +65,20 @@ const (
 	updateDeveloperNamesSQL = `UPDATE developer SET full_name = $1 WHERE username = $2`
 )
 
-func (s *Store) GetDeveloperUsernames() ([]string, error) {
-	return s.getDBSlice(selectDeveloperUsernameSQL)
+func (s *Store) GetDeveloperUsernames(ctx context.Context) ([]string, error) {
+	return s.getDBSlice(ctx, selectDeveloperUsernameSQL)
 }
 
-func (s *Store) GetNoFullnameDeveloperUsernames() ([]string, error) {
-	return s.getDBSlice(selectNoFullNameDeveloperUsernameSQL)
+func (s *Store) GetNoFullnameDeveloperUsernames(ctx context.Context) ([]string, error) {
+	return s.getDBSlice(ctx, selectNoFullNameDeveloperUsernameSQL)
 }
 
-func (s *Store) getDBSlice(sqlQuery string) ([]string, error) {
+func (s *Store) getDBSlice(ctx context.Context, sqlQuery string) ([]string, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), sqlQuery)
+	stmt, err := s.db.PrepareContext(ctx, sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare sql statement: %w", err)
 	}
@@ -107,7 +107,7 @@ func (s *Store) getDBSlice(sqlQuery string) ([]string, error) {
 	return list, nil
 }
 
-func (s *Store) SaveDevelopers(devs []*data.Developer) error {
+func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
@@ -116,13 +116,13 @@ func (s *Store) SaveDevelopers(devs []*data.Developer) error {
 		return nil
 	}
 
-	userStmt, err := s.db.PrepareContext(context.Background(), insertDeveloperSQL)
+	userStmt, err := s.db.PrepareContext(ctx, insertDeveloperSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare developer insert statement: %w", err)
 	}
 	defer userStmt.Close()
 
-	tx, err := s.db.BeginTx(context.Background(), nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -159,7 +159,7 @@ func (s *Store) MergeDeveloper(ctx context.Context, client *http.Client, usernam
 		return nil, data.ErrDBNotInitialized
 	}
 
-	dbDev, err := s.GetDeveloper(username)
+	dbDev, err := s.GetDeveloper(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get developer %s: %w", username, err)
 	}
@@ -220,12 +220,12 @@ func printDevDeltas(dbDev *data.Developer, ghDev *data.Developer, cncfDev *data.
 	)
 }
 
-func (s *Store) GetDeveloper(username string) (*data.Developer, error) {
+func (s *Store) GetDeveloper(ctx context.Context, username string) (*data.Developer, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectDeveloperSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectDeveloperSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer select statement: %w", err)
 	}
@@ -244,12 +244,12 @@ func (s *Store) GetDeveloper(username string) (*data.Developer, error) {
 	return u, nil
 }
 
-func (s *Store) SearchDevelopers(val string, limit int) ([]*data.DeveloperListItem, error) {
+func (s *Store) SearchDevelopers(ctx context.Context, val string, limit int) ([]*data.DeveloperListItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), queryDeveloperSQL)
+	stmt, err := s.db.PrepareContext(ctx, queryDeveloperSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer query statement: %w", err)
 	}
@@ -265,18 +265,18 @@ func (s *Store) SearchDevelopers(val string, limit int) ([]*data.DeveloperListIt
 	return mapDeveloperListItem(rows)
 }
 
-func (s *Store) UpdateDeveloperNames(devs map[string]string) error {
+func (s *Store) UpdateDeveloperNames(ctx context.Context, devs map[string]string) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
 
-	updateStmt, err := s.db.PrepareContext(context.Background(), updateDeveloperNamesSQL)
+	updateStmt, err := s.db.PrepareContext(ctx, updateDeveloperNamesSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare entity update statement: %w", err)
 	}
 	defer updateStmt.Close()
 
-	tx, err := s.db.BeginTx(context.Background(), nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

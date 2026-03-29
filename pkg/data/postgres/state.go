@@ -26,12 +26,12 @@ const (
 	selectStateSQL = `SELECT since, page FROM state WHERE query = $1 AND org = $2 AND repo = $3`
 )
 
-func (s *Store) GetState(query, org, repo string, min time.Time) (*data.State, error) {
+func (s *Store) GetState(ctx context.Context, query, org, repo string, min time.Time) (*data.State, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stateStmt, err := s.db.PrepareContext(context.Background(), selectStateSQL)
+	stateStmt, err := s.db.PrepareContext(ctx, selectStateSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare state select statement: %w", err)
 	}
@@ -57,7 +57,7 @@ func (s *Store) GetState(query, org, repo string, min time.Time) (*data.State, e
 	return st, nil
 }
 
-func (s *Store) SaveState(query, org, repo string, state *data.State) error {
+func (s *Store) SaveState(ctx context.Context, query, org, repo string, state *data.State) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
@@ -70,7 +70,7 @@ func (s *Store) SaveState(query, org, repo string, state *data.State) error {
 		return fmt.Errorf("query: %s, org: %s, repo: %s are all required", query, org, repo)
 	}
 
-	stateStmt, err := s.db.PrepareContext(context.Background(), insertStateSQL)
+	stateStmt, err := s.db.PrepareContext(ctx, insertStateSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
@@ -84,20 +84,20 @@ func (s *Store) SaveState(query, org, repo string, state *data.State) error {
 	return nil
 }
 
-func (s *Store) ClearState(org, repo string) error {
+func (s *Store) ClearState(ctx context.Context, org, repo string) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
 
 	q := "DELETE FROM state WHERE org = $1 AND repo = $2"
-	if _, err := s.db.ExecContext(context.Background(), q, org, repo); err != nil {
+	if _, err := s.db.ExecContext(ctx, q, org, repo); err != nil {
 		return fmt.Errorf("failed to clear state for %s/%s: %w", org, repo, err)
 	}
 
 	return nil
 }
 
-func (s *Store) GetDataState() (map[string]int64, error) {
+func (s *Store) GetDataState(ctx context.Context) (map[string]int64, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -105,7 +105,7 @@ func (s *Store) GetDataState() (map[string]int64, error) {
 	state := make(map[string]int64)
 	for k, v := range stateQueries {
 		var count int64
-		if err := s.db.QueryRowContext(context.Background(), v).Scan(&count); err != nil {
+		if err := s.db.QueryRowContext(ctx, v).Scan(&count); err != nil {
 			return nil, fmt.Errorf("error getting %s count: %w", k, err)
 		}
 		state[k] = count

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
@@ -11,16 +12,17 @@ import (
 
 func seedTestData(t *testing.T, store *Store) {
 	t.Helper()
+	ctx := context.Background()
 	devs := []*data.Developer{
 		{Username: "dev1", FullName: "Dev One", Email: "dev1@google.com", Entity: "GOOGLE"},
 		{Username: "dev2", FullName: "Dev Two", Email: "dev2@google.com", Entity: "GOOGLE"},
 		{Username: "dev3", FullName: "Dev Three", Email: "dev3@msft.com", Entity: "MICROSOFT"},
 	}
-	require.NoError(t, store.SaveDevelopers(devs))
+	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	tx, err := store.db.Begin()
+	tx, err := store.db.BeginTx(ctx, nil)
 	require.NoError(t, err)
-	stmt, err := store.db.Prepare(insertEventSQL)
+	stmt, err := store.db.PrepareContext(ctx, insertEventSQL)
 	require.NoError(t, err)
 
 	events := []data.Event{
@@ -45,85 +47,96 @@ func seedTestData(t *testing.T, store *Store) {
 }
 
 func TestQueryEntities(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.QueryEntities("GOOGLE", 10)
+	results, err := store.QueryEntities(ctx, "GOOGLE", 10)
 	require.NoError(t, err)
 	assert.NotEmpty(t, results)
 }
 
 func TestGetEntity(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	result, err := store.GetEntity("GOOGLE")
+	result, err := store.GetEntity(ctx, "GOOGLE")
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.DeveloperCount)
 }
 
 func TestGetEntityLike(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.GetEntityLike("GOOG", 10)
+	results, err := store.GetEntityLike(ctx, "GOOG", 10)
 	require.NoError(t, err)
 	assert.NotEmpty(t, results)
 }
 
 func TestGetEntityLike_EmptyQuery(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
-	_, err := store.GetEntityLike("", 10)
+	_, err := store.GetEntityLike(ctx, "", 10)
 	assert.Error(t, err)
 }
 
 func TestGetEntityLike_NilDB(t *testing.T) {
+	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetEntityLike("test", 10)
+	_, err := s.GetEntityLike(ctx, "test", 10)
 	assert.Error(t, err)
 }
 
 func TestQueryEntities_NilDB(t *testing.T) {
+	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.QueryEntities("test", 10)
+	_, err := s.QueryEntities(ctx, "test", 10)
 	assert.Error(t, err)
 }
 
 func TestGetEntity_NilDB(t *testing.T) {
+	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetEntity("test")
+	_, err := s.GetEntity(ctx, "test")
 	assert.Error(t, err)
 }
 
 func TestCleanEntities(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 	devs := []*data.Developer{
 		{Username: "dev1", FullName: "Dev One", Entity: "Google LLC"},
 		{Username: "dev2", FullName: "Dev Two", Entity: "Microsoft Corp"},
 	}
-	require.NoError(t, store.SaveDevelopers(devs))
+	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	require.NoError(t, store.CleanEntities())
+	require.NoError(t, store.CleanEntities(ctx))
 
-	dev, err := store.GetDeveloper("dev1")
+	dev, err := store.GetDeveloper(ctx, "dev1")
 	require.NoError(t, err)
 	assert.Equal(t, "GOOGLE", dev.Entity)
 }
 
 func TestCleanEntities_NilDB(t *testing.T) {
+	ctx := context.Background()
 	s := &Store{db: nil}
-	err := s.CleanEntities()
+	err := s.CleanEntities(ctx)
 	assert.Error(t, err)
 }
 
 func TestGetEntity_NotFound(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
-	result, err := store.GetEntity("NONEXISTENT")
+	result, err := store.GetEntity(ctx, "NONEXISTENT")
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.DeveloperCount)
 }
 
 func TestQueryEntities_NoMatch(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.QueryEntities("NONEXISTENT", 10)
+	results, err := store.QueryEntities(ctx, "NONEXISTENT", 10)
 	require.NoError(t, err)
 	assert.Empty(t, results)
 }

@@ -45,7 +45,9 @@ func main() {
 		err = importer.Run(ctx, store.DB(), store)
 	}
 
-	store.Close()
+	if closeErr := store.Close(); closeErr != nil {
+		slog.Error("closing store", "error", closeErr)
+	}
 	stop()
 
 	if err != nil {

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -10,29 +11,32 @@ import (
 )
 
 func TestGetRepoMetricHistory_NilDB(t *testing.T) {
+	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetRepoMetricHistory(nil, nil, 6)
+	_, err := s.GetRepoMetricHistory(ctx, nil, nil, 6)
 	assert.Error(t, err)
 }
 
 func TestGetRepoMetricHistory_EmptyDB(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
-	list, err := store.GetRepoMetricHistory(nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
 	require.NoError(t, err)
 	assert.Empty(t, list)
 }
 
 func TestGetRepoMetricHistory_WithData(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.Exec(`INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org1', 'repo1', '2026-03-11', 105, 52),
 		('org1', 'repo1', '2026-03-12', 110, 55)`)
 	require.NoError(t, err)
 
-	list, err := store.GetRepoMetricHistory(nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
 	require.NoError(t, err)
 	require.Len(t, list, 3)
 	assert.Equal(t, "2026-03-10", list[0].Date)
@@ -41,9 +45,10 @@ func TestGetRepoMetricHistory_WithData(t *testing.T) {
 }
 
 func TestGetRepoMetricHistory_WithFilter(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.Exec(`INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org2', 'repo2', '2026-03-10', 200, 80)`)
@@ -51,16 +56,17 @@ func TestGetRepoMetricHistory_WithFilter(t *testing.T) {
 
 	org := "org1"
 	repo := "repo1"
-	list, err := store.GetRepoMetricHistory(&org, &repo, 6)
+	list, err := store.GetRepoMetricHistory(ctx, &org, &repo, 6)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "org1", list[0].Org)
 }
 
 func TestGetRepoMetricHistory_AggregateByDate(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.Exec(`INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org1', 'repo1', '2026-03-11', 105, 52),
@@ -69,7 +75,7 @@ func TestGetRepoMetricHistory_AggregateByDate(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	list, err := store.GetRepoMetricHistory(&org, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, &org, nil, 6)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, "2026-03-10", list[0].Date)
@@ -100,6 +106,7 @@ func TestBuildDailyTotals(t *testing.T) {
 }
 
 func TestUpsertMetricHistory(t *testing.T) {
+	ctx := context.Background()
 	store := setupTestDB(t)
 
 	history := []*data.RepoMetricHistory{
@@ -107,20 +114,20 @@ func TestUpsertMetricHistory(t *testing.T) {
 		{Date: "2026-03-11", Stars: 105, Forks: 52},
 	}
 
-	err := store.upsertMetricHistory("org1", "repo1", history)
+	err := store.upsertMetricHistory(ctx, "org1", "repo1", history)
 	require.NoError(t, err)
 
-	list, err := store.GetRepoMetricHistory(nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, 100, list[0].Stars)
 
 	// Upsert same dates with new values.
 	history[0].Stars = 101
-	err = store.upsertMetricHistory("org1", "repo1", history)
+	err = store.upsertMetricHistory(ctx, "org1", "repo1", history)
 	require.NoError(t, err)
 
-	list, err = store.GetRepoMetricHistory(nil, nil, 6)
+	list, err = store.GetRepoMetricHistory(ctx, nil, nil, 6)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, 101, list[0].Stars)

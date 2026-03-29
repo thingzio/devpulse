@@ -18,7 +18,7 @@ const (
 	`
 )
 
-func (s *Store) GetRepoLike(query string, limit int) ([]*data.ListItem, error) {
+func (s *Store) GetRepoLike(ctx context.Context, query string, limit int) ([]*data.ListItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -27,7 +27,7 @@ func (s *Store) GetRepoLike(query string, limit int) ([]*data.ListItem, error) {
 		return nil, errors.New("query is required")
 	}
 
-	stmt, err := s.db.PrepareContext(context.Background(), selectRepoLikeSQL)
+	stmt, err := s.db.PrepareContext(ctx, selectRepoLikeSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare repo like statement: %w", err)
 	}
