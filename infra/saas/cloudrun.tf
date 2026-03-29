@@ -33,7 +33,12 @@ resource "google_cloud_run_v2_service" "serve" {
       }
 
       env {
-        name = "GITHUB_OAUTH_CLIENT_ID"
+        name  = "GITHUB_OAUTH_CLIENT_ID"
+        value = var.github_oauth_client_id
+      }
+
+      env {
+        name = "GITHUB_OAUTH_CLIENT_SECRET"
         value_source {
           secret_key_ref {
             secret  = google_secret_manager_secret.oauth_client_secret.secret_id

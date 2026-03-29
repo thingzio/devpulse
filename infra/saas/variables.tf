@@ -27,6 +27,11 @@ variable "git_repo" {
   default     = "thingzio/devpulse"
 }
 
+variable "github_oauth_client_id" {
+  description = "GitHub OAuth App client ID (public, not a secret)"
+  type        = string
+}
+
 variable "db_tier" {
   description = "Cloud SQL machine tier"
   type        = string
