@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "devpulse-saas-tf-state"
+    bucket = "devpulse-state"
     prefix = "infra"
   }
 }
