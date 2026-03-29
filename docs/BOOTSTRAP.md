@@ -43,7 +43,7 @@ Go to https://github.com/settings/apps/new
 
 | Field | Value |
 |-------|-------|
-| GitHub App name | DevPulse |
+| GitHub App name | `DevPulseThingz` (must be globally unique) |
 | Homepage URL | `https://devpulse.thingz.io` |
 | Webhook URL | `https://devpulse.thingz.io/webhook/github` |
 | Webhook secret | Generate a random string (e.g. `openssl rand -hex 32`) |
