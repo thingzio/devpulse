@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -95,7 +96,7 @@ func (s *Store) SearchEvents(q *data.EventSearchCriteria) ([]*data.EventDetails,
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectEventSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectEventSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare event search statement: %w", err)
 	}
@@ -139,7 +140,7 @@ func (s *Store) GetMinEventDate(org, repo *string) (string, error) {
 	}
 
 	var minDate string
-	if err := s.db.QueryRow(selectMinEventDateSQL, org, repo).Scan(&minDate); err != nil {
+	if err := s.db.QueryRowContext(context.Background(), selectMinEventDateSQL, org, repo).Scan(&minDate); err != nil {
 		return "", fmt.Errorf("failed to query min event date: %w", err)
 	}
 
@@ -151,7 +152,7 @@ func (s *Store) GetEventTypeSeries(org, repo, entity *string, months int) (*data
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectEventTypesSinceSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectEventTypesSinceSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare repo events statement: %w", err)
 	}

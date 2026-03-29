@@ -156,7 +156,7 @@ func (s *Store) ImportReputation(org, repo *string) (*data.ReputationResult, err
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 	res := &data.ReputationResult{}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error starting reputation tx: %w", err)
 	}
@@ -256,7 +256,7 @@ func (s *Store) GetOrComputeDeepReputation(ctx context.Context, token, username 
 
 	var rep float64
 	var signalsJSON sql.NullString
-	err := s.db.QueryRow(selectUserReputationSQL, username, threshold).Scan(&rep, &signalsJSON)
+	err := s.db.QueryRowContext(context.Background(), selectUserReputationSQL, username, threshold).Scan(&rep, &signalsJSON)
 	if err == nil {
 		result := &data.UserReputation{
 			Username:   username,
@@ -353,7 +353,7 @@ func (s *Store) GetReputationDistribution(org, repo, entity *string, months int)
 
 	since := sinceDate(months)
 
-	rows, err := s.db.Query(selectReputationSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(context.Background(), selectReputationSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query reputation distribution: %w", err)
 	}
@@ -378,7 +378,7 @@ func (s *Store) GetReputationDistribution(org, repo, entity *string, months int)
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	if err := s.db.QueryRow(selectReputationCountSQL, org, repo, entity, since).Scan(&d.Total, &d.Scored); err != nil {
+	if err := s.db.QueryRowContext(context.Background(), selectReputationCountSQL, org, repo, entity, since).Scan(&d.Total, &d.Scored); err != nil {
 		return nil, fmt.Errorf("failed to query reputation counts: %w", err)
 	}
 
@@ -389,7 +389,7 @@ func (s *Store) gatherLocalSignals(username, since string, stats *globalStats) s
 	var sig score.Signals
 
 	var commits int64
-	if err := s.db.QueryRow(selectUserCommitCountSQL, username, since).Scan(&commits); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := s.db.QueryRowContext(context.Background(), selectUserCommitCountSQL, username, since).Scan(&commits); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Debug("error counting user commits", "username", username, "error", err)
 	}
 	sig.Commits = commits
@@ -398,7 +398,7 @@ func (s *Store) gatherLocalSignals(username, since string, stats *globalStats) s
 	sig.TotalContributors = stats.totalContributors
 
 	var lastDate sql.NullString
-	if err := s.db.QueryRow(selectLastCommitDateSQL, username).Scan(&lastDate); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := s.db.QueryRowContext(context.Background(), selectLastCommitDateSQL, username).Scan(&lastDate); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Debug("error getting last commit date", "username", username, "error", err)
 	}
 	if lastDate.Valid && lastDate.String != "" {
@@ -541,11 +541,11 @@ func (s *Store) gatherFullSignals(ctx context.Context, client *github.Client, us
 func (s *Store) computeGlobalStats(since string) (*globalStats, error) {
 	var gs globalStats
 
-	if err := s.db.QueryRow(selectTotalCommitCountSQL, since).Scan(&gs.totalCommits); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := s.db.QueryRowContext(context.Background(), selectTotalCommitCountSQL, since).Scan(&gs.totalCommits); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error counting total commits: %w", err)
 	}
 
-	if err := s.db.QueryRow(selectTotalContributorCountSQL, since).Scan(&gs.totalContributors); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := s.db.QueryRowContext(context.Background(), selectTotalContributorCountSQL, since).Scan(&gs.totalContributors); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error counting total contributors: %w", err)
 	}
 
@@ -557,7 +557,7 @@ func (s *Store) getStaleReputationUsernames(org, repo *string, threshold string)
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.Query(selectStaleReputationUsernamesSQL, org, repo, threshold)
+	rows, err := s.db.QueryContext(context.Background(), selectStaleReputationUsernamesSQL, org, repo, threshold)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stale reputation usernames: %w", err)
 	}
@@ -584,7 +584,7 @@ func (s *Store) getLowestReputationUsernames(org, repo *string, threshold string
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.Query(selectLowestReputationUsernamesSQL, org, repo, threshold, limit)
+	rows, err := s.db.QueryContext(context.Background(), selectLowestReputationUsernamesSQL, org, repo, threshold, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query lowest reputation usernames: %w", err)
 	}
@@ -626,7 +626,7 @@ func (s *Store) updateReputation(username string, reputation float64, updatedAt 
 		signalsJSON = &str
 	}
 
-	_, err := s.db.Exec(updateReputationSQL, reputation, updatedAt, deepVal, signalsJSON, username)
+	_, err := s.db.ExecContext(context.Background(), updateReputationSQL, reputation, updatedAt, deepVal, signalsJSON, username)
 	if err != nil {
 		return fmt.Errorf("failed to update reputation for %s: %w", username, err)
 	}
@@ -639,7 +639,7 @@ func (s *Store) getDistinctOrgs() ([]string, error) {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.Query(selectDistinctOrgsSQL)
+	rows, err := s.db.QueryContext(context.Background(), selectDistinctOrgsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query distinct orgs: %w", err)
 	}

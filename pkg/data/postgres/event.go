@@ -336,25 +336,25 @@ func (e *eventImporter) flush() error {
 
 	db := e.store.db
 
-	eventStmt, err := db.Prepare(insertEventSQL)
+	eventStmt, err := db.PrepareContext(context.Background(), insertEventSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare event insert statement: %w", err)
 	}
 	defer eventStmt.Close()
 
-	devStmt, err := db.Prepare(insertDeveloperSQL)
+	devStmt, err := db.PrepareContext(context.Background(), insertDeveloperSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare developer insert statement: %w", err)
 	}
 	defer devStmt.Close()
 
-	stateStmt, err := db.Prepare(insertStateSQL)
+	stateStmt, err := db.PrepareContext(context.Background(), insertStateSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
 	defer stateStmt.Close()
 
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

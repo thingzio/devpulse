@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -53,7 +54,7 @@ func (s *Store) GetEntityLike(query string, limit int) ([]*data.ListItem, error)
 		return nil, errors.New("query is required")
 	}
 
-	stmt, err := s.db.Prepare(selectEntityLikeSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectEntityLikeSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare entity like statement: %w", err)
 	}
@@ -92,7 +93,7 @@ func (s *Store) GetEntity(val string) (*data.EntityResult, error) {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectEntityDevelopersSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectEntityDevelopersSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer entity affiliation statement: %w", err)
 	}
@@ -127,7 +128,7 @@ func (s *Store) QueryEntities(val string, limit int) ([]*data.CountedItem, error
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(queryEntitySQL)
+	stmt, err := s.db.PrepareContext(context.Background(), queryEntitySQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer entity statement: %w", err)
 	}
@@ -165,7 +166,7 @@ func (s *Store) CleanEntities() error {
 		return data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectEntityNamesSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectEntityNamesSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare developer query statement: %w", err)
 	}
@@ -190,13 +191,13 @@ func (s *Store) CleanEntities() error {
 		return fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	updateStmt, err := s.db.Prepare(updateEntityNamesSQL)
+	updateStmt, err := s.db.PrepareContext(context.Background(), updateEntityNamesSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare entity update statement: %w", err)
 	}
 	defer updateStmt.Close()
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

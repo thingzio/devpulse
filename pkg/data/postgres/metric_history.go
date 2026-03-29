@@ -54,9 +54,9 @@ func (s *Store) GetRepoMetricHistory(org, repo *string, months int) ([]*data.Rep
 	var rows *sql.Rows
 	var err error
 	if repo == nil {
-		rows, err = s.db.Query(selectRepoMetricHistoryAggSQL, org, org, since)
+		rows, err = s.db.QueryContext(context.Background(), selectRepoMetricHistoryAggSQL, org, org, since)
 	} else {
-		rows, err = s.db.Query(selectRepoMetricHistorySQL, org, repo, since)
+		rows, err = s.db.QueryContext(context.Background(), selectRepoMetricHistorySQL, org, repo, since)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo metric history: %w", err)
@@ -235,7 +235,7 @@ func buildDailyTotals(currentStars, currentForks int, starsByDay, forksByDay map
 }
 
 func (s *Store) upsertMetricHistory(owner, repo string, history []*data.RepoMetricHistory) error {
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -23,7 +24,7 @@ func (s *Store) DeleteRepoData(org, repo string) (*data.DeleteResult, error) {
 		return nil, fmt.Errorf("org and repo are required (got org=%q, repo=%q)", org, repo)
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("beginning delete transaction: %w", err)
 	}

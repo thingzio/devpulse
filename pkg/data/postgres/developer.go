@@ -78,7 +78,7 @@ func (s *Store) getDBSlice(sqlQuery string) ([]string, error) {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(sqlQuery)
+	stmt, err := s.db.PrepareContext(context.Background(), sqlQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare sql statement: %w", err)
 	}
@@ -116,13 +116,13 @@ func (s *Store) SaveDevelopers(devs []*data.Developer) error {
 		return nil
 	}
 
-	userStmt, err := s.db.Prepare(insertDeveloperSQL)
+	userStmt, err := s.db.PrepareContext(context.Background(), insertDeveloperSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare developer insert statement: %w", err)
 	}
 	defer userStmt.Close()
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -225,7 +225,7 @@ func (s *Store) GetDeveloper(username string) (*data.Developer, error) {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectDeveloperSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectDeveloperSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer select statement: %w", err)
 	}
@@ -249,7 +249,7 @@ func (s *Store) SearchDevelopers(val string, limit int) ([]*data.DeveloperListIt
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(queryDeveloperSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), queryDeveloperSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer query statement: %w", err)
 	}
@@ -270,13 +270,13 @@ func (s *Store) UpdateDeveloperNames(devs map[string]string) error {
 		return data.ErrDBNotInitialized
 	}
 
-	updateStmt, err := s.db.Prepare(updateDeveloperNamesSQL)
+	updateStmt, err := s.db.PrepareContext(context.Background(), updateDeveloperNamesSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare entity update statement: %w", err)
 	}
 	defer updateStmt.Close()
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}

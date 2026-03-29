@@ -6,25 +6,20 @@ Step-by-step guide to deploy DevPulse from scratch on GCP.
 
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.13
-- GCP organization or billing account
+- GCP organization, project, and billing account
 - Domain name (e.g. `devpulse.thingz.io`) with DNS access at your registrar
 - GitHub account (for OAuth App and GitHub App registration)
 
-## 1. Create GCP Project
+## 1. Setup GCP Project
 
 ```shell
-export PROJECT_ID="devpulse-saas"
-export BILLING_ACCOUNT="XXXXXX-XXXXXX-XXXXXX"
-
-gcloud projects create $PROJECT_ID
-gcloud billing projects link $PROJECT_ID --billing-account=$BILLING_ACCOUNT
-gcloud config set project $PROJECT_ID
+export PROJECT_ID="devpulseio"
 ```
 
 ## 2. Create Terraform State Bucket
 
 ```shell
-gcloud storage buckets create gs://devpulse-saas-tf-state \
+gcloud storage buckets create gs://devpulse-state \
     --project=$PROJECT_ID \
     --location=us \
     --uniform-bucket-level-access

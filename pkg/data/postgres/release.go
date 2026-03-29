@@ -114,17 +114,17 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	var latestPublishedAt string
-	if scanErr := s.db.QueryRow(selectLatestReleaseSQL, owner, repo).Scan(&latestPublishedAt); scanErr != nil {
+	if scanErr := s.db.QueryRowContext(context.Background(), selectLatestReleaseSQL, owner, repo).Scan(&latestPublishedAt); scanErr != nil {
 		return fmt.Errorf("querying latest release for %s/%s: %w", owner, repo, scanErr)
 	}
 
-	stmt, err := s.db.Prepare(insertReleaseSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), insertReleaseSQL)
 	if err != nil {
 		return fmt.Errorf("error preparing release insert: %w", err)
 	}
 	defer stmt.Close()
 
-	assetStmt, err := s.db.Prepare(insertReleaseAssetSQL)
+	assetStmt, err := s.db.PrepareContext(context.Background(), insertReleaseAssetSQL)
 	if err != nil {
 		return fmt.Errorf("error preparing release asset insert: %w", err)
 	}
@@ -161,8 +161,8 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 	return nil
 }
 
-func upsertReleasePage(db *sql.DB, stmt, assetStmt *sql.Stmt, owner, repo string, releases []*github.RepositoryRelease, latestPublishedAt string) (bool, error) {
-	tx, err := db.Begin()
+func upsertReleasePage(db DBTX, stmt, assetStmt *sql.Stmt, owner, repo string, releases []*github.RepositoryRelease, latestPublishedAt string) (bool, error) {
+	tx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return false, fmt.Errorf("error starting release tx: %w", err)
 	}
@@ -240,7 +240,7 @@ func (s *Store) GetReleaseCadence(org, repo, entity *string, months int) (*data.
 
 	since := sinceDate(months)
 
-	rows, err := s.db.Query(selectReleaseCadenceSQL, org, repo, since)
+	rows, err := s.db.QueryContext(context.Background(), selectReleaseCadenceSQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release cadence: %w", err)
 	}
@@ -273,7 +273,7 @@ func (s *Store) GetReleaseCadence(org, repo, entity *string, months int) (*data.
 		return sr, nil
 	}
 
-	fallbackRows, err := s.db.Query(selectMergedPRDeploymentsSQL, org, repo, entity, since)
+	fallbackRows, err := s.db.QueryContext(context.Background(), selectMergedPRDeploymentsSQL, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query merged PR deployments: %w", err)
 	}
@@ -303,7 +303,7 @@ func (s *Store) GetReleaseDownloads(org, repo *string, months int) (*data.Releas
 
 	since := sinceDate(months)
 
-	rows, err := s.db.Query(selectReleaseDownloadsSQL, org, repo, since)
+	rows, err := s.db.QueryContext(context.Background(), selectReleaseDownloadsSQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads: %w", err)
 	}
@@ -338,7 +338,7 @@ func (s *Store) GetReleaseDownloadsByTag(org, repo *string, months int) (*data.R
 
 	since := sinceDate(months)
 
-	rows, err := s.db.Query(selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
+	rows, err := s.db.QueryContext(context.Background(), selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads by tag: %w", err)
 	}

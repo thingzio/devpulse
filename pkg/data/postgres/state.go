@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -30,7 +31,7 @@ func (s *Store) GetState(query, org, repo string, min time.Time) (*data.State, e
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stateStmt, err := s.db.Prepare(selectStateSQL)
+	stateStmt, err := s.db.PrepareContext(context.Background(), selectStateSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare state select statement: %w", err)
 	}
@@ -69,7 +70,7 @@ func (s *Store) SaveState(query, org, repo string, state *data.State) error {
 		return fmt.Errorf("query: %s, org: %s, repo: %s are all required", query, org, repo)
 	}
 
-	stateStmt, err := s.db.Prepare(insertStateSQL)
+	stateStmt, err := s.db.PrepareContext(context.Background(), insertStateSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
@@ -89,7 +90,7 @@ func (s *Store) ClearState(org, repo string) error {
 	}
 
 	q := "DELETE FROM state WHERE org = $1 AND repo = $2"
-	if _, err := s.db.Exec(q, org, repo); err != nil {
+	if _, err := s.db.ExecContext(context.Background(), q, org, repo); err != nil {
 		return fmt.Errorf("failed to clear state for %s/%s: %w", org, repo, err)
 	}
 
@@ -104,7 +105,7 @@ func (s *Store) GetDataState() (map[string]int64, error) {
 	state := make(map[string]int64)
 	for k, v := range stateQueries {
 		var count int64
-		if err := s.db.QueryRow(v).Scan(&count); err != nil {
+		if err := s.db.QueryRowContext(context.Background(), v).Scan(&count); err != nil {
 			return nil, fmt.Errorf("error getting %s count: %w", k, err)
 		}
 		state[k] = count

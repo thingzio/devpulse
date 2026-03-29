@@ -107,8 +107,8 @@ func listRepoContainerPackages(ctx context.Context, client *github.Client, org, 
 	return matched, nil
 }
 
-func upsertContainerVersions(ctx context.Context, client *github.Client, db *sql.DB, org, repo string, packages []*github.Package) (int, error) {
-	tx, err := db.Begin()
+func upsertContainerVersions(ctx context.Context, client *github.Client, db DBTX, org, repo string, packages []*github.Package) (int, error) {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("beginning container version tx: %w", err)
 	}
@@ -124,7 +124,7 @@ func upsertContainerVersions(ctx context.Context, client *github.Client, db *sql
 		pkgName := pkg.GetName()
 
 		var latestCreatedAt string
-		if err := db.QueryRow(selectLatestContainerVersionSQL, org, repo, pkgName).Scan(&latestCreatedAt); err != nil {
+		if err := db.QueryRowContext(ctx, selectLatestContainerVersionSQL, org, repo, pkgName).Scan(&latestCreatedAt); err != nil {
 			rollbackTransaction(tx)
 			return 0, fmt.Errorf("querying latest container version for %s/%s/%s: %w", org, repo, pkgName, err)
 		}
@@ -209,7 +209,7 @@ func (s *Store) GetContainerActivity(org, repo *string, months int) (*data.Conta
 
 	since := sinceDate(months)
 
-	rows, err := s.db.Query(selectContainerActivitySQL, org, repo, since)
+	rows, err := s.db.QueryContext(context.Background(), selectContainerActivitySQL, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("querying container activity: %w", err)
 	}

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -80,7 +81,7 @@ func (s *Store) GetAllOrgRepos() ([]*data.OrgRepoItem, error) {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.Prepare(selectAllOrgReposSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectAllOrgReposSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare developer percentages statement: %w", err)
 	}
@@ -133,7 +134,7 @@ func (s *Store) getPercentages(sqlStr, exColumn string, entity, org, repo *strin
 		formattedSQL = fmt.Sprintf(sqlStr, clause)
 	}
 
-	stmt, err := s.db.Prepare(formattedSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), formattedSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare percentages statement: %w", err)
 	}
@@ -181,7 +182,7 @@ func (s *Store) SearchDeveloperUsernames(query string, org, repo *string, months
 	since := sinceDate(months)
 	pattern := fmt.Sprintf("%%%s%%", query)
 
-	rows, err := s.db.Query(selectDeveloperSearchSQL, pattern, org, repo, since, limit)
+	rows, err := s.db.QueryContext(context.Background(), selectDeveloperSearchSQL, pattern, org, repo, since, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search developers: %w", err)
 	}
@@ -212,7 +213,7 @@ func (s *Store) GetOrgLike(query string, limit int) ([]*data.ListItem, error) {
 		return nil, errors.New("query is required")
 	}
 
-	stmt, err := s.db.Prepare(selectOrgLikeSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectOrgLikeSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare org like statement: %w", err)
 	}

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ func (s *Store) SaveRepoInsights(org, repo string, ri *data.RepoInsights) error 
 	}
 	j := string(b)
 
-	_, err = s.db.Exec(upsertRepoInsightsSQL,
+	_, err = s.db.ExecContext(context.Background(), upsertRepoInsightsSQL,
 		org, repo, j, ri.PeriodMonths, ri.Model, ri.GeneratedAt,
 		j, ri.PeriodMonths, ri.Model, ri.GeneratedAt,
 	)
@@ -55,7 +56,7 @@ func (s *Store) GetRepoInsights(org, repo *string) ([]*data.RepoInsights, error)
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.Query(selectRepoInsightsSQL, org, repo)
+	rows, err := s.db.QueryContext(context.Background(), selectRepoInsightsSQL, org, repo)
 	if err != nil {
 		return nil, fmt.Errorf("querying repo insights: %w", err)
 	}
@@ -88,7 +89,7 @@ func (s *Store) GetRepoInsightsGeneratedAt(org, repo string) (string, error) {
 	}
 
 	var ts string
-	if err := s.db.QueryRow(selectRepoInsightsGeneratedAtSQL, org, repo).Scan(&ts); err != nil {
+	if err := s.db.QueryRowContext(context.Background(), selectRepoInsightsGeneratedAtSQL, org, repo).Scan(&ts); err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil
 		}

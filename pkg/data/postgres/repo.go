@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -26,7 +27,7 @@ func (s *Store) GetRepoLike(query string, limit int) ([]*data.ListItem, error) {
 		return nil, errors.New("query is required")
 	}
 
-	stmt, err := s.db.Prepare(selectRepoLikeSQL)
+	stmt, err := s.db.PrepareContext(context.Background(), selectRepoLikeSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare repo like statement: %w", err)
 	}
