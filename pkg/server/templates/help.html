@@ -1,0 +1,68 @@
+{{define "content"}}
+<div class="landing">
+  <div class="landing-hero">
+    <h1>Help</h1>
+    <p>Getting started with DevPulse</p>
+  </div>
+
+  <div style="max-width:700px;margin:0 auto">
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><strong>Sign in</strong> &mdash; authenticate with your GitHub account</li>
+        <li><strong>Add repos</strong> &mdash; search for any public GitHub repository and add it to your dashboard</li>
+        <li><strong>Wait for import</strong> &mdash; data imports run hourly, or your admin can trigger one manually</li>
+        <li><strong>Explore</strong> &mdash; use the tabbed dashboard to view health, activity, velocity, quality, and community metrics</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Dashboard Tabs</h3>
+      <ul>
+        <li><strong>Health</strong> &mdash; bus factor, repository status, stars/forks trends, community profile</li>
+        <li><strong>Activity</strong> &mdash; event trends, PR size distribution, forks vs activity, issue ratio</li>
+        <li><strong>Velocity</strong> &mdash; lead time to merge, change failure rate, release cadence, downloads</li>
+        <li><strong>Quality</strong> &mdash; PR review ratio, review latency, time to close, reputation scores</li>
+        <li><strong>Community</strong> &mdash; contributor retention, momentum, first-time funnel, entity affiliations</li>
+        <li><strong>Events</strong> &mdash; searchable event log with type, date, username, and entity filters</li>
+        <li><strong>Insights</strong> &mdash; AI-generated observations and action items per repository</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Search</h3>
+      <ul>
+        <li><strong>org:name</strong> &mdash; scope the dashboard to all repos in an organization</li>
+        <li><strong>repo:name</strong> &mdash; scope to a single repository</li>
+        <li>Click a repo name in the overview table to filter by that repo</li>
+        <li>Use the period selector to adjust the time range</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Usage Limits</h3>
+      <ul>
+        <li><strong>Free tier</strong> &mdash; 5 repos, 2,000 events per week</li>
+        <li><strong>Pro tier</strong> &mdash; 25 repos, 20,000 events per week</li>
+        <li><strong>Enterprise</strong> &mdash; 100 repos, 100,000 events per week</li>
+        <li>The usage banner on the dashboard shows your current consumption</li>
+        <li>When the weekly limit is reached, imports pause until the following week</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Troubleshooting</h3>
+      <ul>
+        <li><strong>Stuck in sign-in loop</strong> &mdash; visit <a href="/auth/reset">/auth/reset</a> to clear your session and try again</li>
+        <li><strong>Repo shows "Pending"</strong> &mdash; data imports run hourly; newly added repos will populate after the next import</li>
+        <li><strong>Charts empty after selecting a repo</strong> &mdash; ensure the period selector covers a range with imported data</li>
+        <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added; check spelling of org/repo</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="landing-footer">
+    <p><a href="/dashboard">Back to Dashboard</a></p>
+  </div>
+</div>
+{{end}}
