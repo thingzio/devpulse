@@ -62,11 +62,26 @@ resource "google_cloud_run_v2_service" "serve" {
         value = "https://${var.domain}"
       }
 
+      env {
+        name  = "GITHUB_APP_ID"
+        value = var.github_app_id
+      }
+
+      env {
+        name  = "GITHUB_APP_KEY_PATH"
+        value = "/secrets/github-app-key/key.pem"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
           memory = "512Mi"
         }
+      }
+
+      volume_mounts {
+        name       = "github-app-key"
+        mount_path = "/secrets/github-app-key"
       }
 
       startup_probe {
@@ -83,6 +98,17 @@ resource "google_cloud_run_v2_service" "serve" {
       name = "cloudsql"
       cloud_sql_instance {
         instances = [google_sql_database_instance.default.connection_name]
+      }
+    }
+
+    volumes {
+      name = "github-app-key"
+      secret {
+        secret = google_secret_manager_secret.github_app_key.secret_id
+        items {
+          version = "latest"
+          path    = "key.pem"
+        }
       }
     }
   }
