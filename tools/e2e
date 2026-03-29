@@ -119,12 +119,12 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:$SITE_
 [[ "$STATUS" == "401" || "$STATUS" == "503" ]] && pass "POST /webhook/github (no sig) → $STATUS" || err "POST /webhook/github (no sig) → $STATUS (expected 401 or 503)"
 
 # ==========================================================================
-# Import smoke test (with DB, no token)
+# Import smoke test (with DB, empty — exits 0 with no tenants)
 # ==========================================================================
-if output=$(DATABASE_URL="$DEV_DB" GITHUB_TOKEN="" "$IMPORT" 2>&1); then
-  err "import-no-token (expected non-zero exit)"
+if output=$(DATABASE_URL="$DEV_DB" "$IMPORT" 2>&1); then
+  echo "$output" | grep -qi "import worker complete" && pass "import-empty-db (completes with 0 tenants)" || err "import-empty-db (expected 'import worker complete' in output)"
 else
-  echo "$output" | grep -qi "token\|no.*tenant" && pass "import-no-token (fails gracefully)" || err "import-no-token (unexpected error: $output)"
+  err "import-empty-db (unexpected non-zero exit)"
 fi
 
 # ==========================================================================
