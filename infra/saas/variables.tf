@@ -32,6 +32,12 @@ variable "github_oauth_client_id" {
   type        = string
 }
 
+variable "github_app_id" {
+  description = "GitHub App ID for installation token minting"
+  type        = string
+  default     = ""
+}
+
 variable "db_tier" {
   description = "Cloud SQL machine tier"
   type        = string

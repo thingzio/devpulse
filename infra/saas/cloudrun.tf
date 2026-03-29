@@ -125,6 +125,16 @@ resource "google_cloud_run_v2_job" "import" {
           value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
         }
 
+        env {
+          name  = "GITHUB_APP_ID"
+          value = var.github_app_id
+        }
+
+        env {
+          name  = "GITHUB_APP_KEY_PATH"
+          value = "/secrets/github-app-key/key.pem"
+        }
+
         # ANTHROPIC_API_KEY and ANTHROPIC_MODEL are optional.
         # Add after storing the secret value:
         #   gcloud run jobs update devpulse-saas-import --region=us-west1 \
@@ -137,12 +147,28 @@ resource "google_cloud_run_v2_job" "import" {
             memory = "512Mi"
           }
         }
+
+        volume_mounts {
+          name       = "github-app-key"
+          mount_path = "/secrets/github-app-key"
+        }
       }
 
       volumes {
         name = "cloudsql"
         cloud_sql_instance {
           instances = [google_sql_database_instance.default.connection_name]
+        }
+      }
+
+      volumes {
+        name = "github-app-key"
+        secret {
+          secret = google_secret_manager_secret.github_app_key.secret_id
+          items {
+            version = "latest"
+            path    = "key.pem"
+          }
         }
       }
     }
