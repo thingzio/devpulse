@@ -36,9 +36,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          AR="${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPO }}"
           gcloud run services update ${{ vars.SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse-site:${{ inputs.image_tag }}
+            --image="${AR}/thingzio/devpulse-site:${{ inputs.image_tag }}"
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse-import:${{ inputs.image_tag }}
+            --image="${AR}/thingzio/devpulse-import:${{ inputs.image_tag }}"
