@@ -64,14 +64,13 @@ resource "google_sql_database" "default" {
   instance = google_sql_database_instance.default.name
 }
 
-resource "google_sql_user" "service" {
-  name     = trimsuffix(google_service_account.run.email, ".gserviceaccount.com")
-  instance = google_sql_database_instance.default.name
-  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
+resource "random_password" "db_password" {
+  length  = 32
+  special = false
 }
 
-resource "google_sql_user" "import" {
-  name     = trimsuffix(google_service_account.import.email, ".gserviceaccount.com")
+resource "google_sql_user" "app" {
+  name     = "devpulse"
   instance = google_sql_database_instance.default.name
-  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
+  password = random_password.db_password.result
 }
