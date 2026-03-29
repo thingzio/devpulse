@@ -154,11 +154,11 @@ release: ## Runs the full release process with goreleaser
 
 .PHONY: server
 server: ## Starts local dev server
-	DATABASE_URL="$(DEV_DB)" PORT=8080 DEVPULSE_DEBUG=true go run ./cmd/devpulse
+	DATABASE_URL="$(DEV_DB)" DEVPULSE_DEBUG=true go run ./cmd/devpulse-site
 
 .PHONY: import
 import: ## Runs local import worker
-	DATABASE_URL="$(DEV_DB)" DEVPULSE_DEBUG=true go run ./cmd/devpulse
+	DATABASE_URL="$(DEV_DB)" DEVPULSE_DEBUG=true go run ./cmd/devpulse-import
 
 .PHONY: bump-major
 bump-major: ## Bumps major version (1.2.3 → 2.0.0)

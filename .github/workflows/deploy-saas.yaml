@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           gcloud run services update ${{ vars.SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse:${{ inputs.image_tag }}
+            --image=ghcr.io/thingzio/devpulse-site:${{ inputs.image_tag }}
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse:${{ inputs.image_tag }}
+            --image=ghcr.io/thingzio/devpulse-import:${{ inputs.image_tag }}

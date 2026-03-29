@@ -70,13 +70,13 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
-          echo "Deploying ghcr.io/thingzio/devpulse:${TAG}..."
+          echo "Deploying devpulse-site and devpulse-import:${TAG}..."
           gcloud run services update ${{ vars.SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse:${TAG}
+            --image=ghcr.io/thingzio/devpulse-site:${TAG}
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
-            --image=ghcr.io/thingzio/devpulse:${TAG}
+            --image=ghcr.io/thingzio/devpulse-import:${TAG}
 
   publish:
     runs-on: ubuntu-latest

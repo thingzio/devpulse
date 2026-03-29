@@ -7,40 +7,51 @@ pass() { echo "PASS: $*"; }
 # Require dependencies
 command -v go >/dev/null 2>&1 || err "go is required"
 
-# Build binary to temp directory, clean up on exit
+# Build binaries to temp directory, clean up on exit
 TMPDIR_E2E=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_E2E"' EXIT
-BIN="$TMPDIR_E2E/devpulse"
-
-echo "==> Building devpulse binary..."
-go build -mod=vendor -o "$BIN" ./cmd/devpulse
-[[ -x "$BIN" ]] || err "binary not found after build"
 
 FAILURES=0
 
 # --------------------------------------------------------------------------
-# Test: missing DATABASE_URL starts import mode and fails with clear error
+# Build devpulse-site
 # --------------------------------------------------------------------------
-if output=$(DATABASE_URL="" "$BIN" 2>&1); then
-  echo "FAIL: missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
+echo "==> Building devpulse-site..."
+SITE="$TMPDIR_E2E/devpulse-site"
+go build -mod=vendor -o "$SITE" ./cmd/devpulse-site
+[[ -x "$SITE" ]] || err "devpulse-site binary not found after build"
+
+# --------------------------------------------------------------------------
+# Build devpulse-import
+# --------------------------------------------------------------------------
+echo "==> Building devpulse-import..."
+IMPORT="$TMPDIR_E2E/devpulse-import"
+go build -mod=vendor -o "$IMPORT" ./cmd/devpulse-import
+[[ -x "$IMPORT" ]] || err "devpulse-import binary not found after build"
+
+# --------------------------------------------------------------------------
+# Test: devpulse-site missing DATABASE_URL fails with clear error
+# --------------------------------------------------------------------------
+if output=$(DATABASE_URL="" "$SITE" 2>&1); then
+  echo "FAIL: site-missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
 else
   if echo "$output" | grep -qi "DATABASE_URL"; then
-    pass "missing-database-url (import mode)"
+    pass "site-missing-database-url"
   else
-    echo "FAIL: missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
+    echo "FAIL: site-missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
   fi
 fi
 
 # --------------------------------------------------------------------------
-# Test: missing DATABASE_URL with PORT set starts serve mode and fails
+# Test: devpulse-import missing DATABASE_URL fails with clear error
 # --------------------------------------------------------------------------
-if output=$(DATABASE_URL="" PORT=8080 "$BIN" 2>&1); then
-  echo "FAIL: missing-database-url-serve (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
+if output=$(DATABASE_URL="" "$IMPORT" 2>&1); then
+  echo "FAIL: import-missing-database-url (expected non-zero exit)"; FAILURES=$((FAILURES + 1))
 else
   if echo "$output" | grep -qi "DATABASE_URL"; then
-    pass "missing-database-url (serve mode)"
+    pass "import-missing-database-url"
   else
-    echo "FAIL: missing-database-url-serve (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
+    echo "FAIL: import-missing-database-url (expected DATABASE_URL in error)"; FAILURES=$((FAILURES + 1))
   fi
 fi
 

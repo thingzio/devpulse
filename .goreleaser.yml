@@ -3,9 +3,27 @@ version: 2
 project_name: devpulse
 
 builds:
-  - id: devpulse
-    binary: "{{.ProjectName}}"
-    dir: ./cmd/devpulse
+  - id: devpulse-site
+    binary: devpulse-site
+    dir: ./cmd/devpulse-site
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+        -X main.version={{.Version}}
+        -X main.commit={{.ShortCommit}}
+        -X main.date={{.CommitDate}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+  - id: devpulse-import
+    binary: devpulse-import
+    dir: ./cmd/devpulse-import
     env:
       - CGO_ENABLED=0
     flags:
@@ -29,10 +47,23 @@ release:
   draft: true
 
 kos:
-  - id: devpulse
-    build: devpulse
+  - id: devpulse-site
+    build: devpulse-site
     repositories:
-      - ghcr.io/thingzio/devpulse
+      - ghcr.io/thingzio/devpulse-site
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - latest
+      - "{{.Tag}}"
+    preserve_import_paths: false
+    bare: true
+
+  - id: devpulse-import
+    build: devpulse-import
+    repositories:
+      - ghcr.io/thingzio/devpulse-import
     platforms:
       - linux/amd64
       - linux/arm64

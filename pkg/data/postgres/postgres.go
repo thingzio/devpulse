@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"os"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -87,6 +88,23 @@ func (s *Store) Close() error {
 // DB returns the underlying *sql.DB for cases that need direct access.
 func (s *Store) DB() *sql.DB {
 	return s.pool
+}
+
+// NewFromEnv creates a Store from DATABASE_URL env var, runs base + SaaS migrations.
+func NewFromEnv() (*Store, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+	store, err := New(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+	if err := RunSaaSMigrations(store.DB()); err != nil {
+		store.Close()
+		return nil, fmt.Errorf("running saas migrations: %w", err)
+	}
+	return store, nil
 }
 
 func runMigrations(db *sql.DB) error {

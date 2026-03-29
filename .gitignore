@@ -12,6 +12,8 @@ tmp
 bin
 dist
 devpulse
+devpulse-site
+devpulse-import
 devpulse-cloud
 
 # Keys
