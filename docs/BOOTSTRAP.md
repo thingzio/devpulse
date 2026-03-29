@@ -71,9 +71,9 @@ Terraform needs container images to exist before creating Cloud Run resources. P
 # Authenticate to GHCR
 echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
 
-# Build and push both images
-KO_DOCKER_REPO=ghcr.io/thingzio ko build ./cmd/devpulse-site/ --bare --tags latest
-KO_DOCKER_REPO=ghcr.io/thingzio ko build ./cmd/devpulse-import/ --bare --tags latest
+# Build and push both images (repo must include full image name)
+KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
+KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
 ```
 
 Then make both packages public on GHCR (required for the AR remote repo to pull):
