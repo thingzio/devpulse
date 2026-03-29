@@ -93,6 +93,12 @@ resource "google_logging_metric" "tenant_weekly_events" {
     metric_kind = "DELTA"
     value_type  = "DISTRIBUTION"
     unit        = "1"
+
+    labels {
+      key         = "tenant_id"
+      value_type  = "STRING"
+      description = "Tenant ID"
+    }
   }
 
   value_extractor = "EXTRACT(jsonPayload.weekly_events)"
@@ -116,6 +122,12 @@ resource "google_logging_metric" "event_limit_reached" {
   metric_descriptor {
     metric_kind = "DELTA"
     value_type  = "INT64"
+
+    labels {
+      key         = "tenant_id"
+      value_type  = "STRING"
+      description = "Tenant ID"
+    }
   }
 
   label_extractors = {

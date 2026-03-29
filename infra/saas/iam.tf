@@ -43,7 +43,7 @@ resource "google_project_iam_member" "import" {
 # GitHub Actions federated identity for deployments
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "gh-pool-${var.prefix}"
-  display_name              = "GitHub Actions Pool (${var.prefix})"
+  display_name              = "GH Actions ${var.prefix}"
   project                   = var.project_id
 
   depends_on = [google_project_service.default]
