@@ -104,8 +104,8 @@ func setupTestDB(t *testing.T) *Store {
 	// New() sets maxOpenConns=25 which exhausts the container in CI.
 	testDB, err := sql.Open("postgres", schemaDSN)
 	require.NoError(t, err)
-	testDB.SetMaxOpenConns(1)
-	testDB.SetMaxIdleConns(1)
+	testDB.SetMaxOpenConns(3)
+	testDB.SetMaxIdleConns(2)
 	require.NoError(t, testDB.Ping())
 	require.NoError(t, runMigrations(testDB))
 	store := &Store{db: testDB, pool: testDB}
