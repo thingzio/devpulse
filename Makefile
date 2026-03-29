@@ -46,7 +46,7 @@ upgrade: ## Upgrades all dependencies to latest versions
 # =============================================================================
 
 .PHONY: lint
-lint: lint-go lint-yaml ## Lints Go code and YAML files
+lint: lint-go lint-yaml lint-tf ## Lints Go code, YAML files, and Terraform
 
 .PHONY: lint-go
 lint-go: ## Lints Go code with go vet and golangci-lint
@@ -59,6 +59,10 @@ lint-go: ## Lints Go code with go vet and golangci-lint
 .PHONY: lint-yaml
 lint-yaml: ## Lints YAML files with yamllint
 	yamllint -c .yamllint.yaml $(YAML_FILES)
+
+.PHONY: lint-tf
+lint-tf: ## Scans Terraform for security misconfigurations
+	tfsec infra/saas
 
 .PHONY: test
 test: tidy ## Runs unit tests with race detector and coverage

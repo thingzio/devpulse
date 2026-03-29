@@ -91,6 +91,10 @@ func setupTestDB(t *testing.T) *Store {
 	store, err := New(schemaDSN)
 	require.NoError(t, err)
 
+	// Limit connections per test to avoid exhausting the shared container.
+	store.DB().SetMaxOpenConns(2)
+	store.DB().SetMaxIdleConns(1)
+
 	t.Cleanup(func() {
 		store.Close()
 		// Drop the schema to free resources.

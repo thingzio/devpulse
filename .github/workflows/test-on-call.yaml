@@ -76,6 +76,20 @@ jobs:
       - name: Postgres Integration Tests
         run: go test -race -count=1 -timeout=600s ./pkg/data/postgres/...
 
+  tfsec:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@b842aa196da004c70498ed7c4e460fd8cda5e685  # v1.0.3
+        with:
+          working_directory: infra/saas
+
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 10
