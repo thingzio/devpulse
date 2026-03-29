@@ -136,7 +136,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 
 	// Public routes (no auth)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("GET /{$}", landingHandler())
+	mux.HandleFunc("GET /{$}", landingHandler(opts))
 	mux.HandleFunc("GET /auth/github", oauthStartHandler(oauthCfg))
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
@@ -226,11 +226,19 @@ type pageData struct {
 	Title        string
 	Username     string
 	GitHubAppURL string
+	Version      string
+	Commit       string
+	Date         string
 }
 
-func landingHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate(w, "landing.html", pageData{Title: "Home"})
+func landingHandler(opts Options) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		renderTemplate(w, "landing.html", pageData{
+			Title:   "Home",
+			Version: opts.Version,
+			Commit:  opts.Commit,
+			Date:    opts.Date,
+		})
 	}
 }
 
