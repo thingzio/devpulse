@@ -101,15 +101,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install tfsec
+      - name: Install and run tfsec
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          TFSEC_VERSION="v1.28.14"
+          curl -fsSL -o /usr/local/bin/tfsec \
+            "https://github.com/aquasecurity/tfsec/releases/download/${TFSEC_VERSION}/tfsec-linux-amd64"
+          chmod +x /usr/local/bin/tfsec
           tfsec --version
-
-      - name: Run tfsec
-        run: tfsec infra/saas
+          tfsec infra/saas
 
   e2e:
     runs-on: ubuntu-latest
