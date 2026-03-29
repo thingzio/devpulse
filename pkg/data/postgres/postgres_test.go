@@ -64,7 +64,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to open shared pool: %v\n", err)
 		os.Exit(1)
 	}
-	sharedPool.SetMaxOpenConns(3)
+	sharedPool.SetMaxOpenConns(2)
 	sharedPool.SetMaxIdleConns(1)
 
 	code := m.Run()
@@ -99,7 +99,7 @@ func setupTestDB(t *testing.T) *Store {
 	// New() sets maxOpenConns=25 which exhausts the container in CI.
 	testDB, err := sql.Open("postgres", schemaDSN)
 	require.NoError(t, err)
-	testDB.SetMaxOpenConns(2)
+	testDB.SetMaxOpenConns(1)
 	testDB.SetMaxIdleConns(1)
 	require.NoError(t, testDB.Ping())
 	require.NoError(t, runMigrations(testDB))
