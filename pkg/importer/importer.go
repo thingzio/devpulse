@@ -2,13 +2,10 @@ package importer
 
 import (
 	"context"
-	"crypto/x509"
 	"database/sql"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -245,7 +242,7 @@ func resolveToken(ctx context.Context, db *sql.DB, tenantID string) string {
 // mintInstallationToken loads the GitHub App config from env and mints
 // an installation token for the tenant's first active installation.
 func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) {
-	cfg, err := loadGitHubAppConfig()
+	cfg, err := tenant.LoadGitHubAppConfig()
 	if err != nil {
 		return "", fmt.Errorf("loading github app config: %w", err)
 	}
@@ -274,39 +271,4 @@ func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string) (st
 	)
 
 	return token.Token, nil
-}
-
-// loadGitHubAppConfig reads GitHub App credentials from environment variables.
-func loadGitHubAppConfig() (*tenant.GitHubAppConfig, error) {
-	appIDStr := os.Getenv("GITHUB_APP_ID")
-	keyPath := os.Getenv("GITHUB_APP_KEY_PATH")
-
-	if appIDStr == "" || keyPath == "" {
-		return nil, fmt.Errorf("GITHUB_APP_ID and GITHUB_APP_KEY_PATH are required")
-	}
-
-	appID, err := strconv.ParseInt(appIDStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parsing GITHUB_APP_ID: %w", err)
-	}
-
-	keyData, err := os.ReadFile(keyPath) //nolint:gosec // path from trusted GITHUB_APP_KEY_PATH env var
-	if err != nil {
-		return nil, fmt.Errorf("reading private key from %s: %w", keyPath, err)
-	}
-
-	block, _ := pem.Decode(keyData)
-	if block == nil {
-		return nil, fmt.Errorf("no PEM block found in %s", keyPath)
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("parsing private key: %w", err)
-	}
-
-	return &tenant.GitHubAppConfig{
-		AppID:      appID,
-		PrivateKey: key,
-	}, nil
 }

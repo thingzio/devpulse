@@ -413,9 +413,41 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Check for active GitHub App installation on the org.
+		install, err := tenant.GetInstallationForOrg(r.Context(), db, tn.ID, org)
+		if err != nil {
+			slog.Error("checking installation", "org", org, "error", err)
+			http.Error(w, "error checking installation", http.StatusInternalServerError)
+			return
+		}
+		if install == nil {
+			http.Error(w, fmt.Sprintf(
+				"DevPulse app is not installed on %s. Install it at https://github.com/apps/DevPulseThingz", org),
+				http.StatusBadRequest)
+			return
+		}
+
+		// Verify the installation has access to this specific repo.
+		cfg, err := tenant.LoadGitHubAppConfig()
+		if err != nil {
+			slog.Error("loading github app config", "error", err)
+			http.Error(w, "error checking repo access", http.StatusInternalServerError)
+			return
+		}
+		accessible, err := tenant.CheckRepoAccess(r.Context(), cfg, install.ID, org, repo)
+		if err != nil {
+			slog.Error("checking repo access", "org", org, "repo", repo, "error", err)
+			http.Error(w, "error checking repo access", http.StatusInternalServerError)
+			return
+		}
+		if !accessible {
+			http.Error(w, fmt.Sprintf(
+				"DevPulse app does not have access to %s/%s. Update repository permissions in your GitHub organization settings.", org, repo),
+				http.StatusBadRequest)
+			return
+		}
+
 		// Verify the repo is publicly accessible before adding.
-		// This prevents users from gaining access to private repo data
-		// imported by another tenant.
 		if !isPublicRepo(r.Context(), org, repo) {
 			http.Error(w, "repo not found or not public", http.StatusForbidden)
 			return

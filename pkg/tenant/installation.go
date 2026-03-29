@@ -72,6 +72,12 @@ const countTenantReposSQL = `SELECT COUNT(*) FROM tenant_repo WHERE tenant_id = 
 
 const getTenantMaxReposSQL = `SELECT max_repos FROM tenant WHERE id = $1`
 
+const getInstallationForOrgSQL = `
+	SELECT installation_id, target_login
+	FROM github_app_installation
+	WHERE tenant_id = $1 AND target_login = $2 AND suspended_at IS NULL
+	LIMIT 1`
+
 // SaveInstallation stores or updates a GitHub App installation for a tenant.
 func SaveInstallation(ctx context.Context, db *sql.DB, tenantID string, installationID int64, targetType, targetLogin string, permissions []byte) error {
 	_, err := db.ExecContext(ctx, saveInstallationSQL, tenantID, installationID, targetType, targetLogin, permissions)
@@ -170,4 +176,17 @@ func DeactivateTenantRepo(ctx context.Context, db *sql.DB, tenantID, org, repo s
 		return fmt.Errorf("deactivating repo: %w", err)
 	}
 	return nil
+}
+
+// GetInstallationForOrg returns the active installation for a tenant's org, if any.
+func GetInstallationForOrg(ctx context.Context, db *sql.DB, tenantID, org string) (*ActiveInstallation, error) {
+	var inst ActiveInstallation
+	err := db.QueryRowContext(ctx, getInstallationForOrgSQL, tenantID, org).Scan(&inst.ID, &inst.Login)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("querying installation for org %s: %w", org, err)
+	}
+	return &inst, nil
 }

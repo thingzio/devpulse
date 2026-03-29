@@ -10,6 +10,7 @@
       <h3>Getting Started</h3>
       <ul>
         <li><strong>Sign in</strong> &mdash; authenticate with your GitHub account</li>
+        <li><strong>Install the GitHub App</strong> &mdash; after signing in, <a href="https://github.com/apps/DevPulseThingz" target="_blank">install the DevPulse GitHub App</a> on the organizations whose repos you want to track. This grants DevPulse API access to import repository data. Signing in alone is not enough &mdash; the app must be installed separately.</li>
         <li><strong>Add repos</strong> &mdash; search for any public GitHub repository and add it to your dashboard</li>
         <li><strong>Wait for import</strong> &mdash; data imports run hourly, or your admin can trigger one manually</li>
         <li><strong>Explore</strong> &mdash; use the tabbed dashboard to view health, activity, velocity, quality, and community metrics</li>
@@ -57,6 +58,7 @@
         <li><strong>Repo shows "Pending"</strong> &mdash; data imports run hourly; newly added repos will populate after the next import</li>
         <li><strong>Charts empty after selecting a repo</strong> &mdash; ensure the period selector covers a range with imported data</li>
         <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added; check spelling of org/repo</li>
+        <li><strong>Import errors or "Bad credentials"</strong> &mdash; the <a href="https://github.com/apps/DevPulseThingz" target="_blank">DevPulse GitHub App</a> must be installed on the organization that owns the repo. Signing in via GitHub OAuth is not enough &mdash; the app installation is a separate step that grants API access for data imports.</li>
       </ul>
     </div>
   </div>

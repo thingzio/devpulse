@@ -77,7 +77,7 @@ func listRepoContainerPackages(ctx context.Context, client *github.Client, org, 
 	for {
 		packages, resp, err := client.Organizations.ListPackages(ctx, org, opts)
 		if err != nil {
-			if resp != nil && (resp.StatusCode == 404 || resp.StatusCode == 403) {
+			if resp != nil && (resp.StatusCode == 400 || resp.StatusCode == 403 || resp.StatusCode == 404) {
 				slog.Debug("container packages not accessible", "org", org, "status", resp.StatusCode)
 				return nil, nil
 			}

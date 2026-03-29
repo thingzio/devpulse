@@ -57,11 +57,17 @@ Go to https://github.com/settings/apps/new
 | Webhook URL | `https://$DOMAIN/webhook/github` |
 | Webhook secret | `openssl rand -hex 32` |
 
-Permissions (Repository): **Metadata** Read-only, **Contents** Read-only
+Permissions:
+- **Repository**: Metadata (Read-only), Contents (Read-only)
+- **Organization**: Packages (Read-only) — required for container version imports
 
 Subscribe to events: **Installation**, **Installation repositories**
 
 After creating: note the **App ID**, download the **private key** (.pem), note the **webhook secret**.
+
+```shell
+export GITHUB_APP_ID="your-app-id"
+```
 
 ## 5. Push Bootstrap Images
 
@@ -114,7 +120,8 @@ terraform apply \
     -var="project_id=$PROJECT_ID" \
     -var="region=$REGION" \
     -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
+    -var="github_app_id=$GITHUB_APP_ID"
 ```
 
 This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
@@ -178,7 +185,12 @@ gcloud run services describe devpulse-saas-serve \
 # Open in browser
 open https://$DOMAIN
 
-# Trigger manual import (after signing in and adding repos)
+# After signing in, install the GitHub App on your org:
+# https://github.com/apps/DevPulseThingz
+# This is required before adding repos — the app must be installed
+# on the org to grant API access for imports.
+
+# Trigger manual import (after signing in, installing app, and adding repos)
 gcloud run jobs execute devpulse-saas-import --region=$REGION
 
 # Check logs
@@ -210,7 +222,8 @@ cd infra/saas && terraform apply \
     -var="project_id=$PROJECT_ID" \
     -var="region=$REGION" \
     -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
+    -var="github_app_id=$GITHUB_APP_ID"
 ```
 
 ### Rotate secrets
@@ -242,7 +255,8 @@ terraform apply \
     -var="project_id=$PROJECT_ID" \
     -var="region=$REGION" \
     -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
+    -var="github_app_id=$GITHUB_APP_ID"
 ```
 
 ### Database tier upgrade
