@@ -110,6 +110,12 @@ echo -n "YOUR_WEBHOOK_SECRET" | \
 gcloud secrets versions add devpulse-saas-webhook-secret \
     --project=$PROJECT_ID \
     --data-file=-
+
+# Anthropic API key (optional, enables LLM-generated insights)
+echo -n "YOUR_ANTHROPIC_API_KEY" | \
+gcloud secrets versions add devpulse-saas-anthropic-api-key \
+    --project=$PROJECT_ID \
+    --data-file=-
 ```
 
 ## 7. Delegate DNS

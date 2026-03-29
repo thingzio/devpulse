@@ -157,11 +157,49 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 		errs++
 	}
 
+	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
+	if llmCfg := data.NewLLMConfigFromEnv(); llmCfg != nil {
+		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
+			slog.Error("generating insights", "org", org, "repo", repo, "error", err)
+			errs++
+		}
+	}
+
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
 
 	if errs > 0 {
 		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
 	}
+	return nil
+}
+
+const insightsPeriodMonths = 3
+
+func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
+	metrics, err := data.GatherInsightsMetrics(store, org, repo, insightsPeriodMonths)
+	if err != nil {
+		return fmt.Errorf("gathering metrics: %w", err)
+	}
+
+	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodMonths)
+	if err != nil {
+		return fmt.Errorf("generating insights: %w", err)
+	}
+
+	ri := &data.RepoInsights{
+		Org:          org,
+		Repo:         repo,
+		Insights:     insights,
+		PeriodMonths: insightsPeriodMonths,
+		Model:        model,
+		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+	}
+
+	if err := store.SaveRepoInsights(org, repo, ri); err != nil {
+		return fmt.Errorf("saving insights: %w", err)
+	}
+
+	slog.Info("insights generated", "org", org, "repo", repo, "model", model)
 	return nil
 }
 

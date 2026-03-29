@@ -107,6 +107,21 @@ resource "google_cloud_run_v2_job" "import" {
           value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_service_account.import.email} sslmode=disable"
         }
 
+        env {
+          name = "ANTHROPIC_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name  = "ANTHROPIC_MODEL"
+          value = "claude-haiku-4-5-20251001"
+        }
+
         resources {
           limits = {
             cpu    = "1000m"

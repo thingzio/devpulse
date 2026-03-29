@@ -49,6 +49,29 @@ resource "google_secret_manager_secret_iam_member" "run_webhook" {
   member    = "serviceAccount:${google_service_account.run.email}"
 }
 
+resource "google_secret_manager_secret" "anthropic_api_key" {
+  secret_id = "${var.prefix}-anthropic-api-key"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_secret_manager_secret_iam_member" "run_anthropic" {
+  secret_id = google_secret_manager_secret.anthropic_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "import_anthropic" {
+  secret_id = google_secret_manager_secret.anthropic_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.import.email}"
+}
+
 resource "google_secret_manager_secret_iam_member" "import_github_app" {
   secret_id = google_secret_manager_secret.github_app_key.id
   role      = "roles/secretmanager.secretAccessor"
