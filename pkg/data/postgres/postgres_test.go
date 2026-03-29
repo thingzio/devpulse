@@ -23,6 +23,10 @@ var sharedDSN string
 // schemaSeq generates unique schema names across tests.
 var schemaSeq atomic.Uint64
 
+// sharedPool is a single connection pool for schema create/drop operations.
+// Prevents each test from opening its own unlimited pool against the container.
+var sharedPool *sql.DB
+
 func TestMain(m *testing.M) {
 	// Cannot call testing.Short() before flag.Parse(); check the flag directly.
 	for _, arg := range os.Args[1:] {
@@ -53,7 +57,18 @@ func TestMain(m *testing.M) {
 	}
 	sharedDSN = dsn
 
+	// Single shared pool for schema create/drop operations.
+	sharedPool, err = sql.Open("postgres", sharedDSN)
+	if err != nil {
+		container.Terminate(ctx)
+		fmt.Fprintf(os.Stderr, "failed to open shared pool: %v\n", err)
+		os.Exit(1)
+	}
+	sharedPool.SetMaxOpenConns(3)
+	sharedPool.SetMaxIdleConns(1)
+
 	code := m.Run()
+	sharedPool.Close()
 
 	container.Terminate(ctx)
 	os.Exit(code)
@@ -68,17 +83,9 @@ func setupTestDB(t *testing.T) *Store {
 
 	schema := fmt.Sprintf("test_%d", schemaSeq.Add(1))
 
-	// Connect to the shared container and create an isolated schema.
-	db, err := sql.Open("postgres", sharedDSN)
+	// Create an isolated schema using the shared pool.
+	_, err := sharedPool.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
 	require.NoError(t, err)
-
-	_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
-	require.NoError(t, err)
-
-	_, err = db.Exec(fmt.Sprintf("SET search_path TO %s", schema))
-	require.NoError(t, err)
-
-	require.NoError(t, db.Close())
 
 	// Build a DSN that sets search_path to the isolated schema.
 	schemaDSN := sharedDSN
@@ -100,12 +107,7 @@ func setupTestDB(t *testing.T) *Store {
 
 	t.Cleanup(func() {
 		store.Close()
-		// Drop the schema to free resources.
-		cleanDB, err := sql.Open("postgres", sharedDSN)
-		if err == nil {
-			cleanDB.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", schema))
-			cleanDB.Close()
-		}
+		sharedPool.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", schema))
 	})
 
 	return store

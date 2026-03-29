@@ -74,7 +74,7 @@ jobs:
         uses: ./.github/actions/setup-go-env
 
       - name: Postgres Integration Tests
-        run: go test -race -count=1 -timeout=600s ./pkg/data/postgres/...
+        run: go test -race -count=1 -timeout=600s -parallel=4 ./pkg/data/postgres/...
 
   tfsec:
     runs-on: ubuntu-latest
