@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/middleware"
@@ -52,6 +53,9 @@ const (
 	serverIdleTimeout       = 120 * time.Second
 	serverMaxHeaderBytes    = 64 * 1024 // 64KB
 	externalHTTPTimeout     = 10 * time.Second
+
+	addressDefault = "0.0.0.0"
+	portDefault    = "8080"
 )
 
 // httpClient is used for all outbound HTTP calls (GitHub API, etc.)
@@ -77,7 +81,7 @@ func Run(ctx context.Context, opts Options) error {
 	}()
 
 	db := store.DB()
-	port := os.Getenv("PORT")
+	port := config.GetEnv("PORT", portDefault)
 	baseURL := strings.TrimRight(os.Getenv("BASE_URL"), "/")
 
 	oauthCfg := &oauth.Config{
@@ -89,7 +93,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts)
 
-	address := fmt.Sprintf("0.0.0.0:%s", port)
+	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
 		Addr:              address,
 		Handler:           mux,
