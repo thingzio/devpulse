@@ -21,15 +21,16 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites, make targets, 
 
 Single binary with two subcommands:
 
-| Subcommand | Purpose | Deploy |
-|------------|---------|--------|
-| `serve` | HTTP server: dashboard, API, OAuth, webhooks | Cloud Run service |
-| `import` | Scheduled tenant data import worker | Cloud Run job (hourly) |
+| Binary | Purpose | Deploy |
+|--------|---------|--------|
+| `devpulse-site` | HTTP server: dashboard, API, OAuth, webhooks | Cloud Run service |
+| `devpulse-import` | Scheduled tenant data import worker | Cloud Run job (hourly) |
 
 Key packages:
 
 ```
-cmd/devpulse/       Entrypoint (serve, import subcommands)
+cmd/devpulse-site/   HTTP server (dashboard, OAuth, webhooks, data API)
+cmd/devpulse-import/ Batch import worker
 pkg/tenant/         Tenant CRUD, sessions, GitHub App, installations
 pkg/middleware/     Auth middleware, tenant scope (RLS)
 pkg/oauth/          GitHub OAuth web flow

@@ -10,11 +10,11 @@ resource "google_sql_database_instance" "default" {
     availability_type = "ZONAL"
     disk_autoresize   = true
 
-    ip_configuration {
+    ip_configuration { #tfsec:ignore:google-sql-encrypt-in-transit-data -- ssl_mode=ENCRYPTED_ONLY used (provider v7+, tfsec checks require_ssl)
       ipv4_enabled                                  = false
       private_network                               = google_compute_network.default.id
       enable_private_path_for_google_cloud_services = true
-      ssl_mode                                      = "ENCRYPTED_ONLY" #tfsec:ignore:google-sql-encrypt-in-transit-data
+      ssl_mode                                      = "ENCRYPTED_ONLY"
     }
 
     backup_configuration {

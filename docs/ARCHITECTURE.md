@@ -1,6 +1,6 @@
 # Architecture
 
-Multi-tenant SaaS for GitHub project health analytics. Single `devpulse` binary, mode selected by `PORT` env var. PostgreSQL with Row-Level Security for tenant isolation.
+Multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-site` (HTTP server) and `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation.
 
 ## Data Flow
 
@@ -14,7 +14,8 @@ Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboar
 
 ```
 devpulse/
-├── cmd/devpulse/           Thin entrypoint (logging, store, mode dispatch)
+├── cmd/devpulse-site/     HTTP server entrypoint (dashboard, OAuth, webhooks, data API)
+├── cmd/devpulse-import/   Batch import worker entrypoint
 ├── pkg/
 │   ├── server/             HTTP server, handlers, templates, static assets
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
@@ -37,9 +38,7 @@ devpulse/
 
 ## Mode Selection
 
-Single binary, env var driven:
-- `PORT` set → `pkg/server.Run()` — HTTP server (dashboard, API, OAuth, webhooks)
-- `PORT` unset → `pkg/importer.Run()` — batch import worker
+Two separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports. Each creates its own store via `postgres.NewFromEnv()`.
 
 ## Data Layer
 

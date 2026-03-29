@@ -33,7 +33,7 @@ Cloud DNS       → devpulse.thingz.io
 
 ## Compute
 
-Single container image (`ghcr.io/thingzio/devpulse`), mode selected by `PORT` env var.
+Two container images: `ghcr.io/thingzio/devpulse-site` (Cloud Run service) and `ghcr.io/thingzio/devpulse-import` (Cloud Run job).
 
 | Mode | Deployment | Scaling |
 |------|-----------|---------|

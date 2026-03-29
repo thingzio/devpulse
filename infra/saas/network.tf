@@ -6,7 +6,7 @@ resource "google_compute_network" "default" {
   depends_on = [google_project_service.default]
 }
 
-resource "google_compute_subnetwork" "default" {
+resource "google_compute_subnetwork" "default" { #tfsec:ignore:google-compute-enable-vpc-flow-logs -- internal subnet for Cloud Run→Cloud SQL only
   name          = "${var.prefix}-subnet"
   ip_cidr_range = "10.0.0.0/24"
   region        = var.region

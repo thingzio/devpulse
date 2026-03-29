@@ -61,8 +61,8 @@ export GITHUB_TOKEN="ghp_..."
 
 ```bash
 make up             # start Postgres (data persists in pgdata volume)
-make server         # serve mode: PORT=8080, opens http://localhost:8080
-make import         # import mode: no PORT, runs once and exits
+make server         # runs devpulse-site on :8080
+make import         # runs devpulse-import, processes tenants and exits
 make stats          # show tenant count, repos, recent sign-ins
 make db             # open psql shell
 make down           # stop Postgres (data preserved)
@@ -70,9 +70,7 @@ make down           # stop Postgres (data preserved)
 
 ### Mode Selection
 
-The binary has no subcommands or flags. Mode is determined by the `PORT` env var:
-- `PORT` set → HTTP server (dashboard, API, OAuth, webhooks)
-- `PORT` unset → import worker (iterates tenants, imports repos, exits)
+`make server` runs `devpulse-site` (HTTP server on :8080). `make import` runs `devpulse-import` (batch worker, exits when done).
 
 Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
@@ -151,7 +149,7 @@ go tool cover -html=cover.out
 make server
 
 # Directly
-DEVPULSE_DEBUG=true DATABASE_URL="postgres://..." PORT=8080 go run ./cmd/devpulse
+DEVPULSE_DEBUG=true DATABASE_URL="postgres://..." go run ./cmd/devpulse-site
 ```
 
 All logs are JSON to stderr. Use `jq` for local filtering:

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Single Go binary with `serve` (HTTP server) and `import` (scheduled worker) subcommands. PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
+`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-site` (HTTP server) and `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
 
 ## Build & Test
 
@@ -133,7 +133,8 @@ When choosing between approaches, prioritize in this order:
 ## Architecture
 
 ```
-cmd/devpulse/           Thin entrypoint (logging, store init, mode dispatch by PORT env var)
+cmd/devpulse-site/     HTTP server entrypoint (dashboard, OAuth, webhooks, data API)
+cmd/devpulse-import/   Batch import worker entrypoint
 pkg/server/             HTTP server, handlers, scoped.go (RLS middleware), data.go (chart API)
 pkg/server/static/      Frontend: CSS, JS, images (embedded via go:embed)
 pkg/server/templates/   HTML templates: header, home, footer, landing, tos, help
@@ -150,7 +151,7 @@ infra/saas/             Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-Mode selection: `PORT` env var set → serve mode, unset → import mode. No CLI flags, no subcommands.
+Two separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports. Each creates its own store via `postgres.NewFromEnv()`.
 
 Data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
 
