@@ -42,7 +42,7 @@ resource "google_project_iam_member" "import" {
 
 # GitHub Actions federated identity for deployments
 resource "google_iam_workload_identity_pool" "github" {
-  workload_identity_pool_id = "github-actions-pool-${var.prefix}"
+  workload_identity_pool_id = "gh-pool-${var.prefix}"
   display_name              = "GitHub Actions Pool (${var.prefix})"
   project                   = var.project_id
 
@@ -51,7 +51,7 @@ resource "google_iam_workload_identity_pool" "github" {
 
 resource "google_iam_workload_identity_pool_provider" "github" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github-actions-provider-${var.prefix}"
+  workload_identity_pool_provider_id = "gh-provider-${var.prefix}"
   display_name                       = "GitHub Actions Provider (${var.prefix})"
 
   attribute_mapping = {
