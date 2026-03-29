@@ -2,16 +2,43 @@
 <div class="landing">
   <div class="landing-hero">
     <h1>Terms of Service</h1>
-    <p>By using DevPulse, you agree to the following:</p>
+    <p>Please review and accept the following terms before using DevPulse.</p>
   </div>
 
-  <div style="max-width:600px;margin:0 auto 30px">
-    <div class="landing-feature">
+  <div style="max-width:700px;margin:0 auto 30px">
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Data Collection &amp; Access</h3>
       <ul>
-        <li>DevPulse accesses only the GitHub repositories you explicitly authorize via GitHub App installation or manual addition.</li>
-        <li>Only public repository data is importable. Private repos require explicit GitHub App access.</li>
-        <li>Imported data (events, metadata, releases) is stored in our database and used to generate analytics.</li>
-        <li>You can remove repos or revoke access at any time from the dashboard.</li>
+        <li>DevPulse collects and analyzes publicly available data from GitHub repositories you add to your dashboard.</li>
+        <li>Data collected includes contribution events (pull requests, issues, reviews, comments), repository metadata (stars, forks, language, license), releases, and contributor profiles.</li>
+        <li>Private repository data is only accessible when you explicitly grant access through a GitHub App installation.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Data Storage &amp; Use</h3>
+      <ul>
+        <li>Imported data is stored in our database and used solely to generate project health analytics and insights for your dashboard.</li>
+        <li>Your data is isolated from other users through row-level security. Other users cannot view your tracked repositories or analytics.</li>
+        <li>We do not sell, share, or distribute your data to third parties.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Your Controls</h3>
+      <ul>
+        <li>You can add or remove repositories from your dashboard at any time.</li>
+        <li>You can revoke DevPulse access by uninstalling the GitHub App from your organization or account settings.</li>
+        <li>You can sign out and clear your session at any time from the dashboard or via <a href="/auth/reset">/auth/reset</a>.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>Usage Limits</h3>
+      <ul>
+        <li>Free accounts are limited to 5 tracked repositories and 2,000 imported events per week.</li>
+        <li>When weekly limits are reached, data imports are paused until the following week.</li>
+        <li>Higher limits are available on paid plans.</li>
       </ul>
     </div>
   </div>
