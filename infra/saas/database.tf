@@ -14,6 +14,7 @@ resource "google_sql_database_instance" "default" {
       ipv4_enabled                                  = false
       private_network                               = google_compute_network.default.id
       enable_private_path_for_google_cloud_services = true
+      require_ssl                                   = true
     }
 
     backup_configuration {
@@ -24,6 +25,31 @@ resource "google_sql_database_instance" "default" {
 
     database_flags {
       name  = "cloudsql.iam_authentication"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_temp_files"
+      value = "0"
+    }
+
+    database_flags {
+      name  = "log_connections"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_disconnections"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_lock_waits"
+      value = "on"
+    }
+
+    database_flags {
+      name  = "log_checkpoints"
       value = "on"
     }
   }

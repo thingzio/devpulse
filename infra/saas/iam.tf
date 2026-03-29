@@ -84,7 +84,6 @@ resource "google_service_account_iam_member" "deployer_wif" {
 locals {
   deployer_roles = [
     "roles/run.admin",
-    "roles/iam.serviceAccountUser",
     "roles/cloudscheduler.admin",
   ]
 }
@@ -94,4 +93,17 @@ resource "google_project_iam_member" "deployer" {
   project  = var.project_id
   role     = each.value
   member   = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+# Grant serviceAccountUser at service-account level (not project level)
+resource "google_service_account_iam_member" "deployer_run_sa" {
+  service_account_id = google_service_account.run.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+resource "google_service_account_iam_member" "deployer_import_sa" {
+  service_account_id = google_service_account.import.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
 }
