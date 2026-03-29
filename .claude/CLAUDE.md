@@ -35,35 +35,61 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
 
 ## Code Conventions
 
+**Context propagation (CRITICAL):**
+- Every Store interface method takes `ctx context.Context` as its first parameter
+- Every DB call must use `*Context` variants: `ExecContext`, `QueryContext`, `QueryRowContext`, `PrepareContext`, `BeginTx`
+- Never use `context.Background()` in production code — always thread the caller's ctx
+- HTTP handlers pass `r.Context()` to all Store/tenant calls
+- Import worker passes its `ctx` through all layers
+- When adding a new Store method: add to interface in `pkg/data/store.go`, implement in `pkg/data/postgres/`, update all callers
+
+**Tenant isolation (CRITICAL):**
+- Data API routes use `ScopedStoreMiddleware` which acquires a dedicated `db.Conn()` and calls `set_config('app.tenant_id', $1, false)` for RLS
+- Data handlers use `storeFromRequest(r, defaultStore)` to get the tenant-scoped Store from context
+- The `DBTX` interface is context-only — both `*sql.DB` and `*sql.Conn` satisfy it natively
+- `NewFromConn(conn)` creates a Store from a dedicated connection (no adapter needed)
+- When adding a new data endpoint: use `scopedWrap()` in the router, use `storeFromRequest()` in the handler
+
+**Tenant schema changes:**
+- When adding a column to the `tenant` table, you MUST update ALL of these:
+  - `upsertTenantSQL`, `getTenantByGitHubIDSQL`, `getTenantByIDSQL` in `pkg/tenant/tenant.go`
+  - `validateSessionSQL` in `pkg/tenant/session.go` (auth loop if missed!)
+  - `scanTenant()` field list in `pkg/tenant/tenant.go`
+  - `Tenant` struct in `pkg/tenant/tenant.go`
+  - Migration in `pkg/data/postgres/sql/migrations_saas/001_initial.sql`
+
 **Error handling:**
-- Use `fmt.Errorf("context: %w", err)` for wrapping — this is the project-wide pattern
-- Sentinel errors defined as package-level vars (e.g. `errDBNotInitialized`)
+- Use `fmt.Errorf("context: %w", err)` for wrapping — never bare `return err`
+- Exported sentinel errors: `ErrRepoLimitExceeded`, `ErrSessionInvalid`
+- Unexported sentinel errors: `errDBNotInitialized`, `errNoToken`
 
 **Logging:**
-- Use `log/slog` (Info, Debug, Warn, Error) — never `fmt.Println`
+- JSON-only via `log/slog` (Info, Debug, Warn, Error) — never `fmt.Println`
+- `DEVPULSE_DEBUG=true` for debug level
 
 **Database:**
 - All SQL constants defined at the top of the file they're used in
-- COALESCE pattern for optional filters on non-nullable columns: `WHERE col = COALESCE(?, col)`
-- IFNULL/COALESCE pattern for nullable columns (e.g. entity): `IFNULL(d.entity, '') = COALESCE(?, IFNULL(d.entity, ''))`
-- Developer upsert preserves existing entity when new value is empty: `CASE WHEN ? = '' THEN COALESCE(developer.entity, '') ELSE ? END`
+- COALESCE pattern for optional filters: `WHERE col = COALESCE(?, col)`
 - Transactions with explicit rollback on error
 - Upserts via `INSERT ... ON CONFLICT(...) DO UPDATE SET`
+- Limit checks inside transactions to prevent TOCTOU races
 
 **HTTP handlers:**
 - Return `http.HandlerFunc` closures: `func handler(db *sql.DB) http.HandlerFunc`
 - Use `writeJSON(w, status, v)` and `writeError(w, status, msg)` helpers
-- Query params: `r.URL.Query().Get("key")`, convert with `queryParamInt()`
+- Use `storeFromRequest(r, store)` in data API handlers (gets RLS-scoped Store)
+- Generic insight handlers: `insightWithEntityHandler(store, label, fn)` and `insightHandler(store, label, fn)`
+- All outbound HTTP calls use a `*http.Client` with timeout (10-30s), never `http.DefaultClient`
 
 **Imports:**
 - GitHub API via `github.com/google/go-github/v83/github`
-- CLI via `github.com/urfave/cli/v3`
 - Testing via `github.com/stretchr/testify` (assert + require)
 - PostgreSQL via `github.com/lib/pq`
 - JWT via `github.com/golang-jwt/jwt/v5`
 
 **Testing:**
-- `setupTestDB(t)` helper creates temp DB with all migrations
+- `setupTestDB(t)` helper creates temp Postgres container with all migrations
+- All test functions must create `ctx := context.Background()` and pass to Store methods
 - Table-driven tests where applicable
 - Test both nil DB and empty DB cases for query functions
 
@@ -75,6 +101,13 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
 | Skip or disable tests to make CI pass | Fix the actual issue |
 | Invent new patterns | Study existing code in same package first |
 | Use `fmt.Println` for logging | Use `slog.Info/Debug/Warn/Error` |
+| Use `context.Background()` in handlers | Thread `r.Context()` or caller's `ctx` |
+| Use `http.DefaultClient` for outbound calls | Use a `*http.Client` with timeout |
+| Use `s.db.Exec()` (non-context) | Use `s.db.ExecContext(ctx, ...)` |
+| Bare `return err` without wrapping | Use `fmt.Errorf("context: %w", err)` |
+| Use `fmt.Sprintf` for SQL with user input | Use parameterized queries (`$1, $2`) |
+| Add tenant column without updating all SQL | Update ALL 5 SQL constants + scanTenant + struct |
+| Add data endpoint without `scopedWrap()` | Data routes must use RLS scoping middleware |
 | Add features not requested | Implement exactly what was asked |
 | Create new files when editing suffices | Prefer `Edit` over `Write` |
 | Guess at missing parameters | Ask for clarification |
@@ -100,24 +133,32 @@ When choosing between approaches, prioritize in this order:
 ## Architecture
 
 ```
-cmd/devpulse/           Entrypoint (serve, import subcommands)
-pkg/data/               Store interface, shared types, helpers
-pkg/data/postgres/      PostgreSQL Store implementation + migrations (base + SaaS)
+cmd/devpulse/           Thin entrypoint (logging, store init, mode dispatch by PORT env var)
+pkg/server/             HTTP server, handlers, scoped.go (RLS middleware), data.go (chart API)
+pkg/server/static/      Frontend: CSS, JS, images (embedded via go:embed)
+pkg/server/templates/   HTML templates: header, home, footer, landing, tos, help
+pkg/importer/           Tenant import worker with weekly event limit check + LLM insights
+pkg/data/               Store interface (all methods take ctx), shared types, helpers
+pkg/data/postgres/      PostgreSQL Store (DBTX interface: *sql.DB and *sql.Conn)
 pkg/data/ghutil/        Shared GitHub API helpers (rate limiting, user mapping)
-pkg/data/insights_gen.go  LLM insights generation
+pkg/data/insights_gen.go  LLM insights generation via Anthropic API
+pkg/tenant/             Tenant CRUD, sessions, GitHub App JWT, installations, overview
+pkg/middleware/         Auth (session cookie), tenant scope (dedicated conn + set_config)
 pkg/oauth/              GitHub OAuth web flow
-pkg/tenant/             Tenant CRUD, sessions, GitHub App, installations
-pkg/middleware/         Auth middleware, tenant scope injection (RLS)
 pkg/net/                HTTP client utilities
 infra/saas/             Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-Subcommands: `serve` (HTTP server with OAuth, webhooks, dashboard), `import` (scheduled tenant data import worker)
+Mode selection: `PORT` env var set → serve mode, unset → import mode. No CLI flags, no subcommands.
 
 Data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
 
-Tenant isolation: PostgreSQL Row-Level Security (RLS) policies filter data via `app.tenant_id` session variable set by middleware. Global tables (event, developer, etc.) join through `tenant_repo`; tenant-scoped tables have direct `tenant_id` columns.
+Tenant isolation layers:
+1. **RLS policies** on all data tables, filtering by `app.tenant_id` session variable
+2. **ScopedStoreMiddleware** acquires dedicated `db.Conn()`, calls `set_config`, creates scoped Store
+3. **Data handlers** use `storeFromRequest()` to get the scoped Store from request context
+4. **Public repo check** on add — HEAD to GitHub API prevents private repo data access
 
 ## Environment Variables
 
