@@ -2,10 +2,13 @@ package importer
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -106,10 +109,7 @@ func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.Ac
 		return nil
 	}
 
-	token, err := resolveToken(ctx, db, t.ID)
-	if err != nil {
-		return fmt.Errorf("resolving token for tenant %s: %w", t.ID, err)
-	}
+	token := resolveToken(ctx, db, t.ID)
 
 	var repoErrors int
 	for _, r := range repos {
@@ -220,18 +220,93 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 }
 
 // resolveToken returns a GitHub token for API access.
-// Prefers GITHUB_TOKEN env var; falls back to minting a GitHub App installation token.
-func resolveToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) { //nolint:unparam // ctx+db used when GitHub App token minting is implemented
+// Priority: 1) GITHUB_TOKEN env var, 2) GitHub App installation token, 3) empty (unauthenticated, public repos only).
+func resolveToken(ctx context.Context, db *sql.DB, tenantID string) string {
+	// 1. Explicit token (dev/testing)
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 		slog.Debug("using GITHUB_TOKEN env var")
-		return token, nil
+		return token
 	}
 
-	// TODO: mint GitHub App installation token using ctx, db, tenantID
-	// 1. tenant.GetActiveInstallations(ctx, db, tenantID)
-	// 2. Load GitHub App private key from GITHUB_APP_KEY_PATH
-	// 3. tenant.CreateAppJWT(cfg)
-	// 4. tenant.MintInstallationToken(ctx, cfg, installationID)
+	// 2. GitHub App installation token
+	if token, err := mintInstallationToken(ctx, db, tenantID); err == nil {
+		return token
+	} else {
+		slog.Debug("github app token minting failed, falling back to unauthenticated",
+			"tenant_id", tenantID, "error", err)
+	}
 
-	return "", fmt.Errorf("%w (tenant %s)", errNoToken, tenantID)
+	// 3. Unauthenticated (60 req/hr, public repos only)
+	slog.Warn("no GitHub token available, using unauthenticated API (rate limited to 60 req/hr)",
+		"tenant_id", tenantID)
+	return ""
+}
+
+// mintInstallationToken loads the GitHub App config from env and mints
+// an installation token for the tenant's first active installation.
+func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) {
+	cfg, err := loadGitHubAppConfig()
+	if err != nil {
+		return "", fmt.Errorf("loading github app config: %w", err)
+	}
+
+	installs, err := tenant.GetActiveInstallations(ctx, db, tenantID)
+	if err != nil {
+		return "", fmt.Errorf("getting installations: %w", err)
+	}
+
+	if len(installs) == 0 {
+		return "", fmt.Errorf("no active installations for tenant %s", tenantID)
+	}
+
+	// Use the first active installation
+	install := installs[0]
+	token, err := tenant.MintInstallationToken(ctx, cfg, install.ID)
+	if err != nil {
+		return "", fmt.Errorf("minting token for installation %d: %w", install.ID, err)
+	}
+
+	slog.Info("minted installation token",
+		"tenant_id", tenantID,
+		"installation_id", install.ID,
+		"login", install.Login,
+		"expires_at", token.ExpiresAt,
+	)
+
+	return token.Token, nil
+}
+
+// loadGitHubAppConfig reads GitHub App credentials from environment variables.
+func loadGitHubAppConfig() (*tenant.GitHubAppConfig, error) {
+	appIDStr := os.Getenv("GITHUB_APP_ID")
+	keyPath := os.Getenv("GITHUB_APP_KEY_PATH")
+
+	if appIDStr == "" || keyPath == "" {
+		return nil, fmt.Errorf("GITHUB_APP_ID and GITHUB_APP_KEY_PATH are required")
+	}
+
+	appID, err := strconv.ParseInt(appIDStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parsing GITHUB_APP_ID: %w", err)
+	}
+
+	keyData, err := os.ReadFile(keyPath) //nolint:gosec // path from trusted GITHUB_APP_KEY_PATH env var
+	if err != nil {
+		return nil, fmt.Errorf("reading private key from %s: %w", keyPath, err)
+	}
+
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found in %s", keyPath)
+	}
+
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parsing private key: %w", err)
+	}
+
+	return &tenant.GitHubAppConfig{
+		AppID:      appID,
+		PrivateKey: key,
+	}, nil
 }
