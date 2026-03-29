@@ -36,11 +36,6 @@ func TestMain(m *testing.M) {
 		tcpostgres.WithDatabase("devpulse_test"),
 		tcpostgres.WithUsername("test"),
 		tcpostgres.WithPassword("test"),
-		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Cmd: []string{"postgres", "-c", "max_connections=500"},
-			},
-		}),
 		testcontainers.WithWaitStrategy(
 			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
 		),
