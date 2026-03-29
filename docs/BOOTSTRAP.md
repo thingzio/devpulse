@@ -6,9 +6,11 @@ Step-by-step guide to deploy DevPulse from scratch on GCP.
 
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.13
+- [ko](https://ko.build/install/) for building container images
 - GCP organization, project, and billing account
 - Domain name (e.g. `devpulse.thingz.io`) with DNS access at your registrar
 - GitHub account (for OAuth App and GitHub App registration)
+- `GITHUB_TOKEN` with `write:packages` scope for GHCR push
 
 ## 1. Setup GCP Project
 
@@ -35,7 +37,7 @@ Go to https://github.com/settings/applications/new
 | Homepage URL | `https://devpulse.thingz.io` |
 | Authorization callback URL | `https://devpulse.thingz.io/auth/github/callback` |
 
-Save the **Client ID** and generate a **Client Secret**. You'll need these in step 6.
+Save the **Client ID** and generate a **Client Secret**. You'll need these in step 8.
 
 ## 4. Register GitHub App
 
@@ -61,7 +63,24 @@ After creating:
 - Generate and download a **private key** (.pem file)
 - Note the **webhook secret** you chose
 
-## 5. Run Terraform
+## 5. Push Bootstrap Images
+
+Terraform needs container images to exist before creating Cloud Run resources. Push them manually (one-time):
+
+```shell
+# Authenticate to GHCR
+echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+
+# Build and push both images
+KO_DOCKER_REPO=ghcr.io/thingzio ko build ./cmd/devpulse-site/ --bare --tags latest
+KO_DOCKER_REPO=ghcr.io/thingzio ko build ./cmd/devpulse-import/ --bare --tags latest
+```
+
+Then make both packages public on GHCR (required for the AR remote repo to pull):
+- https://github.com/orgs/thingzio/packages/container/devpulse-site/settings → Visibility → Public
+- https://github.com/orgs/thingzio/packages/container/devpulse-import/settings → Visibility → Public
+
+## 6. Run Terraform
 
 ```shell
 cd infra/saas
@@ -79,7 +98,7 @@ terraform apply \
     -var="domain=devpulse.thingz.io"
 ```
 
-This creates: VPC, Cloud SQL, Secret Manager, service accounts, Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, monitoring alerts, Workload Identity Federation for GitHub Actions.
+This creates: VPC, Cloud SQL, Secret Manager, service accounts, Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, Artifact Registry remote repo, monitoring alerts, Workload Identity Federation.
 
 Note the outputs:
 ```shell
@@ -87,11 +106,23 @@ terraform output
 # service_url       = "https://devpulse-saas-serve-xxxxx.run.app"
 # db_connection_name = "devpulse-saas:us-west1:devpulse-saas-pg"
 # dns_nameservers   = ["ns-cloud-a1.googledomains.com.", ...]
-# deployer_sa       = "github-actions-devpulse-saas@devpulse-saas.iam.gserviceaccount.com"
-# wif_provider      = "projects/.../providers/github-actions-provider-devpulse-saas"
+# deployer_sa       = "github-actions-devpulse-saas@devpulseio.iam.gserviceaccount.com"
+# wif_provider      = "projects/.../providers/gh-provider-devpulse-saas"
 ```
 
-## 6. Store Secrets
+## 7. Configure GitHub Actions
+
+In the GitHub repo settings (`Settings → Environments`), create an environment called `saas` with these variables:
+
+| Variable | Value |
+|----------|-------|
+| `WIF_PROVIDER` | From `terraform output wif_provider` |
+| `DEPLOYER_SA` | From `terraform output deployer_sa` |
+| `SERVICE_NAME` | `devpulse-saas-serve` |
+| `JOB_NAME` | `devpulse-saas-import` |
+| `REGION` | `us-west1` |
+
+## 8. Store Secrets
 
 ```shell
 # GitHub App private key
@@ -118,7 +149,7 @@ gcloud secrets versions add devpulse-saas-anthropic-api-key \
     --data-file=-
 ```
 
-## 7. Delegate DNS
+## 9. Delegate DNS
 
 At your domain registrar, update the NS records for `devpulse.thingz.io` to point to the Cloud DNS nameservers from the Terraform output.
 
@@ -126,36 +157,6 @@ Verify propagation:
 ```shell
 dig NS devpulse.thingz.io
 ```
-
-## 8. Build and Push First Image
-
-Push triggers automatically on version tags via GitHub Actions. For the first deployment, push manually:
-
-```shell
-# Authenticate to GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-
-# Build and push
-docker build -t ghcr.io/thingzio/devpulse:latest .
-docker push ghcr.io/thingzio/devpulse:latest
-```
-
-Or tag a release to trigger the CI pipeline:
-```shell
-make bump-patch
-```
-
-## 9. Configure GitHub Actions
-
-In the GitHub repo settings, create an environment called `saas` with these variables:
-
-| Variable | Value |
-|----------|-------|
-| `WIF_PROVIDER` | From `terraform output wif_provider` |
-| `DEPLOYER_SA` | From `terraform output deployer_sa` |
-| `SERVICE_NAME` | `devpulse-saas-serve` |
-| `JOB_NAME` | `devpulse-saas-import` |
-| `REGION` | `us-west1` |
 
 ## 10. Create Monitoring Dashboard
 
@@ -165,20 +166,32 @@ gcloud monitoring dashboards create \
     --config-from-file=infra/saas/dashboard.json
 ```
 
-This creates a Cloud Monitoring dashboard with 12 widgets: service request count, latency percentiles, instance count, CPU/memory utilization, billable time, sign-ins, import tenant count, import duration, Cloud SQL CPU/memory/connections.
-
 View at: https://console.cloud.google.com/monitoring/dashboards?project=$PROJECT_ID
 
-## 11. Verify
+## 11. First Release
+
+Tag a release to trigger the full CI pipeline (build images + deploy to Cloud Run):
 
 ```shell
-# Check Cloud Run service is running
+make bump-minor
+```
+
+This triggers `release-on-tag.yaml` which:
+1. Runs all tests
+2. Builds `devpulse-site` and `devpulse-import` container images via goreleaser + ko
+3. Pushes images to GHCR
+4. Deploys to Cloud Run using the GitHub Actions environment vars from step 7
+5. Publishes the GitHub release
+
+## 12. Verify
+
+```shell
+# Check Cloud Run service
 gcloud run services describe devpulse-saas-serve \
     --region=us-west1 --format="value(status.url)"
 
 # Check import job
-gcloud run jobs describe devpulse-saas-import \
-    --region=us-west1
+gcloud run jobs describe devpulse-saas-import --region=us-west1
 
 # Trigger a manual import
 gcloud run jobs execute devpulse-saas-import --region=us-west1
@@ -188,7 +201,7 @@ gcloud logging read 'resource.type="cloud_run_revision"' \
     --limit=20 --format='table(timestamp, textPayload)'
 ```
 
-Open `https://devpulse.thingz.io` in your browser. You should see the landing page with "Sign in with GitHub".
+Open `https://devpulse.thingz.io` — you should see the landing page with "Sign in with GitHub".
 
 ## Updating
 
@@ -199,18 +212,9 @@ Push a version tag to trigger the release pipeline:
 make bump-patch  # or bump-minor, bump-major
 ```
 
-Or deploy manually:
+Or deploy a specific tag manually:
 ```shell
-# Via GitHub Actions
 gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
-
-# Via gcloud
-gcloud run services update devpulse-saas-serve \
-    --region=us-west1 \
-    --image=ghcr.io/thingzio/devpulse:v1.2.3
-gcloud run jobs update devpulse-saas-import \
-    --region=us-west1 \
-    --image=ghcr.io/thingzio/devpulse:v1.2.3
 ```
 
 ### Infrastructure changes
@@ -223,7 +227,6 @@ terraform apply -var="project_id=$PROJECT_ID"
 
 ### Database tier upgrade
 
-Change the `db_tier` variable:
 ```shell
 terraform apply -var="project_id=$PROJECT_ID" -var="db_tier=db-g1-small"
 ```
