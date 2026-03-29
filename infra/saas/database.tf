@@ -39,13 +39,13 @@ resource "google_sql_database" "default" {
 }
 
 resource "google_sql_user" "service" {
-  name     = google_service_account.run.email
+  name     = trimsuffix(google_service_account.run.email, ".gserviceaccount.com")
   instance = google_sql_database_instance.default.name
   type     = "CLOUD_IAM_SERVICE_ACCOUNT"
 }
 
 resource "google_sql_user" "import" {
-  name     = google_service_account.import.email
+  name     = trimsuffix(google_service_account.import.email, ".gserviceaccount.com")
   instance = google_sql_database_instance.default.name
   type     = "CLOUD_IAM_SERVICE_ACCOUNT"
 }
