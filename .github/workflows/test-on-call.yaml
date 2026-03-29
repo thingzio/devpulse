@@ -88,10 +88,13 @@ jobs:
             sleep 1
           done
 
+      - name: Verify Postgres
+        run: docker exec pg-test pg_isready -U test -d devpulse_test
+
       - name: Postgres Integration Tests
         env:
           DEVPULSE_TEST_DSN: "postgres://test:test@localhost:5432/devpulse_test?sslmode=disable"
-        run: go test -race -count=1 -timeout=600s ./pkg/data/postgres/...
+        run: go test -v -race -count=1 -timeout=600s ./pkg/data/postgres/...
 
   tfsec:
     runs-on: ubuntu-latest
