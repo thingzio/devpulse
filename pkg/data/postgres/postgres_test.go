@@ -35,42 +35,47 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	ctx := context.Background()
-	container, err := tcpostgres.Run(ctx, "postgres:17-alpine",
-		tcpostgres.WithDatabase("devpulse_test"),
-		tcpostgres.WithUsername("test"),
-		tcpostgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
-		),
-	)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start postgres container: %v\n", err)
-		os.Exit(1)
+	// Use DEVPULSE_TEST_DSN if set (CI service container), else start testcontainer.
+	var cleanup func()
+	if dsn := os.Getenv("DEVPULSE_TEST_DSN"); dsn != "" {
+		sharedDSN = dsn
+		cleanup = func() {}
+	} else {
+		ctx := context.Background()
+		container, err := tcpostgres.Run(ctx, "postgres:17-alpine",
+			tcpostgres.WithDatabase("devpulse_test"),
+			tcpostgres.WithUsername("test"),
+			tcpostgres.WithPassword("test"),
+			testcontainers.WithWaitStrategy(
+				wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
+			),
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to start postgres container: %v\n", err)
+			os.Exit(1)
+		}
+		dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+		if err != nil {
+			container.Terminate(ctx)
+			fmt.Fprintf(os.Stderr, "failed to get connection string: %v\n", err)
+			os.Exit(1)
+		}
+		sharedDSN = dsn
+		cleanup = func() { container.Terminate(ctx) }
 	}
 
-	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		container.Terminate(ctx)
-		fmt.Fprintf(os.Stderr, "failed to get connection string: %v\n", err)
-		os.Exit(1)
-	}
-	sharedDSN = dsn
-
-	// Single shared pool for schema create/drop operations.
+	var err error
 	sharedPool, err = sql.Open("postgres", sharedDSN)
 	if err != nil {
-		container.Terminate(ctx)
 		fmt.Fprintf(os.Stderr, "failed to open shared pool: %v\n", err)
 		os.Exit(1)
 	}
-	sharedPool.SetMaxOpenConns(2)
-	sharedPool.SetMaxIdleConns(1)
+	sharedPool.SetMaxOpenConns(5)
+	sharedPool.SetMaxIdleConns(2)
 
 	code := m.Run()
 	sharedPool.Close()
-
-	container.Terminate(ctx)
+	cleanup()
 	os.Exit(code)
 }
 

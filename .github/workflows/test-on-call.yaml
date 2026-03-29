@@ -64,6 +64,22 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: devpulse_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DEVPULSE_TEST_DSN: "postgres://test:test@localhost:5432/devpulse_test?sslmode=disable"
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -74,7 +90,7 @@ jobs:
         uses: ./.github/actions/setup-go-env
 
       - name: Postgres Integration Tests
-        run: go test -race -count=1 -p=1 -parallel=1 -timeout=600s ./pkg/data/postgres/...
+        run: go test -race -count=1 -timeout=600s ./pkg/data/postgres/...
 
   tfsec:
     runs-on: ubuntu-latest
