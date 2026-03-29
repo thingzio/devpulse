@@ -1,21 +1,24 @@
 # Bootstrap Guide
 
-Step-by-step guide to deploy DevPulse from scratch on GCP.
+Step-by-step guide to deploy DevPulse from scratch on GCP. Steps are ordered to minimize friction — each step depends only on previous steps.
 
 ## Prerequisites
 
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.13
 - [ko](https://ko.build/install/) for building container images
-- GCP organization, project, and billing account
-- Domain name (e.g. `devpulse.thingz.io`) with DNS access at your registrar
-- GitHub account (for OAuth App and GitHub App registration)
-- `GITHUB_TOKEN` with `write:packages` scope for GHCR push
+- [gh CLI](https://cli.github.com/) for GitHub Actions environment setup
+- GCP project with billing enabled
+- Domain name with DNS access at your registrar
+- GitHub account with org admin access
+- `GITHUB_TOKEN` with `write:packages` scope
 
-## 1. Setup GCP Project
+## 1. Set Environment
 
 ```shell
 export PROJECT_ID="devpulseio"
+export REGION="us-west1"
+export DOMAIN="devpulse.thingz.io"
 ```
 
 ## 2. Create Terraform State Bucket
@@ -34,10 +37,14 @@ Go to https://github.com/settings/applications/new
 | Field | Value |
 |-------|-------|
 | Application name | DevPulse |
-| Homepage URL | `https://devpulse.thingz.io` |
-| Authorization callback URL | `https://devpulse.thingz.io/auth/github/callback` |
+| Homepage URL | `https://$DOMAIN` |
+| Authorization callback URL | `https://$DOMAIN/auth/github/callback` |
 
-Save the **Client ID** and generate a **Client Secret**. You'll need these in step 8.
+Save the **Client ID** (short, like `Ov23li...`) and generate a **Client Secret** (40-char hex).
+
+```shell
+export GITHUB_OAUTH_CLIENT_ID="your-client-id"
+```
 
 ## 4. Register GitHub App
 
@@ -45,117 +52,99 @@ Go to https://github.com/settings/apps/new
 
 | Field | Value |
 |-------|-------|
-| GitHub App name | `DevPulseThingz` (must be globally unique) |
-| Homepage URL | `https://devpulse.thingz.io` |
-| Webhook URL | `https://devpulse.thingz.io/webhook/github` |
-| Webhook secret | Generate a random string (e.g. `openssl rand -hex 32`) |
+| GitHub App name | Must be globally unique (e.g. `DevPulseThingz`) |
+| Homepage URL | `https://$DOMAIN` |
+| Webhook URL | `https://$DOMAIN/webhook/github` |
+| Webhook secret | `openssl rand -hex 32` |
 
-Permissions (Repository):
-- **Metadata**: Read-only
-- **Contents**: Read-only
+Permissions (Repository): **Metadata** Read-only, **Contents** Read-only
 
-Subscribe to events:
-- Installation
-- Installation repositories
+Subscribe to events: **Installation**, **Installation repositories**
 
-After creating:
-- Note the **App ID**
-- Generate and download a **private key** (.pem file)
-- Note the **webhook secret** you chose
+After creating: note the **App ID**, download the **private key** (.pem), note the **webhook secret**.
 
 ## 5. Push Bootstrap Images
 
-Terraform needs container images to exist before creating Cloud Run resources. Push them manually (one-time):
+Terraform needs images to exist before creating Cloud Run resources. Push manually (one-time):
 
 ```shell
 # Authenticate to GHCR
 echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
 
-# Build and push both images (repo must include full image name)
+# Build and push (repo must include full image name)
 KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
 KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
 ```
 
-Then make both packages public on GHCR (required for the AR remote repo to pull):
-- https://github.com/orgs/thingzio/packages/container/devpulse-site/settings → Visibility → Public
-- https://github.com/orgs/thingzio/packages/container/devpulse-import/settings → Visibility → Public
+**Make both GHCR packages public** (required for AR remote repo):
+- `https://github.com/orgs/thingzio/packages/container/devpulse-site/settings` → Visibility → Public
+- `https://github.com/orgs/thingzio/packages/container/devpulse-import/settings` → Visibility → Public
 
-## 6. Run Terraform
+If "Public" is disabled, enable it in org settings: `https://github.com/organizations/thingzio/settings/packages`
 
-```shell
-cd infra/saas
+## 6. Store Secrets
 
-terraform init
-
-terraform plan \
-    -var="project_id=$PROJECT_ID" \
-    -var="region=us-west1" \
-    -var="domain=devpulse.thingz.io"
-
-terraform apply \
-    -var="project_id=$PROJECT_ID" \
-    -var="region=us-west1" \
-    -var="domain=devpulse.thingz.io"
-```
-
-This creates: VPC, Cloud SQL, Secret Manager, service accounts, Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, Artifact Registry remote repo, monitoring alerts, Workload Identity Federation.
-
-Note the outputs:
-```shell
-terraform output
-# service_url       = "https://devpulse-saas-serve-xxxxx.run.app"
-# db_connection_name = "devpulse-saas:us-west1:devpulse-saas-pg"
-# dns_nameservers   = ["ns-cloud-a1.googledomains.com.", ...]
-# deployer_sa       = "github-actions-devpulse-saas@devpulseio.iam.gserviceaccount.com"
-# wif_provider      = "projects/.../providers/gh-provider-devpulse-saas"
-```
-
-## 7. Configure GitHub Actions
-
-In the GitHub repo settings (`Settings → Environments`), create an environment called `saas` with these variables:
-
-| Variable | Value |
-|----------|-------|
-| `WIF_PROVIDER` | From `terraform output wif_provider` |
-| `DEPLOYER_SA` | From `terraform output deployer_sa` |
-| `SERVICE_NAME` | `devpulse-saas-serve` |
-| `JOB_NAME` | `devpulse-saas-import` |
-| `REGION` | `us-west1` |
-
-## 8. Store Secrets
+Store secret values **before** Terraform apply (Cloud Run fails if secrets have no versions):
 
 ```shell
-# GitHub App private key
-gcloud secrets versions add devpulse-saas-github-app-key \
-    --project=$PROJECT_ID \
-    --data-file=devpulse.pem
-
 # GitHub OAuth client secret
 echo -n "YOUR_OAUTH_CLIENT_SECRET" | \
 gcloud secrets versions add devpulse-saas-oauth-client-secret \
-    --project=$PROJECT_ID \
-    --data-file=-
+    --project=$PROJECT_ID --data-file=-
 
 # GitHub webhook secret
 echo -n "YOUR_WEBHOOK_SECRET" | \
 gcloud secrets versions add devpulse-saas-webhook-secret \
-    --project=$PROJECT_ID \
-    --data-file=-
+    --project=$PROJECT_ID --data-file=-
 
-# Anthropic API key (optional, enables LLM-generated insights)
-echo -n "YOUR_ANTHROPIC_API_KEY" | \
-gcloud secrets versions add devpulse-saas-anthropic-api-key \
-    --project=$PROJECT_ID \
-    --data-file=-
+# GitHub App private key
+gcloud secrets versions add devpulse-saas-github-app-key \
+    --project=$PROJECT_ID --data-file=path/to/devpulse.pem
 ```
+
+> **Note:** Secret Manager resources are created by Terraform, but you must add versions (values) manually. Terraform creates empty secret containers — Cloud Run fails if it references a secret with no versions.
+
+## 7. Run Terraform
+
+```shell
+cd infra/saas
+terraform init
+
+terraform apply \
+    -var="project_id=$PROJECT_ID" \
+    -var="region=$REGION" \
+    -var="domain=$DOMAIN" \
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
+```
+
+This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+
+> **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
+
+Note the outputs:
+```shell
+terraform output
+```
+
+## 8. Configure GitHub Actions
+
+Populate the `saas` environment variables from Terraform outputs:
+
+```shell
+cd ../..  # back to repo root
+./tools/setup-gh-env
+```
+
+This creates 7 variables in the GitHub `saas` environment:
+`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`
 
 ## 9. Delegate DNS
 
-At your domain registrar, update the NS records for `devpulse.thingz.io` to point to the Cloud DNS nameservers from the Terraform output.
+At your domain registrar, update NS records for your domain to Cloud DNS nameservers from Terraform output:
 
-Verify propagation:
 ```shell
-dig NS devpulse.thingz.io
+terraform -chdir=infra/saas output dns_nameservers
+dig NS $DOMAIN
 ```
 
 ## 10. Create Monitoring Dashboard
@@ -166,53 +155,81 @@ gcloud monitoring dashboards create \
     --config-from-file=infra/saas/dashboard.json
 ```
 
-View at: https://console.cloud.google.com/monitoring/dashboards?project=$PROJECT_ID
-
 ## 11. First Release
-
-Tag a release to trigger the full CI pipeline (build images + deploy to Cloud Run):
 
 ```shell
 make bump-minor
 ```
 
-This triggers `release-on-tag.yaml` which:
-1. Runs all tests
-2. Builds `devpulse-site` and `devpulse-import` container images via goreleaser + ko
-3. Pushes images to GHCR
-4. Deploys to Cloud Run using the GitHub Actions environment vars from step 7
-5. Publishes the GitHub release
+This triggers the release pipeline:
+1. Tests (unit, lint, tfsec, integration, e2e)
+2. Builds `devpulse-site` and `devpulse-import` images via goreleaser + ko
+3. Pushes to GHCR
+4. Deploys to Cloud Run via AR remote repo proxy
+5. Publishes GitHub release
 
 ## 12. Verify
 
 ```shell
-# Check Cloud Run service
+# Check service
 gcloud run services describe devpulse-saas-serve \
-    --region=us-west1 --format="value(status.url)"
+    --region=$REGION --format='value(status.url)'
 
-# Check import job
-gcloud run jobs describe devpulse-saas-import --region=us-west1
+# Open in browser
+open https://$DOMAIN
 
-# Trigger a manual import
-gcloud run jobs execute devpulse-saas-import --region=us-west1
+# Trigger manual import (after signing in and adding repos)
+gcloud run jobs execute devpulse-saas-import --region=$REGION
 
 # Check logs
 gcloud logging read 'resource.type="cloud_run_revision"' \
-    --limit=20 --format='table(timestamp, textPayload)'
+    --project=$PROJECT_ID --limit=20 \
+    --format='table(timestamp, jsonPayload.msg)'
 ```
 
-Open `https://devpulse.thingz.io` — you should see the landing page with "Sign in with GitHub".
+## Post-Deploy
 
-## Updating
+### Add Anthropic API key (optional, enables LLM insights)
+
+```shell
+echo -n "YOUR_ANTHROPIC_API_KEY" | \
+gcloud secrets versions add devpulse-saas-anthropic-api-key \
+    --project=$PROJECT_ID --data-file=-
+
+gcloud run jobs update devpulse-saas-import --region=$REGION \
+    --set-secrets=ANTHROPIC_API_KEY=devpulse-saas-anthropic-api-key:latest \
+    --set-env-vars=ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+```
+
+### Enable deletion protection
+
+After verifying everything works:
+```shell
+# Edit infra/saas/cloudrun.tf — set deletion_protection = true on both resources
+cd infra/saas && terraform apply \
+    -var="project_id=$PROJECT_ID" \
+    -var="region=$REGION" \
+    -var="domain=$DOMAIN" \
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
+```
+
+### Rotate secrets
+
+If any secrets were exposed during setup, rotate them:
+1. Regenerate in GitHub (OAuth App settings / GitHub App settings)
+2. Update in Secret Manager: `gcloud secrets versions add <secret-name> --data-file=-`
+3. Redeploy: `make bump-patch`
+
+## Ongoing Operations
 
 ### Code changes
 
-Push a version tag to trigger the release pipeline:
 ```shell
 make bump-patch  # or bump-minor, bump-major
 ```
 
-Or deploy a specific tag manually:
+### Manual deploy
+
 ```shell
 gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
 ```
@@ -221,53 +238,36 @@ gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
 
 ```shell
 cd infra/saas
-terraform plan -var="project_id=$PROJECT_ID"
-terraform apply -var="project_id=$PROJECT_ID"
+terraform apply \
+    -var="project_id=$PROJECT_ID" \
+    -var="region=$REGION" \
+    -var="domain=$DOMAIN" \
+    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID"
 ```
 
 ### Database tier upgrade
 
 ```shell
-terraform apply -var="project_id=$PROJECT_ID" -var="db_tier=db-g1-small"
+terraform apply -var="project_id=$PROJECT_ID" -var="db_tier=db-g1-small" ...
 ```
 
 See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the full scaling plan.
 
 ### Tenant plan management
 
-Tenant plans are managed via SQL. Connect to the database and update directly.
-
-**View current tenants and their limits:**
 ```sql
+-- View tenants
 SELECT username, plan, max_repos, max_events_per_week, created_at
 FROM tenant ORDER BY created_at;
-```
 
-**Promote a tenant to pro:**
-```sql
+-- Promote to pro
 UPDATE tenant
 SET plan = 'pro', max_repos = 25, max_events_per_week = 20000, updated_at = NOW()
 WHERE username = 'their-github-username';
 ```
-
-**Plan tier defaults:**
 
 | Plan | Repos | Events/Week |
 |------|-------|-------------|
 | free | 5 | 2,000 |
 | pro | 25 | 20,000 |
 | enterprise | 100 | 100,000 |
-
-**Check a tenant's current weekly usage:**
-```sql
-SELECT t.username, t.plan, t.max_repos, t.max_events_per_week,
-    COUNT(DISTINCT tr.id) AS active_repos,
-    (SELECT COUNT(*) FROM event e
-     JOIN tenant_repo tr2 ON tr2.org = e.org AND tr2.repo = e.repo
-     WHERE tr2.tenant_id = t.id AND tr2.active = TRUE
-       AND e.date >= date_trunc('week', NOW())::text) AS weekly_events
-FROM tenant t
-LEFT JOIN tenant_repo tr ON tr.tenant_id = t.id AND tr.active = TRUE
-GROUP BY t.id
-ORDER BY t.username;
-```
