@@ -18,7 +18,7 @@ const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES
 
 const validateSessionSQL = `
 	SELECT t.id, t.github_id, t.username, t.email, t.avatar_url,
-	       t.max_repos, t.plan, t.tos_accepted_at, t.created_at, t.updated_at
+	       t.max_repos, t.max_events_per_week, t.plan, t.tos_accepted_at, t.created_at, t.updated_at
 	FROM session s
 	JOIN tenant t ON t.id = s.tenant_id
 	WHERE s.id = $1 AND s.expires_at > NOW()`
