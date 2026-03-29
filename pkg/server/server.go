@@ -128,6 +128,10 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.HandleFunc("GET /auth/github", oauthStartHandler(oauthCfg))
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
+	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
+		middleware.ClearSessionCookie(w)
+		http.Redirect(w, r, "/", http.StatusFound)
+	})
 
 	// Auth middleware
 	auth := middleware.RequireAuth(db, "/auth/github")
