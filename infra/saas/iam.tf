@@ -83,6 +83,7 @@ resource "google_service_account_iam_member" "deployer_wif" {
 
 locals {
   deployer_roles = [
+    "roles/artifactregistry.reader",
     "roles/run.admin",
     "roles/cloudscheduler.admin",
   ]
