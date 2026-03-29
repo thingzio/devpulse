@@ -11,10 +11,11 @@ tmp
 # Binaries
 bin
 dist
-devpulse
-devpulse-site
-devpulse-import
-devpulse-cloud
+# Build output binaries (not source directories)
+/devpulse
+/devpulse-site
+/devpulse-import
+/devpulse-cloud
 
 # Keys
 *.pem
