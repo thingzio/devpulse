@@ -14,7 +14,17 @@ import (
 )
 
 // Run iterates active tenants and imports data for each tracked repo.
-func Run(ctx context.Context, store *postgres.Store) error {
+func Run(ctx context.Context) error {
+	store, err := postgres.NewFromEnv()
+	if err != nil {
+		return fmt.Errorf("opening store: %w", err)
+	}
+	defer func() {
+		if closeErr := store.Close(); closeErr != nil {
+			slog.Error("closing store", "error", closeErr)
+		}
+	}()
+
 	db := store.DB()
 	start := time.Now()
 
