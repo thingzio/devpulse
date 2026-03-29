@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/oauth"
 	"github.com/thingzio/devpulse/pkg/tenant"
@@ -56,20 +57,16 @@ const (
 // httpClient is used for all outbound HTTP calls (GitHub API, etc.)
 var httpClient = &http.Client{Timeout: externalHTTPTimeout}
 
-var (
-	version = "dev"
-	commit  = ""
-	date    = ""
-)
-
-// SetVersion sets build info for templates.
-// Must be called once before Run() — not safe for concurrent use.
-func SetVersion(v, c, d string) {
-	version, commit, date = v, c, d
+// Options configures the server.
+type Options struct {
+	Version string
+	Commit  string
+	Date    string
 }
 
 // Run starts the HTTP server. It blocks until the context is canceled.
-func Run(ctx context.Context, db *sql.DB, store data.Store) error {
+func Run(ctx context.Context, store *postgres.Store, opts Options) error {
+	db := store.DB()
 	port := os.Getenv("PORT")
 	baseURL := strings.TrimRight(os.Getenv("BASE_URL"), "/")
 
@@ -80,7 +77,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret)
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts)
 
 	address := fmt.Sprintf("0.0.0.0:%s", port)
 	s := &http.Server{
@@ -117,7 +114,7 @@ func Run(ctx context.Context, db *sql.DB, store data.Store) error {
 	return nil
 }
 
-func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string) *http.ServeMux {
+func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -146,7 +143,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	// Authenticated routes
 	mux.Handle("GET /tos", wrap(tosPageHandler()))
 	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
-	mux.Handle("GET /dashboard", wrap(dashboardHandler()))
+	mux.Handle("GET /dashboard", wrap(dashboardHandler(opts)))
 	mux.Handle("POST /auth/signout", wrap(signoutHandler(db)))
 
 	// Tenant management API
@@ -223,7 +220,7 @@ func landingHandler() http.HandlerFunc {
 	}
 }
 
-func dashboardHandler() http.HandlerFunc {
+func dashboardHandler(opts Options) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
@@ -234,9 +231,9 @@ func dashboardHandler() http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := t.ExecuteTemplate(w, "home", map[string]any{
 			"base_path":     "",
-			"version":       version,
-			"commit":        commit,
-			"build_date":    date,
+			"version":       opts.Version,
+			"commit":        opts.Commit,
+			"build_date":    opts.Date,
 			"period_months": 6,
 			"username":      tn.Username,
 		}); err != nil {

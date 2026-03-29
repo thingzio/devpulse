@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 // Run iterates active tenants and imports data for each tracked repo.
-func Run(ctx context.Context, db *sql.DB, store data.Store) error {
+func Run(ctx context.Context, store *postgres.Store) error {
+	db := store.DB()
 	start := time.Now()
 
 	tenants, err := tenant.GetActiveTenants(ctx, db)
