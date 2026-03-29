@@ -69,10 +69,9 @@ func TenantFromContext(ctx context.Context) *tenant.Tenant {
 
 // SetSessionCookie sets the session cookie with security attributes.
 func SetSessionCookie(w http.ResponseWriter, token string, maxAge int) {
-	sameSite := http.SameSiteStrictMode
-	if !secure {
-		sameSite = http.SameSiteLaxMode
-	}
+	// Lax is required for OAuth redirects (cross-site GET from github.com).
+	// Strict would block the cookie on the callback redirect.
+	sameSite := http.SameSiteLaxMode
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName(),
 		Value:    token,
