@@ -1,7 +1,75 @@
 {{define "content"}}
-<div class="auth-page">
-  <h1>DevPulse</h1>
-  <p>GitHub project health analytics</p>
-  <a href="/auth/github" class="btn">Sign in with GitHub</a>
+<div class="landing">
+  <div class="landing-hero">
+    <h1>DevPulse</h1>
+    <p>Community health analytics for GitHub organizations and repositories. Import contribution data, track project health metrics, and surface actionable insights.</p>
+    <a href="/auth/github" class="cta-btn">Sign in with GitHub</a>
+  </div>
+
+  <div class="landing-features">
+    <div class="landing-feature">
+      <h3>Project Health</h3>
+      <ul>
+        <li><strong>Bus factor / pony factor</strong> &mdash; risk assessment for key contributor dependencies</li>
+        <li><strong>Repository status</strong> &mdash; stars, forks, issues, language, license</li>
+        <li><strong>Stars &amp; forks trends</strong> &mdash; daily counts with historical backfill</li>
+        <li><strong>Community profile</strong> &mdash; README, Contributing, CoC, issue/PR templates</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature">
+      <h3>Activity &amp; Velocity</h3>
+      <ul>
+        <li><strong>Activity trends</strong> &mdash; monthly PRs, reviews, issues, comments, forks</li>
+        <li><strong>PR size distribution</strong> &mdash; changes bucketed by S/M/L/XL per month</li>
+        <li><strong>Lead time to merge</strong> &mdash; average days from PR creation to merge</li>
+        <li><strong>Release cadence</strong> &mdash; monthly release counts and download trends</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature">
+      <h3>Quality</h3>
+      <ul>
+        <li><strong>PR review ratio</strong> &mdash; PRs to reviews per month with trend line</li>
+        <li><strong>Review latency</strong> &mdash; average hours from PR to first review</li>
+        <li><strong>Time to close</strong> &mdash; average days to close issues</li>
+        <li><strong>Change failure rate</strong> &mdash; bug issues near releases + revert PRs</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature">
+      <h3>Community</h3>
+      <ul>
+        <li><strong>Contributor retention</strong> &mdash; new vs returning contributors per month</li>
+        <li><strong>Contributor momentum</strong> &mdash; rolling active count with delta</li>
+        <li><strong>First-time contributor funnel</strong> &mdash; comment, PR, merge milestones</li>
+        <li><strong>Entity affiliations</strong> &mdash; contributing companies with developer drill-down</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature">
+      <h3>Insights</h3>
+      <ul>
+        <li><strong>LLM-generated observations</strong> &mdash; AI-powered health analysis per repo</li>
+        <li><strong>Time to first response</strong> &mdash; hours to first review or comment</li>
+        <li><strong>Issue open/close ratio</strong> &mdash; monthly opened vs closed</li>
+        <li><strong>Contributor reputation</strong> &mdash; two-tier scoring with bot filtering</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature">
+      <h3>Dashboard</h3>
+      <ul>
+        <li><strong>Seven tabs</strong> &mdash; Health, Activity, Velocity, Quality, Community, Events, Insights</li>
+        <li><strong>Lazy-loaded charts</strong> &mdash; Chart.js with dark/light theme</li>
+        <li><strong>Search &amp; filter</strong> &mdash; org: and repo: prefix syntax</li>
+        <li><strong>Usage tracking</strong> &mdash; weekly event limits with per-repo breakdown</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="landing-footer">
+    <p>Free tier: 5 repos, 2,000 events/week. <a href="/auth/github">Sign in</a> to get started.</p>
+  </div>
 </div>
 {{end}}
