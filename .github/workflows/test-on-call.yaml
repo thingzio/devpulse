@@ -64,6 +64,20 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: devpulse_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d devpulse_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -72,28 +86,6 @@ jobs:
 
       - name: Setup Go Environment
         uses: ./.github/actions/setup-go-env
-
-      - name: Start Postgres
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run -d --name pg-test \
-            -e POSTGRES_DB=devpulse_test \
-            -e POSTGRES_USER=test \
-            -e POSTGRES_PASSWORD=test \
-            -p 5432:5432 \
-            postgres:17-alpine
-          echo "Waiting for Postgres to accept connections..."
-          for i in $(seq 1 60); do
-            if docker exec pg-test pg_isready -U test -d devpulse_test 2>/dev/null; then
-              echo "Postgres ready after ${i}s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Postgres failed to start"
-          docker logs pg-test
-          exit 1
 
       - name: Postgres Integration Tests
         env:
