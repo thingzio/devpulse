@@ -1,7 +1,8 @@
 resource "google_cloud_run_v2_service" "serve" {
-  name     = "${var.prefix}-serve"
-  location = var.region
-  project  = var.project_id
+  name                = "${var.prefix}-serve"
+  location            = var.region
+  project             = var.project_id
+  deletion_protection = false # TODO: set to true after initial deploy
 
   template {
     service_account = google_service_account.run.email
@@ -9,6 +10,14 @@ resource "google_cloud_run_v2_service" "serve" {
     scaling {
       min_instance_count = 0
       max_instance_count = 10
+    }
+
+    vpc_access {
+      network_interfaces {
+        network    = google_compute_network.default.id
+        subnetwork = google_compute_subnetwork.default.id
+      }
+      egress = "PRIVATE_RANGES_ONLY"
     }
 
     containers {
@@ -85,14 +94,23 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 }
 
 resource "google_cloud_run_v2_job" "import" {
-  name     = "${var.prefix}-import"
-  location = var.region
-  project  = var.project_id
+  name                = "${var.prefix}-import"
+  location            = var.region
+  project             = var.project_id
+  deletion_protection = false # TODO: set to true after initial deploy
 
   template {
     template {
       service_account = google_service_account.import.email
       timeout         = "3600s"
+
+      vpc_access {
+        network_interfaces {
+          network    = google_compute_network.default.id
+          subnetwork = google_compute_subnetwork.default.id
+        }
+        egress = "PRIVATE_RANGES_ONLY"
+      }
 
       containers {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-import:latest"

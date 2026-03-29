@@ -6,6 +6,14 @@ resource "google_compute_network" "default" {
   depends_on = [google_project_service.default]
 }
 
+resource "google_compute_subnetwork" "default" {
+  name          = "${var.prefix}-subnet"
+  ip_cidr_range = "10.0.0.0/24"
+  region        = var.region
+  network       = google_compute_network.default.id
+  project       = var.project_id
+}
+
 resource "google_compute_global_address" "private_ip" {
   name          = "${var.prefix}-private-ip"
   purpose       = "VPC_PEERING"
