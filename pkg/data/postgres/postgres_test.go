@@ -88,12 +88,15 @@ func setupTestDB(t *testing.T) *Store {
 		schemaDSN += "?search_path=" + schema
 	}
 
-	store, err := New(schemaDSN)
+	// Use sql.Open directly so we can set pool limits BEFORE any connections are made.
+	// New() sets maxOpenConns=25 which exhausts the container in CI.
+	testDB, err := sql.Open("postgres", schemaDSN)
 	require.NoError(t, err)
-
-	// Limit connections per test to avoid exhausting the shared container.
-	store.DB().SetMaxOpenConns(2)
-	store.DB().SetMaxIdleConns(1)
+	testDB.SetMaxOpenConns(2)
+	testDB.SetMaxIdleConns(1)
+	require.NoError(t, testDB.Ping())
+	require.NoError(t, runMigrations(testDB))
+	store := &Store{db: testDB, pool: testDB}
 
 	t.Cleanup(func() {
 		store.Close()
