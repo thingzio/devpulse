@@ -323,6 +323,8 @@ function loadSummaryBanner(months, org, repo, entity) {
         $("#banner-events").text(data.events.toLocaleString());
         $("#banner-contributors").text(data.contributors.toLocaleString());
         $("#banner-last-import").text(formatImportDate(data.last_import, repo));
+        $("#bus-factor-val").text(data.bus_factor);
+        $("#pony-factor-val").text(data.pony_factor);
     });
 }
 
@@ -330,7 +332,6 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
-            loadInsightsSummary('/data/insights/summary?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
@@ -995,12 +996,6 @@ function loadRightChart(url, fn, cb) {
     });
 }
 
-function loadInsightsSummary(url) {
-    $.get(url, function (data) {
-        $("#bus-factor-val").text(data.bus_factor);
-        $("#pony-factor-val").text(data.pony_factor);
-    });
-}
 
 function loadHealthActivitySparkline(url) {
     $.get(url, function (data) {

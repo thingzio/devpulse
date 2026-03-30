@@ -38,13 +38,16 @@ func WebhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {
 		}
 
 		event := r.Header.Get("X-GitHub-Event")
-		slog.Info("webhook received", "event", event)
 
 		switch event {
 		case "installation":
+			slog.Info("webhook received", "event", event)
 			handleInstallationEvent(r.Context(), db, body)
 		case "installation_repositories":
+			slog.Info("webhook received", "event", event)
 			handleInstallationReposEvent(r.Context(), db, body)
+		default:
+			slog.Debug("webhook ignored", "event", event)
 		}
 
 		w.WriteHeader(http.StatusOK)
