@@ -46,12 +46,19 @@ DATABASE_URL=postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disabl
 For OAuth sign-in, set these before running `make server`:
 
 ```bash
-export GITHUB_OAUTH_CLIENT_ID="your-client-id"
+export GITHUB_OAUTH_CLIENT_ID="your-client-id"       # localhost OAuth app
 export GITHUB_OAUTH_CLIENT_SECRET="your-client-secret"
 export BASE_URL="http://localhost:8080"
 ```
 
-For the import worker:
+For repo-add gating and import (GitHub App installation token minting):
+
+```bash
+export GITHUB_APP_ID="your-app-id"
+export GITHUB_APP_KEY_PATH="/path/to/devpulse-app.pem"
+```
+
+For the import worker (alternative to GitHub App tokens):
 
 ```bash
 export GITHUB_TOKEN="ghp_..."

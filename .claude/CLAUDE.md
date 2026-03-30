@@ -159,7 +159,7 @@ Tenant isolation layers:
 1. **RLS policies** on all data tables, filtering by `app.tenant_id` session variable
 2. **ScopedStoreMiddleware** acquires dedicated `db.Conn()`, calls `set_config`, creates scoped Store
 3. **Data handlers** use `storeFromRequest()` to get the scoped Store from request context
-4. **Public repo check** on add — HEAD to GitHub API prevents private repo data access
+4. **Repo-add gating** — public repo check (HEAD to GitHub API) + GitHub App installation check (tenant must have at least one active installation for import tokens)
 
 ## Environment Variables
 

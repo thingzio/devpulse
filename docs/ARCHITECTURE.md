@@ -6,9 +6,18 @@ Multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-s
 
 ```
 GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
-Cloud Scheduler ──→ devpulse (import) ──→ per-tenant GitHub API tokens ──→ PostgreSQL
+Cloud Scheduler ──→ devpulse (import) ──→ per-tenant install tokens ──→ PostgreSQL
 Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
+Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo
 ```
+
+### Repo-Add Gating
+
+Adding a repo requires two conditions:
+1. **Public repo** — verified via HEAD request to GitHub API
+2. **Active GitHub App installation** — tenant must have at least one installation (org-specific preferred, falls back to any). This ensures the import job can mint installation tokens for authenticated API access (12,500 req/hr).
+
+The GitHub App installation is separate from OAuth login. Users must install the DevPulseThingz app on their org/account after signing in. The webhook handler records installations in `github_app_installation`.
 
 ## Directory Structure
 
