@@ -4,7 +4,7 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${DIR}/common"
 
-has_tools gcloud
+has_tools gcloud terraform
 
 usage() {
     echo "Usage: $0 <username> <plan>"
@@ -35,9 +35,13 @@ DB_USER="devpulse"
 
 SQL="UPDATE tenant SET plan='${PLAN}', max_repos=${MAX_REPOS}, max_events_per_week=${MAX_EVENTS}, upgrade_requested_at=NULL, updated_at=NOW() WHERE username='${USERNAME}' RETURNING username, plan, max_repos, max_events_per_week;"
 
+msg "Fetching DB password from Terraform state..."
+DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform output -raw db_password 2>/dev/null)" \
+    || err "Failed to get DB password from Terraform. Run 'terraform apply' in infra/saas first."
+
 msg "Upgrading ${USERNAME} to ${PLAN} (${MAX_REPOS} repos, ${MAX_EVENTS} events/week)"
 
-gcloud sql connect "${INSTANCE}" \
+PGPASSWORD="${DB_PASS}" gcloud sql connect "${INSTANCE}" \
     --project="${PROJECT}" \
     --user="${DB_USER}" \
     --database="${DB}" \
