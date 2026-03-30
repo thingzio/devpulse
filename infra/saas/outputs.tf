@@ -28,12 +28,6 @@ output "notification_email" {
   value       = var.notification_email
 }
 
-output "db_password" {
-  description = "Cloud SQL app user password"
-  value       = random_password.db_password.result
-  sensitive   = true
-}
-
 output "deployer_sa" {
   description = "GitHub Actions deployer service account email"
   value       = google_service_account.deployer.email
