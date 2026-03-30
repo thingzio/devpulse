@@ -43,15 +43,9 @@ DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform state pull 2>/dev/null \
 
 msg "Upgrading ${USERNAME} to ${PLAN} (${MAX_REPOS} repos, ${MAX_EVENTS} events/week)"
 
-# Create temporary .pgpass so psql (spawned by gcloud) skips password prompt
-PGPASS_BAK=""
-if [[ -f "${HOME}/.pgpass" ]]; then
-    PGPASS_BAK="$(mktemp)"
-    cp "${HOME}/.pgpass" "${PGPASS_BAK}"
-fi
-echo "*:*:${DB}:${DB_USER}:${DB_PASS}" > "${HOME}/.pgpass"
-chmod 600 "${HOME}/.pgpass"
-trap 'if [[ -n "${PGPASS_BAK}" ]]; then mv "${PGPASS_BAK}" "${HOME}/.pgpass"; else rm -f "${HOME}/.pgpass"; fi' EXIT
+# Copy password to clipboard for easy paste
+echo -n "${DB_PASS}" | pbcopy
+msg "DB password copied to clipboard. Paste when prompted."
 
 gcloud sql connect "${INSTANCE}" \
     --project="${PROJECT}" \
