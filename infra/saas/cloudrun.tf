@@ -84,6 +84,11 @@ resource "google_cloud_run_v2_service" "serve" {
         mount_path = "/secrets/github-app-key"
       }
 
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+
       startup_probe {
         http_get {
           path = "/health"
@@ -177,6 +182,11 @@ resource "google_cloud_run_v2_job" "import" {
         volume_mounts {
           name       = "github-app-key"
           mount_path = "/secrets/github-app-key"
+        }
+
+        volume_mounts {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
         }
       }
 
