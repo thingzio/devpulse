@@ -221,7 +221,7 @@ resource "google_monitoring_alert_policy" "high_latency" {
   conditions {
     display_name = "Request latency p99 > 500ms"
     condition_threshold {
-      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${google_cloud_run_v2_service.serve.name}\" AND metric.type = \"run.googleapis.com/request_latencies\""
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${google_cloud_run_v2_service.serve.name}\" AND metric.type = \"run.googleapis.com/request_latencies\" AND metric.labels.response_code_class = \"2xx\""
       comparison      = "COMPARISON_GT"
       threshold_value = 500
       duration        = "300s"
