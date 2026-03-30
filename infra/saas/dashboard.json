@@ -144,16 +144,16 @@
         }
       },
       {
-        "title": "Sign-ins",
+        "title": "Import: Duration (seconds)",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-sign-ins\"",
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-duration\"",
                 "aggregation": {
                   "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_MEAN"
                 }
               }
             },
@@ -162,7 +162,7 @@
         }
       },
       {
-        "title": "Import: Tenant Count",
+        "title": "Import: Tenants per Run",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -170,30 +170,30 @@
                 "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-tenant-count\"",
                 "aggregation": {
                   "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_MEAN"
                 }
               }
             },
-            "plotType": "LINE"
+            "plotType": "STACKED_BAR"
           }]
         }
       },
       {
-        "title": "Import: Duration",
+        "title": "Import: Weekly Events per Tenant",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-duration\"",
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-tenant-weekly-events\"",
                 "aggregation": {
                   "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_MEAN"
                 }
               }
             },
-            "plotType": "LINE"
+            "plotType": "STACKED_BAR"
           }]
         }
       },
@@ -249,15 +249,88 @@
         }
       },
       {
+        "title": "Sign-ins",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-sign-ins\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "ToS Accepted",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-tos-accepted\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
         "title": "Upgrade Requests",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloud_run_revision\" metric.type=\"logging.googleapis.com/user/devpulse-saas-upgrade-requests\"",
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-upgrade-requests\"",
                 "aggregation": {
                   "alignmentPeriod": "86400s",
-                  "perSeriesAligner": "ALIGN_SUM"
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Application Errors",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-serve\" metric.type=\"logging.googleapis.com/log_entry_count\" metric.labels.severity=\"ERROR\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Event Limit Reached",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-event-limit-reached\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
                 }
               }
             },
