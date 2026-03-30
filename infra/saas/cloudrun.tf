@@ -166,11 +166,20 @@ resource "google_cloud_run_v2_job" "import" {
           value = "/secrets/github-app-key/key.pem"
         }
 
-        # ANTHROPIC_API_KEY and ANTHROPIC_MODEL are optional.
-        # Add after storing the secret value:
-        #   gcloud run jobs update devpulse-saas-import --region=us-west1 \
-        #     --set-secrets=ANTHROPIC_API_KEY=devpulse-saas-anthropic-api-key:latest \
-        #     --set-env-vars=ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+        env {
+          name = "ANTHROPIC_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name  = "ANTHROPIC_MODEL"
+          value = "claude-haiku-4-5-20251001"
+        }
 
         resources {
           limits = {
