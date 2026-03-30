@@ -247,6 +247,23 @@
             "plotType": "LINE"
           }]
         }
+      },
+      {
+        "title": "Upgrade Requests",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" metric.type=\"logging.googleapis.com/user/devpulse-saas-upgrade-requests\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",
+                  "perSeriesAligner": "ALIGN_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
       }
     ]
   }

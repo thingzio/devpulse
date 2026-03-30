@@ -165,6 +165,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /api/repos/overview", wrap(repoOverviewHandler(db)))
 	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
+	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
 	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))
 
@@ -452,6 +453,35 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func upgradeRequestHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		req, err := tenant.RequestUpgrade(r.Context(), db, tn.ID)
+		if err != nil {
+			slog.Error("upgrade request failed", "tenant_id", tn.ID, "error", err)
+			http.Error(w, "error processing request", http.StatusInternalServerError)
+			return
+		}
+
+		if req != nil {
+			slog.Info("upgrade requested",
+				"tenant_id", tn.ID,
+				"username", req.Username,
+				"email", req.Email,
+				"plan", req.Plan,
+				"max_repos", req.MaxRepos,
+			)
+		}
+
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 

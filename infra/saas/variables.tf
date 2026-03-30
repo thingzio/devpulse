@@ -38,6 +38,12 @@ variable "github_app_id" {
   default     = ""
 }
 
+variable "notification_email" {
+  description = "Email for monitoring alert notifications"
+  type        = string
+  default     = "devpulse@thingz.io"
+}
+
 variable "db_tier" {
   description = "Cloud SQL machine tier"
   type        = string

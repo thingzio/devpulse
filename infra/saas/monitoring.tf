@@ -137,10 +137,64 @@ resource "google_logging_metric" "event_limit_reached" {
 
 # Alert policies
 
-resource "google_monitoring_alert_policy" "error_rate" {
-  display_name = "${var.prefix}-error-rate"
+resource "google_monitoring_notification_channel" "email" {
+  display_name = "${var.prefix}-email"
+  type         = "email"
   project      = var.project_id
-  combiner     = "OR"
+
+  labels = {
+    email_address = var.notification_email
+  }
+}
+
+resource "google_logging_metric" "upgrade_requests" {
+  name    = "${var.prefix}-upgrade-requests"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"upgrade requested\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "tenant_id"
+      value_type  = "STRING"
+      description = "Tenant ID"
+    }
+  }
+
+  label_extractors = {
+    "tenant_id" = "EXTRACT(jsonPayload.tenant_id)"
+  }
+}
+
+resource "google_monitoring_alert_policy" "upgrade_request" {
+  display_name          = "${var.prefix}-upgrade-request"
+  project               = var.project_id
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.name]
+
+  conditions {
+    display_name = "Upgrade requested"
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_revision\" AND metric.type = \"logging.googleapis.com/user/${google_logging_metric.upgrade_requests.name}\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+}
+
+resource "google_monitoring_alert_policy" "error_rate" {
+  display_name          = "${var.prefix}-error-rate"
+  project               = var.project_id
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.name]
 
   conditions {
     display_name = "Cloud Run 5xx error rate"
@@ -159,9 +213,10 @@ resource "google_monitoring_alert_policy" "error_rate" {
 }
 
 resource "google_monitoring_alert_policy" "import_failure" {
-  display_name = "${var.prefix}-import-failure"
-  project      = var.project_id
-  combiner     = "OR"
+  display_name          = "${var.prefix}-import-failure"
+  project               = var.project_id
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.name]
 
   conditions {
     display_name = "Import job failure"

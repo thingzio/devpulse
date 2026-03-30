@@ -2340,13 +2340,27 @@ function addTrackedRepo(org, repo) {
         $status.text('');
     }).fail(function(xhr) {
         var msg = xhr.responseText || 'Failed to add repo';
-        var urlMatch = msg.match(/(https:\/\/\S+)/);
-        if (urlMatch) {
-            var url = urlMatch[1];
-            var text = msg.replace(url, '');
-            $status.html(text + '<a href="' + $('<span>').text(url).html() + '" target="_blank">Install here</a>');
+        var limitMatch = msg.match(/^repo_limit_reached:(\d+)$/);
+        if (limitMatch) {
+            var limit = limitMatch[1];
+            $status.html('Repo limit for current plan reached (' + limit + '). <a href="#" id="request-upgrade-link">Request Upgrade</a>');
+            $('#request-upgrade-link').on('click', function(e) {
+                e.preventDefault();
+                $.post('/api/upgrade-request', function() {
+                    $status.text('Upgrade request submitted. We will be in touch.');
+                }).fail(function() {
+                    $status.text('Error submitting upgrade request. Please try again.');
+                });
+            });
         } else {
-            $status.text(msg);
+            var urlMatch = msg.match(/(https:\/\/\S+)/);
+            if (urlMatch) {
+                var url = urlMatch[1];
+                var text = msg.replace(url, '');
+                $status.html(text + '<a href="' + $('<span>').text(url).html() + '" target="_blank">Install here</a>');
+            } else {
+                $status.text(msg);
+            }
         }
     });
 }

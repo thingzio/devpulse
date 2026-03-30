@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS tenant (
     max_repos            INT NOT NULL DEFAULT 5,
     max_events_per_week  INT NOT NULL DEFAULT 2000,
     plan                 TEXT NOT NULL DEFAULT 'free',
-    tos_accepted_at TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tos_accepted_at      TIMESTAMPTZ,
+    upgrade_requested_at TIMESTAMPTZ,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
