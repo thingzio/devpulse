@@ -22,11 +22,14 @@ var (
 
 func init() {
 	secure = strings.HasPrefix(os.Getenv("BASE_URL"), "https://")
-	if secure {
-		cookieName = "__Host-session"
-	} else {
-		cookieName = "session"
+	cookieName = cookieNameFor(secure)
+}
+
+func cookieNameFor(isSecure bool) string {
+	if isSecure {
+		return "__Host-session"
 	}
+	return "session"
 }
 
 // SessionCookieName returns the session cookie name based on the BASE_URL scheme.

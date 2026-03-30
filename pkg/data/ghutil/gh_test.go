@@ -140,3 +140,43 @@ func TestTrim_AtSign(t *testing.T) {
 	s := "@org"
 	assert.Equal(t, "org", Trim(&s))
 }
+
+func TestDeref(t *testing.T) {
+	s := "  hello  "
+	assert.Equal(t, "hello", Deref(&s))
+	assert.Equal(t, "", Deref(nil))
+	empty := ""
+	assert.Equal(t, "", Deref(&empty))
+}
+
+func TestMapRepo(t *testing.T) {
+	name := "myrepo"
+	full := "org/myrepo"
+	desc := "a repo"
+	url := "https://github.com/org/myrepo"
+	r := &github.Repository{Name: &name, FullName: &full, Description: &desc, HTMLURL: &url}
+	got := MapRepo(r)
+	assert.Equal(t, "myrepo", got.Name)
+	assert.Equal(t, "org/myrepo", got.FullName)
+	assert.Equal(t, "a repo", got.Description)
+	assert.Equal(t, "https://github.com/org/myrepo", got.URL)
+}
+
+func TestMapRepo_NilFields(t *testing.T) {
+	got := MapRepo(&github.Repository{})
+	assert.Equal(t, "", got.Name)
+	assert.Equal(t, "", got.FullName)
+}
+
+func TestMapOrg(t *testing.T) {
+	login := "myorg"
+	company := "My Company"
+	desc := "org desc"
+	url := "https://api.github.com/orgs/myorg"
+	o := &github.Organization{Login: &login, Company: &company, Description: &desc, URL: &url}
+	got := MapOrg(o)
+	assert.Equal(t, "myorg", got.Name)
+	assert.Equal(t, "My Company", got.Company)
+	assert.Equal(t, "org desc", got.Description)
+	assert.Equal(t, "https://api.github.com/orgs/myorg", got.URL)
+}

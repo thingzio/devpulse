@@ -49,3 +49,8 @@ func TestClearSessionCookie(t *testing.T) {
 	assert.Equal(t, "", cookies[0].Value)
 	assert.Equal(t, -1, cookies[0].MaxAge)
 }
+
+func TestCookieNameFor(t *testing.T) {
+	assert.Equal(t, "__Host-session", cookieNameFor(true))
+	assert.Equal(t, "session", cookieNameFor(false))
+}

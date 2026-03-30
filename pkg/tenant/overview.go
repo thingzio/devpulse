@@ -157,10 +157,13 @@ func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int,
 }
 
 func startOfWeek() time.Time {
-	now := time.Now().UTC()
-	weekday := int(now.Weekday())
+	return startOfWeekFrom(time.Now().UTC())
+}
+
+func startOfWeekFrom(t time.Time) time.Time {
+	weekday := int(t.Weekday())
 	if weekday == 0 {
 		weekday = 7
 	}
-	return now.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
+	return t.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
 }

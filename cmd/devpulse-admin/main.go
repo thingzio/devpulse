@@ -40,6 +40,11 @@ type upgradeResponse struct {
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
 }
 
+func resolvePlanLimits(plan string) ([2]int, bool) {
+	limits, ok := planLimits[plan]
+	return limits, ok
+}
+
 func main() {
 	logging.SetupLogger()
 
@@ -76,7 +81,7 @@ func main() {
 			return
 		}
 
-		limits, ok := planLimits[req.Plan]
+		limits, ok := resolvePlanLimits(req.Plan)
 		if !ok {
 			http.Error(w, fmt.Sprintf("invalid plan: %s (must be free, pro, or enterprise)", req.Plan), http.StatusBadRequest)
 			return

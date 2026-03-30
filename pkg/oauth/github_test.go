@@ -99,3 +99,36 @@ func TestFetchUser_Unauthorized(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "status 401")
 }
+
+func TestExchangeCode_EmptyToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"access_token":""}`))
+	}))
+	defer server.Close()
+
+	cfg := &Config{ClientID: "x", ClientSecret: "y", TokenURL: server.URL}
+	_, err := ExchangeCode(context.Background(), cfg, "code")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty access token")
+}
+
+func TestFetchUser_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`not json`))
+	}))
+	defer server.Close()
+
+	cfg := &Config{UserURL: server.URL}
+	_, err := FetchUser(context.Background(), cfg, "token")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decoding user")
+}
+
+func TestBuildAuthURL_StateLength(t *testing.T) {
+	cfg := &Config{ClientID: "abc"}
+	_, state := BuildAuthURL(cfg)
+	// randomState() returns hex of 16 bytes = 32 chars
+	assert.Len(t, state, 32)
+}
