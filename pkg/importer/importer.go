@@ -140,31 +140,37 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 
 	var errs int
 
+	slog.Info("phase: metadata", "org", org, "repo", repo)
 	if err := store.ImportRepoMeta(ctx, token, org, repo); err != nil {
 		slog.Error("importing repo meta", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	slog.Info("phase: events", "org", org, "repo", repo)
 	if _, _, err := store.ImportEvents(ctx, token, org, repo, 6); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	slog.Info("phase: releases", "org", org, "repo", repo)
 	if err := store.ImportReleases(ctx, token, org, repo); err != nil {
 		slog.Error("importing releases", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	slog.Info("phase: metrics", "org", org, "repo", repo)
 	if err := store.ImportRepoMetricHistory(ctx, token, org, repo); err != nil {
 		slog.Error("importing metric history", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	slog.Info("phase: containers", "org", org, "repo", repo)
 	if err := store.ImportContainerVersions(ctx, token, org, repo); err != nil {
 		slog.Error("importing container versions", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	slog.Info("phase: reputation", "org", org, "repo", repo)
 	if _, err := store.ImportReputation(ctx, &org, &repo); err != nil {
 		slog.Error("importing reputation", "org", org, "repo", repo, "error", err)
 		errs++
@@ -172,6 +178,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 
 	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
 	if llmCfg := data.NewLLMConfigFromEnv(); llmCfg != nil {
+		slog.Info("phase: insights", "org", org, "repo", repo)
 		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
 			slog.Error("generating insights", "org", org, "repo", repo, "error", err)
 			errs++

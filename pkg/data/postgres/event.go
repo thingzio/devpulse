@@ -406,7 +406,7 @@ func (e *eventImporter) flush() error {
 	total := e.flushed
 	e.mu.Unlock()
 
-	slog.Debug("flushed events",
+	slog.Info("events progress",
 		"repo", e.owner+"/"+e.repo,
 		"batch", len(events),
 		"total", total,
@@ -550,6 +550,11 @@ func (e *eventImporter) importPREvents(ctx context.Context) error {
 	return nil
 }
 
+type prRef struct {
+	org, repo string
+	number    int
+}
+
 func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 	db := e.store.db
 
@@ -559,10 +564,6 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 	}
 	defer rows.Close()
 
-	type prRef struct {
-		org, repo string
-		number    int
-	}
 	var prs []prRef
 	for rows.Next() {
 		var r prRef
@@ -579,55 +580,69 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 		return nil
 	}
 
+	slog.Info("backfilling PR sizes", "repo", e.owner+"/"+e.repo, "total", len(prs))
 	updated := 0
-	for _, p := range prs {
+	for i, p := range prs {
+		if i > 0 && i%50 == 0 {
+			slog.Info("PR backfill progress", "repo", e.owner+"/"+e.repo, "processed", i, "total", len(prs))
+		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		pr, resp, err := e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
+		ok, err := e.fetchAndUpdatePRSize(ctx, db, p)
 		if err != nil {
-			if wait := ghutil.AbuseRetryAfter(err); wait > 0 {
-				slog.Warn("secondary rate limit hit, waiting", "number", p.number, "wait", wait.String())
-				time.Sleep(wait)
-				pr, resp, err = e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
-				if err != nil {
-					slog.Warn("error fetching PR details after retry", "number", p.number, "error", err)
-					continue
-				}
-			} else {
-				slog.Warn("error fetching PR details", "number", p.number, "error", err)
-				continue
-			}
-		}
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
 			return err
 		}
-
-		additions := pr.GetAdditions()
-		deletions := pr.GetDeletions()
-		changedFiles := pr.GetChangedFiles()
-		commits := pr.GetCommits()
-
-		if additions == 0 && deletions == 0 && changedFiles == 0 && commits == 0 {
-			continue
+		if ok {
+			updated++
 		}
-
-		if _, err := db.ExecContext(ctx, updatePRSizeSQL,
-			intPtr(additions), intPtr(deletions), intPtr(changedFiles), intPtr(commits),
-			p.org, p.repo, p.number); err != nil {
-			slog.Warn("error updating PR size", "number", p.number, "error", err)
-			continue
-		}
-		updated++
 	}
 
 	if updated > 0 {
 		slog.Info("PR sizes backfilled", "repo", e.owner+"/"+e.repo, "updated", updated, "total", len(prs))
 	}
 	return nil
+}
+
+func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prRef) (bool, error) {
+	pr, resp, err := e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
+	if err != nil {
+		if wait := ghutil.AbuseRetryAfter(err); wait > 0 {
+			slog.Warn("secondary rate limit hit, waiting", "number", p.number, "wait", wait.String())
+			time.Sleep(wait)
+			pr, resp, err = e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
+			if err != nil {
+				slog.Warn("error fetching PR details after retry", "number", p.number, "error", err)
+				return false, nil
+			}
+		} else {
+			slog.Warn("error fetching PR details", "number", p.number, "error", err)
+			return false, nil
+		}
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+	if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
+		return false, err
+	}
+
+	additions := pr.GetAdditions()
+	deletions := pr.GetDeletions()
+	changedFiles := pr.GetChangedFiles()
+	commits := pr.GetCommits()
+
+	if additions == 0 && deletions == 0 && changedFiles == 0 && commits == 0 {
+		return false, nil
+	}
+
+	if _, err := db.ExecContext(ctx, updatePRSizeSQL,
+		intPtr(additions), intPtr(deletions), intPtr(changedFiles), intPtr(commits),
+		p.org, p.repo, p.number); err != nil {
+		slog.Warn("error updating PR size", "number", p.number, "error", err)
+		return false, nil
+	}
+	return true, nil
 }
 
 func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error {

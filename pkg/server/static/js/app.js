@@ -1531,6 +1531,7 @@ function loadRepoOverview(url) {
         }
 
         var data = resp.repos || [];
+        $("#banner-repos").text(data.length.toLocaleString());
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
@@ -1567,7 +1568,13 @@ function loadRepoOverview(url) {
             $row.append($('<td class="num"></td>').text(r.scored + '/' + r.contributors));
             $row.append($('<td></td>').text(r.language || '—'));
             $row.append($('<td></td>').text(r.license || '—'));
-            $row.append($('<td></td>').text(formatImportDate(r.last_import, false)));
+            var $importCell = $('<td></td>');
+            if (r.last_import) {
+                $importCell.text(formatImportDate(r.last_import, false));
+            } else {
+                $importCell.text('Pending').css({'color': 'var(--gray)', 'font-style': 'italic'});
+            }
+            $row.append($importCell);
             var $removeBtn = $('<button style="color:var(--gray);font-size:0.85em;padding:2px 8px;border:1px solid var(--border-color);border-radius:var(--border-radius);cursor:pointer">Remove</button>');
             $removeBtn.on('click', function() { removeTrackedRepo(r.org, r.repo); });
             $row.append($('<td></td>').append($removeBtn));
