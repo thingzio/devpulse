@@ -43,13 +43,12 @@ DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform state pull 2>/dev/null \
 
 msg "Upgrading ${USERNAME} to ${PLAN} (${MAX_REPOS} repos, ${MAX_EVENTS} events/week)"
 
-export PGPASSWORD="${DB_PASS}"
-gcloud sql connect "${INSTANCE}" \
+# Pipe password + SQL to gcloud sql connect
+# gcloud reads password from first line of stdin, then passes rest to psql
+printf '%s\n%s\n' "${DB_PASS}" "${SQL}" | gcloud sql connect "${INSTANCE}" \
     --project="${PROJECT}" \
     --user="${DB_USER}" \
     --database="${DB}" \
-    --quiet \
-    <<< "${SQL}"
-unset PGPASSWORD
+    --quiet
 
 msg "Done"
