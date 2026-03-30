@@ -50,15 +50,20 @@ Start small, upgrade in-place as tenant count grows. Each Cloud SQL tier change 
 
 **Cloud SQL db-f1-micro** — shared vCPU, 614MB RAM.
 
-| | Estimate |
-|---|---|
-| Cloud SQL | $7/mo |
-| Storage (10GB) | $2/mo |
-| Cloud Run (serve + import) | $5/mo |
-| Fixed (scheduler, secrets, DNS) | $1/mo |
-| **Total** | **~$15/mo** |
+| Service | Details | Estimate |
+|---------|---------|----------|
+| Cloud SQL | db-f1-micro, 10GB storage | $9/mo |
+| Cloud Run Service | scale-to-zero, 1 vCPU/512MB | $1-2/mo |
+| Cloud Run Job | hourly, ~1 min/run | $0.50/mo |
+| Anthropic API | Claude Haiku insights, per-repo/per-import | $1-5/mo |
+| Cloud Scheduler | 1 hourly job | free (3 free) |
+| Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
+| Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
+| Cloud DNS | 1 hosted zone | $0.20/mo |
+| Cloud Monitoring | log-based metrics, 3 alert policies, email | free tier |
+| **Total** | | **~$12-17/mo** |
 
-Handles low traffic dashboards and hourly imports for up to ~100 tenants. Import job completes in under 15 minutes.
+Handles low traffic dashboards and hourly imports for up to ~100 tenants. Import job completes in under 15 minutes. Anthropic cost scales with repo count and import frequency.
 
 **Upgrade signal:** DB CPU sustained > 80%, or import duration > 30 minutes.
 
@@ -66,12 +71,14 @@ Handles low traffic dashboards and hourly imports for up to ~100 tenants. Import
 
 **Cloud SQL db-g1-small** — shared vCPU, 1.7GB RAM.
 
-| | Estimate |
-|---|---|
+| Service | Estimate |
+|---------|----------|
 | Cloud SQL | $25/mo |
 | Storage (25GB) | $4/mo |
 | Cloud Run | $15/mo |
-| **Total** | **~$45/mo** |
+| Anthropic API | $5-15/mo |
+| Fixed (scheduler, DNS, secrets) | $1/mo |
+| **Total** | **~$50-60/mo** |
 
 Migration: `terraform apply` (change `db_tier` variable). Zero downtime with HA enabled.
 
@@ -81,13 +88,14 @@ Migration: `terraform apply` (change `db_tier` variable). Zero downtime with HA 
 
 **Cloud SQL db-custom-1-3840** — 1 dedicated vCPU, 3.75GB RAM.
 
-| | Estimate |
-|---|---|
+| Service | Estimate |
+|---------|----------|
 | Cloud SQL | $50/mo |
 | Storage (50GB) | $9/mo |
 | Cloud Run | $30/mo |
 | PgBouncer sidecar | $10/mo |
-| **Total** | **~$100/mo** |
+| Anthropic API | $15-40/mo |
+| **Total** | **~$115-140/mo** |
 
 Adds PgBouncer as a Cloud Run sidecar for connection pooling. Import job may need to split to Cloud Tasks for parallel per-tenant processing (1hr timeout at ~300 tenants sequential).
 
@@ -99,14 +107,15 @@ Migration: `terraform apply`. Zero downtime.
 
 **AlloyDB** — 2+ vCPUs, built-in connection pooling, columnar analytics engine.
 
-| | Estimate |
-|---|---|
+| Service | Estimate |
+|---------|----------|
 | AlloyDB primary (2 vCPU) | $150/mo |
 | Storage (100GB) | $35/mo |
 | Read pool (optional, 2 vCPU) | $150/mo |
 | Cloud Run | $50/mo |
 | Cloud Tasks (parallel import) | $10/mo |
-| **Total** | **~$250-400/mo** |
+| Anthropic API | $40-100/mo |
+| **Total** | **~$300-500/mo** |
 
 Why AlloyDB at this tier:
 - **Connection pooling built-in** — no PgBouncer sidecar needed
@@ -149,7 +158,7 @@ All infrastructure is defined in `infra/saas/`:
 | `cloudrun.tf` | Cloud Run service + job |
 | `scheduler.tf` | Hourly import trigger |
 | `dns.tf` | Cloud DNS zone |
-| `monitoring.tf` | Uptime checks, error rate + import failure alerts |
+| `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
 | `outputs.tf` | Service URL, DB connection, DNS nameservers |
 
 ### Tier upgrades via Terraform
