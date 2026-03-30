@@ -1512,13 +1512,16 @@ function loadRepoOverview(url) {
             var pct = Math.min(u.weekly_pct || 0, 100).toFixed(1);
             var color = pct >= 100 ? 'var(--red)' : pct >= 80 ? '#d29a00' : 'var(--accent)';
             var reposPct = u.max_repos > 0 ? Math.round(u.active_repos / u.max_repos * 100) : 0;
+            var planName = (u.plan || 'free').charAt(0).toUpperCase() + (u.plan || 'free').slice(1);
             $banner.html(
-                '<div class="banner-stat"><span class="banner-val" style="color:' + color + '">' +
-                (u.weekly_events || 0).toLocaleString() + ' / ' + (u.max_events_per_week || 0).toLocaleString() +
-                '</span><span class="banner-label">Events This Week (' + pct + '%)</span></div>' +
+                '<div class="banner-stat"><span class="banner-val">' + planName +
+                '</span><span class="banner-label">Plan</span></div>' +
                 '<div class="banner-stat"><span class="banner-val">' +
                 (u.active_repos || 0) + ' / ' + (u.max_repos || 0) +
-                '</span><span class="banner-label">Repos (' + reposPct + '%)</span></div>'
+                '</span><span class="banner-label">Repos (' + reposPct + '%)</span></div>' +
+                '<div class="banner-stat"><span class="banner-val" style="color:' + color + '">' +
+                (u.weekly_events || 0).toLocaleString() + ' / ' + (u.max_events_per_week || 0).toLocaleString() +
+                '</span><span class="banner-label">Events This Week (' + pct + '%)</span></div>'
             );
             if (u.limit_reached) {
                 $banner.append('<div class="banner-stat"><span class="banner-val" style="color:var(--red)">LIMIT REACHED</span><span class="banner-label">Imports paused until next week</span></div>');

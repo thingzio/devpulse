@@ -27,6 +27,7 @@ type RepoOverview struct {
 
 // UsageSummary holds tenant-level usage stats for the dashboard.
 type UsageSummary struct {
+	Plan             string  `json:"plan"`
 	MaxRepos         int     `json:"max_repos"`
 	ActiveRepos      int     `json:"active_repos"`
 	MaxEventsPerWeek int     `json:"max_events_per_week"`
@@ -63,7 +64,7 @@ const tenantRepoOverviewSQL = `
 	ORDER BY tr.org, tr.repo`
 
 const tenantLimitsSQL = `
-	SELECT max_repos, max_events_per_week
+	SELECT plan, max_repos, max_events_per_week
 	FROM tenant WHERE id = $1`
 
 const tenantActiveRepoCountSQL = `
@@ -75,8 +76,9 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 	weekStart := startOfWeek().Format("2006-01-02")
 
 	// Get tenant limits
+	var plan string
 	var maxRepos, maxEventsPerWeek int
-	if err := db.QueryRowContext(ctx, tenantLimitsSQL, tenantID).Scan(&maxRepos, &maxEventsPerWeek); err != nil {
+	if err := db.QueryRowContext(ctx, tenantLimitsSQL, tenantID).Scan(&plan, &maxRepos, &maxEventsPerWeek); err != nil {
 		return nil, fmt.Errorf("querying tenant limits: %w", err)
 	}
 
@@ -126,6 +128,7 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 
 	return &OverviewResponse{
 		Usage: UsageSummary{
+			Plan:             plan,
 			MaxRepos:         maxRepos,
 			ActiveRepos:      activeRepos,
 			MaxEventsPerWeek: maxEventsPerWeek,
