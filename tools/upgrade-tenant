@@ -36,7 +36,8 @@ DB_USER="devpulse"
 SQL="UPDATE tenant SET plan='${PLAN}', max_repos=${MAX_REPOS}, max_events_per_week=${MAX_EVENTS}, upgrade_requested_at=NULL, updated_at=NOW() WHERE username='${USERNAME}' RETURNING username, plan, max_repos, max_events_per_week;"
 
 msg "Fetching DB password from Terraform state..."
-DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform state show random_password.db_password 2>/dev/null | grep 'result' | awk -F'"' '{print $2}')" \
+DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform state pull 2>/dev/null \
+    | python3 -c "import sys,json; resources=json.load(sys.stdin)['resources']; pw=[r for r in resources if r['type']=='random_password' and r['name']=='db_password']; print(pw[0]['instances'][0]['attributes']['result'])" 2>/dev/null)" \
     || err "Failed to get DB password from Terraform state."
 [[ -z "${DB_PASS}" ]] && err "DB password is empty. Ensure Terraform state is accessible in infra/saas."
 
