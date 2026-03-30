@@ -337,12 +337,14 @@ function loadTabCharts(tab, months, org, repo, entity) {
                 $("#stars-trend-panel").show();
                 $("#forks-trend-panel").show();
                 $("#repo-overview-panel").hide();
+                $("#add-repo-panel").hide();
                 loadStarsTrendChart('/data/insights/repo-metric-history?' + q);
                 loadForksTrendChart('/data/insights/repo-metric-history?' + q);
             } else {
                 $("#stars-trend-panel").hide();
                 $("#forks-trend-panel").hide();
                 $("#repo-overview-panel").show();
+                $("#add-repo-panel").show();
                 loadRepoOverview('/api/repos/overview');
             }
             break;
@@ -2335,7 +2337,15 @@ function addTrackedRepo(org, repo) {
         $('#repo-search-results').removeClass('visible');
         $status.text('');
     }).fail(function(xhr) {
-        $status.text(xhr.responseText || 'Failed to add repo');
+        var msg = xhr.responseText || 'Failed to add repo';
+        var urlMatch = msg.match(/(https:\/\/\S+)/);
+        if (urlMatch) {
+            var url = urlMatch[1];
+            var text = msg.replace(url, '');
+            $status.html(text + '<a href="' + $('<span>').text(url).html() + '" target="_blank">Install here</a>');
+        } else {
+            $status.text(msg);
+        }
     });
 }
 

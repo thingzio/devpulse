@@ -422,7 +422,7 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 		if install == nil {
 			http.Error(w, fmt.Sprintf(
-				"DevPulse app is not installed on %s. Install it at https://github.com/apps/DevPulseThingz", org),
+				"DevPulse app is not installed on %s. Install it at https://github.com/apps/DevPulseThingz/installations/select_target", org),
 				http.StatusBadRequest)
 			return
 		}
