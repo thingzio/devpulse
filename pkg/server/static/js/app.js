@@ -2339,7 +2339,7 @@ function addTrackedRepo(org, repo) {
         $('#repo-search-results').removeClass('visible');
         $status.text('');
     }).fail(function(xhr) {
-        var msg = xhr.responseText || 'Failed to add repo';
+        var msg = (xhr.responseText || 'Failed to add repo').trim();
         var limitMatch = msg.match(/^repo_limit_reached:(\d+)$/);
         if (limitMatch) {
             var limit = limitMatch[1];
