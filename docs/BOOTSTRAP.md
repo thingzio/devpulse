@@ -80,11 +80,16 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
 # Build and push (repo must include full image name)
 KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
 KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
+KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-admin ko build ./cmd/devpulse-admin/ --bare --tags latest
 ```
 
-**Make both GHCR packages public** (required for AR remote repo):
+**Make all GHCR packages public** (required for AR remote repo):
 - `https://github.com/orgs/thingzio/packages/container/devpulse-site/settings` → Visibility → Public
 - `https://github.com/orgs/thingzio/packages/container/devpulse-import/settings` → Visibility → Public
+- `https://github.com/orgs/thingzio/packages/container/devpulse-admin/settings` → Visibility → Public
+
+**Link all packages to the repo** (required for GitHub Actions write access):
+- Each package → Settings → Repository source → Connect to `thingzio/devpulse`
 
 If "Public" is disabled, enable it in org settings: `https://github.com/organizations/thingzio/settings/packages`
 

@@ -135,6 +135,7 @@ When choosing between approaches, prioritize in this order:
 ```
 cmd/devpulse-site/     HTTP server entrypoint (dashboard, OAuth, webhooks, data API)
 cmd/devpulse-import/   Batch import worker entrypoint
+cmd/devpulse-admin/    IAM-protected admin service (tenant plan management)
 pkg/server/             HTTP server, handlers, scoped.go (RLS middleware), data.go (chart API)
 pkg/server/static/      Frontend: CSS, JS, images (embedded via go:embed)
 pkg/server/templates/   HTML templates: header, home, footer, landing, tos, help
@@ -151,7 +152,7 @@ infra/saas/             Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-Two separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports. Each creates its own store via `postgres.NewFromEnv()`.
+Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports, `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
 
 Data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
 
@@ -189,5 +190,5 @@ GitHub Actions workflows in `.github/workflows/`:
 Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`, or `make bump-major` to tag and push.
 
 - **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
-- **Images**: pushed to `ghcr.io/thingzio/devpulse`
-- **Deploy**: Cloud Run service + job updated via `deploy-saas.yaml` or `release-on-tag.yaml`
+- **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to `ghcr.io/thingzio/`
+- **Deploy**: Cloud Run service + job + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`

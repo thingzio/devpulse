@@ -16,6 +16,9 @@ Internet
    ├── Cloud Run job (import mode, hourly)
    │     └── Per-tenant repo import via GitHub API
    │
+   ├── Cloud Run service (admin, IAM-gated)
+   │     └── Tenant plan management (upgrade/downgrade)
+   │
    └── GitHub
          ├── OAuth (user identity)
          ├── App webhooks (installation events)
@@ -27,20 +30,21 @@ Cloud SQL PostgreSQL
    └── RLS policies (tenant isolation)
 
 Cloud Scheduler → triggers import job hourly
-Secret Manager  → GitHub App key, OAuth secret, webhook secret
+Secret Manager  → GitHub App key, OAuth secret, webhook secret, Anthropic API key
 Cloud DNS       → devpulse.thingz.io
 ```
 
 ## Compute
 
-Two container images: `ghcr.io/thingzio/devpulse-site` (Cloud Run service) and `ghcr.io/thingzio/devpulse-import` (Cloud Run job).
+Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run job), `devpulse-admin` (Cloud Run service, IAM-protected).
 
-| Mode | Deployment | Scaling |
-|------|-----------|---------|
-| Serve | Cloud Run service | 0-10 instances, scale-to-zero |
-| Import | Cloud Run job | Single execution, hourly |
+| Mode | Deployment | Scaling | Access |
+|------|-----------|---------|--------|
+| Serve | Cloud Run service | 0-10 instances, scale-to-zero | Public |
+| Import | Cloud Run job | Single execution, hourly | Internal |
+| Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
-Cloud Run scales to zero when idle — no cost when no one is using the dashboard. The import job runs for the duration of the import and exits.
+Cloud Run scales to zero when idle — no cost when no one is using the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) for tenant management operations.
 
 ## Database Scaling Plan
 
@@ -155,7 +159,7 @@ All infrastructure is defined in `infra/saas/`:
 | `database.tf` | Cloud SQL instance, database, IAM users |
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
-| `cloudrun.tf` | Cloud Run service + job |
+| `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
 | `scheduler.tf` | Hourly import trigger |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
