@@ -95,13 +95,6 @@ resource "google_cloud_run_v2_service" "serve" {
     }
 
     volumes {
-      name = "cloudsql"
-      cloud_sql_instance {
-        instances = [google_sql_database_instance.default.connection_name]
-      }
-    }
-
-    volumes {
       name = "github-app-key"
       secret {
         secret = google_secret_manager_secret.github_app_key.secret_id
@@ -109,6 +102,13 @@ resource "google_cloud_run_v2_service" "serve" {
           version = "latest"
           path    = "key.pem"
         }
+      }
+    }
+
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.default.connection_name]
       }
     }
   }
@@ -181,13 +181,6 @@ resource "google_cloud_run_v2_job" "import" {
       }
 
       volumes {
-        name = "cloudsql"
-        cloud_sql_instance {
-          instances = [google_sql_database_instance.default.connection_name]
-        }
-      }
-
-      volumes {
         name = "github-app-key"
         secret {
           secret = google_secret_manager_secret.github_app_key.secret_id
@@ -195,6 +188,13 @@ resource "google_cloud_run_v2_job" "import" {
             version = "latest"
             path    = "key.pem"
           }
+        }
+      }
+
+      volumes {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.default.connection_name]
         }
       }
     }
