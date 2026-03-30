@@ -1,6 +1,7 @@
 variable "project_id" {
   description = "GCP project ID for the SaaS deployment"
   type        = string
+  default     = "devpulseio"
 }
 
 variable "region" {
@@ -30,12 +31,13 @@ variable "git_repo" {
 variable "github_oauth_client_id" {
   description = "GitHub OAuth App client ID (public, not a secret)"
   type        = string
+  default     = "Ov23li1tN3Czc3uhlc0j"
 }
 
 variable "github_app_id" {
   description = "GitHub App ID for installation token minting"
   type        = string
-  default     = ""
+  default     = "3216423"
 }
 
 variable "notification_email" {

@@ -116,12 +116,7 @@ gcloud secrets versions add devpulse-saas-github-app-key \
 cd infra/saas
 terraform init
 
-terraform apply \
-    -var="project_id=$PROJECT_ID" \
-    -var="region=$REGION" \
-    -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
-    -var="github_app_id=$GITHUB_APP_ID"
+terraform apply
 ```
 
 This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
@@ -218,12 +213,7 @@ gcloud run jobs update devpulse-saas-import --region=$REGION \
 After verifying everything works:
 ```shell
 # Edit infra/saas/cloudrun.tf — set deletion_protection = true on both resources
-cd infra/saas && terraform apply \
-    -var="project_id=$PROJECT_ID" \
-    -var="region=$REGION" \
-    -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
-    -var="github_app_id=$GITHUB_APP_ID"
+cd infra/saas && terraform apply
 ```
 
 ### Rotate secrets
@@ -251,12 +241,7 @@ gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
 
 ```shell
 cd infra/saas
-terraform apply \
-    -var="project_id=$PROJECT_ID" \
-    -var="region=$REGION" \
-    -var="domain=$DOMAIN" \
-    -var="github_oauth_client_id=$GITHUB_OAUTH_CLIENT_ID" \
-    -var="github_app_id=$GITHUB_APP_ID"
+terraform apply
 ```
 
 ### Database tier upgrade
