@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools gcloud
+
+usage() {
+    echo "Usage: $0 <username> <plan>"
+    echo ""
+    echo "Plans:"
+    echo "  free        5 repos, 2,000 events/week"
+    echo "  pro         25 repos, 20,000 events/week"
+    echo "  enterprise  100 repos, 100,000 events/week"
+    exit 1
+}
+
+[[ $# -ne 2 ]] && usage
+
+USERNAME="$1"
+PLAN="$2"
+
+case "$PLAN" in
+    free)       MAX_REPOS=5;   MAX_EVENTS=2000 ;;
+    pro)        MAX_REPOS=25;  MAX_EVENTS=20000 ;;
+    enterprise) MAX_REPOS=100; MAX_EVENTS=100000 ;;
+    *)          err "Unknown plan: $PLAN (must be free, pro, or enterprise)" ;;
+esac
+
+PROJECT="${PROJECT_ID:-devpulseio}"
+INSTANCE="devpulse-saas-pg"
+DB="devpulse"
+DB_USER="devpulse"
+
+SQL="UPDATE tenant SET plan='${PLAN}', max_repos=${MAX_REPOS}, max_events_per_week=${MAX_EVENTS}, upgrade_requested_at=NULL, updated_at=NOW() WHERE username='${USERNAME}' RETURNING username, plan, max_repos, max_events_per_week;"
+
+msg "Upgrading ${USERNAME} to ${PLAN} (${MAX_REPOS} repos, ${MAX_EVENTS} events/week)"
+
+gcloud sql connect "${INSTANCE}" \
+    --project="${PROJECT}" \
+    --user="${DB_USER}" \
+    --database="${DB}" \
+    --quiet \
+    <<< "${SQL}"
+
+msg "Done"
