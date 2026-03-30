@@ -20,6 +20,7 @@ import (
 
 var sharedDSN string
 var schemaSeq atomic.Uint64
+var sharedPool *sql.DB
 
 func TestMain(m *testing.M) {
 	for _, arg := range os.Args[1:] {
@@ -28,30 +29,47 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	ctx := context.Background()
-	container, err := tcpostgres.Run(ctx, "postgres:17-alpine",
-		tcpostgres.WithDatabase("tenant_test"),
-		tcpostgres.WithUsername("test"),
-		tcpostgres.WithPassword("test"),
-		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
-		),
-	)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start postgres container: %v\n", err)
-		os.Exit(1)
+	var cleanup func()
+	if dsn := os.Getenv("DEVPULSE_TEST_DSN"); dsn != "" {
+		sharedDSN = dsn
+		cleanup = func() {}
+	} else {
+		ctx := context.Background()
+		container, err := tcpostgres.Run(ctx, "postgres:17-alpine",
+			tcpostgres.WithDatabase("tenant_test"),
+			tcpostgres.WithUsername("test"),
+			tcpostgres.WithPassword("test"),
+			testcontainers.WithWaitStrategy(
+				wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
+			),
+		)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to start postgres container: %v\n", err)
+			os.Exit(1)
+		}
+
+		dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+		if err != nil {
+			container.Terminate(ctx)
+			fmt.Fprintf(os.Stderr, "failed to get connection string: %v\n", err)
+			os.Exit(1)
+		}
+		sharedDSN = dsn
+		cleanup = func() { container.Terminate(ctx) }
 	}
 
-	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	var err error
+	sharedPool, err = sql.Open("postgres", sharedDSN)
 	if err != nil {
-		container.Terminate(ctx)
-		fmt.Fprintf(os.Stderr, "failed to get connection string: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to open shared pool: %v\n", err)
 		os.Exit(1)
 	}
-	sharedDSN = dsn
+	sharedPool.SetMaxOpenConns(5)
+	sharedPool.SetMaxIdleConns(2)
 
 	code := m.Run()
-	container.Terminate(ctx)
+	sharedPool.Close()
+	cleanup()
 	os.Exit(code)
 }
 
@@ -64,12 +82,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	schema := fmt.Sprintf("test_%d", schemaSeq.Add(1))
 
-	db, err := sql.Open("postgres", sharedDSN)
+	_, err := sharedPool.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
 	require.NoError(t, err)
-
-	_, err = db.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
-	require.NoError(t, err)
-	require.NoError(t, db.Close())
 
 	schemaDSN := sharedDSN
 	if strings.Contains(schemaDSN, "?") {
@@ -78,26 +92,23 @@ func setupTestDB(t *testing.T) *sql.DB {
 		schemaDSN += "?search_path=" + schema
 	}
 
-	// Run base migrations
+	testDB, err := sql.Open("postgres", schemaDSN)
+	require.NoError(t, err)
+	testDB.SetMaxOpenConns(3)
+	testDB.SetMaxIdleConns(2)
+	require.NoError(t, testDB.Ping())
+
 	store, err := postgres.New(schemaDSN)
 	require.NoError(t, err)
-
-	// Run SaaS migrations
-	err = postgres.RunSaaSMigrations(store.DB())
-	require.NoError(t, err)
-
-	rawDB := store.DB()
+	require.NoError(t, postgres.RunSaaSMigrations(store.DB()))
+	store.Close()
 
 	t.Cleanup(func() {
-		store.Close()
-		cleanDB, cErr := sql.Open("postgres", sharedDSN)
-		if cErr == nil {
-			cleanDB.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", schema))
-			cleanDB.Close()
-		}
+		testDB.Close()
+		sharedPool.Exec(fmt.Sprintf("DROP SCHEMA %s CASCADE", schema))
 	})
 
-	return rawDB
+	return testDB
 }
 
 func TestUpsertAndGetTenant(t *testing.T) {

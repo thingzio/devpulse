@@ -116,11 +116,21 @@ func SuspendInstallation(ctx context.Context, db *sql.DB, installationID int64) 
 }
 
 // AddTenantRepos adds repos to a tenant's tracking list, enforcing the plan limit.
-// The count check and inserts are in the same transaction to prevent races.
+// Upserts run first (ON CONFLICT re-activates deactivated repos without inflating the
+// count), then the resulting active count is checked against the plan limit and rolled
+// back if exceeded. This prevents the previous bug where re-adding a deactivated repo
+// at capacity was incorrectly rejected.
 func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []OrgRepo) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning tx: %w", err)
+	}
+
+	for _, r := range repos {
+		if _, err := tx.ExecContext(ctx, addTenantRepoSQL, tenantID, r.Org, r.Repo); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("adding repo %s/%s: %w", r.Org, r.Repo, err)
+		}
 	}
 
 	var maxRepos int
@@ -135,16 +145,9 @@ func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []Or
 		return fmt.Errorf("counting repos: %w", err)
 	}
 
-	if currentCount+len(repos) > maxRepos {
+	if currentCount > maxRepos {
 		_ = tx.Rollback()
-		return fmt.Errorf("repo_limit_reached:%d", maxRepos)
-	}
-
-	for _, r := range repos {
-		if _, err := tx.ExecContext(ctx, addTenantRepoSQL, tenantID, r.Org, r.Repo); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("adding repo %s/%s: %w", r.Org, r.Repo, err)
-		}
+		return fmt.Errorf("adding repos would exceed plan limit (%d): %w", maxRepos, ErrRepoLimitExceeded)
 	}
 
 	return tx.Commit()

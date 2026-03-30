@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/thingzio/devpulse/pkg/data"
-	"github.com/thingzio/devpulse/pkg/data/ghutil"
 )
 
 const (
@@ -152,72 +150,6 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 	}
 
 	return nil
-}
-
-func (s *Store) MergeDeveloper(ctx context.Context, client *http.Client, username string, cDev *data.CNCFDeveloper) (*data.Developer, error) {
-	if s.db == nil {
-		return nil, data.ErrDBNotInitialized
-	}
-
-	dbDev, err := s.GetDeveloper(ctx, username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get developer %s: %w", username, err)
-	}
-	if dbDev == nil {
-		return nil, nil
-	}
-
-	if dbDev.Username != cDev.Username {
-		return nil, fmt.Errorf("username mismatch (CNCF): %s != %s", dbDev.Username, cDev.Username)
-	}
-
-	ghDev, err := ghutil.GetGitHubDeveloper(ctx, client, username)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get github developer %s: %w", username, err)
-	}
-
-	if dbDev.Username != ghDev.Username {
-		return nil, fmt.Errorf("username mismatch (GitHub): %s != %s", dbDev.Username, ghDev.Username)
-	}
-
-	printDevDeltas(dbDev, ghDev, cDev)
-
-	if ghDev.Email != "" {
-		dbDev.Email = ghDev.Email
-	}
-
-	if ghDev.FullName != "" {
-		dbDev.FullName = ghDev.FullName
-	}
-
-	if ghDev.AvatarURL != "" {
-		dbDev.AvatarURL = ghDev.AvatarURL
-	}
-
-	ghEntity := cleanEntityName(ghDev.Entity)
-	if ghEntity != "" {
-		dbDev.Entity = ghEntity
-	} else if ca := cDev.GetLatestAffiliation(); ca != "" {
-		dbDev.Entity = ca
-	}
-
-	if len(dbDev.Email) == 0 {
-		dbDev.Email = cleanEntityName(cDev.GetBestIdentity())
-	}
-
-	return dbDev, nil
-}
-
-func printDevDeltas(dbDev *data.Developer, ghDev *data.Developer, cncfDev *data.CNCFDeveloper) {
-	slog.Debug("developer deltas",
-		"username", dbDev.Username,
-		"entity_db", dbDev.Entity,
-		"entity_gh", ghDev.Entity,
-		"entity_cncf", cncfDev.GetLatestAffiliation(),
-		"email_db", dbDev.Email,
-		"email_gh", ghDev.Email,
-		"email_cncf", cncfDev.GetBestIdentity(),
-	)
 }
 
 func (s *Store) GetDeveloper(ctx context.Context, username string) (*data.Developer, error) {

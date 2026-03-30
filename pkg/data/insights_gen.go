@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"strings"
@@ -228,7 +229,8 @@ func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetr
 		}
 
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == 529) && attempt < insightsMaxRetries-1 {
-			delay := insightsRetryDelay * time.Duration(attempt+1)
+			jitter := time.Duration(rand.IntN(1000)) * time.Millisecond //nolint:gosec // non-crypto jitter ok for retry delay
+			delay := insightsRetryDelay*time.Duration(attempt+1) + jitter
 			slog.Warn("insights API retrying", "status", resp.StatusCode, "attempt", attempt+1, "delay", delay)
 			select {
 			case <-ctx.Done():

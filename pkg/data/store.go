@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"io"
-	"net/http"
 	"time"
 )
 
@@ -57,7 +56,6 @@ type DeveloperStore interface {
 	GetDeveloperUsernames(ctx context.Context) ([]string, error)
 	GetNoFullnameDeveloperUsernames(ctx context.Context) ([]string, error)
 	SaveDevelopers(ctx context.Context, devs []*Developer) error
-	MergeDeveloper(ctx context.Context, client *http.Client, username string, cDev *CNCFDeveloper) (*Developer, error)
 	GetDeveloper(ctx context.Context, username string) (*Developer, error)
 	SearchDevelopers(ctx context.Context, val string, limit int) ([]*DeveloperListItem, error)
 	UpdateDeveloperNames(ctx context.Context, devs map[string]string) error

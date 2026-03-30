@@ -33,6 +33,13 @@ type upgradeRequest struct {
 	Plan     string `json:"plan"`
 }
 
+type upgradeResponse struct {
+	Username         string `json:"username"`
+	Plan             string `json:"plan"`
+	MaxRepos         int    `json:"max_repos"`
+	MaxEventsPerWeek int    `json:"max_events_per_week"`
+}
+
 func main() {
 	logging.SetupLogger()
 
@@ -104,8 +111,14 @@ func main() {
 		)
 
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"username":%q,"plan":%q,"max_repos":%d,"max_events_per_week":%d}`,
-			req.Username, req.Plan, limits[0], limits[1])
+		if err := json.NewEncoder(w).Encode(upgradeResponse{
+			Username:         req.Username,
+			Plan:             req.Plan,
+			MaxRepos:         limits[0],
+			MaxEventsPerWeek: limits[1],
+		}); err != nil {
+			slog.Error("encoding upgrade response", "error", err)
+		}
 	})
 
 	port := os.Getenv("PORT")

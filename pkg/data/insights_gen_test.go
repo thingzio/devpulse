@@ -34,7 +34,27 @@ func TestParseInsightsResponse_WithCodeFences(t *testing.T) {
 	assert.Empty(t, result.Observations)
 }
 
+func TestParseInsightsResponse_PlainCodeFence(t *testing.T) {
+	raw := "```\n{\"observations\":[],\"actions\":[]}\n```"
+	result, err := parseInsightsResponse(raw)
+	require.NoError(t, err)
+	assert.Empty(t, result.Observations)
+}
+
 func TestParseInsightsResponse_InvalidJSON(t *testing.T) {
 	_, err := parseInsightsResponse("not json")
 	require.Error(t, err)
+}
+
+func TestParseInsightsResponse_EmptyString(t *testing.T) {
+	_, err := parseInsightsResponse("")
+	require.Error(t, err)
+}
+
+func TestParseInsightsResponse_WhitespaceTrimmed(t *testing.T) {
+	raw := "  \n{\"observations\":[{\"headline\":\"X\",\"detail\":\"Y\"}],\"actions\":[]}\n  "
+	result, err := parseInsightsResponse(raw)
+	require.NoError(t, err)
+	require.Len(t, result.Observations, 1)
+	assert.Equal(t, "X", result.Observations[0].Headline)
 }

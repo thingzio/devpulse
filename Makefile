@@ -96,6 +96,10 @@ DEV_DB := postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable
 # Local Development
 # =============================================================================
 
+.PHONY: setup
+setup: ## Validates and installs all local dev tool dependencies
+	tools/setup-tools
+
 .PHONY: up
 up: ## Starts local Postgres (docker compose)
 	docker compose up -d

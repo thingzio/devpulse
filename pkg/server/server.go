@@ -448,7 +448,11 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 
 		if err := tenant.AddTenantRepos(r.Context(), db, tn.ID, []tenant.OrgRepo{{Org: org, Repo: repo}}); err != nil {
 			slog.Error("adding repo", "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			if errors.Is(err, tenant.ErrRepoLimitExceeded) {
+				http.Error(w, "repo limit reached for your plan", http.StatusForbidden)
+				return
+			}
+			http.Error(w, "error adding repository", http.StatusInternalServerError)
 			return
 		}
 
@@ -594,13 +598,17 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 				FullName string `json:"full_name"`
 			} `json:"items"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if decErr := json.NewDecoder(resp.Body).Decode(&result); decErr != nil {
 			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
 			return
 		}
 
 		// Filter out already-tracked repos
-		tracked, _ := tenant.ListTenantRepos(r.Context(), db, tn.ID)
+		tracked, err := tenant.ListTenantRepos(r.Context(), db, tn.ID)
+		if err != nil {
+			slog.Warn("listing tracked repos for dedup filter", "error", err)
+			// continue with empty set — search still works, dedup filtering is best-effort
+		}
 		trackedSet := make(map[string]bool, len(tracked))
 		for _, tr := range tracked {
 			trackedSet[tr.Org+"/"+tr.Repo] = true

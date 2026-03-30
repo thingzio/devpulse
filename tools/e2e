@@ -8,7 +8,8 @@ command -v go >/dev/null 2>&1 || { echo "FAIL: go is required" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "FAIL: curl is required" >&2; exit 1; }
 
 TMPDIR_E2E=$(mktemp -d)
-trap 'kill "$SITE_PID" 2>/dev/null; docker compose down 2>/dev/null; rm -rf "$TMPDIR_E2E"' EXIT
+SITE_PID=""
+trap '[[ -n "$SITE_PID" ]] && kill "$SITE_PID" 2>/dev/null; docker compose down 2>/dev/null; rm -rf "$TMPDIR_E2E"' EXIT
 
 FAILURES=0
 DEV_DB="postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable"
