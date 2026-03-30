@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"time"
-
-	"golang.org/x/oauth2"
 )
 
 // GetHTTPClient returns a new HTTP client.
@@ -24,15 +22,21 @@ func GetHTTPClient() (*http.Client, error) {
 	}, nil
 }
 
-func GetOAuthClient(ctx context.Context, token string) *http.Client {
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{
-			TokenType:   "token",
-			AccessToken: token,
-		},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	tc.Timeout = time.Duration(timeoutInSeconds) * time.Second
+// GetOAuthClient returns an HTTP client that injects a Bearer token into every request.
+func GetOAuthClient(_ context.Context, token string) *http.Client {
+	return &http.Client{
+		Timeout:   time.Duration(timeoutInSeconds) * time.Second,
+		Transport: &tokenTransport{token: token, base: http.DefaultTransport},
+	}
+}
 
-	return tc
+type tokenTransport struct {
+	token string
+	base  http.RoundTripper
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "token "+t.token)
+	return t.base.RoundTrip(req)
 }
