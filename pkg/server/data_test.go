@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -138,6 +139,49 @@ func TestParseInsightParams(t *testing.T) {
 		assert.Equal(t, "myorg", *p.org)
 		assert.Equal(t, "myrepo", *p.repo)
 	})
+}
+
+func TestEntityDevelopersAPIHandler_MissingEntity(t *testing.T) {
+	h := entityDevelopersAPIHandler(nil)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/data/entity-devs", nil)
+	h(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "entity parameter required")
+}
+
+func TestDeveloperSearchAPIHandler_MissingQuery(t *testing.T) {
+	h := developerSearchAPIHandler(nil)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/data/devs/search", nil)
+	h(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "query parameter (q) is required")
+}
+
+func TestContributorProfileAPIHandler_MissingUsername(t *testing.T) {
+	h := insightsContributorProfileAPIHandler(nil)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/data/contributor", nil)
+	h(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "username parameter (u) is required")
+}
+
+func TestEventSearchAPIHandler_InvalidJSON(t *testing.T) {
+	h := eventSearchAPIHandler(nil)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/data/events/search", strings.NewReader("not json"))
+	h(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestQueryAPIHandler_DefaultScope(t *testing.T) {
+	h := queryAPIHandler(nil)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/data/query?v=unknown", nil)
+	h(w, r)
+	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func strPtr(s string) *string { return &s }

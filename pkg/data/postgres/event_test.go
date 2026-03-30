@@ -103,6 +103,26 @@ func TestGetStrPtr(t *testing.T) {
 	})
 }
 
+func TestUnique(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{name: "nil input", input: nil, want: []string{}},
+		{name: "no duplicates", input: []string{"a", "b", "c"}, want: []string{"a", "b", "c"}},
+		{name: "with duplicates", input: []string{"a", "b", "a", "c"}, want: []string{"a", "b", "c"}},
+		{name: "strips at-sign prefix", input: []string{"@user", "user"}, want: []string{"user"}},
+		{name: "trims whitespace and deduplicates", input: []string{"  a  ", "a"}, want: []string{"a"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := unique(tc.input)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestIsEventBatchValidAge(t *testing.T) {
 	minTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	e := &eventImporter{minEventTime: minTime}

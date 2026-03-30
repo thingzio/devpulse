@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +78,44 @@ func TestVerifyWebhookSignature(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestWebhookHandler(t *testing.T) {
+	secret := "test-secret"
+	payload := []byte(`{"action":"created"}`)
+
+	validSig := func(body []byte) string {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write(body)
+		return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	}
+
+	t.Run("empty secret returns 503", func(t *testing.T) {
+		h := WebhookHandler(nil, "")
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(payload))
+		h(w, r)
+		assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	})
+
+	t.Run("invalid signature returns 401", func(t *testing.T) {
+		h := WebhookHandler(nil, secret)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(payload))
+		r.Header.Set("X-Hub-Signature-256", "sha256=badsig")
+		h(w, r)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("valid sig with unknown event returns 200", func(t *testing.T) {
+		h := WebhookHandler(nil, secret)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(payload))
+		r.Header.Set("X-Hub-Signature-256", validSig(payload))
+		r.Header.Set("X-GitHub-Event", "push") // not handled, ignored
+		h(w, r)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
 }
 
 func TestParseRepoNames(t *testing.T) {
