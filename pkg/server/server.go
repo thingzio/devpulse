@@ -413,7 +413,15 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Check for active GitHub App installation on the org.
+		// Repo must be publicly accessible.
+		if !isPublicRepo(r.Context(), org, repo) {
+			http.Error(w, "repo not found or not public", http.StatusForbidden)
+			return
+		}
+
+		// Tenant must have at least one GitHub App installation.
+		// Try org-specific first, then fall back to any active installation
+		// (any installation token can access public repos).
 		install, err := tenant.GetInstallationForOrg(r.Context(), db, tn.ID, org)
 		if err != nil {
 			slog.Error("checking installation", "org", org, "error", err)
@@ -421,35 +429,19 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		if install == nil {
-			http.Error(w, fmt.Sprintf(
-				"DevPulse app is not installed on %s. Install it at https://github.com/apps/DevPulseThingz/installations/select_target", org),
+			installs, err := tenant.GetActiveInstallations(r.Context(), db, tn.ID)
+			if err != nil {
+				slog.Error("checking installations", "error", err)
+				http.Error(w, "error checking installation", http.StatusInternalServerError)
+				return
+			}
+			if len(installs) > 0 {
+				install = &installs[0]
+			}
+		}
+		if install == nil {
+			http.Error(w, "No GitHub App installation found. Go to https://github.com/apps/DevPulseThingz and click Configure to install the app.",
 				http.StatusBadRequest)
-			return
-		}
-
-		// Verify the installation has access to this specific repo.
-		cfg, err := tenant.LoadGitHubAppConfig()
-		if err != nil {
-			slog.Error("loading github app config", "error", err)
-			http.Error(w, "error checking repo access", http.StatusInternalServerError)
-			return
-		}
-		accessible, err := tenant.CheckRepoAccess(r.Context(), cfg, install.ID, org, repo)
-		if err != nil {
-			slog.Error("checking repo access", "org", org, "repo", repo, "error", err)
-			http.Error(w, "error checking repo access", http.StatusInternalServerError)
-			return
-		}
-		if !accessible {
-			http.Error(w, fmt.Sprintf(
-				"DevPulse app does not have access to %s/%s. Update repository permissions in your GitHub organization settings.", org, repo),
-				http.StatusBadRequest)
-			return
-		}
-
-		// Verify the repo is publicly accessible before adding.
-		if !isPublicRepo(r.Context(), org, repo) {
-			http.Error(w, "repo not found or not public", http.StatusForbidden)
 			return
 		}
 
@@ -539,9 +531,14 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Search GitHub public repos
+		// Search GitHub public repos.
+		// If query contains org/repo pattern, use org: qualifier for better matching.
+		searchQ := query
+		if parts := strings.SplitN(query, "/", 2); len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			searchQ = parts[1] + " in:name org:" + parts[0]
+		}
 		ghURL := fmt.Sprintf("https://api.github.com/search/repositories?q=%s&per_page=10",
-			url.QueryEscape(query))
+			url.QueryEscape(searchQ))
 		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, ghURL, nil) //nolint:gosec // constant base URL, query param is url-escaped
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
