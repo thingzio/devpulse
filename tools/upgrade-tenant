@@ -4,7 +4,7 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${DIR}/common"
 
-has_tools gcloud terraform
+has_tools gcloud terraform cloud-sql-proxy psql
 
 usage() {
     echo "Usage: $0 <username> <plan>"
@@ -43,11 +43,18 @@ DB_PASS="$(cd "${REPO_ROOT}/infra/saas" && terraform state pull 2>/dev/null \
 
 msg "Upgrading ${USERNAME} to ${PLAN} (${MAX_REPOS} repos, ${MAX_EVENTS} events/week)"
 
-PGPASSWORD="${DB_PASS}" gcloud sql connect "${INSTANCE}" \
-    --project="${PROJECT}" \
-    --user="${DB_USER}" \
-    --database="${DB}" \
-    --quiet \
-    <<< "${SQL}"
+# Create temporary .pgpass file for non-interactive auth
+PGPASS_FILE="$(mktemp)"
+trap "rm -f ${PGPASS_FILE}" EXIT
+echo "127.0.0.1:9470:${DB}:${DB_USER}:${DB_PASS}" > "${PGPASS_FILE}"
+chmod 600 "${PGPASS_FILE}"
+
+# Start Cloud SQL Proxy in background
+cloud-sql-proxy "${PROJECT}:us-west1:${INSTANCE}" --port 9470 --quiet &
+PROXY_PID=$!
+trap "kill ${PROXY_PID} 2>/dev/null; rm -f ${PGPASS_FILE}" EXIT
+sleep 3
+
+PGPASSFILE="${PGPASS_FILE}" psql -h 127.0.0.1 -p 9470 -U "${DB_USER}" -d "${DB}" -c "${SQL}"
 
 msg "Done"
