@@ -39,6 +39,24 @@ builds:
       - amd64
       - arm64
 
+  - id: devpulse-admin
+    binary: devpulse-admin
+    dir: ./cmd/devpulse-admin
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+        -X main.version={{.Version}}
+        -X main.commit={{.ShortCommit}}
+        -X main.date={{.CommitDate}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
 release:
   github:
     owner: thingzio
@@ -64,6 +82,19 @@ kos:
     build: devpulse-import
     repositories:
       - ghcr.io/thingzio/devpulse-import
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - latest
+      - "{{.Tag}}"
+    preserve_import_paths: false
+    bare: true
+
+  - id: devpulse-admin
+    build: devpulse-admin
+    repositories:
+      - ghcr.io/thingzio/devpulse-admin
     platforms:
       - linux/amd64
       - linux/arm64

@@ -221,3 +221,81 @@ resource "google_cloud_run_v2_job" "import" {
 
   depends_on = [google_project_service.default]
 }
+
+# Admin service (IAM-protected, no public access)
+
+resource "google_cloud_run_v2_service" "admin" {
+  name                = "${var.prefix}-admin"
+  location            = var.region
+  project             = var.project_id
+  deletion_protection = false
+
+  template {
+    service_account = google_service_account.run.email
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+
+    vpc_access {
+      network_interfaces {
+        network    = google_compute_network.default.id
+        subnetwork = google_compute_subnetwork.default.id
+      }
+      egress = "PRIVATE_RANGES_ONLY"
+    }
+
+    containers {
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-admin:latest"
+
+      ports {
+        container_port = 8080
+      }
+
+      env {
+        name  = "DATABASE_URL"
+        value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+      }
+
+      resources {
+        limits = {
+          cpu    = "1000m"
+          memory = "256Mi"
+        }
+      }
+
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+        }
+        initial_delay_seconds = 2
+        period_seconds        = 3
+        failure_threshold     = 5
+      }
+    }
+
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.default.connection_name]
+      }
+    }
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "admin_invoker" {
+  for_each = toset(var.admin_invoker_emails)
+  name     = google_cloud_run_v2_service.admin.name
+  location = var.region
+  project  = var.project_id
+  role     = "roles/run.invoker"
+  member   = "user:${each.value}"
+}

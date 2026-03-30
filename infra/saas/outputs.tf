@@ -28,6 +28,11 @@ output "notification_email" {
   value       = var.notification_email
 }
 
+output "admin_url" {
+  description = "Admin service URL (IAM-protected)"
+  value       = google_cloud_run_v2_service.admin.uri
+}
+
 output "deployer_sa" {
   description = "GitHub Actions deployer service account email"
   value       = google_service_account.deployer.email

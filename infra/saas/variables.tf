@@ -46,6 +46,12 @@ variable "notification_email" {
   default     = "devpulse@thingz.io"
 }
 
+variable "admin_invoker_emails" {
+  description = "GCP identities allowed to invoke the admin service"
+  type        = list(string)
+  default     = ["mchmarny@gmail.com"]
+}
+
 variable "db_tier" {
   description = "Cloud SQL machine tier"
   type        = string
