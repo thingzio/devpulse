@@ -58,7 +58,7 @@ Go to https://github.com/settings/apps/new
 | Webhook secret | `openssl rand -hex 32` |
 
 Permissions:
-- **Repository**: Metadata (Read-only), Contents (Read-only)
+- **Repository**: Metadata (Read-only), Contents (Read-only), Issues (Read-only), Pull requests (Read-only)
 - **Organization**: Packages (Read-only) — required for container version imports
 
 Subscribe to events: **Installation**, **Installation repositories**

@@ -183,7 +183,6 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
-| `codeql-analysis.yml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
 
 ## Release Process
 

@@ -160,10 +160,6 @@ GitHub Actions workflows in `.github/workflows/`:
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
-| `codeql-analysis.yaml` | schedule, push | CodeQL security analysis (Go + JavaScript) |
-| `scan-on-schedule.yaml` | schedule | Vulnerability scanning |
-| `score-on-schedule.yaml` | schedule | Scheduled reputation scoring |
-| `reputation-on-pr.yaml` | PR events | Reputation scoring on PR contributors |
 
 ## Supply Chain Security
 
