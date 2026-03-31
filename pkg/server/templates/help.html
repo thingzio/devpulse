@@ -82,7 +82,6 @@
         <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added. Double-check the spelling of the org/repo name. The repository must exist and be publicly accessible on GitHub.</li>
         <li><strong>Import errors or "Bad credentials"</strong> &mdash; the <a href="https://github.com/apps/DevPulseThingz" target="_blank">DevPulse GitHub App</a> must be installed on the organization that owns the repo. Signing in via GitHub OAuth is not enough &mdash; the app installation is a separate step that grants API access for data imports.</li>
         <li><strong>Missing contributors or events</strong> &mdash; DevPulse imports events from the GitHub API, which may not include very old history for large repositories. Events are imported incrementally on each cycle.</li>
-        <li><strong>Insights tab not visible</strong> &mdash; AI-generated insights require the feature to be enabled on your account. Contact <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> if you'd like to enable it.</li>
         <li><strong>Data looks stale</strong> &mdash; check the "Last Import" timestamp in the dashboard banner. If the last import was more than a few hours ago, there may be a temporary issue with the import worker.</li>
       </ul>
       <p style="margin-top:12px;color:var(--gray);font-size:0.9em">For all other issues and questions, contact <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a></p>
