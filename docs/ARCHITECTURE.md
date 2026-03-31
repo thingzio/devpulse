@@ -111,7 +111,7 @@ Each claimed repo runs 7 phases:
 6. **Reputation** — shallow scores from local data
 7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
 
-Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [LIMITS.md](LIMITS.md) for throughput analysis.
+Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 
 ## Dashboard
 
@@ -149,29 +149,3 @@ GitHub OAuth web flow (`pkg/oauth/`):
 5. Tenant upserted, session created (SHA-256 hashed, stored in DB)
 6. Session cookie set (`__Host-session` on HTTPS, `session` on HTTP)
 
-## Rate Limit Handling
-
-All GitHub API calls go through `pkg/net/` which:
-- Checks `X-RateLimit-Remaining` headers after each response
-- Waits with jitter backoff when approaching the limit
-- Logs rate limit state at debug level
-
-## CI/CD
-
-GitHub Actions workflows in `.github/workflows/`:
-
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
-| `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
-| `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
-| `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
-
-## Supply Chain Security
-
-- **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`)
-- **Vulnerability scanning** — govulncheck in CI
-- **Dependency pinning** — all GitHub Actions pinned by commit hash
-- **CODEOWNERS** — `.github/` directory protected
-
-Tool versions and quality thresholds are centralized in `.settings.yaml`.

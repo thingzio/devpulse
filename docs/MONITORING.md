@@ -1,54 +1,8 @@
 # Monitoring
 
-Observability for DevPulse across local development and GCP production.
+GCP production observability for DevPulse. For local development monitoring, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-## Local Development
-
-### make stats
-
-Quick snapshot of system state from the local Postgres:
-
-```shell
-make stats
-```
-
-Output:
-```
-Tenants              1
-Active repos         3
-Imported repos       2
-Total events         807
-
-Recent sign-ins:
-  mchmarny             2026-03-26 21:02
-
-Repos per tenant:
-  mchmarny             3 repos
-```
-
-### Structured Logs
-
-All logs are JSON (via `log/slog`). Enable debug level with `DEVPULSE_DEBUG=true`.
-
-Key log messages to watch:
-
-| Message | When | Fields |
-|---------|------|--------|
-| `starting` | Binary startup | version, commit, date |
-| `server started` | HTTP server ready | address |
-| `user signed in` | OAuth callback | username, tenant_id |
-| `tos accepted` | ToS flow | tenant_id, username |
-| `import worker starting` | Import begins | execution |
-| `claimed repo` | Repo claimed from queue | org, repo, tenant_id, execution |
-| `tenant usage` | Per-tenant usage check | tenant_id, weekly_events, max_events_per_week, weekly_pct |
-| `weekly event limit reached` | Tenant hit limit | tenant_id, weekly_events, max_events_per_week |
-| `importing repo` | Per-repo import | org, repo |
-| `repo import complete` | Per-repo done | org, repo, errors, duration |
-| `import worker complete` | Full run done | repos, errors, duration |
-
-## GCP Production
-
-### Log-Based Metrics
+## Log-Based Metrics
 
 Created by Terraform (`infra/saas/monitoring.tf`). These are free — no additional cost.
 
@@ -113,20 +67,9 @@ Created by Terraform (`infra/saas/monitoring.tf`):
 | DB connections | Connection count approaching max | Increase pool size or add PgBouncer |
 | Import failure | Any failed import job execution | Check import logs |
 
-### Scaling Signals
+For scaling signals and upgrade thresholds, see [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
-Use the dashboard to decide when to upgrade. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the full tier plan.
-
-| Signal | Threshold | Action |
-|--------|-----------|--------|
-| Cloud SQL CPU | Sustained > 80% | Upgrade DB tier (`terraform apply -var="db_tier=..."`) |
-| Cloud SQL connections | > 80 | Add PgBouncer sidecar |
-| Import duration | > 45 min | Increase `import_parallelism` or migrate to Cloud Tasks |
-| Tenant count | > 100 | Evaluate db-g1-small |
-| Tenant count | > 300 | Evaluate db-custom-1-3840 |
-| Tenant count | > 1,000 | Evaluate AlloyDB |
-
-### Querying Logs Directly
+## Querying Logs Directly
 
 ```shell
 # Recent sign-ins

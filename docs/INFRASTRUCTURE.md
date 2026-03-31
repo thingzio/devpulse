@@ -139,13 +139,68 @@ The import job uses a PostgreSQL SKIP LOCKED claim queue. Each Cloud Run task cl
 | 50–200 | 250–2000 | 5–10 | 30–50 min | Scale DB tier + pool |
 | 200+ | 2000+ | 10+ | Variable | Cloud Tasks for unbounded parallelism |
 
-Each tenant's GitHub App installation has its own 5,000 req/hr API budget — tenant count scales linearly. The bottlenecks are DB write contention and job timeout. See [LIMITS.md](LIMITS.md) for detailed throughput analysis.
-
 Cloud Tasks migration path (for 200+ tenants):
 1. Cloud Scheduler triggers a dispatcher endpoint
 2. Dispatcher queries unclaimed repos and enqueues one Cloud Task per repo
 3. Each task claims and imports a single repo
 4. Unbounded parallelism, no timeout concern
+
+### GitHub API Budget
+
+Each tenant's GitHub App installation gets its own **5,000 requests/hour** budget. Tenants are fully isolated — one tenant's API usage never affects another.
+
+| Auth method | Rate limit |
+|-------------|-----------|
+| Installation token (production) | 5,000/hr per installation |
+| Personal access token (dev) | 5,000/hr per token |
+| Unauthenticated (fallback) | 60/hr per IP |
+
+### API Calls Per Repo Import
+
+Each repo runs 7 import phases:
+
+| Phase | Incremental | First import | Notes |
+|-------|------------:|-------------:|-------|
+| Metadata | 2 | 2 | `Repositories.Get` + `GetCommunityHealthMetrics` |
+| Events (5 concurrent) | 10–30 | 50–200+ | PRs, reviews, issues, comments, forks (100/page) |
+| PR size backfill | 0–20 | 50–200 | `PullRequests.Get` per new PR |
+| Releases | 1–3 | 1–5 | `ListReleases` paginated |
+| Metric history | 3–10 | 5–15 | Stars + forks pagination |
+| Containers | 0–5 | 2–10 | Packages + versions |
+| Reputation | 5–10/dev | 5–10/dev | User profile + org membership + search |
+
+Typical totals: **~60–100 calls/repo** incremental, **~150–300** first import. The free tier (5 repos) and pro tier (25 repos) are well within the 5,000/hr budget.
+
+### Throughput Per Tenant
+
+| Repo activity | Repos/hour |
+|---------------|-----------|
+| Low activity (incremental) | ~100–160 |
+| Moderate activity (incremental) | ~50–80 |
+| High activity (incremental) | ~12–25 |
+| First import (moderate) | ~15–30 |
+
+First imports of large repos may span multiple hourly cycles — the importer resumes from saved page state automatically.
+
+### Rate Limit Handling
+
+The importer tracks remaining requests via `X-RateLimit-Remaining` headers. When remaining drops below 10, it sleeps until reset (with jitter). Maximum wait is capped at 15 minutes — longer waits return an error and the repo re-enters the queue.
+
+Secondary (abuse) limits return HTTP 403 with `Retry-After`. The importer detects `AbuseRateLimitError` and retries after the specified wait (default: 60s).
+
+### What scales linearly
+
+- **GitHub API budget** — each tenant's installation token has its own 5,000/hr
+- **Queue work distribution** — SKIP LOCKED ensures no repo is claimed twice
+
+### What doesn't scale automatically
+
+| Bottleneck | Symptom | Mitigation |
+|------------|---------|------------|
+| Serial processing | Job exceeds 1hr timeout | Increase `import_parallelism` |
+| DB write contention | Slow event flushes, lock waits | Increase Cloud SQL tier, tune pool |
+| Connection pool | `too many clients` errors | Increase pool size in DATABASE_URL |
+| Cloud SQL CPU | High latency on upserts | Scale to `db-custom-*` tier |
 
 ## Terraform
 
