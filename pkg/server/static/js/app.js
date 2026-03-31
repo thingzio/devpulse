@@ -1,7 +1,9 @@
 function formatImportDate(ts, withTime) {
     if (!ts) return '—';
-    if (withTime && ts.length >= 16) return ts.substring(0, 10) + ' ' + ts.substring(11, 16);
-    return ts.substring(0, 10);
+    var d = new Date(ts);
+    if (isNaN(d)) return ts.substring(0, 10);
+    if (withTime) return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    return d.toLocaleDateString();
 }
 
 function isDarkMode() {
