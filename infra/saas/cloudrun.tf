@@ -136,6 +136,9 @@ resource "google_cloud_run_v2_job" "import" {
   deletion_protection = false # TODO: set to true after initial deploy
 
   template {
+    task_count  = var.import_parallelism
+    parallelism = var.import_parallelism
+
     template {
       service_account = google_service_account.import.email
       timeout         = "3600s"

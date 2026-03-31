@@ -3,8 +3,86 @@ package tenant
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
+
+// ClaimedRepo is a repo claimed from the import queue.
+type ClaimedRepo struct {
+	ID       string
+	TenantID string
+	Org      string
+	Repo     string
+}
+
+// ErrNoWork is returned by ClaimNextRepo when the import queue is empty.
+var ErrNoWork = errors.New("no work available")
+
+const resetStaleClaimsSQL = `
+	UPDATE tenant_repo
+	SET import_claimed_at = NULL, import_claimed_by = NULL
+	WHERE import_claimed_at IS NOT NULL
+	  AND import_done_at IS NULL
+	  AND import_claimed_at < NOW() - INTERVAL '2 hours'`
+
+const resetDoneSQL = `
+	UPDATE tenant_repo
+	SET import_claimed_at = NULL, import_claimed_by = NULL, import_done_at = NULL
+	WHERE import_done_at IS NOT NULL`
+
+const claimNextRepoSQL = `
+	UPDATE tenant_repo
+	SET import_claimed_at = NOW(), import_claimed_by = $1
+	WHERE id = (
+		SELECT id FROM tenant_repo
+		WHERE active = TRUE AND import_claimed_at IS NULL
+		ORDER BY org, repo
+		LIMIT 1
+		FOR UPDATE SKIP LOCKED
+	)
+	RETURNING id, tenant_id, org, repo`
+
+const markRepoDoneSQL = `
+	UPDATE tenant_repo
+	SET import_done_at = NOW()
+	WHERE org = $1 AND repo = $2`
+
+// PrepareImportQueue resets stale claims (job died mid-run) and clears completed
+// work from the prior cycle so all active repos are available for claiming.
+// Safe to call concurrently — both UPDATEs are idempotent.
+func PrepareImportQueue(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, resetStaleClaimsSQL); err != nil {
+		return fmt.Errorf("resetting stale claims: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, resetDoneSQL); err != nil {
+		return fmt.Errorf("resetting completed repos: %w", err)
+	}
+	return nil
+}
+
+// ClaimNextRepo atomically claims one unclaimed active repo for import.
+// Returns ErrNoWork when the queue is empty.
+func ClaimNextRepo(ctx context.Context, db *sql.DB, executionID string) (*ClaimedRepo, error) {
+	var r ClaimedRepo
+	err := db.QueryRowContext(ctx, claimNextRepoSQL, executionID).
+		Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoWork
+	}
+	if err != nil {
+		return nil, fmt.Errorf("claiming repo: %w", err)
+	}
+	return &r, nil
+}
+
+// MarkRepoDone marks a claimed repo as successfully imported.
+func MarkRepoDone(ctx context.Context, db *sql.DB, org, repo string) error {
+	_, err := db.ExecContext(ctx, markRepoDoneSQL, org, repo)
+	if err != nil {
+		return fmt.Errorf("marking repo done: %w", err)
+	}
+	return nil
+}
 
 // ActiveTenant represents a tenant with at least one active repo.
 type ActiveTenant struct {

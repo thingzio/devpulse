@@ -3,6 +3,7 @@ package importer
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,7 +14,8 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
-// Run iterates active tenants and imports data for each tracked repo.
+// Run iterates active repos via a SKIP LOCKED claim queue and imports each one.
+// Multiple concurrent executions safely share work without overlap.
 func Run(ctx context.Context) error {
 	store, err := postgres.NewFromEnv()
 	if err != nil {
@@ -28,110 +30,108 @@ func Run(ctx context.Context) error {
 	db := store.DB()
 	start := time.Now()
 
-	tenants, err := tenant.GetActiveTenants(ctx, db)
-	if err != nil {
-		return fmt.Errorf("listing active tenants: %w", err)
+	executionID := os.Getenv("CLOUD_RUN_EXECUTION")
+	if executionID == "" {
+		executionID = fmt.Sprintf("local-%d", time.Now().Unix())
 	}
 
-	slog.Info("import worker starting", "tenants", len(tenants))
+	if err := tenant.PrepareImportQueue(ctx, db); err != nil {
+		return fmt.Errorf("preparing import queue: %w", err)
+	}
 
-	var totalErrors int
-	for _, t := range tenants {
+	slog.Info("import worker starting", "execution", executionID)
+
+	// Cache tokens per tenant to avoid re-minting for each repo of the same tenant.
+	// Installation tokens are valid for 1 hour — safe to reuse within a single run.
+	tokenCache := make(map[string]string)
+
+	var totalRepos, totalErrors int
+	for {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("import canceled: %w", err)
 		}
 
-		if importErr := importTenant(ctx, db, store, t); importErr != nil {
+		claim, err := tenant.ClaimNextRepo(ctx, db, executionID)
+		if errors.Is(err, tenant.ErrNoWork) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("claiming next repo: %w", err)
+		}
+
+		totalRepos++
+		slog.Info("claimed repo",
+			"org", claim.Org,
+			"repo", claim.Repo,
+			"tenant_id", claim.TenantID,
+			"execution", executionID)
+
+		if importErr := importClaim(ctx, db, store, claim, tokenCache); importErr != nil {
 			totalErrors++
-			slog.Error("tenant import failed",
-				"tenant_id", t.ID,
-				"username", t.Username,
-				"error", importErr,
-			)
+			slog.Error("repo import failed",
+				"org", claim.Org,
+				"repo", claim.Repo,
+				"error", importErr)
+			// Do not call MarkRepoDone on failure — leaving done_at NULL means
+			// this repo re-enters the queue on the next execution.
 			continue
+		}
+
+		if err := tenant.MarkRepoDone(ctx, db, claim.Org, claim.Repo); err != nil {
+			slog.Warn("marking repo done",
+				"org", claim.Org,
+				"repo", claim.Repo,
+				"error", err)
 		}
 	}
 
 	slog.Info("import worker complete",
-		"tenants", len(tenants),
+		"repos", totalRepos,
 		"errors", totalErrors,
-		"duration", time.Since(start).String(),
-	)
+		"duration", time.Since(start).String())
 
-	if totalErrors > 0 && totalErrors == len(tenants) {
-		return fmt.Errorf("all %d tenant imports failed", totalErrors)
+	if totalErrors > 0 && totalErrors == totalRepos {
+		return fmt.Errorf("all %d repo imports failed", totalErrors)
 	}
 
 	return nil
 }
 
-func importTenant(ctx context.Context, db *sql.DB, store data.Store, t tenant.ActiveTenant) error {
-	slog.Info("importing tenant", "tenant_id", t.ID, "username", t.Username)
-
-	repos, err := tenant.ListTenantRepos(ctx, db, t.ID)
-	if err != nil {
-		return fmt.Errorf("listing repos for tenant %s: %w", t.ID, err)
-	}
-
-	if len(repos) == 0 {
-		slog.Info("no active repos", "tenant_id", t.ID)
-		return nil
-	}
-
-	// Check weekly event limit
-	tn, err := tenant.GetTenantByID(ctx, db, t.ID)
+func importClaim(ctx context.Context, db *sql.DB, store data.Store,
+	claim *tenant.ClaimedRepo, tokenCache map[string]string) error {
+	tn, err := tenant.GetTenantByID(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting tenant: %w", err)
 	}
 
-	weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, t.ID)
+	weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting weekly events: %w", err)
 	}
 
 	slog.Info("tenant usage",
-		"tenant_id", t.ID,
-		"username", t.Username,
+		"tenant_id", claim.TenantID,
 		"weekly_events", weeklyEvents,
 		"max_events_per_week", tn.MaxEventsPerWeek,
-		"weekly_pct", float64(weeklyEvents)/float64(tn.MaxEventsPerWeek)*100,
-	)
+		"weekly_pct", float64(weeklyEvents)/float64(tn.MaxEventsPerWeek)*100)
 
 	if weeklyEvents >= tn.MaxEventsPerWeek {
 		slog.Warn("weekly event limit reached, skipping import",
-			"tenant_id", t.ID,
+			"tenant_id", claim.TenantID,
+			"org", claim.Org,
+			"repo", claim.Repo,
 			"weekly_events", weeklyEvents,
-			"max_events_per_week", tn.MaxEventsPerWeek,
-		)
+			"max_events_per_week", tn.MaxEventsPerWeek)
 		return nil
 	}
 
-	token := resolveToken(ctx, db, t.ID)
-
-	var repoErrors int
-	for _, r := range repos {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("repo import canceled: %w", err)
-		}
-
-		if importErr := importRepo(ctx, store, token, r.Org, r.Repo); importErr != nil {
-			repoErrors++
-			slog.Error("repo import failed",
-				"org", r.Org,
-				"repo", r.Repo,
-				"error", importErr,
-			)
-			continue
-		}
+	token, ok := tokenCache[claim.TenantID]
+	if !ok {
+		token = resolveToken(ctx, db, claim.TenantID)
+		tokenCache[claim.TenantID] = token
 	}
 
-	slog.Info("tenant import complete",
-		"tenant_id", t.ID,
-		"repos", len(repos),
-		"errors", repoErrors,
-	)
-
-	return nil
+	return importRepo(ctx, store, token, claim.Org, claim.Repo)
 }
 
 func importRepo(ctx context.Context, store data.Store, token, org, repo string) error {

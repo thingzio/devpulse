@@ -25,7 +25,7 @@ resource "google_monitoring_uptime_check_config" "serve" {
 resource "google_logging_metric" "sign_ins" {
   name    = "${var.prefix}-sign-ins"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"user signed in\""
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" jsonPayload.msg=\"user signed in\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -36,7 +36,7 @@ resource "google_logging_metric" "sign_ins" {
 resource "google_logging_metric" "tos_accepted" {
   name    = "${var.prefix}-tos-accepted"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"tos accepted\""
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" jsonPayload.msg=\"tos accepted\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -47,7 +47,7 @@ resource "google_logging_metric" "tos_accepted" {
 resource "google_logging_metric" "import_duration" {
   name    = "${var.prefix}-import-duration"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"import worker complete\""
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"import worker complete\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -67,7 +67,7 @@ resource "google_logging_metric" "import_duration" {
 resource "google_logging_metric" "import_tenant_count" {
   name    = "${var.prefix}-import-tenant-count"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"import worker complete\""
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"import worker complete\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -87,7 +87,7 @@ resource "google_logging_metric" "import_tenant_count" {
 resource "google_logging_metric" "tenant_weekly_events" {
   name    = "${var.prefix}-tenant-weekly-events"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"tenant usage\""
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"tenant usage\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -117,7 +117,7 @@ resource "google_logging_metric" "tenant_weekly_events" {
 resource "google_logging_metric" "event_limit_reached" {
   name    = "${var.prefix}-event-limit-reached"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" jsonPayload.msg=\"weekly event limit reached\""
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"weekly event limit reached\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -147,10 +147,59 @@ resource "google_monitoring_notification_channel" "email" {
   }
 }
 
+resource "google_logging_metric" "import_repo_errors" {
+  name    = "${var.prefix}-import-repo-errors"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"repo import failed\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "org"
+      value_type  = "STRING"
+      description = "Organization name"
+    }
+
+    labels {
+      key         = "repo"
+      value_type  = "STRING"
+      description = "Repository name"
+    }
+  }
+
+  label_extractors = {
+    "org"  = "EXTRACT(jsonPayload.org)"
+    "repo" = "EXTRACT(jsonPayload.repo)"
+  }
+}
+
+resource "google_logging_metric" "webhook_installs" {
+  name    = "${var.prefix}-webhook-installs"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" jsonPayload.msg=\"installation event\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "action"
+      value_type  = "STRING"
+      description = "Installation action (created/deleted/suspend)"
+    }
+  }
+
+  label_extractors = {
+    "action" = "EXTRACT(jsonPayload.action)"
+  }
+}
+
 resource "google_logging_metric" "upgrade_requests" {
   name    = "${var.prefix}-upgrade-requests"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_revision\" jsonPayload.msg=\"upgrade requested\""
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" jsonPayload.msg=\"upgrade requested\""
 
   metric_descriptor {
     metric_kind = "DELTA"

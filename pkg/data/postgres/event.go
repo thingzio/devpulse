@@ -157,7 +157,7 @@ func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, mon
 		imp.importForkEvents,
 	}
 
-	if err := imp.loadState(); err != nil {
+	if err := imp.loadState(ctx); err != nil {
 		return nil, nil, fmt.Errorf("error loading last page state: %s/%s: %w", owner, repo, err)
 	}
 
@@ -189,7 +189,7 @@ func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, mon
 
 	_ = g.Wait()
 
-	if err := imp.flush(); err != nil {
+	if err := imp.flush(ctx); err != nil {
 		return nil, nil, fmt.Errorf("error flushing final events: %s/%s: %w", imp.owner, imp.repo, err)
 	}
 
@@ -248,7 +248,7 @@ type eventExtra struct {
 	Title        string
 }
 
-func (e *eventImporter) add(eType, url string, usr *github.User, updated *time.Time, mentions []string, labels []string, extra *eventExtra) error {
+func (e *eventImporter) add(ctx context.Context, eType, url string, usr *github.User, updated *time.Time, mentions []string, labels []string, extra *eventExtra) error {
 	item := &data.Event{
 		Org:      e.owner,
 		Repo:     e.repo,
@@ -281,16 +281,16 @@ func (e *eventImporter) add(eType, url string, usr *github.User, updated *time.T
 	e.mu.Unlock()
 
 	if shouldFlush {
-		if err := e.flush(); err != nil {
+		if err := e.flush(ctx); err != nil {
 			return fmt.Errorf("error flushing events: %w", err)
 		}
 	}
 	return nil
 }
 
-func (e *eventImporter) loadState() error {
+func (e *eventImporter) loadState(ctx context.Context) error {
 	for _, t := range EventTypes {
-		state, err := e.store.GetState(context.Background(), t, e.owner, e.repo, e.minEventTime)
+		state, err := e.store.GetState(ctx, t, e.owner, e.repo, e.minEventTime)
 		if err != nil {
 			return fmt.Errorf("error getting last page: %s/%s - %s: %w", e.owner, e.repo, t, err)
 		}
@@ -300,7 +300,7 @@ func (e *eventImporter) loadState() error {
 	return nil
 }
 
-func (e *eventImporter) flush() error {
+func (e *eventImporter) flush(ctx context.Context) error {
 	if len(e.list) == 0 {
 		return nil
 	}
@@ -336,25 +336,25 @@ func (e *eventImporter) flush() error {
 
 	db := e.store.db
 
-	eventStmt, err := db.PrepareContext(context.Background(), insertEventSQL)
+	eventStmt, err := db.PrepareContext(ctx, insertEventSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare event insert statement: %w", err)
 	}
 	defer eventStmt.Close()
 
-	devStmt, err := db.PrepareContext(context.Background(), insertDeveloperSQL)
+	devStmt, err := db.PrepareContext(ctx, insertDeveloperSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare developer insert statement: %w", err)
 	}
 	defer devStmt.Close()
 
-	stateStmt, err := db.PrepareContext(context.Background(), insertStateSQL)
+	stateStmt, err := db.PrepareContext(ctx, insertStateSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
 	defer stateStmt.Close()
 
-	tx, err := db.BeginTx(context.Background(), nil)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -528,7 +528,7 @@ func (e *eventImporter) importPREvents(ctx context.Context) error {
 				Deletions: intPtr(items[i].GetDeletions()),
 				Title:     items[i].GetTitle(),
 			}
-			if err := e.add(data.EventTypePR, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), mentions,
+			if err := e.add(ctx, data.EventTypePR, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), mentions,
 				ghutil.GetLabels(items[i].Labels), extra); err != nil {
 				return fmt.Errorf("error adding pr event: %s/%s: %w", e.owner, e.repo, err)
 			}
@@ -670,7 +670,7 @@ func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error
 				Number:    &n,
 				CreatedAt: timestampStr(reviews[i].SubmittedAt),
 			}
-			if err := e.add(data.EventTypePRReview, *reviews[i].HTMLURL, reviews[i].User,
+			if err := e.add(ctx, data.EventTypePRReview, *reviews[i].HTMLURL, reviews[i].User,
 				timestampToTime(reviews[i].SubmittedAt), nil, nil, extra); err != nil {
 				return fmt.Errorf("error adding PR review event: %w", err)
 			}
@@ -728,7 +728,7 @@ func (e *eventImporter) importIssueEvents(ctx context.Context) error {
 				ClosedAt:  timestampStr(items[i].ClosedAt),
 				Title:     items[i].GetTitle(),
 			}
-			if err := e.add(data.EventTypeIssue, *items[i].HTMLURL, items[i].User,
+			if err := e.add(ctx, data.EventTypeIssue, *items[i].HTMLURL, items[i].User,
 				timestampToTime(items[i].UpdatedAt), mentions, ghutil.GetLabels(items[i].Labels), extra); err != nil {
 				return fmt.Errorf("error adding issue event: %s/%s: %w", e.owner, e.repo, err)
 			}
@@ -794,7 +794,7 @@ func (e *eventImporter) importIssueCommentEvents(ctx context.Context) error {
 					extra.Number = &n
 				}
 			}
-			if err := e.add(data.EventTypeIssueComment, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), ghutil.ParseUsers(items[i].Body), nil, extra); err != nil {
+			if err := e.add(ctx, data.EventTypeIssueComment, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), ghutil.ParseUsers(items[i].Body), nil, extra); err != nil {
 				return fmt.Errorf("error adding issue comment event: %s/%s: %w", e.owner, e.repo, err)
 			}
 		}
@@ -852,7 +852,7 @@ func (e *eventImporter) importPRReviewEvents(ctx context.Context) error {
 					extra.Number = &n
 				}
 			}
-			if err := e.add(data.EventTypePRReview, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), ghutil.ParseUsers(items[i].Body), nil, extra); err != nil {
+			if err := e.add(ctx, data.EventTypePRReview, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), ghutil.ParseUsers(items[i].Body), nil, extra); err != nil {
 				return fmt.Errorf("error adding PR comment event: %s/%s: %w", e.owner, e.repo, err)
 			}
 		}
@@ -899,7 +899,7 @@ func (e *eventImporter) importForkEvents(ctx context.Context) error {
 		}
 
 		for i := range items {
-			if err := e.add(data.EventTypeFork, *items[i].HTMLURL, items[i].Owner, &items[i].UpdatedAt.Time, nil, items[i].Topics, nil); err != nil {
+			if err := e.add(ctx, data.EventTypeFork, *items[i].HTMLURL, items[i].Owner, &items[i].UpdatedAt.Time, nil, items[i].Topics, nil); err != nil {
 				return fmt.Errorf("error adding fork event: %s/%s: %w", e.owner, e.repo, err)
 			}
 		}

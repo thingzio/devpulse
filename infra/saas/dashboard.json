@@ -99,7 +99,7 @@
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_PERCENTILE_99",
-                  "crossSeriesReducer": "REDUCE_MEAN"
+                  "crossSeriesReducer": "REDUCE_MAX"
                 }
               }
             },
@@ -117,7 +117,7 @@
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_PERCENTILE_99",
-                  "crossSeriesReducer": "REDUCE_MEAN"
+                  "crossSeriesReducer": "REDUCE_MAX"
                 }
               }
             },
@@ -198,12 +198,50 @@
         }
       },
       {
+        "title": "Import: Job Execution Results",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_job\" resource.labels.job_name=\"devpulse-saas-import\" metric.type=\"run.googleapis.com/job/completed_execution_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.result"]
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Import: Repo Errors",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-repo-errors\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.org", "metric.labels.repo"]
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
         "title": "Cloud SQL: CPU Utilization",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -220,7 +258,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -237,7 +275,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -245,6 +283,59 @@
               }
             },
             "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: Disk Used",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/disk/bytes_used\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_MEAN"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: Transactions/sec",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/transaction_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "LINE"
+          }]
+        }
+      },
+      {
+        "title": "Cloud SQL: Deadlocks",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/deadlock_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
           }]
         }
       },
@@ -303,6 +394,24 @@
         }
       },
       {
+        "title": "Webhook: Installation Events",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-webhook-installs\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
         "title": "Application Errors",
         "xyChart": {
           "dataSets": [{
@@ -331,6 +440,25 @@
                   "alignmentPeriod": "86400s",
                   "perSeriesAligner": "ALIGN_SUM",
                   "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Admin: Request Count",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-admin\" metric.type=\"run.googleapis.com/request_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_RATE",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.response_code_class"]
                 }
               }
             },

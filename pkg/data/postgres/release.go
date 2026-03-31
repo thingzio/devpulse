@@ -145,7 +145,7 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 			break
 		}
 
-		seenOld, upsertErr := upsertReleasePage(s.db, stmt, assetStmt, owner, repo, releases, latestPublishedAt)
+		seenOld, upsertErr := upsertReleasePage(ctx, s.db, stmt, assetStmt, owner, repo, releases, latestPublishedAt)
 		if upsertErr != nil {
 			return upsertErr
 		}
@@ -161,8 +161,8 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 	return nil
 }
 
-func upsertReleasePage(db DBTX, stmt, assetStmt *sql.Stmt, owner, repo string, releases []*github.RepositoryRelease, latestPublishedAt string) (bool, error) {
-	tx, err := db.BeginTx(context.Background(), nil)
+func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, owner, repo string, releases []*github.RepositoryRelease, latestPublishedAt string) (bool, error) {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, fmt.Errorf("error starting release tx: %w", err)
 	}

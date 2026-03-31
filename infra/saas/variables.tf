@@ -57,3 +57,9 @@ variable "db_tier" {
   type        = string
   default     = "db-f1-micro"
 }
+
+variable "import_parallelism" {
+  description = "Number of concurrent import job tasks per execution"
+  type        = number
+  default     = 1
+}

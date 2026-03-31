@@ -22,6 +22,11 @@ var (
 	date    = ""
 )
 
+const (
+	selectTenantByUsernameSQL = `SELECT id FROM tenant WHERE username = $1`
+	clearUpgradeRequestSQL    = `UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW() WHERE id = $1`
+)
+
 var planLimits = map[string][2]int{
 	"free":       {5, 2000},
 	"pro":        {25, 20000},
@@ -89,8 +94,7 @@ func main() {
 
 		// Find tenant by username — query all tenants isn't ideal but admin is low-volume.
 		var tenantID string
-		err := db.QueryRowContext(r.Context(),
-			"SELECT id FROM tenant WHERE username = $1", req.Username).Scan(&tenantID)
+		err := db.QueryRowContext(r.Context(), selectTenantByUsernameSQL, req.Username).Scan(&tenantID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("tenant not found: %s", req.Username), http.StatusNotFound)
 			return
@@ -103,8 +107,7 @@ func main() {
 		}
 
 		// Clear upgrade request
-		if _, err := db.ExecContext(r.Context(),
-			"UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW() WHERE id = $1", tenantID); err != nil {
+		if _, err := db.ExecContext(r.Context(), clearUpgradeRequestSQL, tenantID); err != nil {
 			slog.Warn("clearing upgrade request", "error", err)
 		}
 
