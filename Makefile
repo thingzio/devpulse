@@ -60,9 +60,24 @@ lint-go: ## Lints Go code with go vet and golangci-lint
 lint-yaml: ## Lints YAML files with yamllint
 	yamllint -c .yamllint.yaml $(YAML_FILES)
 
+TF_DIR := infra/saas
+export TF_CLI_CONFIG_FILE := $(TF_DIR)/terraformrc
+
 .PHONY: lint-tf
 lint-tf: ## Scans Terraform for security misconfigurations
-	tfsec infra/saas
+	tfsec $(TF_DIR)
+
+.PHONY: tf-init
+tf-init: ## Initializes Terraform
+	terraform -chdir=$(TF_DIR) init
+
+.PHONY: tf-plan
+tf-plan: ## Plans Terraform changes
+	terraform -chdir=$(TF_DIR) plan
+
+.PHONY: tf-apply
+tf-apply: ## Applies Terraform changes
+	terraform -chdir=$(TF_DIR) apply
 
 .PHONY: test
 test: tidy ## Runs unit tests with race detector and coverage
