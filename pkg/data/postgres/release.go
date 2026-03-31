@@ -134,8 +134,11 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 
 	for {
 		releases, resp, listErr := client.Repositories.ListReleases(ctx, owner, repo, opt)
-		if listErr != nil || resp.StatusCode != http.StatusOK {
+		if listErr != nil {
 			return fmt.Errorf("error listing releases %s/%s: %w", owner, repo, listErr)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("error listing releases %s/%s: status %d", owner, repo, resp.StatusCode)
 		}
 		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
 			return err
@@ -168,7 +171,9 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 	}
 
 	txStmt := tx.Stmt(stmt)
+	defer txStmt.Close()
 	txAssetStmt := tx.Stmt(assetStmt)
+	defer txAssetStmt.Close()
 
 	seenOld := false
 	for _, r := range releases {
@@ -188,7 +193,7 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 			break
 		}
 
-		if _, execErr := txStmt.Exec(
+		if _, execErr := txStmt.ExecContext(ctx,
 			owner, repo, tag, name, publishedAt, pre,
 			name, publishedAt, pre,
 		); execErr != nil {
@@ -201,7 +206,7 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 			if aName == "" {
 				continue
 			}
-			if _, execErr := txAssetStmt.Exec(
+			if _, execErr := txAssetStmt.ExecContext(ctx,
 				owner, repo, tag, aName, a.GetContentType(), a.GetSize(), a.GetDownloadCount(),
 				a.GetContentType(), a.GetSize(), a.GetDownloadCount(),
 			); execErr != nil {

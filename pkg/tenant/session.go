@@ -14,7 +14,7 @@ import (
 // ErrSessionInvalid is returned when a session is expired or not found.
 var ErrSessionInvalid = errors.New("session expired or not found")
 
-const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES ($1, $2, $3)`
+const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES ($1, $2, NOW() + $3::interval)`
 
 const validateSessionSQL = `
 	SELECT t.id, t.github_id, t.username, t.email, t.avatar_url,
@@ -37,7 +37,7 @@ func CreateSession(ctx context.Context, db *sql.DB, tenantID string, ttl time.Du
 	rawToken := hex.EncodeToString(raw)
 	hashed := HashToken(rawToken)
 
-	_, err := db.ExecContext(ctx, createSessionSQL, hashed, tenantID, time.Now().Add(ttl))
+	_, err := db.ExecContext(ctx, createSessionSQL, hashed, tenantID, ttl.String())
 	if err != nil {
 		return "", fmt.Errorf("creating session: %w", err)
 	}

@@ -36,7 +36,7 @@ func (s *Store) applyDeveloperSub(ctx context.Context, sub *data.Substitution) e
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(sub.New, sub.Old)
+	res, err := stmt.ExecContext(ctx, sub.New, sub.Old)
 	if err != nil {
 		return fmt.Errorf("failed to execute developer property update statement: %w", err)
 	}
@@ -72,7 +72,7 @@ func (s *Store) SaveAndApplyDeveloperSub(ctx context.Context, prop, old, new str
 	}
 	defer subStmt.Close()
 
-	if _, err = subStmt.Exec(prop, old, new, new); err != nil {
+	if _, err = subStmt.ExecContext(ctx, prop, old, new, new); err != nil {
 		return nil, fmt.Errorf("failed to insert state: %w", err)
 	}
 
@@ -90,7 +90,7 @@ func (s *Store) ApplySubstitutions(ctx context.Context) ([]*data.Substitution, e
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query()
+	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute substitute select statement: %w", err)
 	}

@@ -97,7 +97,7 @@ func (s *Store) getDBSlice(ctx context.Context, sqlQuery string) ([]string, erro
 
 	list := make([]string, 0)
 
-	rows, err := stmt.Query()
+	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute series select statement: %w", err)
 	}
@@ -140,7 +140,7 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 
 	txStmt := tx.Stmt(userStmt)
 	for i, u := range devs {
-		if _, err = txStmt.Exec(u.Username,
+		if _, err = txStmt.ExecContext(ctx, u.Username,
 			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
 			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
 			slog.Error("failed to insert developer",
@@ -176,7 +176,7 @@ func (s *Store) GetDeveloper(ctx context.Context, username string) (*data.Develo
 	}
 	defer stmt.Close()
 
-	row := stmt.QueryRow(username)
+	row := stmt.QueryRowContext(ctx, username)
 
 	u := &data.Developer{}
 	if err = row.Scan(&u.Username, &u.FullName, &u.Email, &u.AvatarURL, &u.ProfileURL, &u.Entity); err != nil {
@@ -201,7 +201,7 @@ func (s *Store) SearchDevelopers(ctx context.Context, val string, limit int) ([]
 	defer stmt.Close()
 
 	val = fmt.Sprintf("%%%s%%", val)
-	rows, err := stmt.Query(val, val, val, limit)
+	rows, err := stmt.QueryContext(ctx, val, val, val, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -228,7 +228,7 @@ func (s *Store) UpdateDeveloperNames(ctx context.Context, devs map[string]string
 
 	txStmt2 := tx.Stmt(updateStmt)
 	for username, name := range devs {
-		if _, err = txStmt2.Exec(name, username); err != nil {
+		if _, err = txStmt2.ExecContext(ctx, name, username); err != nil {
 			rollbackTransaction(tx)
 			return fmt.Errorf("error updating full name for %s to %s: %w", username, name, err)
 		}

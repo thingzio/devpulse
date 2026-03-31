@@ -83,8 +83,11 @@ func (s *Store) ImportRepoMetricHistory(ctx context.Context, token, owner, repo 
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	r, resp, err := client.Repositories.Get(ctx, owner, repo)
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
 		return fmt.Errorf("error getting repo %s/%s: %w", owner, repo, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error getting repo %s/%s: status %d", owner, repo, resp.StatusCode)
 	}
 	if rlErr := ghutil.CheckRateLimit(ctx, resp); rlErr != nil {
 		return rlErr
@@ -240,14 +243,15 @@ func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, his
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	stmt, err := tx.Prepare(upsertRepoMetricHistorySQL)
+	stmt, err := tx.PrepareContext(ctx, upsertRepoMetricHistorySQL)
 	if err != nil {
 		rollbackTransaction(tx)
 		return fmt.Errorf("failed to prepare metric history statement: %w", err)
 	}
+	defer stmt.Close()
 
 	for _, h := range history {
-		if _, err := stmt.Exec(owner, repo, h.Date, h.Stars, h.Forks, h.Stars, h.Forks); err != nil {
+		if _, err := stmt.ExecContext(ctx, owner, repo, h.Date, h.Stars, h.Forks, h.Stars, h.Forks); err != nil {
 			rollbackTransaction(tx)
 			return fmt.Errorf("failed to upsert metric history %s: %w", h.Date, err)
 		}

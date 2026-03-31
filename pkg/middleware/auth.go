@@ -20,6 +20,7 @@ var (
 	cookieName string
 )
 
+// init reads BASE_URL at package load time; env var must be set before import.
 func init() {
 	secure = strings.HasPrefix(os.Getenv("BASE_URL"), "https://")
 	cookieName = cookieNameFor(secure)

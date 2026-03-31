@@ -26,7 +26,7 @@ func GetHTTPClient() (*http.Client, error) {
 func GetOAuthClient(_ context.Context, token string) *http.Client {
 	return &http.Client{
 		Timeout:   time.Duration(timeoutInSeconds) * time.Second,
-		Transport: &tokenTransport{token: token, base: http.DefaultTransport},
+		Transport: &tokenTransport{token: token, base: reqTransport},
 	}
 }
 

@@ -3,6 +3,7 @@ package ghutil
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"time"
@@ -22,9 +23,13 @@ func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 	}
 
 	resetAt := resp.Rate.Reset.Time
+	maxWait := 15 * time.Minute
 	wait := time.Until(resetAt)
 	if wait <= 0 {
 		return nil
+	}
+	if wait > maxWait {
+		return fmt.Errorf("rate limit reset too far in the future: %v", wait)
 	}
 
 	jitter := time.Duration(rand.IntN(2000)) * time.Millisecond //nolint:gosec // jitter for rate limit backoff, not security-sensitive

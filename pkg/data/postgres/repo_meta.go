@@ -72,7 +72,9 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 			if time.Since(t) < 24*time.Hour {
 				slog.Debug("metadata fresh, skipping", "org", owner, "repo", repo, "updated_at", lastUpdated)
 				now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-				_, _ = s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo)
+				if _, err := s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo); err != nil {
+					slog.Warn("failed to update last import time", "owner", owner, "repo", repo, "error", err)
+				}
 				return nil
 			}
 		}
@@ -81,8 +83,11 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	r, resp, err := client.Repositories.Get(ctx, owner, repo)
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
 		return fmt.Errorf("error getting repo %s/%s: %w", owner, repo, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error getting repo %s/%s: status %d", owner, repo, resp.StatusCode)
 	}
 	if rlErr := ghutil.CheckRateLimit(ctx, resp); rlErr != nil {
 		return rlErr

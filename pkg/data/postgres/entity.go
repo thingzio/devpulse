@@ -61,7 +61,7 @@ func (s *Store) GetEntityLike(ctx context.Context, query string, limit int) ([]*
 	defer stmt.Close()
 
 	query = fmt.Sprintf("%%%s%%", query)
-	rows, err := stmt.Query(query, limit)
+	rows, err := stmt.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -99,7 +99,7 @@ func (s *Store) GetEntity(ctx context.Context, val string) (*data.EntityResult, 
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(val)
+	rows, err := stmt.QueryContext(ctx, val)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -135,7 +135,7 @@ func (s *Store) QueryEntities(ctx context.Context, val string, limit int) ([]*da
 	defer stmt.Close()
 
 	val = fmt.Sprintf("%%%s%%", val)
-	rows, err := stmt.Query(val, limit)
+	rows, err := stmt.QueryContext(ctx, val, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -173,7 +173,7 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 	defer stmt.Close()
 
 	m := make(map[string]string)
-	rows, err := stmt.Query()
+	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -204,7 +204,7 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 
 	txStmt := tx.Stmt(updateStmt)
 	for old, new := range m {
-		if _, err = txStmt.Exec(new, old); err != nil {
+		if _, err = txStmt.ExecContext(ctx, new, old); err != nil {
 			rollbackTransaction(tx)
 			return fmt.Errorf("error updating entity %s to %s: %w", old, new, err)
 		}

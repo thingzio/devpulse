@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"database/sql"
@@ -96,7 +97,7 @@ func Run(ctx context.Context, opts Options) error {
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
 		Addr:              address,
-		Handler:           mux,
+		Handler:           securityHeaders(mux),
 		ReadTimeout:       serverReadTimeout,
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		WriteTimeout:      serverWriteTimeout,
@@ -210,6 +211,15 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	return mux
 }
 
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func renderTemplate(w http.ResponseWriter, name string, data any) {
 	t, ok := pageTemplates[name]
 	if !ok {
@@ -217,10 +227,14 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := t.ExecuteTemplate(w, "layout.html", data); err != nil {
-		slog.Error("rendering template", "name", name, "error", err)
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, "layout.html", data); err != nil {
+		slog.Error("failed to render template", "name", name, "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = buf.WriteTo(w)
 }
 
 type pageData struct {
@@ -291,6 +305,16 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 			http.Error(w, "invalid state", http.StatusBadRequest)
 			return
 		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth_state",
+			Value:    "",
+			MaxAge:   -1,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+		})
 
 		code := r.URL.Query().Get("code")
 		token, err := oauth.ExchangeCode(r.Context(), cfg, code)
@@ -627,9 +651,13 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		slog.Error("failed to marshal JSON", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("encoding json response", "error", err)
-	}
+	_, _ = w.Write(b)
 }

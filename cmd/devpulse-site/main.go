@@ -33,7 +33,6 @@ func main() {
 		Commit:  commit,
 		Date:    date,
 	})
-
 	stop()
 
 	if err != nil {

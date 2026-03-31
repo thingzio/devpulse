@@ -113,11 +113,12 @@ func upsertContainerVersions(ctx context.Context, client *github.Client, db DBTX
 		return 0, fmt.Errorf("beginning container version tx: %w", err)
 	}
 
-	stmt, err := tx.Prepare(upsertContainerVersionSQL)
+	stmt, err := tx.PrepareContext(ctx, upsertContainerVersionSQL)
 	if err != nil {
 		rollbackTransaction(tx)
 		return 0, fmt.Errorf("preparing container version upsert: %w", err)
 	}
+	defer stmt.Close()
 
 	var total int
 	for _, pkg := range packages {
@@ -172,7 +173,7 @@ func fetchAndStoreVersions(ctx context.Context, client *github.Client, stmt *sql
 				break
 			}
 
-			if _, execErr := stmt.Exec(org, repo, pkgName, v.GetID(), tag, createdAt); execErr != nil {
+			if _, execErr := stmt.ExecContext(ctx, org, repo, pkgName, v.GetID(), tag, createdAt); execErr != nil {
 				return 0, fmt.Errorf("inserting container version %d: %w", v.GetID(), execErr)
 			}
 			count++

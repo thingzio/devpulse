@@ -70,7 +70,7 @@ func GetGitHubDeveloper(ctx context.Context, client *http.Client, username strin
 
 	usr, resp, err := github.NewClient(client).Users.Get(ctx, username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list repositories for: %s: %w", username, err)
+		return nil, fmt.Errorf("failed to get user: %s: %w", username, err)
 	}
 
 	slog.Debug("got details for user", "username", username, "rate", RateInfo(&resp.Rate))
@@ -172,7 +172,7 @@ func GetUserOrgs(ctx context.Context, client *http.Client, username string, limi
 		return nil, errors.New("username is required")
 	}
 
-	slog.Debug("listing repositories", "username", username, "limit", limit)
+	slog.Debug("listing organizations", "username", username, "limit", limit)
 
 	opt := &github.ListOptions{}
 	if limit > 0 {
@@ -181,7 +181,7 @@ func GetUserOrgs(ctx context.Context, client *http.Client, username string, limi
 
 	items, _, err := github.NewClient(client).Organizations.List(ctx, username, opt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list repositories for: %s: %w", username, err)
+		return nil, fmt.Errorf("failed to list organizations for: %s: %w", username, err)
 	}
 
 	list := make([]*data.Org, 0)
@@ -203,9 +203,22 @@ func GetOrgRepos(ctx context.Context, client *http.Client, org string) ([]*data.
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
+	const maxPages = 50
+
 	var list []*data.Repo
+	var page int
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		page++
+		if page > maxPages {
+			slog.Warn("pagination limit reached for org repos", "org", org, "max_pages", maxPages)
+			break
+		}
+
 		items, resp, err := ghClient.Repositories.ListByUser(ctx, org, opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list repositories for: %s: %w", org, err)

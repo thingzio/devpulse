@@ -35,6 +35,13 @@ func Run(ctx context.Context) error {
 		executionID = fmt.Sprintf("local-%d", time.Now().Unix())
 	}
 
+	ghAppConfig, ghAppErr := tenant.LoadGitHubAppConfig()
+	if ghAppErr != nil {
+		slog.Warn("github app config not available, installation tokens disabled", "error", ghAppErr)
+	}
+
+	llmCfg := data.NewLLMConfigFromEnv()
+
 	if err := tenant.PrepareImportQueue(ctx, db); err != nil {
 		return fmt.Errorf("preparing import queue: %w", err)
 	}
@@ -66,7 +73,7 @@ func Run(ctx context.Context) error {
 			"tenant_id", claim.TenantID,
 			"execution", executionID)
 
-		if importErr := importClaim(ctx, db, store, claim, tokenCache); importErr != nil {
+		if importErr := importClaim(ctx, db, store, claim, tokenCache, ghAppConfig, llmCfg); importErr != nil {
 			totalErrors++
 			slog.Error("repo import failed",
 				"org", claim.Org,
@@ -108,7 +115,8 @@ func Run(ctx context.Context) error {
 }
 
 func importClaim(ctx context.Context, db *sql.DB, store data.Store,
-	claim *tenant.ClaimedRepo, tokenCache map[string]string) error {
+	claim *tenant.ClaimedRepo, tokenCache map[string]string,
+	ghAppConfig *tenant.GitHubAppConfig, llmCfg *data.LLMConfig) error {
 	tn, err := tenant.GetTenantByID(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting tenant: %w", err)
@@ -117,6 +125,14 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 	weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting weekly events: %w", err)
+	}
+
+	if tn.MaxEventsPerWeek == 0 {
+		slog.Warn("max_events_per_week is zero, skipping import",
+			"tenant_id", claim.TenantID,
+			"org", claim.Org,
+			"repo", claim.Repo)
+		return nil
 	}
 
 	slog.Info("tenant usage",
@@ -137,14 +153,16 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 
 	token, ok := tokenCache[claim.TenantID]
 	if !ok {
-		token = resolveToken(ctx, db, claim.TenantID)
-		tokenCache[claim.TenantID] = token
+		token = resolveToken(ctx, db, claim.TenantID, ghAppConfig)
+		if token != "" {
+			tokenCache[claim.TenantID] = token
+		}
 	}
 
-	return importRepo(ctx, store, token, claim.Org, claim.Repo)
+	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg)
 }
 
-func importRepo(ctx context.Context, store data.Store, token, org, repo string) error {
+func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig) error {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
 
@@ -187,7 +205,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 	}
 
 	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
-	if llmCfg := data.NewLLMConfigFromEnv(); llmCfg != nil {
+	if llmCfg != nil {
 		slog.Info("phase: insights", "org", org, "repo", repo)
 		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
 			slog.Error("generating insights", "org", org, "repo", repo, "error", err)
@@ -206,10 +224,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string) 
 const insightsPeriodMonths = 3
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
-	metrics, err := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
-	if err != nil {
-		return fmt.Errorf("gathering metrics: %w", err)
-	}
+	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
 
 	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodMonths)
 	if err != nil {
@@ -235,7 +250,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 
 // resolveToken returns a GitHub token for API access.
 // Priority: 1) GITHUB_TOKEN env var, 2) GitHub App installation token, 3) empty (unauthenticated, public repos only).
-func resolveToken(ctx context.Context, db *sql.DB, tenantID string) string {
+func resolveToken(ctx context.Context, db *sql.DB, tenantID string, ghAppConfig *tenant.GitHubAppConfig) string {
 	// 1. Explicit token (dev/testing)
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
 		slog.Debug("using GITHUB_TOKEN env var")
@@ -243,11 +258,13 @@ func resolveToken(ctx context.Context, db *sql.DB, tenantID string) string {
 	}
 
 	// 2. GitHub App installation token
-	if token, err := mintInstallationToken(ctx, db, tenantID); err == nil {
-		return token
-	} else {
-		slog.Debug("github app token minting failed, falling back to unauthenticated",
-			"tenant_id", tenantID, "error", err)
+	if ghAppConfig != nil {
+		if token, err := mintInstallationToken(ctx, db, tenantID, ghAppConfig); err == nil {
+			return token
+		} else {
+			slog.Debug("github app token minting failed, falling back to unauthenticated",
+				"tenant_id", tenantID, "error", err)
+		}
 	}
 
 	// 3. Unauthenticated (60 req/hr, public repos only)
@@ -256,14 +273,8 @@ func resolveToken(ctx context.Context, db *sql.DB, tenantID string) string {
 	return ""
 }
 
-// mintInstallationToken loads the GitHub App config from env and mints
-// an installation token for the tenant's first active installation.
-func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string) (string, error) {
-	cfg, err := tenant.LoadGitHubAppConfig()
-	if err != nil {
-		return "", fmt.Errorf("loading github app config: %w", err)
-	}
-
+// mintInstallationToken mints an installation token for the tenant's first active installation.
+func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string, cfg *tenant.GitHubAppConfig) (string, error) {
 	installs, err := tenant.GetActiveInstallations(ctx, db, tenantID)
 	if err != nil {
 		return "", fmt.Errorf("getting installations: %w", err)

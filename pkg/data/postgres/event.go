@@ -360,8 +360,9 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 
 	txDevStmt := tx.Stmt(devStmt)
+	defer txDevStmt.Close()
 	for i, u := range devs {
-		if _, err = txDevStmt.Exec(u.Username,
+		if _, err = txDevStmt.ExecContext(ctx, u.Username,
 			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
 			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
 			rollbackTransaction(tx)
@@ -370,8 +371,9 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 
 	txEventStmt := tx.Stmt(eventStmt)
+	defer txEventStmt.Close()
 	for i, ev := range events {
-		_, err = txEventStmt.Exec(
+		_, err = txEventStmt.ExecContext(ctx,
 			ev.Org, ev.Repo, ev.Username, ev.Type, ev.Date,
 			ev.URL, ev.Mentions, ev.Labels,
 			ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
@@ -387,9 +389,10 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 
 	txStateStmt := tx.Stmt(stateStmt)
+	defer txStateStmt.Close()
 	for t, p := range state {
 		since := p.Since.Unix()
-		_, err = txStateStmt.Exec(t, e.owner, e.repo, p.Page, since, p.Page, since)
+		_, err = txStateStmt.ExecContext(ctx, t, e.owner, e.repo, p.Page, since, p.Page, since)
 		if err != nil {
 			rollbackTransaction(tx)
 			return fmt.Errorf("error inserting state[%s]: %s/%s with page:%d and since:%s: %w",
@@ -609,7 +612,11 @@ func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prR
 	if err != nil {
 		if wait := ghutil.AbuseRetryAfter(err); wait > 0 {
 			slog.Warn("secondary rate limit hit, waiting", "number", p.number, "wait", wait.String())
-			time.Sleep(wait)
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			case <-time.After(wait):
+			}
 			pr, resp, err = e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
 			if err != nil {
 				slog.Warn("error fetching PR details after retry", "number", p.number, "error", err)

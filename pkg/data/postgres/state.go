@@ -37,7 +37,7 @@ func (s *Store) GetState(ctx context.Context, query, org, repo string, min time.
 	}
 	defer stateStmt.Close()
 
-	row := stateStmt.QueryRow(query, org, repo)
+	row := stateStmt.QueryRowContext(ctx, query, org, repo)
 
 	st := &data.State{
 		Since: min,
@@ -77,7 +77,7 @@ func (s *Store) SaveState(ctx context.Context, query, org, repo string, state *d
 	defer stateStmt.Close()
 
 	since := state.Since.Unix()
-	if _, err = stateStmt.Exec(query, org, repo, state.Page, since, state.Page, since); err != nil {
+	if _, err = stateStmt.ExecContext(ctx, query, org, repo, state.Page, since, state.Page, since); err != nil {
 		return fmt.Errorf("failed to insert state: %w", err)
 	}
 

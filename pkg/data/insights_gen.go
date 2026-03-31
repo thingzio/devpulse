@@ -69,7 +69,7 @@ type InsightsMetrics struct {
 // GatherInsightsMetrics calls Store methods to collect all metrics for a repo.
 // Individual metric failures are logged as warnings; the function always returns
 // whatever metrics were successfully gathered.
-func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, months int) (*InsightsMetrics, error) {
+func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, months int) *InsightsMetrics {
 	o, r := &org, &repo
 	m := &InsightsMetrics{}
 	var err error
@@ -120,7 +120,7 @@ func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, m
 		slog.Warn("insights: failed to get repo metas", "error", err)
 	}
 
-	return m, nil
+	return m
 }
 
 // buildInsightsPrompt assembles the JSON metrics and DORA benchmarks into a

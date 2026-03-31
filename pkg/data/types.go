@@ -10,8 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 
 const (
-	DataFileName          string = "data.db"
-	EventAgeMonthsDefault int    = 6
+	EventAgeMonthsDefault int = 6
 
 	EventTypePR           string = "pr"
 	EventTypePRReview     string = "pr_review"

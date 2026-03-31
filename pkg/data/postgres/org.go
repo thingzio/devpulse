@@ -87,7 +87,7 @@ func (s *Store) GetAllOrgRepos(ctx context.Context) ([]*data.OrgRepoItem, error)
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query()
+	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -140,7 +140,7 @@ func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, ent
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(qArgs...)
+	rows, err := stmt.QueryContext(ctx, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -220,7 +220,7 @@ func (s *Store) GetOrgLike(ctx context.Context, query string, limit int) ([]*dat
 	defer stmt.Close()
 
 	query = fmt.Sprintf("%%%s%%", query)
-	rows, err := stmt.Query(query, limit)
+	rows, err := stmt.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}

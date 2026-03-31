@@ -51,13 +51,19 @@ const markRepoDoneSQL = `
 // work from the prior cycle so all active repos are available for claiming.
 // Safe to call concurrently — both UPDATEs are idempotent.
 func PrepareImportQueue(ctx context.Context, db *sql.DB) error {
-	if _, err := db.ExecContext(ctx, resetStaleClaimsSQL); err != nil {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning import queue tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
+
+	if _, err := tx.ExecContext(ctx, resetStaleClaimsSQL); err != nil {
 		return fmt.Errorf("resetting stale claims: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, resetDoneSQL); err != nil {
+	if _, err := tx.ExecContext(ctx, resetDoneSQL); err != nil {
 		return fmt.Errorf("resetting completed repos: %w", err)
 	}
-	return nil
+	return tx.Commit()
 }
 
 // ClaimNextRepo atomically claims one unclaimed active repo for import.

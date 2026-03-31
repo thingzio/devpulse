@@ -161,11 +161,12 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 		return nil, fmt.Errorf("error starting reputation tx: %w", err)
 	}
 
-	stmt, err := tx.Prepare(updateReputationSQL)
+	stmt, err := tx.PrepareContext(ctx, updateReputationSQL)
 	if err != nil {
 		rollbackTransaction(tx)
 		return nil, fmt.Errorf("error preparing reputation update: %w", err)
 	}
+	defer stmt.Close()
 
 	total := len(usernames)
 	logEvery := total / 10
@@ -177,7 +178,7 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 		signals := s.gatherLocalSignals(ctx, username, since, stats)
 		rep := score.Compute(signals)
 
-		if _, execErr := stmt.Exec(rep, now, 0, nil, username); execErr != nil {
+		if _, execErr := stmt.ExecContext(ctx, rep, now, 0, nil, username); execErr != nil {
 			rollbackTransaction(tx)
 			return nil, fmt.Errorf("error updating reputation for %s: %w", username, execErr)
 		}

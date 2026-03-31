@@ -60,7 +60,7 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanning tenant: %w", err)
 	}
 	return &t, nil
 }

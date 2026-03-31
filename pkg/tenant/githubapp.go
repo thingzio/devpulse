@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -36,6 +37,7 @@ type InstallationToken struct {
 func CreateAppJWT(cfg *GitHubAppConfig) (string, error) {
 	now := time.Now()
 	claims := jwt.RegisteredClaims{
+		// GitHub recommends backdating iat by 60s to account for clock drift
 		IssuedAt:  jwt.NewNumericDate(now.Add(-60 * time.Second)),
 		ExpiresAt: jwt.NewNumericDate(now.Add(10 * time.Minute)),
 		Issuer:    fmt.Sprintf("%d", cfg.AppID),
@@ -77,6 +79,7 @@ func MintInstallationToken(ctx context.Context, cfg *GitHubAppConfig, installati
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("installation token request: status %d", resp.StatusCode)
 	}
 
@@ -121,6 +124,7 @@ func CheckRepoAccess(ctx context.Context, cfg *GitHubAppConfig, installationID i
 		return false, nil
 	}
 
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return false, fmt.Errorf("unexpected status checking repo access: %d", resp.StatusCode)
 }
 

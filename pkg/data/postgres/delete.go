@@ -43,7 +43,7 @@ func (s *Store) DeleteRepoData(ctx context.Context, org, repo string) (*data.Del
 	}
 
 	for _, d := range deletes {
-		res, execErr := tx.Exec(d.sql, org, repo)
+		res, execErr := tx.ExecContext(ctx, d.sql, org, repo)
 		if execErr != nil {
 			_ = tx.Rollback()
 			return nil, fmt.Errorf("deleting from %s/%s: %w", org, repo, execErr)

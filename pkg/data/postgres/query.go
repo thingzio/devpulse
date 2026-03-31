@@ -103,7 +103,7 @@ func (s *Store) SearchEvents(ctx context.Context, q *data.EventSearchCriteria) (
 	defer stmt.Close()
 
 	offset := (q.Page - 1) * q.PageSize
-	rows, err := stmt.Query(q.FromDate, q.ToDate, q.Type, q.Org, q.Repo, q.Username, optionalLike(q.Mention), optionalLike(q.Label), q.Entity, q.PageSize, offset)
+	rows, err := stmt.QueryContext(ctx, q.FromDate, q.ToDate, q.Type, q.Org, q.Repo, q.Username, optionalLike(q.Mention), optionalLike(q.Label), q.Entity, q.PageSize, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute event search statement: %w", err)
 	}
@@ -161,7 +161,7 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	since := sinceDate(months)
 	to := time.Now().UTC().Format("2006-01-02")
 
-	rows, err := stmt.Query(since, to,
+	rows, err := stmt.QueryContext(ctx, since, to,
 		data.EventTypePR, data.EventTypePRReview, data.EventTypeIssue, data.EventTypeIssueComment, data.EventTypeFork,
 		org, repo, entity)
 	if err != nil {

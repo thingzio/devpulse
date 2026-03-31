@@ -34,7 +34,7 @@ func (s *Store) GetRepoLike(ctx context.Context, query string, limit int) ([]*da
 	defer stmt.Close()
 
 	query = fmt.Sprintf("%%%s%%", query)
-	rows, err := stmt.Query(query, limit)
+	rows, err := stmt.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}

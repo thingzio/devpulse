@@ -29,7 +29,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	err := importer.Run(ctx)
-
 	stop()
 
 	if err != nil {

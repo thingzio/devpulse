@@ -39,7 +39,7 @@ func queryParamInt(r *http.Request, key string, def int) int {
 
 	i, err := strconv.Atoi(v)
 	if err != nil {
-		slog.Error("error converting query string to int", "value", v, "error", err)
+		slog.Warn("error converting query string to int", "value", v, "error", err)
 		return def
 	}
 
