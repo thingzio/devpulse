@@ -2,75 +2,100 @@
 <div class="landing">
   <div class="landing-hero">
     <h1>DevPulse</h1>
-    <p>Community health analytics for GitHub organizations and repositories. Import contribution data, track project health metrics, and surface actionable insights.</p>
+    <p>Understand the health of any open source project at a glance. Track contributor trends, measure development velocity, and surface risks before they become problems.</p>
     <a href="/auth/github" class="cta-btn">Sign in with GitHub</a>
+  </div>
+
+  <div style="max-width:700px;margin:0 auto 32px;text-align:center">
+    <h3 style="color:var(--dark-color);margin-bottom:16px;">How It Works</h3>
+    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:150px;">
+        <strong style="display:block;font-size:1.4em;color:var(--accent);margin-bottom:4px;">1</strong>
+        <span style="font-size:0.9em;color:var(--gray);">Install the <a href="https://github.com/apps/DevPulseThingz" target="_blank">GitHub App</a></span>
+      </div>
+      <div style="flex:1;min-width:150px;">
+        <strong style="display:block;font-size:1.4em;color:var(--accent);margin-bottom:4px;">2</strong>
+        <span style="font-size:0.9em;color:var(--gray);">Add repos to track</span>
+      </div>
+      <div style="flex:1;min-width:150px;">
+        <strong style="display:block;font-size:1.4em;color:var(--accent);margin-bottom:4px;">3</strong>
+        <span style="font-size:0.9em;color:var(--gray);">Explore trends and insights</span>
+      </div>
+    </div>
   </div>
 
   <div class="landing-features">
     <div class="landing-feature">
       <h3>Project Health</h3>
+      <img src="/static/img/dashboard.png" alt="Project Health dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>Bus factor / pony factor</strong> &mdash; risk assessment for key contributor dependencies</li>
-        <li><strong>Repository status</strong> &mdash; stars, forks, issues, language, license</li>
-        <li><strong>Stars &amp; forks trends</strong> &mdash; daily counts with historical backfill</li>
-        <li><strong>Community profile</strong> &mdash; README, Contributing, CoC, issue/PR templates</li>
+        <li><strong>Bus factor &amp; pony factor</strong> &mdash; identify single-contributor risks and measure how evenly work is distributed across the team</li>
+        <li><strong>Repository status</strong> &mdash; stars, forks, open issues, primary language, and license at a glance</li>
+        <li><strong>Stars &amp; forks trends</strong> &mdash; daily counts with historical backfill to spot growth or decline</li>
+        <li><strong>Community profile</strong> &mdash; check for README, contributing guide, code of conduct, and issue/PR templates</li>
       </ul>
     </div>
 
     <div class="landing-feature">
       <h3>Activity &amp; Velocity</h3>
+      <img src="/static/img/activity.png" alt="Activity and Velocity dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>Activity trends</strong> &mdash; monthly PRs, reviews, issues, comments, forks</li>
-        <li><strong>PR size distribution</strong> &mdash; changes bucketed by S/M/L/XL per month</li>
-        <li><strong>Lead time to merge</strong> &mdash; average days from PR creation to merge</li>
-        <li><strong>Release cadence</strong> &mdash; monthly release counts and download trends</li>
+        <li><strong>Activity trends</strong> &mdash; monthly PRs, reviews, issues, comments, and forks visualized over time</li>
+        <li><strong>PR size distribution</strong> &mdash; changes bucketed by S/M/L/XL to spot review bottlenecks</li>
+        <li><strong>Lead time to merge</strong> &mdash; average days from PR creation to merge, tracked monthly</li>
+        <li><strong>Release cadence</strong> &mdash; monthly release counts and download trends to gauge delivery rhythm</li>
       </ul>
     </div>
 
     <div class="landing-feature">
       <h3>Quality</h3>
+      <img src="/static/img/quality.png" alt="Quality dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>PR review ratio</strong> &mdash; PRs to reviews per month with trend line</li>
-        <li><strong>Review latency</strong> &mdash; average hours from PR to first review</li>
-        <li><strong>Time to close</strong> &mdash; average days to close issues</li>
-        <li><strong>Change failure rate</strong> &mdash; bug issues near releases + revert PRs</li>
+        <li><strong>PR review ratio</strong> &mdash; PRs to reviews per month with trend line showing review culture health</li>
+        <li><strong>Review latency</strong> &mdash; average hours from PR creation to first review, helping teams set SLAs</li>
+        <li><strong>Time to close</strong> &mdash; average days to close issues, highlighting responsiveness</li>
+        <li><strong>Change failure rate</strong> &mdash; bug issues near releases and revert PRs as a proxy for release stability</li>
       </ul>
     </div>
 
     <div class="landing-feature">
       <h3>Community</h3>
+      <img src="/static/img/community.png" alt="Community dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>Contributor retention</strong> &mdash; new vs returning contributors per month</li>
-        <li><strong>Contributor momentum</strong> &mdash; rolling active count with delta</li>
-        <li><strong>First-time contributor funnel</strong> &mdash; comment, PR, merge milestones</li>
-        <li><strong>Entity affiliations</strong> &mdash; contributing companies with developer drill-down</li>
+        <li><strong>Contributor retention</strong> &mdash; new vs. returning contributors per month to measure community stickiness</li>
+        <li><strong>Contributor momentum</strong> &mdash; rolling active count with month-over-month delta</li>
+        <li><strong>First-time contributor funnel</strong> &mdash; track newcomers from first comment to first PR to first merge</li>
+        <li><strong>Entity affiliations</strong> &mdash; see which companies are contributing and drill down to individual developers</li>
       </ul>
     </div>
 
     <div class="landing-feature">
-      <h3>Insights</h3>
+      <h3>AI Insights</h3>
+      <img src="/static/img/insights.png" alt="AI Insights dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>LLM-generated observations</strong> &mdash; AI-powered health analysis per repo</li>
-        <li><strong>Time to first response</strong> &mdash; hours to first review or comment</li>
-        <li><strong>Issue open/close ratio</strong> &mdash; monthly opened vs closed</li>
-        <li><strong>Contributor reputation</strong> &mdash; two-tier scoring with bot filtering</li>
+        <li><strong>LLM-generated observations</strong> &mdash; AI-powered health analysis highlighting trends, risks, and opportunities per repo</li>
+        <li><strong>Time to first response</strong> &mdash; hours to first review or comment, a key contributor experience metric</li>
+        <li><strong>Issue open/close ratio</strong> &mdash; monthly opened vs. closed to detect growing backlogs</li>
+        <li><strong>Contributor reputation</strong> &mdash; two-tier scoring with bot filtering to surface your most impactful contributors</li>
       </ul>
     </div>
 
     <div class="landing-feature">
       <h3>Dashboard</h3>
+      <img src="/static/img/events.png" alt="Dashboard overview" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
       <ul>
-        <li><strong>Seven tabs</strong> &mdash; Health, Activity, Velocity, Quality, Community, Events, Insights</li>
-        <li><strong>Lazy-loaded charts</strong> &mdash; Chart.js with dark/light theme</li>
-        <li><strong>Search &amp; filter</strong> &mdash; org: and repo: prefix syntax</li>
-        <li><strong>Usage tracking</strong> &mdash; weekly event limits with per-repo breakdown</li>
+        <li><strong>Seven tabs</strong> &mdash; Health, Activity, Velocity, Quality, Community, Events, and Insights in one unified view</li>
+        <li><strong>Interactive charts</strong> &mdash; lazy-loaded Chart.js visualizations with dark and light theme support</li>
+        <li><strong>Search &amp; filter</strong> &mdash; scope by organization, repository, entity, event type, and time period</li>
+        <li><strong>Usage tracking</strong> &mdash; weekly event limits with per-repo breakdown so you always know your consumption</li>
       </ul>
     </div>
   </div>
 
   <div class="landing-footer">
-    <p>Free tier: 5 repos, 2,000 events/week. <a href="/auth/github">Sign in</a> to get started.</p>
-    <p style="margin-top:12px">{{.Version}} ({{.Commit}}) &middot; <a href="/help">Help</a></p>
+    <p><strong>Free to start</strong> &mdash; 5 repos and 2,000 events/week. No credit card required.</p>
+    <p style="margin-top:8px"><a href="/auth/github" style="color:var(--accent);font-weight:600;">Sign in with GitHub</a> to get started.</p>
+    <p style="margin-top:12px">{{.Version}} ({{.Commit}}) &middot; <a href="/help">Help</a> &middot; <a href="/tos">Terms</a></p>
   </div>
 </div>
 {{end}}
