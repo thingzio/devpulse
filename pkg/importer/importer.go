@@ -77,7 +77,7 @@ func Run(ctx context.Context) error {
 			continue
 		}
 
-		if err := tenant.MarkRepoDone(ctx, db, claim.Org, claim.Repo); err != nil {
+		if err := tenant.MarkRepoDone(ctx, db, claim.ID); err != nil {
 			slog.Warn("marking repo done",
 				"org", claim.Org,
 				"repo", claim.Repo,

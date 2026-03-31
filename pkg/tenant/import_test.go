@@ -97,7 +97,7 @@ func TestMarkRepoDone(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, claim)
 
-	require.NoError(t, MarkRepoDone(ctx, db, claim.Org, claim.Repo))
+	require.NoError(t, MarkRepoDone(ctx, db, claim.ID))
 
 	// Verify done_at is set
 	var doneCount int

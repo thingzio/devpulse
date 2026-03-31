@@ -45,7 +45,7 @@ const claimNextRepoSQL = `
 const markRepoDoneSQL = `
 	UPDATE tenant_repo
 	SET import_done_at = NOW()
-	WHERE org = $1 AND repo = $2`
+	WHERE id = $1`
 
 // PrepareImportQueue resets stale claims (job died mid-run) and clears completed
 // work from the prior cycle so all active repos are available for claiming.
@@ -76,8 +76,8 @@ func ClaimNextRepo(ctx context.Context, db *sql.DB, executionID string) (*Claime
 }
 
 // MarkRepoDone marks a claimed repo as successfully imported.
-func MarkRepoDone(ctx context.Context, db *sql.DB, org, repo string) error {
-	_, err := db.ExecContext(ctx, markRepoDoneSQL, org, repo)
+func MarkRepoDone(ctx context.Context, db *sql.DB, id string) error {
+	_, err := db.ExecContext(ctx, markRepoDoneSQL, id)
 	if err != nil {
 		return fmt.Errorf("marking repo done: %w", err)
 	}

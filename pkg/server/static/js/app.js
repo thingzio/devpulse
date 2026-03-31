@@ -1934,8 +1934,7 @@ function showEntityDevelopers(entity) {
         $.each(data.developers, function (i, dev) {
             list.append(`<li><a href="https://github.com/${dev.username}" target="_blank">${dev.username}</a></li>`);
         });
-        const escaped = entity.replace(/'/g, "\\'");
-        list.append(`<li class="entity-popover-hint">Wrong affiliation? Fix locally:<br><code>devpulse import substitutions --type entity --old '${escaped}' --new 'CORRECT'</code><br>Or update the source: <a href="https://github.com/cncf/gitdm" target="_blank">cncf/gitdm</a></li>`);
+        list.append(`<li class="entity-popover-hint">Wrong affiliation? Update the company field in your <a href="https://github.com/settings/profile" target="_blank">GitHub profile</a>.</li>`);
     }).fail(function () {
         list.empty().append('<li>Failed to load contributors</li>');
     });

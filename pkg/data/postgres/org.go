@@ -19,7 +19,7 @@ const (
 				COUNT(*) as events
 			FROM developer d
 			JOIN event e ON d.username = e.username
-			WHERE (d.entity <> '' OR d.entity is null)
+			WHERE d.entity IS NOT NULL AND d.entity <> ''
 			AND e.date >= $1
 			AND d.entity = COALESCE($2, d.entity)
 			AND e.org = COALESCE($3, e.org)
