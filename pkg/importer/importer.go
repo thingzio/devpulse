@@ -204,6 +204,17 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		errs++
 	}
 
+	if token != "" {
+		slog.Info("phase: deep reputation", "org", org, "repo", repo)
+		tokenFn := func() string { return token }
+		if res, err := store.ImportDeepReputation(ctx, tokenFn, deepReputationDefaultLimit, 0, &org, &repo); err != nil {
+			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
+			errs++
+		} else {
+			slog.Info("deep reputation complete", "org", org, "repo", repo, "scored", res.Scored, "errors", res.Errors)
+		}
+	}
+
 	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
 	if llmCfg != nil {
 		slog.Info("phase: insights", "org", org, "repo", repo)
@@ -221,7 +232,10 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 	return nil
 }
 
-const insightsPeriodMonths = 3
+const (
+	insightsPeriodMonths       = 3
+	deepReputationDefaultLimit = 100
+)
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
 	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
