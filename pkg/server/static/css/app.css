@@ -1441,4 +1441,13 @@ a.link {
   .landing { padding: 30px 15px; }
   .landing-hero h1 { font-size: 1.8em; }
   .landing-features { grid-template-columns: 1fr; }
+  .landing-steps { flex-direction: column; gap: 12px; }
+}
+
+.landing-feature img[src] {
+  display: block;
+}
+
+.landing-feature img:not([src]), .landing-feature img[src=""] {
+  display: none;
 }

@@ -8,7 +8,7 @@
 
   <div style="max-width:700px;margin:0 auto 32px;text-align:center">
     <h3 style="color:var(--dark-color);margin-bottom:16px;">How It Works</h3>
-    <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
+    <div class="landing-steps" style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
       <div style="flex:1;min-width:150px;">
         <strong style="display:block;font-size:1.4em;color:var(--accent);margin-bottom:4px;">1</strong>
         <span style="font-size:0.9em;color:var(--gray);">Install the <a href="https://github.com/apps/DevPulseThingz" target="_blank">GitHub App</a></span>
@@ -27,7 +27,7 @@
   <div class="landing-features">
     <div class="landing-feature">
       <h3>Project Health</h3>
-      <img src="/static/img/dashboard.png" alt="Project Health dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/dashboard.png" alt="Project Health dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>Bus factor &amp; pony factor</strong> &mdash; identify single-contributor risks and measure how evenly work is distributed across the team</li>
         <li><strong>Repository status</strong> &mdash; stars, forks, open issues, primary language, and license at a glance</li>
@@ -38,7 +38,7 @@
 
     <div class="landing-feature">
       <h3>Activity &amp; Velocity</h3>
-      <img src="/static/img/activity.png" alt="Activity and Velocity dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/activity.png" alt="Activity and Velocity dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>Activity trends</strong> &mdash; monthly PRs, reviews, issues, comments, and forks visualized over time</li>
         <li><strong>PR size distribution</strong> &mdash; changes bucketed by S/M/L/XL to spot review bottlenecks</li>
@@ -49,7 +49,7 @@
 
     <div class="landing-feature">
       <h3>Quality</h3>
-      <img src="/static/img/quality.png" alt="Quality dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/quality.png" alt="Quality dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>PR review ratio</strong> &mdash; PRs to reviews per month with trend line showing review culture health</li>
         <li><strong>Review latency</strong> &mdash; average hours from PR creation to first review, helping teams set SLAs</li>
@@ -60,7 +60,7 @@
 
     <div class="landing-feature">
       <h3>Community</h3>
-      <img src="/static/img/community.png" alt="Community dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/community.png" alt="Community dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>Contributor retention</strong> &mdash; new vs. returning contributors per month to measure community stickiness</li>
         <li><strong>Contributor momentum</strong> &mdash; rolling active count with month-over-month delta</li>
@@ -71,7 +71,7 @@
 
     <div class="landing-feature">
       <h3>AI Insights</h3>
-      <img src="/static/img/insights.png" alt="AI Insights dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/insights.png" alt="AI Insights dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>LLM-generated observations</strong> &mdash; AI-powered health analysis highlighting trends, risks, and opportunities per repo</li>
         <li><strong>Time to first response</strong> &mdash; hours to first review or comment, a key contributor experience metric</li>
@@ -82,7 +82,7 @@
 
     <div class="landing-feature">
       <h3>Dashboard</h3>
-      <img src="/static/img/events.png" alt="Dashboard overview" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" />
+      <img src="/static/img/events.png" alt="Dashboard overview" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
       <ul>
         <li><strong>Seven tabs</strong> &mdash; Health, Activity, Velocity, Quality, Community, Events, and Insights in one unified view</li>
         <li><strong>Interactive charts</strong> &mdash; lazy-loaded Chart.js visualizations with dark and light theme support</li>
