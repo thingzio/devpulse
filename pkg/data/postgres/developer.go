@@ -8,12 +8,16 @@ import (
 	"log/slog"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const (
 	// insertDeveloperSQL: 12 params
 	// VALUES: $1=username, $2=full_name, $3=email, $4=avatar, $5=url, $6=entity
 	// ON CONFLICT UPDATE: $7=full_name, $8=email, $9=avatar, $10=url, $11=entity(case check), $12=entity(else)
+	// NULLIF($6,'') ensures new developers start with entity=NULL (never enriched).
+	// ON CONFLICT keeps existing entity when incoming is '' (partial user from event API).
 	insertDeveloperSQL = `INSERT INTO developer (
 			username,
 			full_name,
@@ -22,13 +26,13 @@ const (
 			url,
 			entity
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''))
 		ON CONFLICT(username) DO UPDATE SET
 			full_name = $7,
 			email = $8,
 			avatar = $9,
 			url = $10,
-			entity = CASE WHEN $11 = '' THEN COALESCE(developer.entity, '') ELSE $12 END
+			entity = CASE WHEN $11 = '' THEN developer.entity ELSE $12 END
 	`
 
 	selectDeveloperSQL = `SELECT
@@ -37,7 +41,7 @@ const (
 			email,
 			avatar,
 			url,
-			entity
+			COALESCE(entity, '') AS entity
 		FROM developer
 		WHERE username = $1
 	`
@@ -49,6 +53,15 @@ const (
 		WHERE full_name IS NULL
 		OR full_name = ''
 	`
+
+	// selectUnenrichedDeveloperUsernameSQL returns developers whose entity has never
+	// been populated from GitHub (NULL = never enriched). Limit prevents burning
+	// too much API quota in a single execution.
+	selectUnenrichedDeveloperUsernameSQL = `SELECT username FROM developer WHERE entity IS NULL LIMIT 200`
+
+	// updateDeveloperEntitySQL is used by enrichment — always writes entity (even '').
+	// This marks developers as "enriched but no company" so they are not re-fetched.
+	updateDeveloperEntitySQL = `UPDATE developer SET entity = $2 WHERE username = $1`
 
 	queryDeveloperSQL = `SELECT
 			username,
@@ -224,6 +237,63 @@ func (s *Store) UpdateDeveloperNames(ctx context.Context, devs map[string]string
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	return nil
+}
+
+func (s *Store) GetUnenrichedDeveloperUsernames(ctx context.Context) ([]string, error) {
+	return s.getDBSlice(ctx, selectUnenrichedDeveloperUsernameSQL)
+}
+
+// EnrichDeveloperEntities fetches full GitHub profiles for developers whose entity
+// is NULL (never enriched) and writes entity back. Developers with no GitHub company
+// get entity=” which marks them as enriched so they are not re-fetched next run.
+func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
+	usernames, err := s.GetUnenrichedDeveloperUsernames(ctx)
+	if err != nil {
+		return fmt.Errorf("getting unenriched developer usernames: %w", err)
+	}
+
+	if len(usernames) == 0 {
+		return nil
+	}
+
+	slog.Info("enriching developer profiles", "count", len(usernames))
+
+	client := net.GetOAuthClient(ctx, token)
+
+	stmt, err := s.db.PrepareContext(ctx, updateDeveloperEntitySQL)
+	if err != nil {
+		return fmt.Errorf("preparing developer entity update: %w", err)
+	}
+	defer stmt.Close()
+
+	var enriched, skipped int
+	for _, username := range usernames {
+		dev, fetchErr := ghutil.GetGitHubDeveloper(ctx, client, username)
+		if fetchErr != nil {
+			slog.Warn("fetching developer profile", "username", username, "error", fetchErr)
+			skipped++
+			continue
+		}
+
+		if _, execErr := stmt.ExecContext(ctx, username, dev.Entity); execErr != nil {
+			slog.Warn("updating developer entity", "username", username, "error", execErr)
+			skipped++
+			continue
+		}
+
+		enriched++
+	}
+
+	slog.Info("developer enrichment complete",
+		"enriched", enriched,
+		"skipped", skipped,
+		"total", len(usernames))
 
 	return nil
 }

@@ -133,6 +133,23 @@ func TestGetNoFullnameDeveloperUsernames(t *testing.T) {
 	assert.Equal(t, "noname", usernames[0])
 }
 
+func TestGetUnenrichedDeveloperUsernames(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+	devs := []*data.Developer{
+		{Username: "with_entity", FullName: "Has Entity", Entity: "CORP"},
+		{Username: "no_entity", FullName: "No Entity"},
+	}
+	require.NoError(t, store.SaveDevelopers(ctx, devs))
+
+	// with_entity has entity='CORP' → stored as 'CORP'
+	// no_entity has entity='' → NULLIF → stored as NULL → unenriched
+	usernames, err := store.GetUnenrichedDeveloperUsernames(ctx)
+	require.NoError(t, err)
+	assert.Len(t, usernames, 1)
+	assert.Equal(t, "no_entity", usernames[0])
+}
+
 func TestGetDeveloperUsernames_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}

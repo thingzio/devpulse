@@ -55,10 +55,12 @@ type OrgStore interface {
 type DeveloperStore interface {
 	GetDeveloperUsernames(ctx context.Context) ([]string, error)
 	GetNoFullnameDeveloperUsernames(ctx context.Context) ([]string, error)
+	GetUnenrichedDeveloperUsernames(ctx context.Context) ([]string, error)
 	SaveDevelopers(ctx context.Context, devs []*Developer) error
 	GetDeveloper(ctx context.Context, username string) (*Developer, error)
 	SearchDevelopers(ctx context.Context, val string, limit int) ([]*DeveloperListItem, error)
 	UpdateDeveloperNames(ctx context.Context, devs map[string]string) error
+	EnrichDeveloperEntities(ctx context.Context, token string) error
 }
 
 // QueryStore manages event search and aggregation queries.

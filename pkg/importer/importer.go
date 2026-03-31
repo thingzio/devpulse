@@ -85,6 +85,16 @@ func Run(ctx context.Context) error {
 		}
 	}
 
+	// Enrich developer profiles from GitHub once per execution, after all repo
+	// imports. Uses any available token from the cache.
+	for _, anyToken := range tokenCache {
+		slog.Info("phase: developer enrichment")
+		if enrichErr := store.EnrichDeveloperEntities(ctx, anyToken); enrichErr != nil {
+			slog.Warn("enriching developer entities", "error", enrichErr)
+		}
+		break
+	}
+
 	slog.Info("import worker complete",
 		"repos", totalRepos,
 		"errors", totalErrors,
