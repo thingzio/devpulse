@@ -3,63 +3,87 @@
   <div class="landing-hero">
     <h1>Help</h1>
     <p>Getting started with DevPulse</p>
+    <div style="max-width:400px;margin:16px auto 0">
+      <input type="text" id="help-search" placeholder="Search help topics..." style="width:100%;padding:8px 12px;font-size:0.95em;border:1px solid var(--border-color);border-radius:var(--border-radius);background:var(--white);color:var(--dark-color);" />
+    </div>
   </div>
 
   <div style="max-width:700px;margin:0 auto">
-    <div class="landing-feature" style="margin-bottom:20px">
+    <p id="help-no-results" style="display:none;text-align:center;color:var(--gray);padding:20px 0;">No matching help topics found.</p>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Getting Started</h3>
       <ul>
-        <li><strong>Sign in</strong> &mdash; authenticate with your GitHub account</li>
-        <li><strong>Install the GitHub App</strong> &mdash; after signing in, <a href="https://github.com/apps/DevPulseThingz" target="_blank">install the DevPulse GitHub App</a> on the organizations whose repos you want to track. This grants DevPulse API access to import repository data. Signing in alone is not enough &mdash; the app must be installed separately.</li>
-        <li><strong>Add repos</strong> &mdash; search for any public GitHub repository and add it to your dashboard</li>
-        <li><strong>Wait for import</strong> &mdash; data imports run hourly, or your admin can trigger one manually</li>
-        <li><strong>Explore</strong> &mdash; use the tabbed dashboard to view health, activity, velocity, quality, and community metrics</li>
+        <li><strong>Sign in</strong> &mdash; authenticate with your GitHub account using the Sign In button on the landing page. DevPulse uses GitHub OAuth, so no separate account is needed.</li>
+        <li><strong>Install the GitHub App</strong> &mdash; after signing in, <a href="https://github.com/apps/DevPulseThingz" target="_blank">install the DevPulse GitHub App</a> on the organizations whose repos you want to track. This grants DevPulse read-only API access to import repository data. Signing in alone is not enough &mdash; the app must be installed separately for each organization.</li>
+        <li><strong>Add repos</strong> &mdash; use the search bar at the top of the dashboard to find any public GitHub repository by typing <code>org/repo</code>. Click the result to add it to your tracked list.</li>
+        <li><strong>Wait for import</strong> &mdash; data imports run hourly. Newly added repos will show "Pending" until the next import cycle completes. Your first import may take longer depending on the repository's history size.</li>
+        <li><strong>Explore</strong> &mdash; once imported, use the tabbed dashboard to view health, activity, velocity, quality, community metrics, event logs, and AI-generated insights.</li>
       </ul>
     </div>
 
-    <div class="landing-feature" style="margin-bottom:20px">
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Dashboard Overview</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">The banner at the top of the dashboard displays key summary statistics for your current selection:</p>
+      <ul>
+        <li><strong>Organizations</strong> &mdash; number of distinct GitHub organizations across your tracked repos</li>
+        <li><strong>Repositories</strong> &mdash; total tracked repos matching your current filter</li>
+        <li><strong>Events</strong> &mdash; total GitHub events (pushes, PRs, issues, reviews, etc.) imported in the selected period</li>
+        <li><strong>Contributors</strong> &mdash; unique contributors who created events in the selected period</li>
+        <li><strong>Last Import</strong> &mdash; timestamp of the most recent completed import, displayed in your local timezone</li>
+        <li><strong>Bus Factor</strong> &mdash; the minimum number of contributors who account for 50% of all activity. A bus factor of 1 means the project depends heavily on a single person.</li>
+        <li><strong>Pony Factor</strong> &mdash; the minimum number of contributors who account for 50% of all commits. Similar to bus factor but focused specifically on code contributions.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Dashboard Tabs</h3>
       <ul>
-        <li><strong>Health</strong> &mdash; bus factor, repository status, stars/forks trends, community profile</li>
-        <li><strong>Activity</strong> &mdash; event trends, PR size distribution, forks vs activity, issue ratio</li>
-        <li><strong>Velocity</strong> &mdash; lead time to merge, change failure rate, release cadence, downloads</li>
-        <li><strong>Quality</strong> &mdash; PR review ratio, review latency, time to close, reputation scores</li>
-        <li><strong>Community</strong> &mdash; contributor retention, momentum, first-time funnel, entity affiliations</li>
-        <li><strong>Events</strong> &mdash; searchable event log with type, date, username, and entity filters</li>
-        <li><strong>Insights</strong> &mdash; AI-generated observations and action items per repository</li>
+        <li><strong>Health</strong> &mdash; overall project health indicators including bus factor score, repository metadata (stars, forks, open issues), stars and forks trends over time, and community profile completeness (README, contributing guide, license, code of conduct).</li>
+        <li><strong>Activity</strong> &mdash; event volume trends over time, PR size distribution (small, medium, large, extra-large), forks-vs-activity correlation, and issue-to-PR ratio showing how much work is issue-driven.</li>
+        <li><strong>Velocity</strong> &mdash; lead time to merge (how quickly PRs get merged), change failure rate (percentage of changes that cause issues), release cadence (time between releases), and download trends for published releases.</li>
+        <li><strong>Quality</strong> &mdash; PR review ratio (percentage of PRs that receive reviews), review latency (time from PR open to first review), time to close issues and PRs, and contributor reputation scores based on review activity.</li>
+        <li><strong>Community</strong> &mdash; contributor retention rates (returning vs. one-time contributors), momentum trends (growing or shrinking contributor base), first-time contributor funnel (how many newcomers return), and entity/company affiliations of contributors.</li>
+        <li><strong>Events</strong> &mdash; searchable, sortable log of all imported GitHub events. Filter by event type (push, PR, issue, review, release), date range, username, or entity/company affiliation.</li>
+        <li><strong>Insights</strong> &mdash; AI-generated observations and recommended action items per repository. Insights are regenerated after each import and highlight trends, risks, and opportunities. Available when your account has the AI insights feature enabled.</li>
       </ul>
     </div>
 
-    <div class="landing-feature" style="margin-bottom:20px">
-      <h3>Search</h3>
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Filtering &amp; Search</h3>
       <ul>
-        <li><strong>org:name</strong> &mdash; scope the dashboard to all repos in an organization</li>
-        <li><strong>repo:name</strong> &mdash; scope to a single repository</li>
-        <li>Click a repo name in the overview table to filter by that repo</li>
-        <li>Use the period selector to adjust the time range</li>
+        <li><strong>Organization filter</strong> &mdash; type <code>org:name</code> in the dashboard search bar to scope all charts and metrics to repositories in a specific GitHub organization.</li>
+        <li><strong>Repository filter</strong> &mdash; type <code>repo:name</code> to drill down into a single repository. You can also click any repo name in the overview table to filter by that repo.</li>
+        <li><strong>Entity filter</strong> &mdash; on the Events tab, use the Entity field to filter events by contributor company or organization affiliation (e.g., "google", "microsoft").</li>
+        <li><strong>Period selector</strong> &mdash; use the dropdown to adjust the time range (1, 3, 6, or 12 months). All charts, banner stats, and metrics update to reflect the selected period.</li>
+        <li><strong>Event type filter</strong> &mdash; on the Events tab, filter by specific event types like pushes, pull requests, issues, reviews, or releases.</li>
+        <li><strong>Combining filters</strong> &mdash; organization, repository, entity, and period filters can be combined. For example, filter by org, select a 3-month period, and view only PR events.</li>
       </ul>
     </div>
 
-    <div class="landing-feature" style="margin-bottom:20px">
+    <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Usage Limits</h3>
       <ul>
         <li><strong>Free tier</strong> &mdash; 5 repos, 2,000 events per week</li>
         <li><strong>Pro tier</strong> &mdash; 25 repos, 20,000 events per week</li>
         <li><strong>Enterprise</strong> &mdash; 100 repos, 100,000 events per week</li>
-        <li>The usage banner on the dashboard shows your current consumption</li>
-        <li>When the weekly limit is reached, imports pause until the following week</li>
-        <li>Need more repos or events? Click "Request Upgrade" when you hit the limit, or email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a></li>
+        <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your plan limits</li>
+        <li><strong>Import pauses</strong> &mdash; when the weekly event limit is reached, imports pause automatically until the following week. Existing data remains fully accessible.</li>
+        <li><strong>Upgrading</strong> &mdash; click "Request Upgrade" when you hit a limit, or email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> to discuss plan options</li>
       </ul>
     </div>
 
-    <div class="landing-feature" style="margin-bottom:20px">
+    <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Troubleshooting</h3>
       <ul>
-        <li><strong>Stuck in sign-in loop</strong> &mdash; visit <a href="/auth/reset">/auth/reset</a> to clear your session and try again</li>
-        <li><strong>Repo shows "Pending"</strong> &mdash; data imports run hourly; newly added repos will populate after the next import</li>
-        <li><strong>Charts empty after selecting a repo</strong> &mdash; ensure the period selector covers a range with imported data</li>
-        <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added; check spelling of org/repo</li>
+        <li><strong>Stuck in sign-in loop</strong> &mdash; visit <a href="/auth/reset">/auth/reset</a> to clear your session cookie and try again. This usually resolves expired or corrupted session state.</li>
+        <li><strong>Repo shows "Pending"</strong> &mdash; data imports run hourly. Newly added repos will populate after the next import cycle. If it stays pending for more than 2 hours, check that the GitHub App is installed on the repo's organization.</li>
+        <li><strong>Charts empty after selecting a repo</strong> &mdash; ensure the period selector covers a range that includes imported data. Try extending to 6 or 12 months. Some repos may have sparse activity in shorter windows.</li>
+        <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added. Double-check the spelling of the org/repo name. The repository must exist and be publicly accessible on GitHub.</li>
         <li><strong>Import errors or "Bad credentials"</strong> &mdash; the <a href="https://github.com/apps/DevPulseThingz" target="_blank">DevPulse GitHub App</a> must be installed on the organization that owns the repo. Signing in via GitHub OAuth is not enough &mdash; the app installation is a separate step that grants API access for data imports.</li>
+        <li><strong>Missing contributors or events</strong> &mdash; DevPulse imports events from the GitHub API, which may not include very old history for large repositories. Events are imported incrementally on each cycle.</li>
+        <li><strong>Insights tab not visible</strong> &mdash; AI-generated insights require the feature to be enabled on your account. Contact <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> if you'd like to enable it.</li>
+        <li><strong>Data looks stale</strong> &mdash; check the "Last Import" timestamp in the dashboard banner. If the last import was more than a few hours ago, there may be a temporary issue with the import worker.</li>
       </ul>
       <p style="margin-top:12px;color:var(--gray);font-size:0.9em">For all other issues and questions, contact <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a></p>
     </div>
@@ -69,4 +93,22 @@
     <p><a href="/">Back to Home</a></p>
   </div>
 </div>
+
+<script>
+(function() {
+  var input = document.getElementById('help-search');
+  var sections = document.querySelectorAll('.help-section');
+  var noResults = document.getElementById('help-no-results');
+  input.addEventListener('input', function() {
+    var q = this.value.toLowerCase().trim();
+    var visible = 0;
+    sections.forEach(function(s) {
+      var match = !q || s.textContent.toLowerCase().indexOf(q) !== -1;
+      s.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    noResults.style.display = visible === 0 ? '' : 'none';
+  });
+})();
+</script>
 {{end}}
