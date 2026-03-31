@@ -38,13 +38,13 @@ Key log messages to watch:
 | `server started` | HTTP server ready | address |
 | `user signed in` | OAuth callback | username, tenant_id |
 | `tos accepted` | ToS flow | tenant_id, username |
-| `import worker starting` | Import begins | tenants |
-| `tenant usage` | Per-tenant usage check | tenant_id, username, weekly_events, max_events_per_week, weekly_pct |
+| `import worker starting` | Import begins | execution |
+| `claimed repo` | Repo claimed from queue | org, repo, tenant_id, execution |
+| `tenant usage` | Per-tenant usage check | tenant_id, weekly_events, max_events_per_week, weekly_pct |
 | `weekly event limit reached` | Tenant hit limit | tenant_id, weekly_events, max_events_per_week |
 | `importing repo` | Per-repo import | org, repo |
 | `repo import complete` | Per-repo done | org, repo, errors, duration |
-| `import worker complete` | Full run done | tenants, errors, duration |
-| `tenant import failed` | Tenant error | tenant_id, username, error |
+| `import worker complete` | Full run done | repos, errors, duration |
 
 ## GCP Production
 
@@ -90,7 +90,7 @@ gcloud monitoring dashboards create \
 |--------|--------------|
 | Sign-ins | New tenant growth rate |
 | Import: Tenant Count | Active tenants per import run |
-| Import: Duration | Trending toward 45min = plan Cloud Tasks migration |
+| Import: Duration | Trending toward 45min = increase parallelism or plan Cloud Tasks migration |
 
 #### Database Widgets (Cloud SQL)
 
@@ -106,7 +106,11 @@ Created by Terraform (`infra/saas/monitoring.tf`):
 
 | Alert | Condition | Action |
 |-------|-----------|--------|
+| Upgrade request | User requested plan upgrade | Review and process upgrade |
 | Error rate | Cloud Run 5xx > 5/min for 5min | Investigate service logs |
+| High latency | p99 latency > threshold | Check slow queries, DB load |
+| DB CPU | Cloud SQL CPU sustained > 80% | Upgrade DB tier |
+| DB connections | Connection count approaching max | Increase pool size or add PgBouncer |
 | Import failure | Any failed import job execution | Check import logs |
 
 ### Scaling Signals
@@ -117,7 +121,7 @@ Use the dashboard to decide when to upgrade. See [INFRASTRUCTURE.md](INFRASTRUCT
 |--------|-----------|--------|
 | Cloud SQL CPU | Sustained > 80% | Upgrade DB tier (`terraform apply -var="db_tier=..."`) |
 | Cloud SQL connections | > 80 | Add PgBouncer sidecar |
-| Import duration | > 45 min | Migrate to Cloud Tasks for parallel imports |
+| Import duration | > 45 min | Increase `import_parallelism` or migrate to Cloud Tasks |
 | Tenant count | > 100 | Evaluate db-g1-small |
 | Tenant count | > 300 | Evaluate db-custom-1-3840 |
 | Tenant count | > 1,000 | Evaluate AlloyDB |

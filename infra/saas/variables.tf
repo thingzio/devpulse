@@ -61,5 +61,5 @@ variable "db_tier" {
 variable "import_parallelism" {
   description = "Number of concurrent import job tasks per execution"
   type        = number
-  default     = 1
+  default     = 3
 }

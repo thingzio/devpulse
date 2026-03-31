@@ -61,7 +61,8 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
 **Error handling:**
 - Use `fmt.Errorf("context: %w", err)` for wrapping — never bare `return err`
 - Exported sentinel errors: `ErrRepoLimitExceeded`, `ErrSessionInvalid`
-- Unexported sentinel errors: `errDBNotInitialized`, `errNoToken`
+- Exported sentinel errors: `ErrDBNotInitialized` (cross-package)
+- Unexported sentinel errors: `errNoToken`
 
 **Logging:**
 - JSON-only via `log/slog` (Info, Debug, Warn, Error) — never `fmt.Println`

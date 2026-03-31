@@ -169,8 +169,8 @@ make bump-minor
 ```
 
 This triggers the release pipeline:
-1. Tests (unit, lint, tfsec, integration, e2e)
-2. Builds `devpulse-site` and `devpulse-import` images via goreleaser + ko
+1. Tests (unit, lint, tfsec, e2e)
+2. Builds `devpulse-site`, `devpulse-import`, and `devpulse-admin` images via goreleaser + ko
 3. Pushes to GHCR
 4. Deploys to Cloud Run via AR remote repo proxy
 5. Publishes GitHub release

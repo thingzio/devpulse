@@ -41,7 +41,7 @@ Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
 | Serve | Cloud Run service | 0-10 instances, scale-to-zero | Public |
-| Import | Cloud Run job | Single execution, hourly | Internal |
+| Import | Cloud Run job | Hourly, parallelism=3 (SKIP LOCKED queue) | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
 Cloud Run scales to zero when idle — no cost when no one is using the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) for tenant management operations.
@@ -64,7 +64,7 @@ Start small, upgrade in-place as tenant count grows. Each Cloud SQL tier change 
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 3 alert policies, email | free tier |
+| Cloud Monitoring | log-based metrics, 6 alert policies, email | free tier |
 | **Total** | | **~$12-17/mo** |
 
 Handles low traffic dashboards and hourly imports for up to ~100 tenants. Import job completes in under 15 minutes. Anthropic cost scales with repo count and import frequency.
@@ -101,7 +101,7 @@ Migration: `terraform apply` (change `db_tier` variable). Zero downtime with HA 
 | Anthropic API | $15-40/mo |
 | **Total** | **~$115-140/mo** |
 
-Adds PgBouncer as a Cloud Run sidecar for connection pooling. Import job may need to split to Cloud Tasks for parallel per-tenant processing (1hr timeout at ~300 tenants sequential).
+Adds PgBouncer as a Cloud Run sidecar for connection pooling. Import parallelism can be increased to 5–10 via `import_parallelism` variable.
 
 Migration: `terraform apply`. Zero downtime.
 
@@ -130,21 +130,22 @@ Migration: `pg_dump`/`pg_restore` (minutes of downtime) or Database Migration Se
 
 ## Import Worker Scaling
 
-The import job processes tenants sequentially. As tenant count grows:
+The import job uses a PostgreSQL SKIP LOCKED claim queue. Each Cloud Run task claims individual repos from the queue — multiple tasks safely share work without overlap. Current setting: `parallelism=3`.
 
-| Tenants | ~Repos | Est. Duration | Strategy |
-|---------|--------|--------------|----------|
-| 50 | 250 | ~12 min | Single job (current) |
-| 200 | 1,000 | ~50 min | Single job (approaching limit) |
-| 300+ | 1,500+ | >1 hr | **Migrate to Cloud Tasks** |
+| Tenants | ~Repos | `import_parallelism` | Est. Duration | Strategy |
+|---------|--------|---------------------|--------------|----------|
+| 1–10 | 5–100 | 3 (current) | < 15 min | Current settings |
+| 10–50 | 50–500 | 3–5 | 15–30 min | Bump parallelism, increase DB pool |
+| 50–200 | 250–2000 | 5–10 | 30–50 min | Scale DB tier + pool |
+| 200+ | 2000+ | 10+ | Variable | Cloud Tasks for unbounded parallelism |
 
-Cloud Tasks migration path (designed in from day one):
+Each tenant's GitHub App installation has its own 5,000 req/hr API budget — tenant count scales linearly. The bottlenecks are DB write contention and job timeout. See [LIMITS.md](LIMITS.md) for detailed throughput analysis.
+
+Cloud Tasks migration path (for 200+ tenants):
 1. Cloud Scheduler triggers a dispatcher endpoint
-2. Dispatcher queries active tenants and enqueues one Cloud Task per tenant
-3. Each task calls the same `importTenant` function
-4. Parallel execution, no timeout concern
-
-The `importTenant` function in `pkg/importer/importer.go` is already the unit of work — only the dispatch layer changes.
+2. Dispatcher queries unclaimed repos and enqueues one Cloud Task per repo
+3. Each task claims and imports a single repo
+4. Unbounded parallelism, no timeout concern
 
 ## Terraform
 
@@ -153,7 +154,7 @@ All infrastructure is defined in `infra/saas/`:
 | File | Resources |
 |------|-----------|
 | `providers.tf` | Terraform + Google provider config, GCS state backend |
-| `variables.tf` | Project ID, region, domain, DB tier |
+| `variables.tf` | Project ID, region, domain, DB tier, import parallelism |
 | `main.tf` | GCP API enablement |
 | `network.tf` | VPC, private service access |
 | `database.tf` | Cloud SQL instance, database, IAM users |
@@ -163,6 +164,7 @@ All infrastructure is defined in `infra/saas/`:
 | `scheduler.tf` | Hourly import trigger |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
+| `registry.tf` | Artifact Registry remote repo (GHCR proxy) |
 | `outputs.tf` | Service URL, DB connection, DNS nameservers |
 
 ### Tier upgrades via Terraform

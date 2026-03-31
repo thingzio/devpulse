@@ -30,8 +30,9 @@ devpulse/
 ├── pkg/
 │   ├── server/             HTTP server, handlers, templates, static assets
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
-│   │   └── templates/      HTML templates: header, home, footer, landing, tos
-│   ├── importer/           Tenant import worker
+│   │   └── templates/      HTML templates: layout, header, footer, home, landing, dashboard, help, tos
+│   ├── importer/           Import worker (SKIP LOCKED claim queue)
+│   ├── config/             Environment configuration
 │   ├── data/               Store interface, shared types, helpers
 │   │   ├── postgres/       PostgreSQL Store implementation + migrations
 │   │   └── ghutil/         Shared GitHub API helpers (rate limiting, user mapping)
@@ -49,7 +50,7 @@ devpulse/
 
 ## Mode Selection
 
-Two separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports. Each creates its own store via `postgres.NewFromEnv()`.
+Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports, `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
 
 ## Data Layer
 
@@ -98,16 +99,19 @@ PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
 
 ## Import Pipeline
 
-The import worker (`pkg/importer/`) iterates active tenants and runs per-repo:
+The import worker (`pkg/importer/`) uses a PostgreSQL SKIP LOCKED claim queue (`pkg/tenant/import.go`) to distribute repos across concurrent tasks. Cloud Run runs with `parallelism=3`, so 3 tasks process the queue concurrently with no overlap.
 
-1. **Metadata** — repo stars, forks, language, license (skips if fresh < 24h)
+Each claimed repo runs 7 phases:
+
+1. **Metadata** — repo stars, forks, language, license, community profile
 2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)
 3. **Releases** — tags, dates, asset downloads
 4. **Metric history** — daily star/fork counts
 5. **Container versions** — image version tracking
 6. **Reputation** — shallow scores from local data
+7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
 
-Token resolution: `GITHUB_TOKEN` env var (fallback) or GitHub App installation tokens (planned).
+Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [LIMITS.md](LIMITS.md) for throughput analysis.
 
 ## Dashboard
 
@@ -166,7 +170,7 @@ GitHub Actions workflows in `.github/workflows/`:
 ## Supply Chain Security
 
 - **Container images** — built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`)
-- **Vulnerability scanning** — govulncheck in CI, Trivy on schedule
+- **Vulnerability scanning** — govulncheck in CI
 - **Dependency pinning** — all GitHub Actions pinned by commit hash
 - **CODEOWNERS** — `.github/` directory protected
 

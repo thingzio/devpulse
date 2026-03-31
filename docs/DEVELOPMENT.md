@@ -7,7 +7,7 @@ git clone https://github.com/thingzio/devpulse.git && cd devpulse
 make up             # start local Postgres
 make server         # run HTTP server on :8080
 make import         # run import worker (needs GITHUB_TOKEN)
-make qualify        # full check: test + lint + vulncheck + e2e
+make qualify        # full check: test-coverage + lint + vulncheck + e2e
 ```
 
 ## Prerequisites
@@ -64,6 +64,14 @@ For the import worker (alternative to GitHub App tokens):
 export GITHUB_TOKEN="ghp_..."
 ```
 
+For LLM insights generation (optional):
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export ANTHROPIC_MODEL="claude-haiku-4-5-20251001"   # optional, this is the default
+export ANTHROPIC_BASE_URL="https://..."               # optional, custom endpoint
+```
+
 ### Workflow
 
 ```bash
@@ -98,10 +106,10 @@ Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
 | Target | Description |
 |--------|-------------|
-| `make qualify` | Full qualification (test + lint + vulncheck + e2e) |
+| `make qualify` | Full qualification (test-coverage + lint + vulncheck + e2e) |
 | `make test` | Unit tests with race detector and coverage |
 | `make test-coverage` | Tests with coverage threshold enforcement |
-| `make lint` | Go + YAML linting |
+| `make lint` | Go + YAML + Terraform linting |
 | `make vulncheck` | Vulnerability scanning with govulncheck |
 | `make e2e` | End-to-end tests |
 
