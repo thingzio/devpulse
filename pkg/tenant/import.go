@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 )
 
 // ClaimedRepo is a repo claimed from the import queue.
@@ -25,10 +27,11 @@ const resetStaleClaimsSQL = `
 	  AND import_done_at IS NULL
 	  AND import_claimed_at < NOW() - INTERVAL '2 hours'`
 
-const resetDoneSQL = `
+const resetDoneSQLTmpl = `
 	UPDATE tenant_repo
 	SET import_claimed_at = NULL, import_claimed_by = NULL, import_done_at = NULL
-	WHERE import_done_at IS NOT NULL`
+	WHERE import_done_at IS NOT NULL
+	  AND import_done_at < NOW() - INTERVAL '%d minutes'`
 
 const claimNextRepoSQL = `
 	UPDATE tenant_repo
@@ -47,8 +50,19 @@ const markRepoDoneSQL = `
 	SET import_done_at = NOW()
 	WHERE id = $1`
 
+// importResetMinutes returns the IMPORT_RESET_MINUTES env var or 30 as default.
+func importResetMinutes() int {
+	if v := os.Getenv("IMPORT_RESET_MINUTES"); v != "" {
+		if m, err := strconv.Atoi(v); err == nil && m > 0 {
+			return m
+		}
+	}
+	return 30
+}
+
 // PrepareImportQueue resets stale claims (job died mid-run) and clears completed
 // work from the prior cycle so all active repos are available for claiming.
+// Only resets repos completed more than IMPORT_RESET_MINUTES ago (default 30).
 // Safe to call concurrently — both UPDATEs are idempotent.
 func PrepareImportQueue(ctx context.Context, db *sql.DB) error {
 	tx, err := db.BeginTx(ctx, nil)
@@ -60,6 +74,8 @@ func PrepareImportQueue(ctx context.Context, db *sql.DB) error {
 	if _, err := tx.ExecContext(ctx, resetStaleClaimsSQL); err != nil {
 		return fmt.Errorf("resetting stale claims: %w", err)
 	}
+
+	resetDoneSQL := fmt.Sprintf(resetDoneSQLTmpl, importResetMinutes())
 	if _, err := tx.ExecContext(ctx, resetDoneSQL); err != nil {
 		return fmt.Errorf("resetting completed repos: %w", err)
 	}
