@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -19,22 +20,32 @@ type migrateConfig struct {
 }
 
 // applyMigrations runs numbered SQL migration files from an embedded FS.
+// Uses a dedicated connection so the advisory lock is held on the same session
+// as the version check and migration execution.
 func applyMigrations(db *sql.DB, cfg migrateConfig) error {
+	ctx := context.Background()
+
+	conn, connErr := db.Conn(ctx)
+	if connErr != nil {
+		return fmt.Errorf("acquiring %s migration connection: %w", cfg.label, connErr)
+	}
+	defer conn.Close()
+
 	createSQL := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
 		version INTEGER PRIMARY KEY,
 		applied_at TIMESTAMP NOT NULL DEFAULT NOW()
 	)`, cfg.versionTable)
-	if _, err := db.Exec(createSQL); err != nil {
+	if _, err := conn.ExecContext(ctx, createSQL); err != nil {
 		return fmt.Errorf("creating %s table: %w", cfg.versionTable, err)
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("SELECT pg_advisory_lock(%d)", cfg.lockID)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("SELECT pg_advisory_lock(%d)", cfg.lockID)); err != nil {
 		return fmt.Errorf("acquiring %s migration lock: %w", cfg.label, err)
 	}
-	defer func() { _, _ = db.Exec(fmt.Sprintf("SELECT pg_advisory_unlock(%d)", cfg.lockID)) }()
+	defer func() { _, _ = conn.ExecContext(ctx, fmt.Sprintf("SELECT pg_advisory_unlock(%d)", cfg.lockID)) }()
 
 	var currentVersion int
-	if err := db.QueryRow(fmt.Sprintf("SELECT COALESCE(MAX(version), 0) FROM %s", cfg.versionTable)).Scan(&currentVersion); err != nil {
+	if err := conn.QueryRowContext(ctx, fmt.Sprintf("SELECT COALESCE(MAX(version), 0) FROM %s", cfg.versionTable)).Scan(&currentVersion); err != nil {
 		return fmt.Errorf("reading %s version: %w", cfg.label, err)
 	}
 
@@ -74,7 +85,7 @@ func applyMigrations(db *sql.DB, cfg migrateConfig) error {
 
 		slog.Debug("applying migration", "label", cfg.label, "version", ver, "file", name)
 
-		tx, err := db.Begin()
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("beginning %s migration tx %d: %w", cfg.label, ver, err)
 		}
