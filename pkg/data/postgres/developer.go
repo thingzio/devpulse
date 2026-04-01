@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 
+	"github.com/google/go-github/v83/github"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/net"
@@ -276,6 +278,17 @@ func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error
 	for _, username := range usernames {
 		dev, fetchErr := ghutil.GetGitHubDeveloper(ctx, client, username)
 		if fetchErr != nil {
+			// If user is deleted/renamed (404), mark as enriched with empty entity
+			// so they are not re-fetched on every run.
+			var ghErr *github.ErrorResponse
+			if errors.As(fetchErr, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusNotFound {
+				slog.Debug("developer not found on github, marking enriched", "username", username)
+				if _, execErr := stmt.ExecContext(ctx, username, ""); execErr != nil {
+					slog.Warn("marking gone developer enriched", "username", username, "error", execErr)
+				}
+				skipped++
+				continue
+			}
 			slog.Warn("fetching developer profile", "username", username, "error", fetchErr)
 			skipped++
 			continue

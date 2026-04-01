@@ -223,7 +223,7 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 	}
 
 	if len(usernames) == 0 {
-		slog.Info("deep reputation: no candidates")
+		slog.Debug("deep reputation: no candidates")
 		return &data.DeepReputationResult{}, nil
 	}
 
