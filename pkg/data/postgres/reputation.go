@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -235,7 +236,18 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 		slog.Info("reputation", "user", username, "progress", fmt.Sprintf("%d/%d", i+1, len(usernames)))
 
 		if _, deepErr := s.ComputeDeepReputation(ctx, tokenFn(), username); deepErr != nil {
-			slog.Error("deep reputation failed", "username", username, "error", deepErr)
+			// If user is deleted/renamed (404), mark as deep-scored so they
+			// drop out of the candidate pool and stop burning API calls.
+			var ghErr *github.ErrorResponse
+			if errors.As(deepErr, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusNotFound {
+				slog.Debug("user not found on github, marking deep-scored", "username", username)
+				now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+				if updateErr := s.updateReputation(ctx, username, 0, now, true, nil); updateErr != nil {
+					slog.Warn("marking gone user deep-scored", "username", username, "error", updateErr)
+				}
+			} else {
+				slog.Error("deep reputation failed", "username", username, "error", deepErr)
+			}
 			res.Errors++
 			continue
 		}
