@@ -77,3 +77,37 @@ resource "google_secret_manager_secret_iam_member" "import_github_app" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.import.email}"
 }
+
+resource "google_secret_manager_secret" "stripe_secret_key" {
+  secret_id = "${var.prefix}-stripe-secret-key"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_secret_manager_secret" "stripe_webhook_secret" {
+  secret_id = "${var.prefix}-stripe-webhook-secret"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_secret_manager_secret_iam_member" "run_stripe_secret_key" {
+  secret_id = google_secret_manager_secret.stripe_secret_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "run_stripe_webhook_secret" {
+  secret_id = google_secret_manager_secret.stripe_webhook_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}

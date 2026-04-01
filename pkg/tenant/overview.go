@@ -34,6 +34,8 @@ type UsageSummary struct {
 	WeeklyEvents     int     `json:"weekly_events"`
 	WeeklyPct        float64 `json:"weekly_pct"`
 	LimitReached     bool    `json:"limit_reached"`
+	DowngradePending bool    `json:"downgrade_pending"`
+	HasBilling       bool    `json:"has_billing"`
 }
 
 // OverviewResponse combines repo overview and usage summary.
@@ -64,7 +66,8 @@ const tenantRepoOverviewSQL = `
 	ORDER BY tr.org, tr.repo`
 
 const tenantLimitsSQL = `
-	SELECT plan, max_repos, max_events_per_week
+	SELECT plan, max_repos, max_events_per_week, downgrade_pending,
+	       stripe_customer_id IS NOT NULL
 	FROM tenant WHERE id = $1`
 
 const tenantActiveRepoCountSQL = `
@@ -78,7 +81,8 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 	// Get tenant limits
 	var plan string
 	var maxRepos, maxEventsPerWeek int
-	if err := db.QueryRowContext(ctx, tenantLimitsSQL, tenantID).Scan(&plan, &maxRepos, &maxEventsPerWeek); err != nil {
+	var downgradePending, hasBilling bool
+	if err := db.QueryRowContext(ctx, tenantLimitsSQL, tenantID).Scan(&plan, &maxRepos, &maxEventsPerWeek, &downgradePending, &hasBilling); err != nil {
 		return nil, fmt.Errorf("querying tenant limits: %w", err)
 	}
 
@@ -135,6 +139,8 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 			WeeklyEvents:     totalWeeklyEvents,
 			WeeklyPct:        weeklyPct,
 			LimitReached:     limitReached,
+			DowngradePending: downgradePending,
+			HasBilling:       hasBilling,
 		},
 		Repos: repos,
 	}, nil

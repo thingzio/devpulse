@@ -1523,8 +1523,12 @@ function loadRepoOverview(url) {
                 '</span><span class="banner-label">Repos (' + reposPct + '%)</span></div>' +
                 '<div class="banner-stat"><span class="banner-val" style="color:' + color + '">' +
                 (u.weekly_events || 0).toLocaleString() + ' / ' + (u.max_events_per_week || 0).toLocaleString() +
-                '</span><span class="banner-label">Events This Week (' + pct + '%)</span></div>'
+                '</span><span class="banner-label">Events This Week (' + pct + '%)</span></div>' +
+                (u.has_billing ? '<div class="banner-stat"><a href="/api/billing/portal" class="banner-link">Manage Billing</a></div>' : '')
             );
+            if (u.downgrade_pending) {
+                $banner.append('<div style="width:100%;text-align:center;padding:8px;color:#d29a00;font-size:0.85em;">⚠ Subscription cancelled. Remove repos to 5 or fewer to complete downgrade.</div>');
+            }
             if (u.limit_reached) {
                 $banner.append('<div class="banner-stat"><span class="banner-val" style="color:var(--red)">LIMIT REACHED</span><span class="banner-label">Imports paused until next week</span></div>');
             }
@@ -2350,11 +2354,7 @@ function addTrackedRepo(org, repo) {
             $status.html('Repo limit for current plan reached (' + limit + '). <a href="#" id="request-upgrade-link">Request Upgrade</a>');
             $('#request-upgrade-link').on('click', function(e) {
                 e.preventDefault();
-                $.post('/api/upgrade-request', function() {
-                    $status.text('Upgrade request submitted. We will be in touch.');
-                }).fail(function() {
-                    $status.text('Error submitting upgrade request. Please try again.');
-                });
+                window.location.href = '/pricing';
             });
         } else {
             var urlMatch = msg.match(/(https:\/\/\S+)/);

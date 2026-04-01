@@ -58,6 +58,36 @@ resource "google_cloud_run_v2_service" "serve" {
       }
 
       env {
+        name = "STRIPE_SECRET_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.stripe_secret_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "STRIPE_WEBHOOK_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.stripe_webhook_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "STRIPE_PRO_MONTHLY_PRICE_ID"
+        value = var.stripe_pro_monthly_price_id
+      }
+
+      env {
+        name  = "STRIPE_PRO_ANNUAL_PRICE_ID"
+        value = var.stripe_pro_annual_price_id
+      }
+
+      env {
         name  = "BASE_URL"
         value = "https://${var.domain}"
       }

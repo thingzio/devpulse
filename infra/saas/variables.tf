@@ -63,3 +63,15 @@ variable "import_parallelism" {
   type        = number
   default     = 3
 }
+
+variable "stripe_pro_monthly_price_id" {
+  description = "Stripe PRO monthly price ID"
+  type        = string
+  default     = ""
+}
+
+variable "stripe_pro_annual_price_id" {
+  description = "Stripe PRO annual price ID"
+  type        = string
+  default     = ""
+}
