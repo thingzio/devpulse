@@ -13,6 +13,7 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/logging"
+	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
@@ -27,12 +28,6 @@ const (
 	clearUpgradeRequestSQL    = `UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW() WHERE id = $1`
 )
 
-var planLimits = map[string][2]int{
-	"free":       {5, 2000},
-	"pro":        {25, 20000},
-	"enterprise": {100, 100000},
-}
-
 type upgradeRequest struct {
 	Username string `json:"username"`
 	Plan     string `json:"plan"`
@@ -43,11 +38,6 @@ type upgradeResponse struct {
 	Plan             string `json:"plan"`
 	MaxRepos         int    `json:"max_repos"`
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
-}
-
-func resolvePlanLimits(plan string) ([2]int, bool) {
-	limits, ok := planLimits[plan]
-	return limits, ok
 }
 
 func main() {
@@ -87,7 +77,7 @@ func main() {
 			return
 		}
 
-		limits, ok := resolvePlanLimits(req.Plan)
+		limits, ok := plan.Get(req.Plan)
 		if !ok {
 			http.Error(w, fmt.Sprintf("invalid plan: %s (must be free, pro, or enterprise)", req.Plan), http.StatusBadRequest)
 			return
@@ -101,7 +91,7 @@ func main() {
 			return
 		}
 
-		if err := tenant.UpdatePlan(r.Context(), db, tenantID, req.Plan, limits[0], limits[1]); err != nil {
+		if err := tenant.UpdatePlan(r.Context(), db, tenantID, req.Plan, limits.MaxRepos, limits.MaxEventsPerWeek); err != nil {
 			slog.Error("updating plan", "error", err)
 			http.Error(w, "error updating plan", http.StatusInternalServerError)
 			return
@@ -115,16 +105,16 @@ func main() {
 		slog.Info("tenant upgraded",
 			"username", req.Username,
 			"plan", req.Plan,
-			"max_repos", limits[0],
-			"max_events_per_week", limits[1],
+			"max_repos", limits.MaxRepos,
+			"max_events_per_week", limits.MaxEventsPerWeek,
 		)
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(upgradeResponse{
 			Username:         req.Username,
 			Plan:             req.Plan,
-			MaxRepos:         limits[0],
-			MaxEventsPerWeek: limits[1],
+			MaxRepos:         limits.MaxRepos,
+			MaxEventsPerWeek: limits.MaxEventsPerWeek,
 		}); err != nil {
 			slog.Error("encoding upgrade response", "error", err)
 		}

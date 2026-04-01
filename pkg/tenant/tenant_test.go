@@ -170,8 +170,8 @@ func TestUpdatePlan(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 44444, "planuser", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, "free", tn.Plan)
-	assert.Equal(t, 5, tn.MaxRepos)
-	assert.Equal(t, 2000, tn.MaxEventsPerWeek)
+	assert.Equal(t, 3, tn.MaxRepos)
+	assert.Equal(t, 1000, tn.MaxEventsPerWeek)
 
 	err = UpdatePlan(ctx, db, tn.ID, "pro", 25, 20000)
 	require.NoError(t, err)
