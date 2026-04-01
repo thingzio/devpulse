@@ -127,21 +127,18 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 		return fmt.Errorf("getting weekly events: %w", err)
 	}
 
-	if tn.MaxEventsPerWeek == 0 {
-		slog.Warn("max_events_per_week is zero, skipping import",
-			"tenant_id", claim.TenantID,
-			"org", claim.Org,
-			"repo", claim.Repo)
-		return nil
+	weeklyPct := float64(0)
+	if tn.MaxEventsPerWeek > 0 {
+		weeklyPct = float64(weeklyEvents) / float64(tn.MaxEventsPerWeek) * 100
 	}
 
 	slog.Info("tenant usage",
 		"tenant_id", claim.TenantID,
 		"weekly_events", weeklyEvents,
 		"max_events_per_week", tn.MaxEventsPerWeek,
-		"weekly_pct", float64(weeklyEvents)/float64(tn.MaxEventsPerWeek)*100)
+		"weekly_pct", weeklyPct)
 
-	if weeklyEvents >= tn.MaxEventsPerWeek {
+	if tn.MaxEventsPerWeek > 0 && weeklyEvents >= tn.MaxEventsPerWeek {
 		slog.Warn("weekly event limit reached, skipping import",
 			"tenant_id", claim.TenantID,
 			"org", claim.Org,

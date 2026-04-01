@@ -36,6 +36,9 @@ var pageTemplates map[string]*template.Template
 
 var templateFuncs = template.FuncMap{
 	"comma": func(n int) string {
+		if n == 0 {
+			return "Unlimited"
+		}
 		if n < 1000 {
 			return fmt.Sprintf("%d", n)
 		}

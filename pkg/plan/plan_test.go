@@ -16,7 +16,7 @@ func TestGet(t *testing.T) {
 	}{
 		{Free, true, 3, 1000},
 		{Pro, true, 15, 15000},
-		{Enterprise, true, 100, 100000},
+		{Enterprise, true, 0, 0}, // 0 = unlimited
 		{"unknown", false, 0, 0},
 		{"", false, 0, 0},
 		{"FREE", false, 0, 0}, // case-sensitive

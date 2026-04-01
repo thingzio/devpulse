@@ -145,7 +145,7 @@ func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []Or
 		return fmt.Errorf("counting repos: %w", err)
 	}
 
-	if currentCount > maxRepos {
+	if maxRepos > 0 && currentCount > maxRepos {
 		_ = tx.Rollback()
 		return fmt.Errorf("adding repos would exceed plan limit (%d): %w", maxRepos, ErrRepoLimitExceeded)
 	}

@@ -14,7 +14,7 @@ type Limits struct {
 var All = map[string]Limits{
 	Free:       {MaxRepos: 3, MaxEventsPerWeek: 1000},
 	Pro:        {MaxRepos: 15, MaxEventsPerWeek: 15000},
-	Enterprise: {MaxRepos: 100, MaxEventsPerWeek: 100000},
+	Enterprise: {MaxRepos: 0, MaxEventsPerWeek: 0}, // 0 = unlimited
 }
 
 // Get returns the limits for a plan name and whether it exists.

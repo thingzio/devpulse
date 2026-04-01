@@ -247,7 +247,7 @@ Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 |------|-------|-------------|
 | free | 3 | 1,000 |
 | pro | 15 | 15,000 |
-| enterprise | 100 | 100,000 |
+| enterprise | Unlimited | Unlimited |
 
 ## Related Documentation
 
