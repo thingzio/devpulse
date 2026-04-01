@@ -113,7 +113,7 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 	}
 
 	// Compute percentages and limit flags
-	limitReached := totalWeeklyEvents >= maxEventsPerWeek
+	limitReached := maxEventsPerWeek > 0 && totalWeeklyEvents >= maxEventsPerWeek
 	for i := range repos {
 		if maxEventsPerWeek > 0 {
 			repos[i].WeeklyPct = float64(repos[i].WeeklyEvents) / float64(maxEventsPerWeek) * 100
