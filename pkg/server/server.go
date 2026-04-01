@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/billing"
 	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
@@ -35,7 +36,7 @@ var pageTemplates map[string]*template.Template
 
 func init() {
 	// Simple pages using layout.html
-	simplePages := []string{"landing.html", "tos.html", "help.html"}
+	simplePages := []string{"landing.html", "tos.html", "help.html", "pricing.html"}
 	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
 	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.ParseFS(templateFS,
@@ -92,7 +93,14 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts)
+	stripeCfg := billing.LoadConfig()
+	if stripeCfg != nil {
+		slog.Info("stripe billing enabled")
+	} else {
+		slog.Info("stripe billing disabled (STRIPE_SECRET_KEY not set)")
+	}
+
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, stripeCfg, opts)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
@@ -129,7 +137,7 @@ func Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options) *http.ServeMux {
+func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, stripeCfg *billing.Config, opts Options) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -141,6 +149,12 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.HandleFunc("GET /auth/github", oauthStartHandler(oauthCfg))
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
+	if stripeCfg != nil {
+		mux.HandleFunc("POST /webhooks/stripe", billing.WebhookHandler(db, stripeCfg))
+	}
+	mux.HandleFunc("GET /pricing", func(w http.ResponseWriter, _ *http.Request) {
+		renderTemplate(w, "pricing.html", pageData{Title: "Pricing"})
+	})
 	mux.HandleFunc("GET /help", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "help.html", pageData{Title: "Help"})
 	})
@@ -167,6 +181,10 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
+	if stripeCfg != nil {
+		mux.Handle("POST /api/checkout", wrap(checkoutHandler(db, stripeCfg)))
+		mux.Handle("GET /api/billing/portal", wrap(billingPortalHandler(db, stripeCfg)))
+	}
 	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))
 

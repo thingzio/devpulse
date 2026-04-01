@@ -1,0 +1,278 @@
+{{define "content"}}
+<style>
+  .pricing {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 20px 64px;
+    font-family: 'Lato', sans-serif;
+    color: var(--page-content-txtColor);
+  }
+  .pricing h1 {
+    text-align: center;
+    font-size: 2em;
+    color: var(--dark-color);
+    margin-bottom: 8px;
+  }
+  .pricing-sub {
+    text-align: center;
+    color: var(--gray);
+    margin-bottom: 32px;
+  }
+  #pricing-status {
+    display: none;
+    max-width: 500px;
+    margin: 0 auto 24px;
+    padding: 12px 16px;
+    border-radius: var(--border-radius);
+    background: var(--light-color);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    color: var(--dark-color);
+    font-size: 0.95em;
+  }
+  .pricing-toggle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    font-size: 0.95em;
+    color: var(--gray);
+  }
+  .pricing-toggle label {
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    transition: all 0.15s;
+  }
+  .pricing-toggle input[type="radio"] {
+    display: none;
+  }
+  .pricing-toggle input[type="radio"]:checked + label {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .pricing-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .pricing-card {
+    background: var(--page-content-blockColor);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+  .pricing-card.pro {
+    border-color: var(--accent);
+    border-width: 2px;
+    position: relative;
+  }
+  .pricing-card h2 {
+    font-size: 1.3em;
+    color: var(--dark-color);
+    margin: 0 0 4px;
+  }
+  .pricing-card .price {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: var(--dark-color);
+    margin: 12px 0 4px;
+  }
+  .pricing-card .price-period {
+    color: var(--gray);
+    font-size: 0.85em;
+    margin-bottom: 20px;
+    min-height: 20px;
+  }
+  .pricing-card .save-badge {
+    display: none;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .pricing-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    flex: 1;
+  }
+  .pricing-card ul li {
+    padding: 6px 0;
+    font-size: 0.93em;
+    color: var(--page-content-txtColor);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .pricing-card ul li:last-child {
+    border-bottom: none;
+  }
+  .pricing-card .card-btn {
+    display: block;
+    text-align: center;
+    padding: 10px 0;
+    border-radius: var(--border-radius);
+    font-weight: 700;
+    font-size: 0.95em;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    transition: opacity 0.15s;
+  }
+  .pricing-card .card-btn:hover {
+    opacity: 0.85;
+  }
+  .pricing-card .card-btn.secondary {
+    background: var(--light-color);
+    color: var(--dark-color);
+    border: 1px solid var(--border-color);
+  }
+  .pricing-card .card-btn.primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .pricing-card .card-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .pricing-footer {
+    text-align: center;
+    margin-top: 40px;
+    color: var(--gray);
+    font-size: 0.9em;
+  }
+  .pricing-footer a {
+    color: var(--accent);
+  }
+  @media (max-width: 600px) {
+    .pricing-cards {
+      grid-template-columns: 1fr;
+    }
+    .pricing h1 {
+      font-size: 1.5em;
+    }
+  }
+</style>
+
+<div class="pricing">
+  <h1>Simple, transparent pricing</h1>
+  <p class="pricing-sub">Start free. Upgrade when you need more.</p>
+
+  <div id="pricing-status"></div>
+
+  <div class="pricing-toggle">
+    <input type="radio" name="period" id="period-monthly" value="monthly" checked>
+    <label for="period-monthly">Monthly</label>
+    <input type="radio" name="period" id="period-annual" value="annual">
+    <label for="period-annual">Annual</label>
+  </div>
+
+  <div class="pricing-cards">
+    <div class="pricing-card">
+      <h2>Free</h2>
+      <div class="price">$0</div>
+      <div class="price-period">free forever</div>
+      <ul>
+        <li>5 repositories</li>
+        <li>2,000 events/week</li>
+        <li>Community insights</li>
+        <li>All dashboard tabs</li>
+      </ul>
+      <a href="/auth/github" class="card-btn secondary">Get Started</a>
+    </div>
+
+    <div class="pricing-card pro">
+      <h2>PRO</h2>
+      <div class="price">
+        <span id="pro-price">$19</span>
+        <span class="save-badge" id="save-badge">Save ~17%</span>
+      </div>
+      <div class="price-period" id="pro-period">per month</div>
+      <ul>
+        <li>25 repositories</li>
+        <li>20,000 events/week</li>
+        <li>All insights + LLM-generated analysis</li>
+        <li>Priority support</li>
+      </ul>
+      <button class="card-btn primary subscribe-btn">Subscribe</button>
+    </div>
+  </div>
+
+  <div class="pricing-footer">
+    <p>All plans include dark mode, interactive charts, and search &amp; filter.</p>
+    <p style="margin-top:8px">Questions? <a href="/help">Visit our help page</a>.</p>
+  </div>
+</div>
+
+<script>
+(function() {
+    var priceEl = document.getElementById('pro-price');
+    var periodEl = document.getElementById('pro-period');
+    var badgeEl = document.getElementById('save-badge');
+    var radios = document.querySelectorAll('input[name="period"]');
+
+    function updatePrice() {
+        var sel = document.querySelector('input[name="period"]:checked');
+        if (!sel) return;
+        if (sel.value === 'annual') {
+            priceEl.textContent = '$190';
+            periodEl.textContent = 'per year';
+            badgeEl.style.display = 'inline';
+        } else {
+            priceEl.textContent = '$19';
+            periodEl.textContent = 'per month';
+            badgeEl.style.display = 'none';
+        }
+    }
+
+    radios.forEach(function(r) {
+        r.addEventListener('change', updatePrice);
+    });
+
+    var btns = document.querySelectorAll('.subscribe-btn');
+    btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var period = document.querySelector('input[name="period"]:checked');
+            if (!period) return;
+            btn.disabled = true;
+            btn.textContent = 'Redirecting...';
+            fetch('/api/checkout', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({period: period.value})
+            })
+            .then(function(r) {
+                if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+                return r.json();
+            })
+            .then(function(data) { window.location.href = data.url; })
+            .catch(function(err) {
+                btn.disabled = false;
+                btn.textContent = 'Subscribe';
+                alert('Error: ' + err.message);
+            });
+        });
+    });
+
+    var params = new URLSearchParams(window.location.search);
+    var status = params.get('status');
+    if (status === 'success') {
+        document.getElementById('pricing-status').textContent = 'Payment successful! Your account has been upgraded to PRO.';
+        document.getElementById('pricing-status').style.display = 'block';
+    } else if (status === 'cancel') {
+        document.getElementById('pricing-status').textContent = 'Payment cancelled. You can try again anytime.';
+        document.getElementById('pricing-status').style.display = 'block';
+    }
+})();
+</script>
+{{end}}
