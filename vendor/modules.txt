@@ -207,6 +207,7 @@ github.com/stripe/stripe-go/v82/billingportal/session
 github.com/stripe/stripe-go/v82/checkout/session
 github.com/stripe/stripe-go/v82/customer
 github.com/stripe/stripe-go/v82/form
+github.com/stripe/stripe-go/v82/webhook
 # github.com/testcontainers/testcontainers-go v0.41.0
 ## explicit; go 1.25.0
 github.com/testcontainers/testcontainers-go
