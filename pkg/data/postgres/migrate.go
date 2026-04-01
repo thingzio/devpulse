@@ -95,7 +95,7 @@ func applyMigrations(db *sql.DB, cfg migrateConfig) error {
 			return fmt.Errorf("executing %s migration %s: %w", cfg.label, name, err)
 		}
 
-		insertSQL := "INSERT INTO " + cfg.versionTable + " (version) VALUES ($1)" //nolint:gosec // table name from trusted config, not user input
+		insertSQL := "INSERT INTO " + cfg.versionTable + " (version) VALUES ($1) ON CONFLICT DO NOTHING" //nolint:gosec // table name from trusted config, not user input
 		if _, err := tx.Exec(insertSQL, ver); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("recording %s migration %d: %w", cfg.label, ver, err)
