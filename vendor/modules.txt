@@ -200,6 +200,13 @@ github.com/sirupsen/logrus
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
+# github.com/stripe/stripe-go/v82 v82.5.1
+## explicit; go 1.18
+github.com/stripe/stripe-go/v82
+github.com/stripe/stripe-go/v82/billingportal/session
+github.com/stripe/stripe-go/v82/checkout/session
+github.com/stripe/stripe-go/v82/customer
+github.com/stripe/stripe-go/v82/form
 # github.com/testcontainers/testcontainers-go v0.41.0
 ## explicit; go 1.25.0
 github.com/testcontainers/testcontainers-go

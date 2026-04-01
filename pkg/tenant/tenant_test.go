@@ -219,6 +219,99 @@ func TestExpiredSession(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestUpdateStripeCustomer(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 99901, "stripe-test", "stripe@test.com", "https://avatar.url")
+	require.NoError(t, err)
+
+	err = UpdateStripeCustomer(ctx, db, tn.ID, "cus_test123")
+	require.NoError(t, err)
+
+	got, err := GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.StripeCustomerID)
+	assert.Equal(t, "cus_test123", *got.StripeCustomerID)
+}
+
+func TestGetTenantByStripeCustomer(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 99902, "stripe-lookup", "lookup@test.com", "https://avatar.url")
+	require.NoError(t, err)
+
+	err = UpdateStripeCustomer(ctx, db, tn.ID, "cus_lookup456")
+	require.NoError(t, err)
+
+	got, err := GetTenantByStripeCustomer(ctx, db, "cus_lookup456")
+	require.NoError(t, err)
+	assert.Equal(t, tn.ID, got.ID)
+}
+
+func TestSubscriptionLifecycle(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 99903, "sub-test", "sub@test.com", "https://avatar.url")
+	require.NoError(t, err)
+
+	periodEnd := time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second)
+
+	// Upgrade to pro
+	err = UpdateSubscription(ctx, db, tn.ID, "sub_test", "pro", 25, 20000, periodEnd)
+	require.NoError(t, err)
+
+	got, err := GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "pro", got.Plan)
+	assert.Equal(t, 25, got.MaxRepos)
+	require.NotNil(t, got.StripeSubscriptionID)
+	assert.Equal(t, "sub_test", *got.StripeSubscriptionID)
+	assert.False(t, got.DowngradePending)
+
+	// Set downgrade pending
+	err = SetDowngradePending(ctx, db, tn.ID, periodEnd)
+	require.NoError(t, err)
+
+	got, err = GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.True(t, got.DowngradePending)
+
+	// Downgrade to free
+	err = DowngradeToFree(ctx, db, tn.ID)
+	require.NoError(t, err)
+
+	got, err = GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "free", got.Plan)
+	assert.Equal(t, 5, got.MaxRepos)
+	assert.Nil(t, got.StripeSubscriptionID)
+	assert.False(t, got.DowngradePending)
+}
+
+func TestClearSubscription(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 99904, "clear-sub", "clear@test.com", "https://avatar.url")
+	require.NoError(t, err)
+
+	periodEnd := time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second)
+
+	err = UpdateSubscription(ctx, db, tn.ID, "sub_clear", "pro", 25, 20000, periodEnd)
+	require.NoError(t, err)
+
+	err = ClearSubscription(ctx, db, tn.ID, periodEnd)
+	require.NoError(t, err)
+
+	got, err := GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got.StripeSubscriptionID)
+	require.NotNil(t, got.PlanPeriodEnd)
+}
+
 func TestCleanExpiredSessions(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
