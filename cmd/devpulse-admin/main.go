@@ -26,6 +26,7 @@ var (
 const (
 	selectTenantByUsernameSQL = `SELECT id FROM tenant WHERE username = $1`
 	clearUpgradeRequestSQL    = `UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW() WHERE id = $1`
+	listTenantsSQL            = `SELECT username, plan, max_repos, max_events_per_week, created_at FROM tenant ORDER BY created_at`
 )
 
 type upgradeRequest struct {
@@ -38,6 +39,14 @@ type upgradeResponse struct {
 	Plan             string `json:"plan"`
 	MaxRepos         int    `json:"max_repos"`
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
+}
+
+type tenantSummary struct {
+	Username         string `json:"username"`
+	Plan             string `json:"plan"`
+	MaxRepos         int    `json:"max_repos"`
+	MaxEventsPerWeek int    `json:"max_events_per_week"`
+	CreatedAt        string `json:"created_at"`
 }
 
 func main() {
@@ -62,6 +71,39 @@ func main() {
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("GET /tenants", func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.QueryContext(r.Context(), listTenantsSQL)
+		if err != nil {
+			slog.Error("listing tenants", "error", err)
+			http.Error(w, "error listing tenants", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var tenants []tenantSummary
+		for rows.Next() {
+			var t tenantSummary
+			var createdAt time.Time
+			if err := rows.Scan(&t.Username, &t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek, &createdAt); err != nil {
+				slog.Error("scanning tenant", "error", err)
+				http.Error(w, "error scanning tenant", http.StatusInternalServerError)
+				return
+			}
+			t.CreatedAt = createdAt.Format("2006-01-02")
+			tenants = append(tenants, t)
+		}
+		if err := rows.Err(); err != nil {
+			slog.Error("iterating tenants", "error", err)
+			http.Error(w, "error iterating tenants", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(tenants); err != nil {
+			slog.Error("encoding tenants", "error", err)
+		}
 	})
 
 	mux.HandleFunc("POST /upgrade", func(w http.ResponseWriter, r *http.Request) {

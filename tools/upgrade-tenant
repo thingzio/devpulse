@@ -10,9 +10,9 @@ usage() {
     echo "Usage: $0 <username> <plan>"
     echo ""
     echo "Plans:"
-    echo "  free        5 repos, 2,000 events/week"
-    echo "  pro         25 repos, 20,000 events/week"
-    echo "  enterprise  100 repos, 100,000 events/week"
+    echo "  free        3 repos, 1,000 events/week"
+    echo "  pro         15 repos, 15,000 events/week"
+    echo "  enterprise  unlimited"
     exit 1
 }
 
