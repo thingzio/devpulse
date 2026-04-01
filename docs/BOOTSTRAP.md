@@ -228,4 +228,4 @@ If any secrets were exposed during setup, rotate them:
 2. Update in Secret Manager: `gcloud secrets versions add <secret-name> --data-file=-`
 3. Redeploy: `make bump-patch`
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for ongoing operations (releases, deploys, tenant management).
+See [ADMIN.md](ADMIN.md) for ongoing operations (releases, deploys, monitoring, tenant management).

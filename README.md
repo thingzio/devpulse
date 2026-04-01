@@ -21,11 +21,11 @@ make qualify    # test-coverage + lint + govulncheck + e2e
 
 | Doc | Purpose |
 |-----|---------|
-| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local setup, make targets, debugging, operations, CI/CD |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local setup, make targets, debugging |
+| [ADMIN.md](docs/ADMIN.md) | Day-2 operations, monitoring, CI/CD, tenant management |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data model, tenant isolation |
 | [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | GCP tiers, scaling, costs, API throughput |
 | [BOOTSTRAP.md](docs/BOOTSTRAP.md) | One-time GCP deployment guide |
-| [MONITORING.md](docs/MONITORING.md) | Alerts, log metrics, dashboards |
 
 ## Contributing
 
