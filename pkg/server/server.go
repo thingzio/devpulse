@@ -22,6 +22,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/oauth"
+	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
@@ -33,16 +34,25 @@ var staticFS embed.FS
 
 var pageTemplates map[string]*template.Template
 
+var templateFuncs = template.FuncMap{
+	"comma": func(n int) string {
+		if n < 1000 {
+			return fmt.Sprintf("%d", n)
+		}
+		return fmt.Sprintf("%d,%03d", n/1000, n%1000)
+	},
+}
+
 func init() {
 	// Simple pages using layout.html
 	simplePages := []string{"landing.html", "tos.html", "help.html"}
 	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
 	for _, p := range simplePages {
-		pageTemplates[p] = template.Must(template.ParseFS(templateFS,
+		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
 			"templates/layout.html", "templates/"+p))
 	}
 	// Dashboard uses the old header/home/footer pattern
-	pageTemplates["home.html"] = template.Must(template.ParseFS(templateFS,
+	pageTemplates["home.html"] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
 		"templates/header.html", "templates/home.html", "templates/footer.html"))
 }
 
@@ -142,7 +152,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
 	mux.HandleFunc("GET /help", func(w http.ResponseWriter, _ *http.Request) {
-		renderTemplate(w, "help.html", pageData{Title: "Help"})
+		renderTemplate(w, "help.html", pageData{Title: "Help", Plans: plan.All})
 	})
 	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
 		middleware.ClearSessionCookie(w)
@@ -244,6 +254,7 @@ type pageData struct {
 	Version      string
 	Commit       string
 	Date         string
+	Plans        map[string]plan.Limits
 }
 
 func landingHandler(opts Options) http.HandlerFunc {
@@ -253,6 +264,7 @@ func landingHandler(opts Options) http.HandlerFunc {
 			Version: opts.Version,
 			Commit:  opts.Commit,
 			Date:    opts.Date,
+			Plans:   plan.All,
 		})
 	}
 }
@@ -372,7 +384,7 @@ func signoutHandler(db *sql.DB) http.HandlerFunc {
 
 func tosPageHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate(w, "tos.html", pageData{Title: "Terms of Service"})
+		renderTemplate(w, "tos.html", pageData{Title: "Terms of Service", Plans: plan.All})
 	}
 }
 

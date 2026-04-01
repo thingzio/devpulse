@@ -93,7 +93,7 @@
   </div>
 
   <div class="landing-footer">
-    <p><strong>Free to start</strong> &mdash; 5 repos and 2,000 events/week. No credit card required.</p>
+    <p><strong>Free to start</strong> &mdash; {{(index .Plans "free").MaxRepos}} repos and {{comma (index .Plans "free").MaxEventsPerWeek}} events/week. No credit card required.</p>
     <p style="margin-top:8px"><a href="/auth/github" style="color:var(--accent);font-weight:600;">Sign in with GitHub</a> to get started.</p>
     <p style="margin-top:12px">{{.Version}} ({{.Commit}}) &middot; <a href="/help">Help</a> &middot; <a href="/tos">Terms</a></p>
   </div>

@@ -64,9 +64,9 @@
     <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Usage Limits</h3>
       <ul>
-        <li><strong>Free tier</strong> &mdash; 5 repos, 2,000 events per week</li>
-        <li><strong>Pro tier</strong> &mdash; 25 repos, 20,000 events per week</li>
-        <li><strong>Enterprise</strong> &mdash; 100 repos, 100,000 events per week</li>
+        <li><strong>Free tier</strong> &mdash; {{(index .Plans "free").MaxRepos}} repos, {{comma (index .Plans "free").MaxEventsPerWeek}} events per week</li>
+        <li><strong>Pro tier</strong> &mdash; {{(index .Plans "pro").MaxRepos}} repos, {{comma (index .Plans "pro").MaxEventsPerWeek}} events per week</li>
+        <li><strong>Enterprise</strong> &mdash; {{(index .Plans "enterprise").MaxRepos}} repos, {{comma (index .Plans "enterprise").MaxEventsPerWeek}} events per week</li>
         <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your plan limits</li>
         <li><strong>Import pauses</strong> &mdash; when the weekly event limit is reached, imports pause automatically until the following week. Existing data remains fully accessible.</li>
         <li><strong>Upgrading</strong> &mdash; click "Request Upgrade" when you hit a limit, or email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> to discuss plan options</li>

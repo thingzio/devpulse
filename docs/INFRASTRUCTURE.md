@@ -169,7 +169,7 @@ Each repo runs 7 import phases:
 | Containers | 0–5 | 2–10 | Packages + versions |
 | Reputation | 5–10/dev | 5–10/dev | User profile + org membership + search |
 
-Typical totals: **~60–100 calls/repo** incremental, **~150–300** first import. The free tier (5 repos) and pro tier (25 repos) are well within the 5,000/hr budget.
+Typical totals: **~60–100 calls/repo** incremental, **~150–300** first import. The free tier (3 repos) and pro tier (15 repos) are well within the 5,000/hr budget.
 
 ### Throughput Per Tenant
 

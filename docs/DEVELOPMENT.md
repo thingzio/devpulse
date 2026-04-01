@@ -237,14 +237,16 @@ FROM tenant ORDER BY created_at;
 
 -- Promote to pro
 UPDATE tenant
-SET plan = 'pro', max_repos = 25, max_events_per_week = 20000, updated_at = NOW()
+SET plan = 'pro', max_repos = 15, max_events_per_week = 15000, updated_at = NOW()
 WHERE username = 'their-github-username';
 ```
 
+Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
+
 | Plan | Repos | Events/Week |
 |------|-------|-------------|
-| free | 5 | 2,000 |
-| pro | 25 | 20,000 |
+| free | 3 | 1,000 |
+| pro | 15 | 15,000 |
 | enterprise | 100 | 100,000 |
 
 ## Related Documentation
