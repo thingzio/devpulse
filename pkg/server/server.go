@@ -183,7 +183,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
 	if stripeCfg != nil {
 		mux.Handle("POST /api/checkout", wrap(checkoutHandler(db, stripeCfg)))
-		mux.Handle("GET /api/billing/portal", wrap(billingPortalHandler(db, stripeCfg)))
+		mux.Handle("GET /api/billing/portal", wrap(billingPortalHandler(stripeCfg)))
 	}
 	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))

@@ -9,15 +9,15 @@ import (
 
 // Tenant represents a registered SaaS tenant.
 type Tenant struct {
-	ID                 string
-	GitHubID           int64
-	Username           string
-	Email              string
-	AvatarURL          string
-	MaxRepos           int
-	MaxEventsPerWeek   int
-	Plan               string
-	ToSAcceptedAt      *time.Time
+	ID                   string
+	GitHubID             int64
+	Username             string
+	Email                string
+	AvatarURL            string
+	MaxRepos             int
+	MaxEventsPerWeek     int
+	Plan                 string
+	ToSAcceptedAt        *time.Time
 	UpgradeRequestedAt   *time.Time
 	StripeCustomerID     *string
 	StripeSubscriptionID *string

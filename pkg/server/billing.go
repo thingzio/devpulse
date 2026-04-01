@@ -52,8 +52,8 @@ func checkoutHandler(db *sql.DB, cfg *billing.Config) http.HandlerFunc {
 				http.Error(w, "error creating customer", http.StatusInternalServerError)
 				return
 			}
-			if err := tenant.UpdateStripeCustomer(r.Context(), db, tn.ID, customerID); err != nil {
-				slog.Error("saving stripe customer id", "error", err)
+			if saveErr := tenant.UpdateStripeCustomer(r.Context(), db, tn.ID, customerID); saveErr != nil {
+				slog.Error("saving stripe customer id", "error", saveErr)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 				return
 			}
@@ -70,7 +70,7 @@ func checkoutHandler(db *sql.DB, cfg *billing.Config) http.HandlerFunc {
 	}
 }
 
-func billingPortalHandler(db *sql.DB, cfg *billing.Config) http.HandlerFunc {
+func billingPortalHandler(cfg *billing.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
