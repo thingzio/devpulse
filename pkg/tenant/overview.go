@@ -156,6 +156,14 @@ func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int,
 	return count, nil
 }
 
+func GetActiveRepoCount(ctx context.Context, db *sql.DB, tenantID string) (int, error) {
+	var count int
+	if err := db.QueryRowContext(ctx, tenantActiveRepoCountSQL, tenantID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting active repos: %w", err)
+	}
+	return count, nil
+}
+
 func startOfWeek() time.Time {
 	return startOfWeekFrom(time.Now().UTC())
 }
