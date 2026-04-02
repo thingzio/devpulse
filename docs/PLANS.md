@@ -8,7 +8,7 @@ This document defines the plan tiers, per-feature gating, and implementation opt
 
 ## Plan Matrix
 
-|                          | Free        | Standard ($4.99) | Pro ($9.99)             | Enterprise (Custom)     |
+|                          | Free        | Starter ($4.99) | Pro ($9.99)             | Enterprise (Custom)     |
 |--------------------------|-------------|-------------------|-------------------------|-------------------------|
 | **Repos**                | 1           | 5                 | 25                      | Unlimited               |
 | **Data Retention**       | 3 months    | 1 year            | 3 years                 | Unlimited               |
@@ -41,7 +41,7 @@ type Limits struct {
 }
 ```
 
-A new `Standard` plan constant is added between `Free` and `Pro`.
+A new `Starter` plan constant is added between `Free` and `Pro`.
 
 ---
 
@@ -72,7 +72,7 @@ This is a UI-level date range clamp, not data purging. Most data queries already
 1. **Server-side only (recommended):** Compute the earliest allowed date (`NOW() - interval`) in each data handler and pass it as a floor to the store query. Simple, tamper-proof.
 2. **Server + client:** Also disable UI date ranges beyond the plan limit for better UX. Slightly more work but avoids confusing "no data" responses.
 
-### 3. Data Export — PDF (Standard+)
+### 3. Data Export — PDF (Starter+)
 
 **Effort:** Low
 
@@ -120,11 +120,11 @@ The Claude API call happens in `pkg/importer/importer.go:240` via `data.Generate
 
 **Implementation options:**
 
-1. **Prompt variation (recommended):** Pass the AI level to `GenerateInsights`. When `AILevel == 1`, the system prompt instructs the LLM to generate only narrative insights, no action items. When `AILevel == 2`, include action items. This saves tokens for Standard since the response is shorter, and the prompt explicitly omits the action items schema.
-2. **Post-filter:** Always generate full insights+actions, strip action items before storing for Standard plans. Simpler code but wastes API tokens — defeats the cost-saving purpose.
+1. **Prompt variation (recommended):** Pass the AI level to `GenerateInsights`. When `AILevel == 1`, the system prompt instructs the LLM to generate only narrative insights, no action items. When `AILevel == 2`, include action items. This saves tokens for Starter since the response is shorter, and the prompt explicitly omits the action items schema.
+2. **Post-filter:** Always generate full insights+actions, strip action items before storing for Starter plans. Simpler code but wastes API tokens — defeats the cost-saving purpose.
 3. **Separate prompts:** Two distinct prompt templates. More maintenance but maximum control over token usage per tier.
 
-**Cost impact:** This is the highest-value gate. Free tenants make zero Claude API calls. Standard tenants get shorter responses (fewer output tokens). Pro/Enterprise get the full generation.
+**Cost impact:** This is the highest-value gate. Free tenants make zero Claude API calls. Starter tenants get shorter responses (fewer output tokens). Pro/Enterprise get the full generation.
 
 ### 6. Reputation Score (Shallow / Deep)
 
@@ -220,7 +220,7 @@ CREATE POLICY tenant_api_key_policy ON tenant_api_key
 Settings page gains an "API Keys" section:
 - Table: name, prefix (`dp_a1b2...`), created date, last used date, revoke button
 - "Create Key" form: name input, submit → modal showing the full key once with copy button
-- Plan gate: section hidden or shows upgrade prompt for Free/Standard tenants
+- Plan gate: section hidden or shows upgrade prompt for Free/Starter tenants
 
 ### 8. Import Frequency (Daily / Hourly / Hourly + On-demand)
 
@@ -237,7 +237,7 @@ The importer uses a `SKIP LOCKED` claim queue (`pkg/tenant/import.go`). `Prepare
 
 **Implementation options:**
 
-1. **Two Cloud Run jobs (recommended):** A daily-schedule job and an hourly-schedule job. Both call the same `devpulse-import` binary. `PrepareImportQueue` checks each repo's plan interval against its last import time, only making eligible repos available for claiming. Free repos only become claimable when 24h have passed; Standard+ repos become claimable every hour.
+1. **Two Cloud Run jobs (recommended):** A daily-schedule job and an hourly-schedule job. Both call the same `devpulse-import` binary. `PrepareImportQueue` checks each repo's plan interval against its last import time, only making eligible repos available for claiming. Free repos only become claimable when 24h have passed; Starter+ repos become claimable every hour.
 2. **Single job with plan-aware queue:** One hourly job, but `PrepareImportQueue` filters by plan. Simpler infra but Free tenants still trigger a job start even when no work is available. The two-job approach is cleaner since each job only runs repos at its cadence.
 
 **On-demand import (Pro+):**
@@ -252,7 +252,7 @@ Alternatively, the site binary could invoke the import logic directly (it alread
 
 ### Phase 1: Plan Infrastructure + Low-Effort Gates
 
-Prerequisites: Stripe integration (feature branch pending), Standard tier added.
+Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 
 | Feature | Gate Point | Effort |
 |---------|-----------|--------|
@@ -285,8 +285,7 @@ Prerequisites: Stripe integration (feature branch pending), Standard tier added.
 
 ## Open Questions
 
-1. **Standard tier naming:** "Standard" vs "Starter" vs "Team" — does "Standard" convey enough value at $4.99?
-2. **Downgrade behavior:** When a tenant downgrades from Pro to Standard, do we immediately hide data beyond 1 year, or show a grace period?
+1. **Downgrade behavior:** When a tenant downgrades from Pro to Starter, do we immediately hide data beyond 1 year, or show a grace period?
 3. **AI action items format:** Are action items stored separately from insights today, or embedded in the same text blob? This affects how cleanly we can split the two tiers.
 4. **On-demand import throttle:** Should on-demand imports have a cooldown (e.g., max 1 per hour per repo) to prevent abuse?
 5. **CSV export scope:** Export current repo only, or all repos for the tenant in one ZIP?
