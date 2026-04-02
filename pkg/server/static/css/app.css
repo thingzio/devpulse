@@ -179,8 +179,8 @@ fieldset {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 50px;
+  height: 50px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   background: var(--white);
@@ -263,7 +263,7 @@ fieldset {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    height: 32px;
+    height: 50px;
     padding: 0 10px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -314,7 +314,7 @@ fieldset {
 #period-select {
   font-size: 1.2rem;
   font-weight: 700;
-  height: 32px;
+  height: 50px;
   padding: 0 8px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
