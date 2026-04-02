@@ -55,7 +55,7 @@ echo "REPOS"
 echo "${BODY}" | jq -r '
     if (.repos | length) == 0 then "  (none)"
     else
-        ["  NAME", "EVENTS", "WEEKLY %", "LAST IMPORT"],
+        ["  NAME", "EVENTS", "WEEKLY-%", "LAST-IMPORT"],
         (.repos[] | [
             "  \(.name)",
             (.events | tostring),
