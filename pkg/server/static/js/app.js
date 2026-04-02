@@ -2442,6 +2442,7 @@ $(function() {
             $results.removeClass('visible');
         }
     });
+});
 
 // --- PDF Report Generation ---
 
@@ -3041,5 +3042,3 @@ function generatePDF() {
         btn.removeClass("loading").prop("disabled", false);
     });
 }
-
-});
