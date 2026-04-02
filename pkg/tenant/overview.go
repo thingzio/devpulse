@@ -73,7 +73,7 @@ const tenantActiveRepoCountSQL = `
 // GetOverview returns the full overview response with repo data and usage summary.
 func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (*OverviewResponse, error) {
 	since := time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
-	weekStart := startOfWeek().Format("2006-01-02")
+	weekStart := StartOfWeek().Format("2006-01-02")
 
 	// Get tenant limits
 	var plan string
@@ -142,7 +142,7 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 
 // GetWeeklyEventCount returns the total events this week for a tenant's repos.
 func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int, error) {
-	weekStart := startOfWeek().Format("2006-01-02")
+	weekStart := StartOfWeek().Format("2006-01-02")
 	var count int
 	err := db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
@@ -156,7 +156,8 @@ func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int,
 	return count, nil
 }
 
-func startOfWeek() time.Time {
+// StartOfWeek returns the Monday 00:00 UTC of the current week.
+func StartOfWeek() time.Time {
 	return startOfWeekFrom(time.Now().UTC())
 }
 
