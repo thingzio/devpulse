@@ -16,10 +16,11 @@ import (
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 const (
-	defaultAuthURL  = "https://github.com/login/oauth/authorize"
-	defaultTokenURL = "https://github.com/login/oauth/access_token" //nolint:gosec // not a credential
-	defaultUserURL  = "https://api.github.com/user"
-	oauthScope      = "read:user user:email"
+	defaultAuthURL   = "https://github.com/login/oauth/authorize"
+	defaultTokenURL  = "https://github.com/login/oauth/access_token" //nolint:gosec // not a credential
+	defaultUserURL   = "https://api.github.com/user"
+	defaultEmailsURL = "https://api.github.com/user/emails"
+	oauthScope       = "read:user user:email"
 )
 
 // Config holds GitHub OAuth App credentials.
@@ -30,6 +31,7 @@ type Config struct {
 	AuthURL      string // override for testing
 	TokenURL     string // override for testing
 	UserURL      string // override for testing
+	EmailsURL    string // override for testing
 }
 
 // GitHubUser represents the authenticated GitHub user profile.
@@ -127,7 +129,51 @@ func FetchUser(ctx context.Context, cfg *Config, token string) (*GitHubUser, err
 	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
 		return nil, fmt.Errorf("decoding user: %w", err)
 	}
+
+	if user.Email == "" {
+		emailsURL := cfg.EmailsURL
+		if emailsURL == "" {
+			emailsURL = defaultEmailsURL
+		}
+		user.Email = fetchPrimaryEmail(ctx, emailsURL, token)
+	}
+
 	return &user, nil
+}
+
+// fetchPrimaryEmail calls GET /user/emails to find the primary verified email.
+// Returns empty string on any failure (best-effort).
+func fetchPrimaryEmail(ctx context.Context, emailsURL, token string) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, emailsURL, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return ""
+	}
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email
+		}
+	}
+	return ""
 }
 
 func randomState() string {

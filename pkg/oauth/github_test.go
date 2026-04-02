@@ -126,6 +126,46 @@ func TestFetchUser_InvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "decoding user")
 }
 
+func TestFetchUser_EmailFallback(t *testing.T) {
+	userServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":99,"login":"nomail","email":"","avatar_url":"https://a.url"}`))
+	}))
+	defer userServer.Close()
+
+	emailsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[
+			{"email":"secondary@example.com","primary":false,"verified":true},
+			{"email":"primary@example.com","primary":true,"verified":true}
+		]`))
+	}))
+	defer emailsServer.Close()
+
+	cfg := &Config{UserURL: userServer.URL, EmailsURL: emailsServer.URL}
+	user, err := FetchUser(context.Background(), cfg, "token")
+	require.NoError(t, err)
+	assert.Equal(t, "primary@example.com", user.Email)
+}
+
+func TestFetchUser_EmailFallbackFailure(t *testing.T) {
+	userServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":99,"login":"nomail","email":"","avatar_url":"https://a.url"}`))
+	}))
+	defer userServer.Close()
+
+	emailsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer emailsServer.Close()
+
+	cfg := &Config{UserURL: userServer.URL, EmailsURL: emailsServer.URL}
+	user, err := FetchUser(context.Background(), cfg, "token")
+	require.NoError(t, err)
+	assert.Empty(t, user.Email)
+}
+
 func TestBuildAuthURL_StateLength(t *testing.T) {
 	cfg := &Config{ClientID: "abc"}
 	_, state := BuildAuthURL(cfg)
