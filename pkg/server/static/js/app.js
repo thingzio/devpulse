@@ -2456,6 +2456,116 @@ var PDF_COLORS = {
     muted: '#999999'
 };
 
+function pdfRenderChart(width, height, chartConfig) {
+    var container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    container.appendChild(canvas);
+    document.body.appendChild(container);
+
+    chartConfig.options = chartConfig.options || {};
+    chartConfig.options.animation = false;
+    chartConfig.options.responsive = false;
+    chartConfig.options.devicePixelRatio = 2;
+
+    var chart = new Chart(canvas.getContext('2d'), chartConfig);
+    var img = canvas.toDataURL('image/png');
+    chart.destroy();
+    document.body.removeChild(container);
+    return img;
+}
+
+function pdfLightScales(opts, extraY) {
+    opts.scales = opts.scales || {};
+    ['x', 'y', 'y1'].forEach(function(axis) {
+        if (opts.scales[axis]) {
+            opts.scales[axis].ticks = opts.scales[axis].ticks || {};
+            opts.scales[axis].ticks.color = PDF_COLORS.text;
+            opts.scales[axis].ticks.font = { size: 9 };
+            opts.scales[axis].grid = opts.scales[axis].grid || {};
+            if (!opts.scales[axis].grid.drawOnChartArea || opts.scales[axis].grid.drawOnChartArea !== false) {
+                opts.scales[axis].grid.color = PDF_COLORS.grid;
+            }
+        }
+    });
+    opts.plugins = opts.plugins || {};
+    opts.plugins.legend = opts.plugins.legend || {};
+    opts.plugins.legend.labels = opts.plugins.legend.labels || {};
+    opts.plugins.legend.labels.color = PDF_COLORS.text;
+    opts.plugins.legend.labels.font = { size: 8 };
+    return opts;
+}
+
+function pdfLineChartConfig(labels, datasets) {
+    var opts = {
+        responsive: false,
+        plugins: { legend: { display: datasets.length > 1 } },
+        scales: {
+            x: { ticks: { maxTicksLimit: 10 } },
+            y: { beginAtZero: false, ticks: { precision: 0 } }
+        }
+    };
+    return { type: 'line', data: { labels: labels, datasets: datasets }, options: pdfLightScales(opts) };
+}
+
+function pdfBarChartConfig(labels, datasets) {
+    var opts = {
+        responsive: false,
+        plugins: { legend: { display: datasets.length > 1 } },
+        scales: {
+            x: { ticks: { maxTicksLimit: 12 } },
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    };
+    return { type: 'bar', data: { labels: labels, datasets: datasets }, options: pdfLightScales(opts) };
+}
+
+function pdfStackedBarConfig(labels, datasets) {
+    var opts = {
+        responsive: false,
+        plugins: { legend: { display: true } },
+        scales: {
+            x: { stacked: true, ticks: { maxTicksLimit: 12 } },
+            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+        }
+    };
+    return { type: 'bar', data: { labels: labels, datasets: datasets }, options: pdfLightScales(opts) };
+}
+
+function pdfMixedBarLineConfig(labels, barDatasets, lineDatasets) {
+    var allDS = [];
+    barDatasets.forEach(function(d) { d.order = 2; allDS.push(d); });
+    lineDatasets.forEach(function(d) { d.type = 'line'; d.order = 1; d.fill = false; allDS.push(d); });
+    var opts = {
+        responsive: false,
+        plugins: { legend: { display: true } },
+        scales: {
+            x: { ticks: { maxTicksLimit: 12 } },
+            y: { beginAtZero: true, position: 'left', ticks: { precision: 0 } },
+            y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0 } }
+        }
+    };
+    return { type: 'bar', data: { labels: labels, datasets: allDS }, options: pdfLightScales(opts) };
+}
+
+function pdfDualAxisLineBarConfig(labels, barDatasets, lineDatasets) {
+    var allDS = [];
+    barDatasets.forEach(function(d) { d.order = 2; d.yAxisID = 'y'; allDS.push(d); });
+    lineDatasets.forEach(function(d) { d.type = 'line'; d.order = 1; d.fill = false; d.yAxisID = 'y1'; allDS.push(d); });
+    var opts = {
+        responsive: false,
+        plugins: { legend: { display: true } },
+        scales: {
+            x: { ticks: { maxTicksLimit: 12 } },
+            y: { beginAtZero: true, position: 'left', ticks: { precision: 0 } },
+            y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0 } }
+        }
+    };
+    return { type: 'bar', data: { labels: labels, datasets: allDS }, options: pdfLightScales(opts) };
+}
+
 function generatePDF() {
     var org = searchCriteria.org || "";
     var repo = searchCriteria.repo || "";
@@ -2586,13 +2696,49 @@ function generatePDF() {
     y += SECTION_GAP;
 
     Promise.all([
-        fetchJSON('/data/insights/summary?m=' + months + '&o=' + org + '&r=' + repo + '&e='),
+        fetchJSON('/data/insights/summary?' + q),
         fetchJSON('/data/insights/repo-meta?o=' + org + '&r=' + repo),
-        fetchJSON('/data/insights/generated?o=' + org + '&r=' + repo)
+        fetchJSON('/data/insights/generated?o=' + org + '&r=' + repo),
+        fetchJSON('/data/insights/repo-metric-history?' + q),
+        fetchJSON('/data/type?' + q),
+        fetchJSON('/data/insights/pr-size?' + q),
+        fetchJSON('/data/insights/forks-and-activity?' + q),
+        fetchJSON('/data/insights/issue-ratio?' + q),
+        fetchJSON('/data/insights/time-to-first-response?' + q),
+        fetchJSON('/data/insights/time-to-merge?' + q),
+        fetchJSON('/data/insights/change-failure-rate?' + q),
+        fetchJSON('/data/insights/release-cadence?' + q),
+        fetchJSON('/data/insights/release-downloads?m=' + months + '&o=' + org + '&r=' + repo),
+        fetchJSON('/data/insights/pr-ratio?' + q),
+        fetchJSON('/data/insights/review-latency?' + q),
+        fetchJSON('/data/insights/time-to-close?' + q),
+        fetchJSON('/data/insights/time-to-restore?' + q),
+        fetchJSON('/data/insights/retention?' + q),
+        fetchJSON('/data/insights/contributor-momentum?' + q),
+        fetchJSON('/data/insights/contributor-funnel?' + q)
     ]).then(function (results) {
-        var summaryData = results[0];
-        var repoMeta = results[1];
-        var insightsData = results[2];
+        var summaryData      = results[0];
+        var repoMeta         = results[1];
+        var insightsData     = results[2];
+        var metricHistory    = results[3];
+        var timeEvents       = results[4];
+        var prSizeData       = results[5];
+        var forksActivity    = results[6];
+        var issueRatio       = results[7];
+        var ttfr             = results[8];
+        var ttm              = results[9];
+        var cfr              = results[10];
+        var relCadence       = results[11];
+        var relDownloads     = results[12];
+        var prRatio          = results[13];
+        var reviewLatency    = results[14];
+        var ttc              = results[15];
+        var ttr              = results[16];
+        var retention        = results[17];
+        var momentum         = results[18];
+        var funnel           = results[19];
+
+        var chartCol, img;
 
         // ========== HEALTH SECTION ==========
         sectionHeader('Health');
@@ -2621,23 +2767,253 @@ function generatePDF() {
             });
             y = doc.lastAutoTable.finalY + 10;
         }
+
+        // Health charts: Stars Trend, Forks Trend
+        chartCol = 0;
+        if (metricHistory && metricHistory.length > 0) {
+            var mhLabels = metricHistory.map(function(d) { return d.date; });
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(mhLabels, [{
+                label: 'Stars', data: metricHistory.map(function(d) { return d.stars; }),
+                borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 1
+            }]));
+            placeChartWithLabel(img, 'Stars Trend', chartCol);
+            chartCol = (chartCol + 1) % 2;
+
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(mhLabels, [{
+                label: 'Forks', data: metricHistory.map(function(d) { return d.forks; }),
+                borderColor: colors[1], backgroundColor: colors[1] + '33', fill: true, tension: 0.3, pointRadius: 1
+            }]));
+            placeChartWithLabel(img, 'Forks Trend', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+        if (chartCol === 1) { y += CHART_H + CHART_GAP; }
         y += SECTION_GAP;
 
-        // Placeholder for chart sections (Tasks 4 & 5 will add chart rendering here)
         // ========== ACTIVITY SECTION ==========
         sectionHeader('Activity');
+        chartCol = 0;
+        var hasActivity = false;
+
+        // Time Events (stacked bar + line)
+        if (timeEvents && timeEvents.dates && timeEvents.dates.length > 0) {
+            hasActivity = true;
+            var teDS = [
+                { label: 'PR', data: timeEvents.pr, backgroundColor: colors[0], borderWidth: 1 },
+                { label: 'PR-Review', data: timeEvents.pr_review, backgroundColor: colors[1], borderWidth: 1 },
+                { label: 'Issue', data: timeEvents.issue, backgroundColor: colors[2], borderWidth: 1 },
+                { label: 'Issue-Comment', data: timeEvents.issue_comment, backgroundColor: colors[3], borderWidth: 1 },
+                { label: 'Fork', data: timeEvents.fork, backgroundColor: colors[4], borderWidth: 1 }
+            ];
+            var teCfg = pdfStackedBarConfig(timeEvents.dates, teDS);
+            if (timeEvents.total) {
+                teCfg.data.datasets.push({
+                    label: 'Total', type: 'line', data: timeEvents.total,
+                    borderColor: colors[5], borderWidth: 2, pointRadius: 1, tension: 0.2, fill: false, order: 0
+                });
+            }
+            img = pdfRenderChart(500, 300, teCfg);
+            placeChartWithLabel(img, 'Events Over Time', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // PR Size (stacked bar)
+        if (prSizeData && prSizeData.months && prSizeData.months.length > 0) {
+            hasActivity = true;
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(prSizeData.months, [
+                { label: 'S (<50)', data: prSizeData.small, backgroundColor: colors[1] },
+                { label: 'M (50-250)', data: prSizeData.medium, backgroundColor: colors[0] },
+                { label: 'L (250-1K)', data: prSizeData.large, backgroundColor: colors[2] },
+                { label: 'XL (>1K)', data: prSizeData.xlarge, backgroundColor: colors[3] }
+            ]));
+            placeChartWithLabel(img, 'PR Size Distribution', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Forks & Activity (dual axis line)
+        if (forksActivity && forksActivity.months && forksActivity.months.length > 0) {
+            hasActivity = true;
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(forksActivity.months,
+                [{ label: 'Forks', data: forksActivity.forks, backgroundColor: colors[0] + '40', borderColor: colors[0], borderWidth: 2 }],
+                [{ label: 'Events', data: forksActivity.events, borderColor: colors[3], borderWidth: 2, tension: 0.3 }]
+            ));
+            placeChartWithLabel(img, 'Forks & Activity', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Issue Ratio (stacked bar)
+        if (issueRatio && issueRatio.months && issueRatio.months.length > 0) {
+            hasActivity = true;
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(issueRatio.months, [
+                { label: 'Opened', data: issueRatio.opened, backgroundColor: colors[3] },
+                { label: 'Closed', data: issueRatio.closed, backgroundColor: colors[2] }
+            ]));
+            placeChartWithLabel(img, 'Issue Ratio', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        if (!hasActivity) { noDataMsg('Activity'); }
+        if (chartCol === 1) { y += CHART_H + CHART_GAP; }
         y += SECTION_GAP;
 
         // ========== VELOCITY SECTION ==========
         sectionHeader('Velocity');
+        chartCol = 0;
+        var hasVelocity = false;
+
+        // Time to First Response
+        if (ttfr && ttfr.months && ttfr.months.length > 0) {
+            hasVelocity = true;
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttfr.months, [
+                { label: 'Issues (avg hrs)', data: ttfr.issue_avg, backgroundColor: colors[3], borderWidth: 1 },
+                { label: 'PRs (avg hrs)', data: ttfr.pr_avg, backgroundColor: colors[2], borderWidth: 1 }
+            ]));
+            placeChartWithLabel(img, 'Time to First Response', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Time to Merge (bar + line dual axis)
+        if (ttm && ttm.months && ttm.months.length > 0) {
+            hasVelocity = true;
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(ttm.months,
+                [{ label: 'Avg Days', data: ttm.avg_days, backgroundColor: colors[2], borderWidth: 1 }],
+                [{ label: 'Count', data: ttm.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
+            ));
+            placeChartWithLabel(img, 'Time to Merge', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Change Failure Rate
+        if (cfr && cfr.months && cfr.months.length > 0) {
+            hasVelocity = true;
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(cfr.months, [{
+                label: 'Failure Rate %', data: cfr.rate,
+                borderColor: colors[3], backgroundColor: colors[3] + '33', fill: true, tension: 0.3, pointRadius: 2
+            }]));
+            placeChartWithLabel(img, 'Change Failure Rate', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Release Cadence
+        if (relCadence && relCadence.months && relCadence.months.length > 0) {
+            hasVelocity = true;
+            var rcCfg = pdfBarChartConfig(relCadence.months, [
+                { label: 'Total', data: relCadence.total, backgroundColor: colors[4], borderWidth: 1 },
+                { label: 'Stable', data: relCadence.stable, backgroundColor: colors[1], borderWidth: 1 }
+            ]);
+            if (relCadence.deployments) {
+                rcCfg.data.datasets.push({
+                    label: 'Deployments', type: 'line', data: relCadence.deployments,
+                    borderColor: colors[3], borderWidth: 2, borderDash: [5, 5], fill: false, tension: 0.3, order: 0
+                });
+            }
+            img = pdfRenderChart(500, 300, rcCfg);
+            placeChartWithLabel(img, 'Release Cadence', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Release Downloads
+        if (relDownloads && relDownloads.months && relDownloads.months.length > 0) {
+            hasVelocity = true;
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(relDownloads.months, [{
+                label: 'Downloads', data: relDownloads.downloads,
+                borderColor: colors[0], backgroundColor: colors[0] + '20', fill: true, tension: 0.3, borderWidth: 2
+            }]));
+            placeChartWithLabel(img, 'Release Downloads', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        if (!hasVelocity) { noDataMsg('Velocity'); }
+        if (chartCol === 1) { y += CHART_H + CHART_GAP; }
         y += SECTION_GAP;
 
         // ========== QUALITY SECTION ==========
         sectionHeader('Quality');
+        chartCol = 0;
+        var hasQuality = false;
+
+        // PR Ratio (mixed bar + line with dual axis)
+        if (prRatio && prRatio.months && prRatio.months.length > 0) {
+            hasQuality = true;
+            img = pdfRenderChart(500, 300, pdfMixedBarLineConfig(prRatio.months,
+                [
+                    { label: 'PRs', data: prRatio.prs, backgroundColor: colors[0], borderWidth: 1, yAxisID: 'y' },
+                    { label: 'Reviews', data: prRatio.reviews, backgroundColor: colors[1], borderWidth: 1, yAxisID: 'y' }
+                ],
+                [{ label: 'Ratio', data: prRatio.ratio, borderColor: colors[3], borderWidth: 2, tension: 0.3, yAxisID: 'y1' }]
+            ));
+            placeChartWithLabel(img, 'PR Review Ratio', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Review Latency (bar + line dual axis)
+        if (reviewLatency && reviewLatency.months && reviewLatency.months.length > 0) {
+            hasQuality = true;
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(reviewLatency.months,
+                [{ label: 'Avg Hours', data: reviewLatency.avg_hours, backgroundColor: colors[2], borderWidth: 1 }],
+                [{ label: 'Count', data: reviewLatency.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
+            ));
+            placeChartWithLabel(img, 'Review Latency', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Time to Close (bar chart with two series)
+        if (ttc && ttc.months && ttc.months.length > 0) {
+            hasQuality = true;
+            var ttcDS = [{ label: 'All Issues', data: ttc.avg_days, backgroundColor: colors[2], borderWidth: 1 }];
+            if (ttr && ttr.avg_days) {
+                ttcDS.push({ label: 'Bug (near release)', data: ttr.avg_days, backgroundColor: colors[3], borderWidth: 1 });
+            }
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttc.months, ttcDS));
+            placeChartWithLabel(img, 'Time to Close', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        if (!hasQuality) { noDataMsg('Quality'); }
+        if (chartCol === 1) { y += CHART_H + CHART_GAP; }
         y += SECTION_GAP;
 
         // ========== COMMUNITY SECTION ==========
         sectionHeader('Community');
+        chartCol = 0;
+        var hasCommunity = false;
+
+        // Retention (stacked bar)
+        if (retention && retention.months && retention.months.length > 0) {
+            hasCommunity = true;
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(retention.months, [
+                { label: 'New', data: retention['new'], backgroundColor: colors[1], borderWidth: 1 },
+                { label: 'Returning', data: retention.returning, backgroundColor: colors[0], borderWidth: 1 }
+            ]));
+            placeChartWithLabel(img, 'Contributor Retention', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Contributor Momentum (line + bar dual axis)
+        if (momentum && momentum.months && momentum.months.length > 0) {
+            hasCommunity = true;
+            var momDelta = momentum.delta || [];
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(momentum.months,
+                [{ label: 'Delta', data: momDelta, backgroundColor: momDelta.map(function(d) { return d >= 0 ? colors[1] + '88' : colors[3] + '88'; }), borderWidth: 0 }],
+                [{ label: 'Active (3mo rolling)', data: momentum.active, borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
+            ));
+            placeChartWithLabel(img, 'Contributor Momentum', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        // Contributor Funnel (grouped bar)
+        if (funnel && funnel.months && funnel.months.length > 0) {
+            hasCommunity = true;
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(funnel.months, [
+                { label: 'First Comment', data: funnel.first_comment, backgroundColor: colors[0] },
+                { label: 'First PR', data: funnel.first_pr, backgroundColor: colors[1] },
+                { label: 'First Merge', data: funnel.first_merge, backgroundColor: colors[4] }
+            ]));
+            placeChartWithLabel(img, 'Contributor Funnel', chartCol);
+            chartCol = (chartCol + 1) % 2;
+        }
+
+        if (!hasCommunity) { noDataMsg('Community'); }
+        if (chartCol === 1) { y += CHART_H + CHART_GAP; }
         y += SECTION_GAP;
 
         // ========== INSIGHTS SECTION ==========
