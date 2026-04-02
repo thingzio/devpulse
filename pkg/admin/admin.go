@@ -61,7 +61,7 @@ const (
 
 // Run starts the admin HTTP server and blocks until ctx is canceled.
 func Run(ctx context.Context) error {
-	store, err := postgres.NewFromEnv()
+	store, err := postgres.NewFromEnv(postgres.AdminPoolConfig())
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
 	}

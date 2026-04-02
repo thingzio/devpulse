@@ -17,7 +17,7 @@ import (
 // Run iterates active repos via a SKIP LOCKED claim queue and imports each one.
 // Multiple concurrent executions safely share work without overlap.
 func Run(ctx context.Context) error {
-	store, err := postgres.NewFromEnv()
+	store, err := postgres.NewFromEnv(postgres.ImportPoolConfig())
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -35,28 +36,77 @@ type Store struct {
 	pool *sql.DB // original pool, used for Close() and DB()
 }
 
-const (
-	maxOpenConns    = 25
-	maxIdleConns    = 10
-	connMaxLifetime = 5 * time.Minute
-	connMaxIdleTime = 1 * time.Minute
-)
+// PoolConfig controls database connection pool sizing.
+type PoolConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+}
+
+// DefaultPoolConfig returns pool settings suitable for the site service.
+func DefaultPoolConfig() PoolConfig {
+	return PoolConfig{
+		MaxOpenConns:    17,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+}
+
+// ImportPoolConfig returns smaller pool settings suitable for batch import workers.
+func ImportPoolConfig() PoolConfig {
+	return PoolConfig{
+		MaxOpenConns:    5,
+		MaxIdleConns:    2,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+}
+
+// AdminPoolConfig returns minimal pool settings for the admin service.
+func AdminPoolConfig() PoolConfig {
+	return PoolConfig{
+		MaxOpenConns:    3,
+		MaxIdleConns:    1,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+}
+
+// applyEnvOverrides lets DB_MAX_OPEN_CONNS and DB_MAX_IDLE_CONNS override code defaults.
+func (c *PoolConfig) applyEnvOverrides() {
+	if v, err := strconv.Atoi(os.Getenv("DB_MAX_OPEN_CONNS")); err == nil && v > 0 {
+		c.MaxOpenConns = v
+	}
+	if v, err := strconv.Atoi(os.Getenv("DB_MAX_IDLE_CONNS")); err == nil && v > 0 {
+		c.MaxIdleConns = v
+	}
+}
 
 // New creates a new PostgreSQL Store, running migrations automatically.
-func New(dsn string) (*Store, error) {
+// Uses DefaultPoolConfig if no config is provided.
+// DB_MAX_OPEN_CONNS and DB_MAX_IDLE_CONNS env vars override code defaults.
+func New(dsn string, cfgs ...PoolConfig) (*Store, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("dsn not specified")
 	}
+
+	cfg := DefaultPoolConfig()
+	if len(cfgs) > 0 {
+		cfg = cfgs[0]
+	}
+	cfg.applyEnvOverrides()
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	db.SetMaxOpenConns(maxOpenConns)
-	db.SetMaxIdleConns(maxIdleConns)
-	db.SetConnMaxLifetime(connMaxLifetime)
-	db.SetConnMaxIdleTime(connMaxIdleTime)
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	if err := db.PingContext(context.Background()); err != nil {
 		db.Close()
@@ -91,12 +141,13 @@ func (s *Store) DB() *sql.DB {
 }
 
 // NewFromEnv creates a Store from DATABASE_URL env var, runs base + SaaS migrations.
-func NewFromEnv() (*Store, error) {
+// Uses DefaultPoolConfig if no config is provided.
+func NewFromEnv(cfgs ...PoolConfig) (*Store, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
-	store, err := New(dsn)
+	store, err := New(dsn, cfgs...)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
