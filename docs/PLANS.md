@@ -118,13 +118,9 @@ The Claude API call happens in `pkg/importer/importer.go:240` via `data.Generate
 - `pkg/importer/importer.go` — skip `GenerateInsights` call when `AILevel == 0`
 - `pkg/data/insights_gen.go` — vary the prompt based on AI level
 
-**Implementation options:**
+**Implementation:** Always generate full insights + action items (single prompt, single stored result). Gate at the display layer — only show action items to Pro+ tenants. This avoids prompt-variation complexity, especially when the same repo is tracked by tenants on different plans.
 
-1. **Prompt variation (recommended):** Pass the AI level to `GenerateInsights`. When `AILevel == 1`, the system prompt instructs the LLM to generate only narrative insights, no action items. When `AILevel == 2`, include action items. This saves tokens for Starter since the response is shorter, and the prompt explicitly omits the action items schema.
-2. **Post-filter:** Always generate full insights+actions, strip action items before storing for Starter plans. Simpler code but wastes API tokens — defeats the cost-saving purpose.
-3. **Separate prompts:** Two distinct prompt templates. More maintenance but maximum control over token usage per tier.
-
-**Cost impact:** This is the highest-value gate. Free tenants make zero Claude API calls. Starter tenants get shorter responses (fewer output tokens). Pro/Enterprise get the full generation.
+**Cost impact:** Free tenants make zero Claude API calls. Starter/Pro/Enterprise all generate the same full response — the cost difference is gated by whether AI is enabled at all (`AILevel == 0` for Free).
 
 ### 6. Reputation Score (Shallow / Deep)
 
@@ -286,7 +282,7 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 ## Open Questions
 
 1. ~~**Downgrade behavior:**~~ Resolved: downgrade takes effect immediately — data range, features, and limits switch to the new plan with no grace period.
-3. **AI action items format:** Are action items stored separately from insights today, or embedded in the same text blob? This affects how cleanly we can split the two tiers.
+3. ~~**AI action items format:**~~ Resolved: always generate full insights + action items (single prompt). Gate at the display layer — only show action items to Pro+ tenants. Avoids complexity when the same repo is shared across tenants on different plans.
 4. **On-demand import throttle:** Should on-demand imports have a cooldown (e.g., max 1 per hour per repo) to prevent abuse?
 5. **CSV export scope:** Export current repo only, or all repos for the tenant in one ZIP?
 6. **Events-per-week limits:** The current `MaxEventsPerWeek` limits (1000/15000) need re-evaluation against the new repo counts (1/5/25). Should they scale proportionally?
