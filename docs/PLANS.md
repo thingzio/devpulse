@@ -285,7 +285,7 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 
 ## Open Questions
 
-1. **Downgrade behavior:** When a tenant downgrades from Pro to Starter, do we immediately hide data beyond 1 year, or show a grace period?
+1. ~~**Downgrade behavior:**~~ Resolved: downgrade takes effect immediately — data range, features, and limits switch to the new plan with no grace period.
 3. **AI action items format:** Are action items stored separately from insights today, or embedded in the same text blob? This affects how cleanly we can split the two tiers.
 4. **On-demand import throttle:** Should on-demand imports have a cooldown (e.g., max 1 per hour per repo) to prevent abuse?
 5. **CSV export scope:** Export current repo only, or all repos for the tenant in one ZIP?
