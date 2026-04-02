@@ -225,6 +225,9 @@ $(function () {
         initSearchFilters();
         initPeriodSelector();
         initTabs();
+        $("#pdf-download").on("click", function () {
+            if (!$(this).prop("disabled")) { generatePDF(); }
+        });
         var params = new URLSearchParams(window.location.search);
         var paramOrg = params.get("o") || "";
         var paramRepo = params.get("r") || "";
@@ -436,6 +439,7 @@ function applySelection(scope, item, skipPushState) {
     rightChartExcludes = [];
 
     searchItem = item;
+    $("#pdf-download").prop("disabled", scope !== "repo");
     $(".header-term").html(item.value);
 
     resetCharts();
@@ -603,6 +607,7 @@ function resetSearch() {
     $("#result-table-content").empty();
     $("#search-results-wrap").hide();
     searchCriteria.reset();
+    $("#pdf-download").prop("disabled", true);
     clearFilterInputs();
     $("#bus-factor-val").text("—");
     $("#pony-factor-val").text("—");
@@ -2437,4 +2442,228 @@ $(function() {
             $results.removeClass('visible');
         }
     });
+
+// --- PDF Report Generation ---
+
+var PDF_COLORS = {
+    text: '#282828',
+    grid: '#e0e0e0',
+    bg: '#ffffff',
+    accent: '#4a90d9',
+    accent2: '#e55353',
+    accent3: '#50c878',
+    accent4: '#f5a623',
+    muted: '#999999'
+};
+
+function generatePDF() {
+    var org = searchCriteria.org || "";
+    var repo = searchCriteria.repo || "";
+    if (!repo) { return; }
+
+    var months = $("#period_months").val();
+    var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=';
+    var btn = $("#pdf-download");
+
+    if (!btn.find('.pdf-spinner').length) {
+        btn.append('<span class="pdf-spinner"></span>');
+    }
+    btn.addClass("loading").prop("disabled", true);
+
+    var PDF_W = 595.28;
+    var PDF_H = 841.89;
+    var MARGIN = 40;
+    var CONTENT_W = PDF_W - 2 * MARGIN;
+    var CHART_W = (CONTENT_W - 10) / 2;
+    var CHART_H = CHART_W * 0.58;
+    var SECTION_GAP = 18;
+    var CHART_GAP = 10;
+
+    var doc = new jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+    var y = MARGIN;
+
+    function ensureSpace(needed) {
+        if (y + needed > PDF_H - MARGIN) {
+            doc.addPage();
+            y = MARGIN;
+        }
+    }
+
+    function sectionHeader(title) {
+        ensureSpace(30);
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(40, 40, 40);
+        doc.text(title, MARGIN, y);
+        y += 20;
+        doc.setDrawColor(200, 200, 200);
+        doc.line(MARGIN, y, PDF_W - MARGIN, y);
+        y += 10;
+    }
+
+    function placeChart(imgData, col) {
+        var x = MARGIN + col * (CHART_W + CHART_GAP);
+        ensureSpace(CHART_H + 20);
+        doc.addImage(imgData, 'PNG', x, y, CHART_W, CHART_H);
+        if (col === 1) { y += CHART_H + CHART_GAP; }
+    }
+
+    function placeChartWithLabel(imgData, label, col) {
+        var x = MARGIN + col * (CHART_W + CHART_GAP);
+        ensureSpace(CHART_H + 25);
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(100, 100, 100);
+        doc.text(label, x, y);
+        y += 10;
+        doc.addImage(imgData, 'PNG', x, y, CHART_W, CHART_H);
+        if (col === 1) { y += CHART_H + CHART_GAP; }
+    }
+
+    function addKeyValue(label, value) {
+        ensureSpace(16);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(80, 80, 80);
+        doc.text(label + ':', MARGIN, y);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(40, 40, 40);
+        doc.text(String(value != null ? value : '\u2014'), MARGIN + doc.getTextWidth(label + ':  '), y);
+        y += 14;
+    }
+
+    function addInsightBlock(heading, items) {
+        if (!items || items.length === 0) { return; }
+        ensureSpace(20);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(60, 60, 60);
+        doc.text(heading, MARGIN, y);
+        y += 14;
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(40, 40, 40);
+        items.forEach(function (item) {
+            ensureSpace(30);
+            doc.setFont(undefined, 'bold');
+            var lines = doc.splitTextToSize(item.headline || '', CONTENT_W);
+            doc.text(lines, MARGIN + 8, y);
+            y += lines.length * 11;
+            doc.setFont(undefined, 'normal');
+            var detail = doc.splitTextToSize(item.detail || '', CONTENT_W - 8);
+            doc.text(detail, MARGIN + 8, y);
+            y += detail.length * 11 + 6;
+        });
+    }
+
+    function noDataMsg(section) {
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text('No data available for ' + section + '.', MARGIN, y);
+        y += 14;
+    }
+
+    function fetchJSON(url) {
+        return $.get(url).then(
+            function (data) { return data; },
+            function () { return null; }
+        );
+    }
+
+    // Report header
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(org + '/' + repo, MARGIN, y);
+    y += 22;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Period: ' + months + ' months  |  Generated: ' + new Date().toLocaleDateString(), MARGIN, y);
+    y += 20;
+    doc.setDrawColor(180, 180, 180);
+    doc.line(MARGIN, y, PDF_W - MARGIN, y);
+    y += SECTION_GAP;
+
+    Promise.all([
+        fetchJSON('/data/insights/summary?m=' + months + '&o=' + org + '&r=' + repo + '&e='),
+        fetchJSON('/data/insights/repo-meta?o=' + org + '&r=' + repo),
+        fetchJSON('/data/insights/generated?o=' + org + '&r=' + repo)
+    ]).then(function (results) {
+        var summaryData = results[0];
+        var repoMeta = results[1];
+        var insightsData = results[2];
+
+        // ========== HEALTH SECTION ==========
+        sectionHeader('Health');
+
+        if (summaryData) {
+            addKeyValue('Bus Factor', summaryData.bus_factor);
+            addKeyValue('Pony Factor', summaryData.pony_factor);
+        }
+
+        if (repoMeta && repoMeta.length > 0) {
+            var meta = repoMeta[0];
+            doc.autoTable({
+                startY: y,
+                margin: { left: MARGIN, right: MARGIN },
+                head: [['Stars', 'Forks', 'Open Issues', 'Language', 'License']],
+                body: [[
+                    String(meta.stars || 0),
+                    String(meta.forks || 0),
+                    String(meta.open_issues || 0),
+                    meta.language || '\u2014',
+                    meta.license || '\u2014'
+                ]],
+                styles: { fontSize: 9, cellPadding: 4, textColor: [40, 40, 40] },
+                headStyles: { fillColor: [74, 144, 217], textColor: 255 },
+                theme: 'grid'
+            });
+            y = doc.lastAutoTable.finalY + 10;
+        }
+        y += SECTION_GAP;
+
+        // Placeholder for chart sections (Tasks 4 & 5 will add chart rendering here)
+        // ========== ACTIVITY SECTION ==========
+        sectionHeader('Activity');
+        y += SECTION_GAP;
+
+        // ========== VELOCITY SECTION ==========
+        sectionHeader('Velocity');
+        y += SECTION_GAP;
+
+        // ========== QUALITY SECTION ==========
+        sectionHeader('Quality');
+        y += SECTION_GAP;
+
+        // ========== COMMUNITY SECTION ==========
+        sectionHeader('Community');
+        y += SECTION_GAP;
+
+        // ========== INSIGHTS SECTION ==========
+        if (insightsData && insightsData.length > 0 && insightsData[0].insights) {
+            sectionHeader('Insights');
+            var insights = insightsData[0].insights;
+            addInsightBlock('Observations', insights.observations);
+            addInsightBlock('Recommended Actions', insights.actions);
+        }
+
+        // Footer on each page
+        var pageCount = doc.internal.getNumberOfPages();
+        for (var i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text('Generated by DevPulse', MARGIN, PDF_H - 20);
+            doc.text('Page ' + i + ' of ' + pageCount, PDF_W - MARGIN - 50, PDF_H - 20);
+        }
+
+        doc.save('devpulse-' + org + '-' + repo + '-' + new Date().toISOString().slice(0, 10) + '.pdf');
+    }).catch(function (err) {
+        console.error('PDF generation failed:', err);
+    }).always(function () {
+        btn.removeClass("loading").prop("disabled", false);
+    });
+}
+
 });
