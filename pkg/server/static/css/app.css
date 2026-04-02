@@ -259,6 +259,43 @@ fieldset {
   white-space: nowrap;
 }
 
+.pdf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: opacity 0.2s;
+}
+.pdf-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.pdf-btn:not(:disabled):hover {
+    background: var(--border-color);
+}
+.pdf-icon {
+    width: 16px;
+    height: 16px;
+}
+.pdf-btn .pdf-spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: pdf-spin 0.6s linear infinite;
+}
+.pdf-btn.loading .pdf-icon { display: none; }
+.pdf-btn.loading .pdf-spinner { display: inline-block; }
+@keyframes pdf-spin { to { transform: rotate(360deg); } }
+
 .period-label {
   font-size: 0.8rem;
   color: var(--gray);
