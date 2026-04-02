@@ -1433,7 +1433,10 @@ function loadRepoMeta(url) {
 
 function loadStarsTrendChart(url) {
     $.get(url, function (data) {
-        if (!data || data.length === 0) return;
+        if (!data || data.length === 0) {
+            $("#stars-trend-desc").text("No star history available. Data appears after the next import.");
+            return;
+        }
         var labels = [];
         var stars = [];
         $.each(data, function (i, d) {
@@ -1470,7 +1473,10 @@ function loadStarsTrendChart(url) {
 
 function loadForksTrendChart(url) {
     $.get(url, function (data) {
-        if (!data || data.length === 0) return;
+        if (!data || data.length === 0) {
+            $("#forks-trend-desc").text("No fork history available. Data appears after the next import.");
+            return;
+        }
         var labels = [];
         var forks = [];
         $.each(data, function (i, d) {
@@ -1588,6 +1594,11 @@ function loadRepoOverview(url) {
 
 function loadReleaseCadenceChart(url) {
     $.get(url, function (data) {
+        if (!data.months || data.months.length === 0) {
+            $("#release-cadence-chart").closest(".tbl").find(".insight-desc")
+                .text("No GitHub releases published for this scope.");
+            return;
+        }
         if (releaseCadenceChart) releaseCadenceChart.destroy();
         releaseCadenceChart = new Chart($("#release-cadence-chart")[0].getContext("2d"), {
             type: 'bar',
@@ -1632,6 +1643,11 @@ function loadReleaseCadenceChart(url) {
 
 function loadReleaseDownloadsChart(url) {
     $.get(url, function (data) {
+        if (!data.months || data.months.length === 0) {
+            $("#release-downloads-chart").closest(".tbl").find(".insight-desc")
+                .text("No download data. Requires binary assets attached to GitHub releases.");
+            return;
+        }
         if (releaseDownloadsChart) releaseDownloadsChart.destroy();
         releaseDownloadsChart = new Chart($("#release-downloads-chart")[0].getContext("2d"), {
             type: 'line',
@@ -1665,6 +1681,11 @@ function loadReleaseDownloadsChart(url) {
 
 function loadReleaseDownloadsByTagChart(url) {
     $.get(url, function (data) {
+        if (!data.tags || data.tags.length === 0) {
+            $("#release-downloads-by-tag-chart").closest(".tbl").find(".insight-desc")
+                .text("No release download data for this scope.");
+            return;
+        }
         if (releaseDownloadsByTagChart) releaseDownloadsByTagChart.destroy();
         releaseDownloadsByTagChart = new Chart($("#release-downloads-by-tag-chart")[0].getContext("2d"), {
             type: 'bar',
