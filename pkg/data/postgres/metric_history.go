@@ -99,12 +99,14 @@ func (s *Store) ImportRepoMetricHistory(ctx context.Context, token, owner, repo 
 
 	starsByDay, err := countRecentStarsByDay(ctx, client, owner, repo, cutoff)
 	if err != nil {
-		return fmt.Errorf("error counting stars: %w", err)
+		slog.Warn("counting stars by day, using flat history", "org", owner, "repo", repo, "error", err)
+		starsByDay = make(map[string]int)
 	}
 
 	forksByDay, err := countRecentForksByDay(ctx, client, owner, repo, cutoff)
 	if err != nil {
-		return fmt.Errorf("error counting forks: %w", err)
+		slog.Warn("counting forks by day, using flat history", "org", owner, "repo", repo, "error", err)
+		forksByDay = make(map[string]int)
 	}
 
 	history := buildDailyTotals(currentStars, currentForks, starsByDay, forksByDay, backfillDays)
