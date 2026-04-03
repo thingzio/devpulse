@@ -1366,4 +1366,3 @@ func (s *Store) GetSignals(ctx context.Context, org *string, limit int) ([]*data
 
 	return signals, nil
 }
-

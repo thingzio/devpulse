@@ -718,7 +718,7 @@ func buildScorecard(
 			Metrics: map[string]any{
 				"Median Merge (hrs)":   ti.MedianMergeHours,
 				"PR Backlog Delta (%)": ti.PRBacklogDelta,
-				"Aging PRs (%)":       ti.AgingPRsPct,
+				"Aging PRs (%)":        ti.AgingPRsPct,
 			},
 		},
 		Responsiveness: data.HealthCategory{
