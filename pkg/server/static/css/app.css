@@ -1510,3 +1510,58 @@ a.link {
   font-size: 0.9em;
   padding: 0 15px 12px;
 }
+
+/* Health Scorecard */
+.scorecard-row {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+}
+.scorecard-category {
+    flex: 1;
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--bg-secondary, #1e1e2e);
+}
+.scorecard-grade {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.scorecard-name {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+    margin-bottom: 0.75rem;
+}
+.scorecard-metrics {
+    text-align: left;
+    font-size: 0.8rem;
+}
+.scorecard-metric {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+.scorecard-metric:last-child {
+    border-bottom: none;
+}
+.scorecard-metric-label {
+    opacity: 0.7;
+}
+.scorecard-metric-val {
+    font-weight: 600;
+}
+.overall-grade {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-left: 0.5rem;
+}
+.grade-a { color: #22c55e; }
+.grade-b { color: #84cc16; }
+.grade-c { color: #eab308; }
+.grade-d { color: #f97316; }
+.grade-f { color: #ef4444; }

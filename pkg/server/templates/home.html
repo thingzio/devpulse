@@ -105,6 +105,31 @@
     <!-- Health Tab -->
     <div class="tab-content active" data-tab="health">
         <section class="grid">
+            <article class="grid-full-width" id="health-scorecard-panel" style="display:none;">
+                <div class="tbl">
+                    <div class="content-header">
+                        Health Scorecard
+                        <span class="overall-grade" id="sc-overall-grade"></span>
+                    </div>
+                    <div class="scorecard-row">
+                        <div class="scorecard-category" id="sc-demand">
+                            <div class="scorecard-grade" id="sc-demand-grade">-</div>
+                            <div class="scorecard-name">Demand</div>
+                            <div class="scorecard-metrics" id="sc-demand-metrics"></div>
+                        </div>
+                        <div class="scorecard-category" id="sc-throughput">
+                            <div class="scorecard-grade" id="sc-throughput-grade">-</div>
+                            <div class="scorecard-name">Throughput</div>
+                            <div class="scorecard-metrics" id="sc-throughput-metrics"></div>
+                        </div>
+                        <div class="scorecard-category" id="sc-responsiveness">
+                            <div class="scorecard-grade" id="sc-responsiveness-grade">-</div>
+                            <div class="scorecard-name">Responsiveness</div>
+                            <div class="scorecard-metrics" id="sc-responsiveness-metrics"></div>
+                        </div>
+                    </div>
+                </div>
+            </article>
             <article>
                 <div class="tbl">
                     <div class="content-header">

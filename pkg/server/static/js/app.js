@@ -341,6 +341,7 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
+            loadHealthScorecard('/data/insights/health-scorecard?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
@@ -1011,6 +1012,39 @@ function loadRightChart(url, fn, cb) {
     });
 }
 
+
+function loadHealthScorecard(url) {
+    $.get(url, function (data) {
+        if (!data || !data.overall) {
+            $('#health-scorecard-panel').hide();
+            return;
+        }
+        $('#health-scorecard-panel').show();
+        $('#sc-overall-grade').text(data.overall).attr('class', 'overall-grade grade-' + data.overall.toLowerCase());
+        renderScorecardCategory('demand', data.demand);
+        renderScorecardCategory('throughput', data.throughput);
+        renderScorecardCategory('responsiveness', data.responsiveness);
+    }).fail(function () {
+        $('#health-scorecard-panel').hide();
+    });
+}
+
+function renderScorecardCategory(id, cat) {
+    var el = $('#sc-' + id + '-grade');
+    el.text(cat.grade);
+    el.attr('class', 'scorecard-grade grade-' + cat.grade.toLowerCase());
+    var html = '';
+    if (cat.metrics) {
+        for (var key in cat.metrics) {
+            var val = cat.metrics[key];
+            if (typeof val === 'number') {
+                val = val % 1 === 0 ? val.toLocaleString() : val.toFixed(1);
+            }
+            html += '<div class="scorecard-metric"><span class="scorecard-metric-label">' + key + '</span><span class="scorecard-metric-val">' + val + '</span></div>';
+        }
+    }
+    $('#sc-' + id + '-metrics').html(html);
+}
 
 function loadHealthActivitySparkline(url) {
     $.get(url, function (data) {
