@@ -11,6 +11,7 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
@@ -156,10 +157,10 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 		}
 	}
 
-	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg)
+	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg, tn.Plan)
 }
 
-func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig) error {
+func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig, planName string) error {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
 
@@ -201,7 +202,9 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		errs++
 	}
 
-	if token != "" {
+	limits, _ := plan.Get(planName)
+
+	if token != "" && limits.DeepReputation {
 		slog.Info("phase: deep reputation", "org", org, "repo", repo)
 		tokenFn := func() string { return token }
 		if res, err := store.ImportDeepReputation(ctx, tokenFn, deepReputationDefaultLimit, 0, &org, &repo); err != nil {
@@ -210,15 +213,19 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		} else {
 			slog.Info("deep reputation complete", "org", org, "repo", repo, "scored", res.Scored, "errors", res.Errors)
 		}
+	} else if token != "" {
+		slog.Debug("skipping deep reputation, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
 	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
-	if llmCfg != nil {
+	if llmCfg != nil && limits.AILevel > 0 {
 		slog.Info("phase: insights", "org", org, "repo", repo)
 		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
 			slog.Error("generating insights", "org", org, "repo", repo, "error", err)
 			errs++
 		}
+	} else if llmCfg != nil {
+		slog.Debug("skipping insights, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())

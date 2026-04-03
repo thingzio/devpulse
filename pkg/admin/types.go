@@ -39,3 +39,16 @@ type repoDetail struct {
 	WeeklyPct    float64 `json:"weekly_pct"`
 	LastImport   string  `json:"last_import"`
 }
+
+type inviteRequest struct {
+	Username string `json:"username"`
+	Plan     string `json:"plan"`
+}
+
+type inviteResponse struct {
+	Username         string `json:"username"`
+	GitHubID         int64  `json:"github_id"`
+	Plan             string `json:"plan"`
+	MaxRepos         int    `json:"max_repos"`
+	MaxEventsPerWeek int    `json:"max_events_per_week"`
+}

@@ -7,7 +7,10 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 has_tools gcloud terraform curl
 
 usage() {
-    echo "Usage: $0 <username> <plan>"
+    echo "Usage: $0 <github-username> <plan>"
+    echo ""
+    echo "Pre-creates a tenant with the given plan."
+    echo "When the user logs in via OAuth, their plan is preserved."
     echo ""
     echo "Plans:"
     echo "  free        1 repo, 500 events/week"
@@ -35,12 +38,12 @@ msg "Getting identity token..."
 TOKEN="$(gcloud auth print-identity-token 2>/dev/null)" \
     || err "Failed to get identity token. Run 'gcloud auth login' first."
 
-msg "Upgrading ${USERNAME} to ${PLAN}..."
+msg "Inviting ${USERNAME} with plan ${PLAN}..."
 RESPONSE="$(curl -s -w "\n%{http_code}" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"username\":\"${USERNAME}\",\"plan\":\"${PLAN}\"}" \
-    "${ADMIN_URL}/upgrade")"
+    "${ADMIN_URL}/invite")"
 
 HTTP_CODE="$(echo "${RESPONSE}" | tail -1)"
 BODY="$(echo "${RESPONSE}" | head -1)"

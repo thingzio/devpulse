@@ -45,6 +45,12 @@ const (
 		WHERE t.username = $1
 		GROUP BY t.id`
 
+	insertMinimalTenantSQL = `
+		INSERT INTO tenant (github_id, username)
+		VALUES ($1, $2)
+		ON CONFLICT (github_id) DO UPDATE SET updated_at = NOW()
+		RETURNING id`
+
 	getTenantReposSQL = `
 		SELECT tr.org, tr.repo,
 		       COUNT(e.type),
@@ -81,6 +87,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("GET /tenants", handleListTenants(db))
 	mux.HandleFunc("GET /tenant", handleGetTenant(db))
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
+	mux.HandleFunc("POST /invite", handleInvite(db))
 
 	address := "0.0.0.0:" + port
 	srv := &http.Server{
@@ -235,7 +242,7 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 		limits, ok := plan.Get(req.Plan)
 		if !ok {
 			http.Error(w, fmt.Sprintf(
-				"invalid plan: %s (must be free, pro, or enterprise)", req.Plan,
+				"invalid plan: %s (must be free, starter, pro, or enterprise)", req.Plan,
 			), http.StatusBadRequest)
 			return
 		}
@@ -275,6 +282,94 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 			MaxEventsPerWeek: limits.MaxEventsPerWeek,
 		})
 	}
+}
+
+func handleInvite(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyLen)
+		var req inviteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.Username == "" {
+			http.Error(w, "username is required", http.StatusBadRequest)
+			return
+		}
+
+		limits, ok := plan.Get(req.Plan)
+		if !ok {
+			http.Error(w, fmt.Sprintf(
+				"invalid plan: %s (must be free, starter, pro, or enterprise)", req.Plan,
+			), http.StatusBadRequest)
+			return
+		}
+
+		ghID, err := resolveGitHubUserID(r.Context(), req.Username)
+		if err != nil {
+			slog.Error("resolving GitHub user", "username", req.Username, "error", err)
+			http.Error(w, fmt.Sprintf("GitHub user not found: %s", req.Username), http.StatusNotFound)
+			return
+		}
+
+		var tenantID string
+		err = db.QueryRowContext(r.Context(), insertMinimalTenantSQL, ghID, req.Username).Scan(&tenantID)
+		if err != nil {
+			slog.Error("inserting tenant", "error", err)
+			http.Error(w, "error creating tenant", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tenant.UpdatePlan(r.Context(), db, tenantID, req.Plan, limits.MaxRepos, limits.MaxEventsPerWeek); err != nil {
+			slog.Error("setting plan", "error", err)
+			http.Error(w, "error setting plan", http.StatusInternalServerError)
+			return
+		}
+
+		slog.Info("tenant invited",
+			"username", req.Username,
+			"github_id", ghID,
+			"plan", req.Plan,
+		)
+
+		writeJSON(w, inviteResponse{
+			Username:         req.Username,
+			GitHubID:         ghID,
+			Plan:             req.Plan,
+			MaxRepos:         limits.MaxRepos,
+			MaxEventsPerWeek: limits.MaxEventsPerWeek,
+		})
+	}
+}
+
+func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("https://api.github.com/users/%s", username), nil)
+	if err != nil {
+		return 0, fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("calling GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+	}
+
+	var ghUser struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ghUser); err != nil {
+		return 0, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return ghUser.ID, nil
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

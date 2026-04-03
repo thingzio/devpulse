@@ -220,6 +220,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /data/insights/issue-ratio", scopedWrap(insightsIssueRatioAPIHandler(store)))
 	mux.Handle("GET /data/insights/time-to-first-response", scopedWrap(insightsTimeToFirstResponseAPIHandler(store)))
 	mux.Handle("GET /data/insights/generated", scopedWrap(insightsGeneratedAPIHandler(store)))
+	mux.Handle("GET /data/export/csv", scopedWrap(csvExportHandler(store, db)))
 
 	return mux
 }
@@ -279,15 +280,22 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			http.Redirect(w, r, "/auth/github", http.StatusFound)
 			return
 		}
+		limits, _ := plan.Get(tn.Plan)
+
 		t := pageTemplates["home.html"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := t.ExecuteTemplate(w, "home", map[string]any{
-			"base_path":     "",
-			"version":       opts.Version,
-			"commit":        opts.Commit,
-			"build_date":    opts.Date,
-			"period_months": 6,
-			"username":      tn.Username,
+			"base_path":       "",
+			"version":         opts.Version,
+			"commit":          opts.Commit,
+			"build_date":      opts.Date,
+			"period_months":   6,
+			"username":        tn.Username,
+			"plan":            tn.Plan,
+			"pdf_export":      limits.PDFExport,
+			"csv_export":      limits.CSVExport,
+			"max_data_months": limits.MaxDataRangeMonths,
+			"ai_level":        limits.AILevel,
 		}); err != nil {
 			slog.Error("rendering dashboard", "error", err)
 		}
