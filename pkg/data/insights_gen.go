@@ -64,6 +64,9 @@ type InsightsMetrics struct {
 	FirstResponse    *FirstResponseSeries     `json:"first_response"`
 	ReleaseCadence   *ReleaseCadenceSeries    `json:"release_cadence"`
 	ReleaseDownloads *ReleaseDownloadsSeries  `json:"release_downloads"`
+	AgingPRs         *AgingPRsSeries          `json:"aging_prs"`
+	Unanswered       *UnansweredSeries        `json:"unanswered"`
+	ResponseSLO      *ResponseSLOSeries       `json:"response_slo"`
 }
 
 // GatherInsightsMetrics calls Store methods to collect all metrics for a repo.
@@ -118,6 +121,15 @@ func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, m
 	}
 	if m.RepoMeta, err = store.GetRepoMetas(ctx, o, r); err != nil {
 		slog.Warn("insights: failed to get repo metas", "error", err)
+	}
+	if m.AgingPRs, err = store.GetAgingPRs(ctx, o, r, nil, months); err != nil {
+		slog.Warn("insights: failed to get aging PRs", "error", err)
+	}
+	if m.Unanswered, err = store.GetUnansweredRate(ctx, o, r, nil, months); err != nil {
+		slog.Warn("insights: failed to get unanswered rate", "error", err)
+	}
+	if m.ResponseSLO, err = store.GetResponseSLO(ctx, o, r, nil, months); err != nil {
+		slog.Warn("insights: failed to get response SLO", "error", err)
 	}
 
 	return m
