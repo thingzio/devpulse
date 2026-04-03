@@ -282,6 +282,21 @@ type HealthScorecard struct {
 	Responsiveness HealthCategory `json:"responsiveness"`
 }
 
+// PortfolioSummary holds aggregated KPIs across all repos.
+type PortfolioSummary struct {
+	TotalStars        int     `json:"total_stars"`
+	TotalForks        int     `json:"total_forks"`
+	TotalOpenIssues   int     `json:"total_open_issues"`
+	TotalClosedPRs    int     `json:"total_closed_prs"`
+	TotalContributors int     `json:"total_contributors"`
+	StarsDelta        int     `json:"stars_delta"`
+	StarsDeltaPct     float64 `json:"stars_delta_pct"`
+	ForksDelta        int     `json:"forks_delta"`
+	ForksDeltaPct     float64 `json:"forks_delta_pct"`
+	AvgMergeHours     float64 `json:"avg_merge_hours"`
+	MedianMergeHours  float64 `json:"median_merge_hours"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`

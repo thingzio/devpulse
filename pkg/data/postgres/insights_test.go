@@ -651,6 +651,12 @@ func TestGetResponseSLO_NilDB(t *testing.T) {
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
+func TestGetPortfolioSummary_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetPortfolioSummary(context.Background(), nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
 func padDay(i int) string {
 	return fmt.Sprintf("%02d", (i%28)+1)
 }

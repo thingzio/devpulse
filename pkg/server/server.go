@@ -220,6 +220,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /data/insights/issue-ratio", scopedWrap(insightsIssueRatioAPIHandler(store)))
 	mux.Handle("GET /data/insights/time-to-first-response", scopedWrap(insightsTimeToFirstResponseAPIHandler(store)))
 	mux.Handle("GET /data/insights/health-scorecard", scopedWrap(insightsHealthScorecardHandler(store)))
+	mux.Handle("GET /data/insights/portfolio-summary", scopedWrap(insightsPortfolioSummaryHandler(store)))
 	mux.Handle("GET /data/insights/generated", scopedWrap(insightsGeneratedAPIHandler(store)))
 	mux.Handle("GET /data/export/csv", scopedWrap(csvExportHandler(store, db)))
 

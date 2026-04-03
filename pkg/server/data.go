@@ -579,6 +579,20 @@ func insightsGeneratedAPIHandler(store data.Store) http.HandlerFunc {
 	}
 }
 
+func insightsPortfolioSummaryHandler(store data.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s := storeFromRequest(r, store)
+		p := parseInsightParams(r)
+		res, err := s.GetPortfolioSummary(r.Context(), p.org, p.months)
+		if err != nil {
+			slog.Error("failed to get portfolio summary", "error", err)
+			writeError(w, http.StatusInternalServerError, "error querying portfolio summary")
+			return
+		}
+		writeJSON(w, http.StatusOK, res)
+	}
+}
+
 func insightsHealthScorecardHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)

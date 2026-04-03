@@ -570,6 +570,49 @@ SELECT
 FROM first_response
 `
 
+	// selectPortfolioSummarySQL: $1=org, $2=since, $3=30_days_ago_date
+	selectPortfolioSummarySQL = `WITH current_totals AS (
+    SELECT
+        COALESCE(SUM(stars), 0) AS stars,
+        COALESCE(SUM(forks), 0) AS forks,
+        COALESCE(SUM(open_issues), 0) AS open_issues
+    FROM repo_meta
+    WHERE org = COALESCE($1, org)
+),
+prev_snapshot AS (
+    SELECT
+        COALESCE(SUM(h.stars), 0) AS stars,
+        COALESCE(SUM(h.forks), 0) AS forks
+    FROM (
+        SELECT DISTINCT ON (org, repo) org, repo, stars, forks
+        FROM repo_metric_history
+        WHERE org = COALESCE($1, org)
+          AND date <= $3
+        ORDER BY org, repo, date DESC
+    ) h
+),
+pr_stats AS (
+    SELECT
+        COUNT(*) FILTER (WHERE e.state IN ('merged', 'closed')) AS closed_prs,
+        COUNT(DISTINCT e.username) AS contributors,
+        COALESCE(AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 3600.0)
+            FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS avg_merge_h,
+        COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (
+            ORDER BY EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 3600.0
+        ) FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS median_merge_h
+    FROM event e
+    WHERE e.type = 'pr'
+      AND e.org = COALESCE($1, e.org)
+      AND e.date >= $2
+      ` + botExcludeSQL + `
+)
+SELECT c.stars, c.forks, c.open_issues,
+       c.stars - p.stars, c.forks - p.forks,
+       ps.closed_prs, ps.contributors,
+       ps.avg_merge_h, ps.median_merge_h
+FROM current_totals c, prev_snapshot p, pr_stats ps
+`
+
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
 	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
 		FROM event e
@@ -1197,5 +1240,35 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, m
 		WithinSLOPct:  pct,
 		SLOThresholdH: 48,
 	}, nil
+}
+
+func (s *Store) GetPortfolioSummary(ctx context.Context, org *string, months int) (*data.PortfolioSummary, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	thirtyDaysAgo := sinceDate(1)
+
+	var ps data.PortfolioSummary
+	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, since, thirtyDaysAgo).Scan(
+		&ps.TotalStars, &ps.TotalForks, &ps.TotalOpenIssues,
+		&ps.StarsDelta, &ps.ForksDelta,
+		&ps.TotalClosedPRs, &ps.TotalContributors,
+		&ps.AvgMergeHours, &ps.MedianMergeHours,
+	); err != nil {
+		return nil, fmt.Errorf("failed to query portfolio summary: %w", err)
+	}
+
+	prevStars := ps.TotalStars - ps.StarsDelta
+	if prevStars > 0 {
+		ps.StarsDeltaPct = float64(ps.StarsDelta) / float64(prevStars) * 100
+	}
+	prevForks := ps.TotalForks - ps.ForksDelta
+	if prevForks > 0 {
+		ps.ForksDeltaPct = float64(ps.ForksDelta) / float64(prevForks) * 100
+	}
+
+	return &ps, nil
 }
 
