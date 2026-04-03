@@ -514,6 +514,36 @@ const (
 	  ` + botExcludeSQL + `
 	`
 
+	// selectUnansweredRateSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectUnansweredRateSQL = `WITH items AS (
+    SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
+    FROM event e
+    JOIN developer d ON e.username = d.username
+    WHERE e.type IN ('issue', 'pr')
+      AND e.number IS NOT NULL
+      AND e.created_at IS NOT NULL
+      AND EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 7
+      AND e.org = COALESCE($1, e.org)
+      AND e.repo = COALESCE($2, e.repo)
+      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+      AND e.created_at >= $4
+      ` + botExcludeSQL + `
+),
+responded AS (
+    SELECT DISTINCT i.org, i.repo, i.number
+    FROM items i
+    JOIN event r ON r.org = i.org AND r.repo = i.repo AND r.number = i.number
+      AND r.type IN ('issue_comment', 'pr_review')
+      AND r.username != i.username
+      AND r.created_at > i.created_at
+)
+SELECT
+    (SELECT COUNT(DISTINCT (i.org, i.repo, i.number)) FROM items i) AS total,
+    (SELECT COUNT(DISTINCT (i.org, i.repo, i.number)) FROM items i
+     WHERE NOT EXISTS (SELECT 1 FROM responded r WHERE r.org = i.org AND r.repo = i.repo AND r.number = i.number)
+    ) AS unanswered
+`
+
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
 	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
 		FROM event e
@@ -1093,3 +1123,28 @@ func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *s
 	}
 	return &data.IssueRatioSeries{Months: ms, Opened: opened, Closed: closed}, nil
 }
+
+func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*data.UnansweredSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, unanswered int
+
+	if err := s.db.QueryRowContext(ctx, selectUnansweredRateSQL, org, repo, entity, since).Scan(&total, &unanswered); err != nil {
+		return nil, fmt.Errorf("failed to query unanswered rate: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(unanswered) / float64(total) * 100
+	}
+
+	return &data.UnansweredSeries{
+		TotalItems:    total,
+		Unanswered:    unanswered,
+		UnansweredPct: pct,
+	}, nil
+}
+

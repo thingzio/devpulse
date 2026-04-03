@@ -250,6 +250,13 @@ type AgingPRsSeries struct {
 	AgingPct   float64 `json:"aging_pct"`
 }
 
+// UnansweredSeries holds counts of unanswered issues and PRs.
+type UnansweredSeries struct {
+	TotalItems    int     `json:"total_items"`
+	Unanswered    int     `json:"unanswered"`
+	UnansweredPct float64 `json:"unanswered_pct"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`

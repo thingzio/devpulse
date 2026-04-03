@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 func TestGetInsightsSummary_EmptyDB(t *testing.T) {
@@ -636,6 +637,12 @@ func TestGetAgingPRs_NilDB(t *testing.T) {
 	s := &Store{db: nil}
 	_, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
 	assert.Error(t, err)
+}
+
+func TestGetUnansweredRate_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
 func padDay(i int) string {
