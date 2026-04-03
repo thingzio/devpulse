@@ -283,7 +283,7 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 
 1. ~~**Downgrade behavior:**~~ Resolved: downgrade takes effect immediately — data range, features, and limits switch to the new plan with no grace period.
 3. ~~**AI action items format:**~~ Resolved: always generate full insights + action items (single prompt). Gate at the display layer — only show action items to Pro+ tenants. Avoids complexity when the same repo is shared across tenants on different plans.
-4. **On-demand import throttle:** Should on-demand imports have a cooldown (e.g., max 1 per hour per repo) to prevent abuse?
+4. ~~**On-demand import throttle:**~~ Resolved: 30-minute cooldown per repo for on-demand imports.
 5. **CSV export scope:** Export current repo only, or all repos for the tenant in one ZIP?
 6. **Events-per-week limits:** The current `MaxEventsPerWeek` limits (1000/15000) need re-evaluation against the new repo counts (1/5/25). Should they scale proportionally?
 7. **API key limits per tenant:** How many API keys can a Pro tenant create? Suggest 5 for Pro, unlimited for Enterprise.
