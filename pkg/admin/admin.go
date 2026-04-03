@@ -235,7 +235,7 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 		limits, ok := plan.Get(req.Plan)
 		if !ok {
 			http.Error(w, fmt.Sprintf(
-				"invalid plan: %s (must be free, pro, or enterprise)", req.Plan,
+				"invalid plan: %s (must be free, starter, pro, or enterprise)", req.Plan,
 			), http.StatusBadRequest)
 			return
 		}
