@@ -1565,9 +1565,11 @@ function loadRepoOverview(url) {
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
-            $tbody.append('<tr><td colspan="13" style="text-align:center">No repository data available. Search below to add repos.</td></tr>');
+            $tbody.append('<tr><td colspan="13" style="text-align:center">No repository data available yet.</td></tr>');
+            $("#add-repo-panel").addClass("spotlight");
             return;
         }
+        $("#add-repo-panel").removeClass("spotlight");
         $.each(data, function (i, r) {
             var name = r.org + '/' + r.repo;
             var $nameCell = $('<td></td>');
