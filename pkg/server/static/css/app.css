@@ -1108,7 +1108,7 @@ a.link {
 /* INSIGHT CARDS */
 .insights-summary {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-evenly;
   gap: 20px;
   padding: 20px;
@@ -1543,8 +1543,6 @@ a.link {
     flex: 1;
     text-align: center;
     padding: 1rem;
-    border-radius: 8px;
-    background: var(--bg-secondary, #1e1e2e);
 }
 .scorecard-grade {
     font-size: 2.5rem;
@@ -1577,48 +1575,11 @@ a.link {
 .scorecard-metric-val {
     font-weight: 600;
 }
-.overall-grade {
-    font-size: 1rem;
-    font-weight: 700;
-    margin-left: 0.5rem;
-}
 .grade-a { color: #22c55e; }
 .grade-b { color: #84cc16; }
 .grade-c { color: #eab308; }
 .grade-d { color: #f97316; }
 .grade-f { color: #ef4444; }
-
-/* Signals Feed */
-.signals-list {
-    padding: 0.5rem 1rem;
-}
-.signal-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.4rem 0;
-    border-bottom: 1px solid var(--border-color, #333);
-    font-size: 0.85rem;
-}
-.signal-item:last-child {
-    border-bottom: none;
-}
-.signal-repo {
-    font-weight: 600;
-    opacity: 0.9;
-}
-.signal-message {
-    text-align: right;
-}
-.signal-critical {
-    color: #ef4444;
-}
-.signal-warning {
-    color: #eab308;
-}
-.signal-info {
-    color: #60a5fa;
-}
 
 .delta-positive {
     color: #22c55e;

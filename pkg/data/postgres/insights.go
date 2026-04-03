@@ -619,22 +619,22 @@ FROM current_totals c, prev_snapshot p, pr_stats ps
 
 	// selectSignalsSQL: $1=org, $2=7_days_ago, $3=14_days_ago, $4=limit
 	selectSignalsSQL = `WITH this_week AS (
-    SELECT org, repo, COUNT(*) AS events
-    FROM event
-    WHERE org = COALESCE($1, org)
-      AND date >= $2
+    SELECT e.org, e.repo, COUNT(*) AS events
+    FROM event e
+    WHERE e.org = COALESCE($1, e.org)
+      AND e.date >= $2
       ` + botExcludeSQL + `
       ` + forkExcludeSQL + `
-    GROUP BY org, repo
+    GROUP BY e.org, e.repo
 ),
 last_week AS (
-    SELECT org, repo, COUNT(*) AS events
-    FROM event
-    WHERE org = COALESCE($1, org)
-      AND date >= $3 AND date < $2
+    SELECT e.org, e.repo, COUNT(*) AS events
+    FROM event e
+    WHERE e.org = COALESCE($1, e.org)
+      AND e.date >= $3 AND e.date < $2
       ` + botExcludeSQL + `
       ` + forkExcludeSQL + `
-    GROUP BY org, repo
+    GROUP BY e.org, e.repo
 )
 SELECT
     COALESCE(t.org, l.org) AS org,

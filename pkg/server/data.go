@@ -623,8 +623,10 @@ func insightsHealthScorecardHandler(store data.Store) http.HandlerFunc {
 		aging, _ := s.GetAgingPRs(ctx, p.org, p.repo, entity, p.months)
 		unanswered, _ := s.GetUnansweredRate(ctx, p.org, p.repo, entity, p.months)
 		slo, _ := s.GetResponseSLO(ctx, p.org, p.repo, entity, p.months)
+		prRatio, _ := s.GetPRReviewRatio(ctx, p.org, p.repo, entity, p.months)
+		issueRatio, _ := s.GetIssueOpenCloseRatio(ctx, p.org, p.repo, entity, p.months)
 
-		sc := buildScorecard(momentum, ttm, ttfr, metricHistory, aging, unanswered, slo)
+		sc := buildScorecard(momentum, ttm, ttfr, metricHistory, aging, unanswered, slo, prRatio, issueRatio)
 		writeJSON(w, http.StatusOK, sc)
 	}
 }
@@ -637,14 +639,29 @@ func buildScorecard(
 	aging *data.AgingPRsSeries,
 	unanswered *data.UnansweredSeries,
 	slo *data.ResponseSLOSeries,
+	prRatio *data.PRReviewRatioSeries,
+	issueRatio *data.IssueRatioSeries,
 ) *data.HealthScorecard {
 	// --- Demand inputs ---
 	di := health.DemandInput{}
 	if len(metricHistory) >= 2 {
 		latest := metricHistory[len(metricHistory)-1]
-		first := metricHistory[0]
-		if first.Stars > 0 {
-			di.StarGrowthPct = float64(latest.Stars-first.Stars) / float64(first.Stars) * 100
+		// Use ~30 days ago snapshot for star growth
+		refIdx := len(metricHistory) - 31
+		if refIdx < 0 {
+			refIdx = 0
+		}
+		ref := metricHistory[refIdx]
+		if ref.Stars >= 10 {
+			// Percentage growth is meaningful with a reasonable base
+			di.StarGrowthPct = float64(latest.Stars-ref.Stars) / float64(ref.Stars) * 100
+		} else if latest.Stars > ref.Stars {
+			// For small repos, use the absolute gain capped at 100% signal
+			gain := float64(latest.Stars - ref.Stars)
+			if gain > 100 {
+				gain = 100
+			}
+			di.StarGrowthPct = gain
 		}
 	}
 	if momentum != nil && len(momentum.Active) >= 2 {
@@ -654,9 +671,19 @@ func buildScorecard(
 			di.ExternalContributorDelta = float64(curr-prev) / float64(prev) * 100
 		}
 	}
-	if momentum != nil && len(momentum.Delta) >= 1 {
-		di.NewPRDelta = float64(momentum.Delta[len(momentum.Delta)-1])
-		di.NewIssueDelta = di.NewPRDelta * 0.5 // approximate from momentum
+	if prRatio != nil && len(prRatio.PRs) >= 2 {
+		prev := prRatio.PRs[len(prRatio.PRs)-2]
+		curr := prRatio.PRs[len(prRatio.PRs)-1]
+		if prev > 0 {
+			di.NewPRDelta = float64(curr-prev) / float64(prev) * 100
+		}
+	}
+	if issueRatio != nil && len(issueRatio.Opened) >= 2 {
+		prev := issueRatio.Opened[len(issueRatio.Opened)-2]
+		curr := issueRatio.Opened[len(issueRatio.Opened)-1]
+		if prev > 0 {
+			di.NewIssueDelta = float64(curr-prev) / float64(prev) * 100
+		}
 	}
 	demandScore := health.DemandScore(di)
 

@@ -342,7 +342,6 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
-            loadSignals('/data/insights/signals?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
@@ -1016,40 +1015,21 @@ function loadRightChart(url, fn, cb) {
 }
 
 
-function loadSignals(url) {
-    $.get(url, function (data) {
-        if (!data || data.length === 0) {
-            $('#signals-feed-panel').hide();
-            return;
-        }
-        $('#signals-feed-panel').show();
-        var html = '';
-        data.forEach(function (s) {
-            var cls = s.severity === 'critical' ? 'signal-critical' : s.severity === 'warning' ? 'signal-warning' : 'signal-info';
-            html += '<div class="signal-item">';
-            html += '<span class="signal-repo">' + s.org + '/' + s.repo + '</span>';
-            html += '<span class="signal-message ' + cls + '">' + s.message + '</span>';
-            html += '</div>';
-        });
-        $('#signals-list').html(html);
-    }).fail(function () {
-        $('#signals-feed-panel').hide();
-    });
-}
 
 function loadHealthScorecard(url) {
     $.get(url, function (data) {
         if (!data || !data.overall) {
-            $('#health-scorecard-panel').hide();
+            $('#health-scorecard-panel').hide(); $('#overall-health-card').hide();
             return;
         }
         $('#health-scorecard-panel').show();
-        $('#sc-overall-grade').text(data.overall).attr('class', 'overall-grade grade-' + data.overall.toLowerCase());
+        $('#overall-health-card').show();
+        $('#sc-overall-grade').text(data.overall).attr('class', 'insight-val grade-' + data.overall.toLowerCase());
         renderScorecardCategory('demand', data.demand);
         renderScorecardCategory('throughput', data.throughput);
         renderScorecardCategory('responsiveness', data.responsiveness);
     }).fail(function () {
-        $('#health-scorecard-panel').hide();
+        $('#health-scorecard-panel').hide(); $('#overall-health-card').hide();
     });
 }
 
@@ -1062,7 +1042,7 @@ function renderScorecardCategory(id, cat) {
         for (var key in cat.metrics) {
             var val = cat.metrics[key];
             if (typeof val === 'number') {
-                val = val % 1 === 0 ? val.toLocaleString() : val.toFixed(1);
+                val = val.toFixed(1);
             }
             html += '<div class="scorecard-metric"><span class="scorecard-metric-label">' + key + '</span><span class="scorecard-metric-val">' + val + '</span></div>';
         }
@@ -1075,6 +1055,7 @@ function loadPortfolioSummary(months, org, repo) {
     if (repo) url += '&r=' + repo;
     $.get(url, function (d) {
         if (!d) { clearPortfolioStats(); return; }
+        if (!d.total_stars) { return; }
         var starsHtml = d.total_stars.toLocaleString();
         if (d.stars_delta) starsHtml += ' <span class="header-delta">' + formatDelta(d.stars_delta, d.stars_delta_pct) + '</span>';
         $('#ph-stars').html(starsHtml);
@@ -1083,18 +1064,21 @@ function loadPortfolioSummary(months, org, repo) {
         if (d.forks_delta) forksHtml += ' <span class="header-delta">' + formatDelta(d.forks_delta, d.forks_delta_pct) + '</span>';
         $('#ph-forks').html(forksHtml);
 
-        var parts = [];
-        parts.push(d.total_closed_prs.toLocaleString() + ' PRs');
-        parts.push(d.total_open_issues.toLocaleString() + ' issues');
-        parts.push(d.median_merge_hours.toFixed(1) + 'h merge');
-        $('#ph-repo-stats').text(parts.join(' · '));
+        // Inject Closed PRs card into repo meta panel if not already present
+        var $container = $('#repo-meta-container');
+        $container.find('.portfolio-pr-card').remove();
+        $('<div class="insight-card portfolio-pr-card">')
+            .append('<span class="insight-label">Closed PRs</span>')
+            .append('<span class="insight-val">' + d.total_closed_prs.toLocaleString() + '</span>')
+            .prependTo($container);
     }).fail(function () {
         clearPortfolioStats();
     });
 }
 
 function clearPortfolioStats() {
-    $('#ph-stars, #ph-forks, #ph-repo-stats').empty();
+    $('#ph-stars, #ph-forks').empty();
+    $('.portfolio-pr-card').remove();
 }
 
 function formatDelta(delta, pct) {
@@ -1617,6 +1601,13 @@ function loadForksTrendChart(url) {
 }
 
 function loadRepoOverview(url) {
+    // Fetch signals for WoW column, then load overview
+    var signalsMap = {};
+    $.get('/data/insights/signals?n=100', function (sigs) {
+        if (sigs) {
+            sigs.forEach(function (s) { signalsMap[s.org + '/' + s.repo] = s; });
+        }
+    }).always(function () {
     $.get(url, function (resp) {
         // Update usage banner
         var u = resp.usage || {};
@@ -1657,7 +1648,7 @@ function loadRepoOverview(url) {
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
-            $tbody.append('<tr><td colspan="13" style="text-align:center">No repository data available yet.</td></tr>');
+            $tbody.append('<tr><td colspan="12" style="text-align:center">No repository data available yet.</td></tr>');
             $("#add-repo-panel").addClass("spotlight");
             return;
         }
@@ -1681,6 +1672,18 @@ function loadRepoOverview(url) {
             $row.append($('<td class="num"></td>').text(r.open_issues.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.events.toLocaleString()));
 
+            // WoW events delta
+            var wow = signalsMap[r.org + '/' + r.repo];
+            var $wowCell = $('<td class="num"></td>');
+            if (wow) {
+                var wowTxt = (wow.delta >= 0 ? '+' : '') + wow.delta.toLocaleString() + ' (' + (wow.delta_pct >= 0 ? '+' : '') + wow.delta_pct.toFixed(0) + '%)';
+                var wowCls = wow.delta >= 0 ? 'delta-positive' : 'delta-negative';
+                $wowCell.html('<span class="' + wowCls + '">' + wowTxt + '</span>');
+            } else {
+                $wowCell.text('—');
+            }
+            $row.append($wowCell);
+
             // Weekly events with percentage
             var wpct = (r.weekly_pct || 0).toFixed(1);
             var wcolor = r.limit_reached ? 'var(--red)' : wpct >= 80 ? '#d29a00' : '';
@@ -1690,8 +1693,6 @@ function loadRepoOverview(url) {
 
             $row.append($('<td class="num"></td>').text(r.contributors.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.scored + '/' + r.contributors));
-            $row.append($('<td></td>').text(r.language || '—'));
-            $row.append($('<td></td>').text(r.license || '—'));
             var $importCell = $('<td></td>');
             if (r.last_import) {
                 $importCell.text(formatImportDate(r.last_import, false));
@@ -1705,6 +1706,7 @@ function loadRepoOverview(url) {
             $tbody.append($row);
         });
     });
+    }); // end signals .always
 }
 
 function loadReleaseCadenceChart(url) {

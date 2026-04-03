@@ -107,12 +107,51 @@
     <!-- Health Tab -->
     <div class="tab-content active" data-tab="health">
         <section class="grid">
-            <article class="grid-full-width" id="health-scorecard-panel" style="display:none;">
+            <article>
                 <div class="tbl">
                     <div class="content-header">
-                        Health Scorecard
-                        <span class="overall-grade" id="sc-overall-grade"></span>
+                        Project Health
                     </div>
+                    <div class="tbl-chart tbl-home insights-summary">
+                        <div class="insight-card">
+                            <span class="insight-label">Bus Factor</span>
+                            <span class="insight-val" id="bus-factor-val">—</span>
+                            <span class="insight-desc">Developers who account for >=50% of all work (lower number means higher risk if they leave)</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Pony Factor</span>
+                            <span class="insight-val" id="pony-factor-val">—</span>
+                            <span class="insight-desc">Organizations behind >=50% of all work (lower means higher dependency on fewer companies)</span>
+                        </div>
+                        <div class="insight-card" id="overall-health-card" style="display:none;">
+                            <span class="insight-label">Overall Health</span>
+                            <span class="insight-val" id="sc-overall-grade">—</span>
+                            <span class="insight-desc">Composite grade across demand, throughput, and responsiveness</span>
+                        </div>
+                    </div>
+                    <div style="height:80px;padding:0 1rem;">
+                        <canvas id="health-activity-sparkline"></canvas>
+                    </div>
+                    <span class="insight-desc">Daily contributor activity over the selected period.</span>
+                </div>
+            </article>
+            <article>
+                <div class="tbl">
+                    <div class="content-header">
+                        Repository Status
+                    </div>
+                    <div class="tbl-chart tbl-home insights-grid" id="repo-meta-container">
+                        <span class="insight-label">No metadata imported yet</span>
+                    </div>
+                    <div style="height:80px;padding:0 1rem;">
+                        <canvas id="repo-meta-sparkline"></canvas>
+                    </div>
+                    <span class="insight-desc">Snapshot from GitHub API at last import. Stars, forks, and issues may lag.</span>
+                </div>
+            </article>
+            <article class="grid-full-width" id="health-scorecard-panel" style="display:none;">
+                <div class="tbl">
+                    <div class="content-header">Health Scorecard</div>
                     <div class="scorecard-row">
                         <div class="scorecard-category" id="sc-demand">
                             <div class="scorecard-grade" id="sc-demand-grade">-</div>
@@ -130,50 +169,6 @@
                             <div class="scorecard-metrics" id="sc-responsiveness-metrics"></div>
                         </div>
                     </div>
-                </div>
-            </article>
-            <article class="grid-full-width" id="signals-feed-panel" style="display:none;">
-                <div class="tbl">
-                    <div class="content-header">Trending This Week</div>
-                    <div id="signals-list" class="signals-list"></div>
-                </div>
-            </article>
-            <article>
-                <div class="tbl">
-                    <div class="content-header">
-                        Project Health
-                    </div>
-                    <div class="tbl-chart tbl-home insights-summary">
-                        <div class="insight-card">
-                            <span class="insight-label">Bus Factor</span>
-                            <span class="insight-val" id="bus-factor-val">—</span>
-                            <span class="insight-desc">Developers who account for >=50% of all work (lower number means higher risk if they leave)</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Pony Factor</span>
-                            <span class="insight-val" id="pony-factor-val">—</span>
-                            <span class="insight-desc">Organizations behind >=50% of all work (lower means higher dependency on fewer companies)</span>
-                        </div>
-                    </div>
-                    <div style="height:80px;padding:0 1rem;">
-                        <canvas id="health-activity-sparkline"></canvas>
-                    </div>
-                    <span class="insight-desc">Daily contributor activity over the selected period.</span>
-                </div>
-            </article>
-            <article>
-                <div class="tbl">
-                    <div class="content-header">
-                        Repository Status
-                        <span class="header-stat" id="ph-repo-stats"></span>
-                    </div>
-                    <div class="tbl-chart tbl-home insights-grid" id="repo-meta-container">
-                        <span class="insight-label">No metadata imported yet</span>
-                    </div>
-                    <div style="height:80px;padding:0 1rem;">
-                        <canvas id="repo-meta-sparkline"></canvas>
-                    </div>
-                    <span class="insight-desc">Snapshot from GitHub API at last import. Stars, forks, and issues may lag.</span>
                 </div>
             </article>
             <article id="stars-trend-panel">
@@ -229,11 +224,10 @@
                                     <th class="num">Forks</th>
                                     <th class="num">Issues</th>
                                     <th class="num">Events</th>
+                                    <th class="num">WoW</th>
                                     <th class="num">Weekly</th>
                                     <th class="num">Contributors</th>
                                     <th class="num">Scored</th>
-                                    <th>Language</th>
-                                    <th>License</th>
                                     <th>Last Import</th>
                                     <th></th>
                                 </tr>
