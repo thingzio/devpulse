@@ -8,7 +8,7 @@ resource "google_cloud_run_v2_service" "serve" {
     service_account = google_service_account.run.email
 
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 10
     }
 
@@ -141,7 +141,7 @@ resource "google_cloud_run_v2_job" "import" {
 
     template {
       service_account = google_service_account.import.email
-      timeout         = "3600s"
+      timeout         = "5400s"
 
       vpc_access {
         network_interfaces {

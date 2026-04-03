@@ -11,6 +11,7 @@ This document defines the plan tiers, per-feature gating, and implementation opt
 |                          | Free        | Starter ($2.99/mo)| Pro ($4.99/mo)          | Enterprise (Custom)     |
 |--------------------------|-------------|-------------------|-------------------------|-------------------------|
 | **Repos**                | 1           | 5                 | 25                      | Unlimited               |
+| **Private Repos**        | -           | -                 | -                       | Yes                     |
 | **Events/Week**          | 500         | 2,500             | 15,000                  | Unlimited               |
 | **Data Retention**       | 3 months    | 1 year            | 3 years                 | Unlimited               |
 | **Data Export (PDF)**    | -           | Yes               | Yes                     | Yes                     |
@@ -36,6 +37,7 @@ type Limits struct {
     DeepReputation      bool
     PDFExport           bool
     CSVExport           bool
+    PrivateRepos        bool
     APIAccess           bool
     ImportIntervalHours int  // 24=daily, 1=hourly
     OnDemandImport      bool
@@ -262,5 +264,6 @@ All plans keep the current single hourly Cloud Run import job. Frequency differe
 | Feature            | Gate Point                                    | Effort |
 |--------------------|-----------------------------------------------|--------|
 | API Access         | New auth middleware + GitHub PAT resolution    | Medium |
+| Private Repos      | Repo-add validation + GitHub App permissions   | Low-Medium |
 | Import Frequency   | `PrepareImportQueue` time check + 2 Cloud Run jobs + Terraform | Medium |
 | On-demand Import   | Repo-level claim trigger + Cloud Run Jobs API | Medium |

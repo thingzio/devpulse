@@ -55,7 +55,7 @@ variable "admin_invoker_emails" {
 variable "db_tier" {
   description = "Cloud SQL machine tier"
   type        = string
-  default     = "db-f1-micro"
+  default     = "db-g1-small"
 }
 
 variable "import_parallelism" {
