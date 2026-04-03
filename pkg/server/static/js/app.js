@@ -228,6 +228,10 @@ $(function () {
         $("#pdf-download").on("click", function () {
             if (!$(this).prop("disabled")) { generatePDF(); }
         });
+        $("#csv-download").on("click", function () { downloadCSV(); });
+        $("#pdf-export-tab").on("click", function () {
+            if (!$(this).prop("disabled")) { generatePDF(); }
+        });
         var params = new URLSearchParams(window.location.search);
         var paramOrg = params.get("o") || "";
         var paramRepo = params.get("r") || "";
@@ -440,6 +444,7 @@ function applySelection(scope, item, skipPushState) {
 
     searchItem = item;
     $("#pdf-download").prop("disabled", scope !== "repo");
+    $("#pdf-export-tab").prop("disabled", scope !== "repo");
     $(".header-term").html(item.value);
 
     resetCharts();
@@ -608,6 +613,7 @@ function resetSearch() {
     $("#search-results-wrap").hide();
     searchCriteria.reset();
     $("#pdf-download").prop("disabled", true);
+    $("#pdf-export-tab").prop("disabled", true);
     clearFilterInputs();
     $("#bus-factor-val").text("—");
     $("#pony-factor-val").text("—");
@@ -2571,6 +2577,17 @@ function pdfDualAxisLineBarConfig(labels, barDatasets, lineDatasets) {
         }
     };
     return { type: 'bar', data: { labels: labels, datasets: allDS }, options: pdfLightScales(opts) };
+}
+
+function downloadCSV() {
+    var months = $("#period_months").val();
+    var org = searchCriteria.org || "";
+    var repo = searchCriteria.repo || "";
+    var url = "/data/export/csv?m=" + months;
+    if (org && repo) {
+        url += "&o=" + encodeURIComponent(org) + "&r=" + encodeURIComponent(repo);
+    }
+    window.location.href = url;
 }
 
 function generatePDF() {

@@ -568,6 +568,30 @@
         </section>
     </div>
 
+    {{ if or .pdf_export .csv_export }}
+    <div class="content-wrap">
+        <section class="grid">
+            <article class="grid-full-width">
+                <div class="tbl">
+                    <div class="content-header">Export</div>
+                    <div style="padding: 1rem; display: flex; gap: 0.75rem; align-items: center;">
+                        {{ if .csv_export }}
+                        <button class="btn" id="csv-download" aria-label="Download CSV export">
+                            <span>CSV/ZIP Export</span>
+                        </button>
+                        {{ end }}
+                        {{ if .pdf_export }}
+                        <button class="btn" id="pdf-export-tab" disabled aria-label="Download PDF report">
+                            <span>PDF Report</span>
+                        </button>
+                        {{ end }}
+                    </div>
+                </div>
+            </article>
+        </section>
+    </div>
+    {{ end }}
+
 <!-- End Middle  -->
 
 {{ template "footer" . }}
