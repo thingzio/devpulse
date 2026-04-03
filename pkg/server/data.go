@@ -562,6 +562,18 @@ func insightsGeneratedAPIHandler(store data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error querying generated insights")
 			return
 		}
+
+		// Strip action items for plans below Pro (AILevel < 2)
+		if tn := middleware.TenantFromContext(r.Context()); tn != nil {
+			if limits, ok := plan.Get(tn.Plan); ok && limits.AILevel < 2 {
+				for _, ri := range res {
+					if ri != nil && ri.Insights != nil {
+						ri.Insights.Actions = nil
+					}
+				}
+			}
+		}
+
 		writeJSON(w, http.StatusOK, res)
 	}
 }
