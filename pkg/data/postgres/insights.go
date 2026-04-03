@@ -501,8 +501,8 @@ const (
 	// selectAgingPRsSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectAgingPRsSQL = `SELECT
 		COUNT(*) AS total_open,
-		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END) AS over_30,
-		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END) AS over_90
+		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END), 0) AS over_30,
+		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END), 0) AS over_90
 	FROM event e
 	JOIN developer d ON e.username = d.username
 	WHERE e.type = 'pr'
@@ -567,7 +567,7 @@ SELECT
 )
 SELECT
     COUNT(*) AS total,
-    SUM(CASE WHEN hours <= 48 THEN 1 ELSE 0 END) AS within_slo
+    COALESCE(SUM(CASE WHEN hours <= 48 THEN 1 ELSE 0 END), 0) AS within_slo
 FROM first_response
 `
 
