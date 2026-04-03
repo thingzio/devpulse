@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/middleware"
+	"github.com/thingzio/devpulse/pkg/plan"
 )
 
 const (
@@ -81,6 +83,13 @@ type insightParams struct {
 
 func parseInsightParams(r *http.Request) insightParams {
 	months := queryParamInt(r, "m", data.EventAgeMonthsDefault)
+	if tn := middleware.TenantFromContext(r.Context()); tn != nil {
+		if limits, ok := plan.Get(tn.Plan); ok && limits.MaxDataRangeMonths > 0 {
+			if months > limits.MaxDataRangeMonths {
+				months = limits.MaxDataRangeMonths
+			}
+		}
+	}
 	org := r.URL.Query().Get("o")
 	repo := r.URL.Query().Get("r")
 	if orgStr, repoStr, ok := parseRepo(optional(repo)); ok {
