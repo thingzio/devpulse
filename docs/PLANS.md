@@ -282,4 +282,4 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 5. ~~**CSV export scope:**~~ Resolved: new "Export" tab in the UI. Both PDF and CSV exports move there. User selects "All repos" or specific repos from their imported list. ZIP contains one CSV per dataset per selected repo.
 6. ~~**Events-per-week limits:**~~ Resolved: Free: 500/week, Starter: 1,000/week, Pro: 15,000/week, Enterprise: unlimited. Enterprise also includes option for a dedicated instance (pricing based on configuration, users, and access patterns).
 7. ~~**API key limits per tenant:**~~ Resolved: no custom API keys — use GitHub PATs. No per-tenant key limit needed; GitHub manages token lifecycle.
-8. **API rate limits:** 100 req/min for Pro is a starting point — should Enterprise get a higher or configurable limit?
+8. ~~**API rate limits:**~~ Resolved: Pro: 100 req/min, Enterprise: 500 req/min.
