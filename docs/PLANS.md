@@ -11,6 +11,7 @@ This document defines the plan tiers, per-feature gating, and implementation opt
 |                          | Free        | Starter ($4.99) | Pro ($9.99)             | Enterprise (Custom)     |
 |--------------------------|-------------|-------------------|-------------------------|-------------------------|
 | **Repos**                | 1           | 5                 | 25                      | Unlimited               |
+| **Events/Week**          | 500         | 1,000             | 15,000                  | Unlimited               |
 | **Data Retention**       | 3 months    | 1 year            | 3 years                 | Unlimited               |
 | **Data Export (PDF)**    | -           | Yes               | Yes                     | Yes                     |
 | **Data Export (CSV/ZIP)**| -           | -                 | Yes                     | Yes                     |
@@ -19,6 +20,7 @@ This document defines the plan tiers, per-feature gating, and implementation opt
 | **API Access**           | -           | -                 | Yes                     | Yes                     |
 | **Webhook Notifications**| -           | -                 | Future                  | Future                  |
 | **Import Frequency**     | Daily       | Hourly            | Hourly + On-demand      | Hourly + On-demand      |
+| **Dedicated Instance**   | -           | -                 | -                       | Optional (quoted)       |
 
 ## Plan Definition Changes
 
@@ -291,6 +293,6 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 3. ~~**AI action items format:**~~ Resolved: always generate full insights + action items (single prompt). Gate at the display layer — only show action items to Pro+ tenants. Avoids complexity when the same repo is shared across tenants on different plans.
 4. ~~**On-demand import throttle:**~~ Resolved: 30-minute cooldown per repo for on-demand imports.
 5. ~~**CSV export scope:**~~ Resolved: new "Export" tab in the UI. Both PDF and CSV exports move there. User selects "All repos" or specific repos from their imported list. ZIP contains one CSV per dataset per selected repo.
-6. **Events-per-week limits:** The current `MaxEventsPerWeek` limits (1000/15000) need re-evaluation against the new repo counts (1/5/25). Should they scale proportionally?
+6. ~~**Events-per-week limits:**~~ Resolved: Free: 500/week, Starter: 1,000/week, Pro: 15,000/week, Enterprise: unlimited. Enterprise also includes option for a dedicated instance (pricing based on configuration, users, and access patterns).
 7. **API key limits per tenant:** How many API keys can a Pro tenant create? Suggest 5 for Pro, unlimited for Enterprise.
 8. **API rate limits:** 100 req/min for Pro is a starting point — should Enterprise get a higher or configurable limit?
