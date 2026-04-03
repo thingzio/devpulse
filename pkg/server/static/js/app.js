@@ -1074,26 +1074,35 @@ function loadPortfolioSummary(months, org, repo) {
     var url = '/data/insights/portfolio-summary?m=' + months + '&o=' + org;
     if (repo) url += '&r=' + repo;
     $.get(url, function (d) {
-        if (!d) { $('#portfolio-banner').hide(); return; }
-        $('#portfolio-banner').show();
-        $('#pb-stars').text(d.total_stars.toLocaleString());
-        $('#pb-forks').text(d.total_forks.toLocaleString());
-        $('#pb-prs').text(d.total_closed_prs.toLocaleString());
-        $('#pb-issues').text(d.total_open_issues.toLocaleString());
-        $('#pb-merge').text(d.median_merge_hours.toFixed(1));
-        renderDelta('#pb-stars-delta', d.stars_delta, d.stars_delta_pct);
-        renderDelta('#pb-forks-delta', d.forks_delta, d.forks_delta_pct);
+        if (!d) { clearPortfolioStats(); return; }
+        var starsHtml = d.total_stars.toLocaleString();
+        if (d.stars_delta) starsHtml += ' <span class="header-delta">' + formatDelta(d.stars_delta, d.stars_delta_pct) + '</span>';
+        $('#ph-stars').html(starsHtml);
+
+        var forksHtml = d.total_forks.toLocaleString();
+        if (d.forks_delta) forksHtml += ' <span class="header-delta">' + formatDelta(d.forks_delta, d.forks_delta_pct) + '</span>';
+        $('#ph-forks').html(forksHtml);
+
+        var parts = [];
+        parts.push(d.total_closed_prs.toLocaleString() + ' PRs');
+        parts.push(d.total_open_issues.toLocaleString() + ' issues');
+        parts.push(d.median_merge_hours.toFixed(1) + 'h merge');
+        $('#ph-repo-stats').text(parts.join(' · '));
     }).fail(function () {
-        $('#portfolio-banner').hide();
+        clearPortfolioStats();
     });
 }
 
-function renderDelta(sel, delta, pct) {
-    if (delta === 0 && pct === 0) { $(sel).text(''); return; }
+function clearPortfolioStats() {
+    $('#ph-stars, #ph-forks, #ph-repo-stats').empty();
+}
+
+function formatDelta(delta, pct) {
     var sign = delta >= 0 ? '+' : '';
     var cls = delta >= 0 ? 'delta-positive' : 'delta-negative';
-    $(sel).html('<span class="' + cls + '">' + sign + delta.toLocaleString() + ' (' + sign + pct.toFixed(1) + '%)</span>');
+    return '<span class="' + cls + '">' + sign + delta.toLocaleString() + ' (' + sign + pct.toFixed(1) + '%)</span>';
 }
+
 
 function loadHealthActivitySparkline(url) {
     $.get(url, function (data) {

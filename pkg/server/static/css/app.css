@@ -398,9 +398,6 @@ fieldset {
 .banner-group .summary-banner {
   margin-bottom: 0;
 }
-.banner-group .portfolio-row {
-  border-top: 1px solid var(--border-color, #333);
-}
 
 /* Summary Banner */
 .summary-banner {
@@ -844,6 +841,17 @@ fieldset {
   font-weight: normal;
   float: right;
   text-transform: none;
+}
+
+.header-stat {
+  float: right;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.header-delta {
+  font-weight: 400;
+  font-size: 0.75em;
 }
 
 .tbl-home {
@@ -1612,12 +1620,6 @@ a.link {
     color: #60a5fa;
 }
 
-/* Portfolio Banner */
-.banner-delta {
-    display: block;
-    font-size: 0.7rem;
-    margin-top: -2px;
-}
 .delta-positive {
     color: #22c55e;
 }

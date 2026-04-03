@@ -92,31 +92,6 @@
             <span class="banner-label">Last Import</span>
         </div>
     </section>
-
-    <section class="summary-banner portfolio-row" id="portfolio-banner" style="display:none;">
-        <div class="banner-stat">
-            <span class="banner-val" id="pb-stars">—</span>
-            <span class="banner-delta" id="pb-stars-delta"></span>
-            <span class="banner-label">Stars</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="pb-forks">—</span>
-            <span class="banner-delta" id="pb-forks-delta"></span>
-            <span class="banner-label">Forks</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="pb-prs">—</span>
-            <span class="banner-label">Closed PRs</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="pb-issues">—</span>
-            <span class="banner-label">Open Issues</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="pb-merge">—</span>
-            <span class="banner-label">Median Merge (hrs)</span>
-        </div>
-    </section>
     </div>
 
     <nav class="tab-bar" id="tab-bar">
@@ -190,6 +165,7 @@
                 <div class="tbl">
                     <div class="content-header">
                         Repository Status
+                        <span class="header-stat" id="ph-repo-stats"></span>
                     </div>
                     <div class="tbl-chart tbl-home insights-grid" id="repo-meta-container">
                         <span class="insight-label">No metadata imported yet</span>
@@ -204,6 +180,7 @@
                 <div class="tbl">
                     <div class="content-header">
                         Stars Trend
+                        <span class="header-stat" id="ph-stars"></span>
                     </div>
                     <div class="tbl-chart tbl-home">
                         <canvas class="chart" id="stars-trend-chart"></canvas>
@@ -215,6 +192,7 @@
                 <div class="tbl">
                     <div class="content-header">
                         Forks Trend
+                        <span class="header-stat" id="ph-forks"></span>
                     </div>
                     <div class="tbl-chart tbl-home">
                         <canvas class="chart" id="forks-trend-chart"></canvas>
