@@ -7,6 +7,7 @@
     <input type="hidden" id="base_path" value="{{ .base_path }}" />
     <input type="hidden" id="period_months" value="{{ .period_months }}" />
     <input type="hidden" id="default_months" value="{{ .period_months }}" />
+    <input type="hidden" id="max_data_months" value="{{ .max_data_months }}" />
 
     {{ if .err }}
         <div class="error">
@@ -35,6 +36,7 @@
                 <option value="{{ .period_months }}">{{ .period_months }} months</option>
             </select>
         </div>
+        {{ if .pdf_export }}
         <button class="pdf-btn" id="pdf-download" disabled aria-label="Download PDF report" title="Download PDF report">
             <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -44,6 +46,7 @@
             </svg>
             <span class="pdf-label">PDF</span>
         </button>
+        {{ end }}
         <button class="theme-toggle-btn" id="theme-toggle" aria-label="toggle theme">
             <svg class="icon-moon" aria-hidden="true">
                 <use xlink:href="#moon"></use>
