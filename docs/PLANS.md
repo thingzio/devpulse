@@ -8,18 +8,17 @@ This document defines the plan tiers, per-feature gating, and implementation opt
 
 ## Plan Matrix
 
-|                          | Free        | Starter ($4.99) | Pro ($9.99)             | Enterprise (Custom)     |
+|                          | Free        | Starter ($2.99/mo)| Pro ($4.99/mo)          | Enterprise (Custom)     |
 |--------------------------|-------------|-------------------|-------------------------|-------------------------|
 | **Repos**                | 1           | 5                 | 25                      | Unlimited               |
-| **Events/Week**          | 500         | 1,000             | 15,000                  | Unlimited               |
+| **Events/Week**          | 500         | 2,500             | 15,000                  | Unlimited               |
 | **Data Retention**       | 3 months    | 1 year            | 3 years                 | Unlimited               |
 | **Data Export (PDF)**    | -           | Yes               | Yes                     | Yes                     |
 | **Data Export (CSV/ZIP)**| -           | -                 | Yes                     | Yes                     |
 | **AI**                   | -           | Insights          | Insights + Action Items | Insights + Action Items |
-| **Reputation Score**     | Shallow     | Deep              | Deep                    | Deep                    |
-| **API Access**           | -           | -                 | Yes                     | Yes                     |
-| **Webhook Notifications**| -           | -                 | Future                  | Future                  |
-| **Import Frequency**     | Daily       | Hourly            | Hourly + On-demand      | Hourly + On-demand      |
+| **Reputation Score**     | Shallow     | Shallow           | Deep                    | Deep                    |
+| **API Access**           | -           | -                 | -                       | Yes                     |
+| **Import Frequency**     | Daily       | Hourly            | Hourly                  | Hourly + On-demand      |
 | **Dedicated Instance**   | -           | -                 | -                       | Optional (quoted)       |
 
 ## Plan Definition Changes
@@ -69,10 +68,7 @@ This is a UI-level date range clamp, not data purging. Most data queries already
 - Data API handlers — clamp the requested date range to the plan's maximum before passing to store queries
 - Frontend — disable date picker options beyond the plan's allowed range
 
-**Implementation options:**
-
-1. **Server-side only (recommended):** Compute the earliest allowed date (`NOW() - interval`) in each data handler and pass it as a floor to the store query. Simple, tamper-proof.
-2. **Server + client:** Also disable UI date ranges beyond the plan limit for better UX. Slightly more work but avoids confusing "no data" responses.
+**Implementation:** Server-side clamp (compute earliest allowed date in each data handler, pass as floor to store query — tamper-proof) plus client-side date picker restrictions (disable ranges beyond plan limit — avoids confusing empty responses). Both layers are straightforward.
 
 ### 3. Data Export — PDF (Starter+) and CSV/ZIP (Pro+)
 
@@ -115,7 +111,9 @@ export-2026-04-02/
 - Insight time-series (PR velocity, review latency, retention, etc.)
 - Repository metadata and overview metrics
 
-### 5. AI (None / Insights / Insights + Action Items)
+**Export date range:** User-configurable up to the plan's maximum data retention window. The server clamps the requested range the same way dashboard queries are clamped (see §2).
+
+### 4. AI (None / Insights / Insights + Action Items)
 
 **Effort:** Low-Medium
 
@@ -130,7 +128,7 @@ The Claude API call happens in `pkg/importer/importer.go:240` via `data.Generate
 
 **Cost impact:** Free tenants make zero Claude API calls. Starter/Pro/Enterprise all generate the same full response — the cost difference is gated by whether AI is enabled at all (`AILevel == 0` for Free).
 
-### 6. Reputation Score (Shallow / Deep)
+### 5. Reputation Score (Shallow / Deep)
 
 **Effort:** Low
 
@@ -143,7 +141,7 @@ Deep reputation is computed in `pkg/importer/importer.go:207` via `store.ImportD
 
 **Cost impact:** Deep reputation makes multiple GitHub API calls per user (profile, repos, contributions). Gating this for Free saves significant GitHub API quota.
 
-### 7. API Access (Pro+)
+### 6. API Access (Enterprise)
 
 **Effort:** Low-Medium
 
@@ -213,7 +211,7 @@ GitHub API call per request is expensive. Cache the `token_hash → (github_id, 
 - Token scoping handled by GitHub (fine-grained PATs can be scoped to specific permissions)
 - Revocation handled by GitHub — user deletes PAT, access stops (within cache TTL)
 
-### 8. Import Frequency (Daily / Hourly / Hourly + On-demand)
+### 7. Import Frequency (Daily / Hourly / Hourly + On-demand)
 
 **Effort:** Medium
 
@@ -241,35 +239,28 @@ Alternatively, the site binary could invoke the import logic directly (it alread
 
 ## Implementation Phases
 
-### Phase 1: Plan Infrastructure + Low-Effort Gates
+### Phase 1: Plan Infrastructure + Core Gating
 
-Prerequisites: Stripe integration (feature branch pending), Starter tier added.
+Prerequisites: Stripe integration (`feat/stripe-integration` branch, use placeholder price IDs until Stripe products are created), Starter tier added to `pkg/plan/plan.go`.
+
+Existing Free tier limits drop from 3 repos / 1,000 events to 1 repo / 500 events. No grandfathering — enforced on next import cycle (only one test account affected).
+
+All plans keep the current single hourly Cloud Run import job. Frequency differentiation is deferred to Phase 2.
 
 | Feature | Gate Point | Effort |
 |---------|-----------|--------|
 | Repos | `pkg/plan/plan.go` constants | Trivial |
-| Data Retention | Data API handlers (date clamp) | Low |
+| Data Retention | Data API handlers (date clamp) + date picker | Low |
 | PDF Export | Template conditional | Low |
-| AI (none vs insights vs actions) | Importer + prompt | Low-Medium |
+| AI (none vs insights vs actions) | Importer + display layer | Low-Medium |
 | Reputation (shallow vs deep) | Importer | Low |
-
-### Phase 2: Export + Import Frequency
-
-| Feature | Gate Point | Effort |
-|---------|-----------|--------|
-| CSV/ZIP Export | New handler + template | Low-Medium |
-| Import Frequency | `PrepareImportQueue` + Cloud Run jobs | Medium |
-
-### Phase 3: API Access
-
-| Feature | Gate Point | Effort |
-|---------|-----------|--------|
-| API Access | New auth middleware + key management | Medium |
-
-### Future (unscheduled)
-
-| Feature | Gate Point | Effort |
-|---------|-----------|--------|
-| Webhook Notifications | New table + dispatch + UI | High |
+| CSV/ZIP Export | New handler + template + retention clamp | Low-Medium |
 
 
+### Phase 2: Enterprise + Import Frequency
+
+| Feature            | Gate Point                                    | Effort |
+|--------------------|-----------------------------------------------|--------|
+| API Access         | New auth middleware + GitHub PAT resolution    | Medium |
+| Import Frequency   | `PrepareImportQueue` time check + 2 Cloud Run jobs + Terraform | Medium |
+| On-demand Import   | Repo-level claim trigger + Cloud Run Jobs API | Medium |
