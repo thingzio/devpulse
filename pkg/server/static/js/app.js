@@ -343,6 +343,7 @@ function loadTabCharts(tab, months, org, repo, entity) {
     switch (tab) {
         case 'health':
             loadHealthScorecard('/data/insights/health-scorecard?' + q);
+            loadSignals('/data/insights/signals?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
@@ -1013,6 +1014,27 @@ function loadRightChart(url, fn, cb) {
     });
 }
 
+
+function loadSignals(url) {
+    $.get(url, function (data) {
+        if (!data || data.length === 0) {
+            $('#signals-feed-panel').hide();
+            return;
+        }
+        $('#signals-feed-panel').show();
+        var html = '';
+        data.forEach(function (s) {
+            var cls = s.severity === 'critical' ? 'signal-critical' : s.severity === 'warning' ? 'signal-warning' : 'signal-info';
+            html += '<div class="signal-item">';
+            html += '<span class="signal-repo">' + s.org + '/' + s.repo + '</span>';
+            html += '<span class="signal-message ' + cls + '">' + s.message + '</span>';
+            html += '</div>';
+        });
+        $('#signals-list').html(html);
+    }).fail(function () {
+        $('#signals-feed-panel').hide();
+    });
+}
 
 function loadHealthScorecard(url) {
     $.get(url, function (data) {

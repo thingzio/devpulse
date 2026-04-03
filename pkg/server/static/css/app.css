@@ -1566,6 +1566,38 @@ a.link {
 .grade-d { color: #f97316; }
 .grade-f { color: #ef4444; }
 
+/* Signals Feed */
+.signals-list {
+    padding: 0.5rem 1rem;
+}
+.signal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border-color, #333);
+    font-size: 0.85rem;
+}
+.signal-item:last-child {
+    border-bottom: none;
+}
+.signal-repo {
+    font-weight: 600;
+    opacity: 0.9;
+}
+.signal-message {
+    text-align: right;
+}
+.signal-critical {
+    color: #ef4444;
+}
+.signal-warning {
+    color: #eab308;
+}
+.signal-info {
+    color: #60a5fa;
+}
+
 /* Portfolio Banner */
 .banner-delta {
     display: block;
