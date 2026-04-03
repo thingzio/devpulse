@@ -421,7 +421,7 @@ fieldset {
 .tab-bar {
   display: flex;
   gap: 0;
-  border-bottom: none;
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 0;
   overflow-x: auto;
 }
@@ -429,7 +429,8 @@ fieldset {
 .tab-btn {
   padding: 0.75rem 1.5rem;
   border: 1px solid transparent;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
+  margin-bottom: -1px;
   background: transparent;
   color: var(--gray);
   font-size: 1rem;

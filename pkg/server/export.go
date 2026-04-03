@@ -63,7 +63,12 @@ func csvExportHandler(defaultStore data.Store, db *sql.DB) http.HandlerFunc {
 		}
 
 		today := time.Now().UTC().Format("2006-01-02")
-		filename := fmt.Sprintf("devpulse-export-%s.zip", today)
+		var filename string
+		if len(active) == 1 {
+			filename = fmt.Sprintf("devpulse-%s-%s-%s.zip", active[0].Org, active[0].Repo, today)
+		} else {
+			filename = fmt.Sprintf("devpulse-export-%s.zip", today)
+		}
 
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))

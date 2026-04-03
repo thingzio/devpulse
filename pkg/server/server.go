@@ -496,7 +496,7 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 		if err := tenant.AddTenantRepos(r.Context(), db, tn.ID, []tenant.OrgRepo{{Org: org, Repo: repo}}); err != nil {
 			slog.Error("adding repo", "error", err)
 			if errors.Is(err, tenant.ErrRepoLimitExceeded) {
-				http.Error(w, "repo limit reached for your plan", http.StatusForbidden)
+				http.Error(w, fmt.Sprintf("repo_limit_reached:%d", tn.MaxRepos), http.StatusForbidden)
 				return
 			}
 			http.Error(w, "error adding repository", http.StatusInternalServerError)

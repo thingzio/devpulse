@@ -1,0 +1,137 @@
+#!/bin/bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools gcloud docker psql
+
+DUMP_FILE="${TMPDIR:-/tmp}/devpulse-prod.sql.gz"
+LOCAL_CONTAINER="devpulse-local-pg"
+LOCAL_PORT="5432"
+LOCAL_PASSWORD="devpulse"
+DB_NAME="devpulse"
+DB_USER="devpulse"
+PROJECT="devpulseio"
+INSTANCE="devpulse-saas-pg"
+GCS_BUCKET="devpulse-state"
+
+usage() {
+    echo "Usage: $0 <command>"
+    echo ""
+    echo "Commands:"
+    echo "  dump      Export production DB via gcloud sql export (bypasses RLS)"
+    echo "  restore   Restore dump into local Postgres container"
+    echo "  all       dump + restore (full snapshot)"
+    echo "  clean     Remove local container and dump file"
+    echo "  set-plan  Change local tenant plan (e.g. '$0 set-plan free')"
+    echo ""
+    echo "After restore, connect with:"
+    echo "  DATABASE_URL=\"postgres://${DB_USER}:${LOCAL_PASSWORD}@localhost:${LOCAL_PORT}/${DB_NAME}?sslmode=disable\" make server"
+    exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+
+do_dump() {
+    local gcs_path="gs://${GCS_BUCKET}/db-snapshot.sql.gz"
+
+    # Ensure Cloud SQL SA has bucket access
+    local sa
+    sa="$(gcloud sql instances describe "${INSTANCE}" \
+        --project="${PROJECT}" \
+        --format='value(serviceAccountEmailAddress)')" \
+        || err "Failed to get Cloud SQL service account"
+
+    msg "Exporting ${DB_NAME} via gcloud sql export..."
+    gcloud sql export sql "${INSTANCE}" "${gcs_path}" \
+        --project="${PROJECT}" \
+        --database="${DB_NAME}" \
+        --offload \
+        --quiet
+
+    msg "Downloading to ${DUMP_FILE}..."
+    gcloud storage cp "${gcs_path}" "${DUMP_FILE}" --quiet
+
+    msg "Cleaning up GCS..."
+    gcloud storage rm "${gcs_path}" --quiet
+
+    local size
+    size="$(du -h "${DUMP_FILE}" | cut -f1)"
+    msg "Dump saved to ${DUMP_FILE} (${size})"
+}
+
+do_restore() {
+    [[ ! -f "${DUMP_FILE}" ]] && err "No dump file found at ${DUMP_FILE}. Run '$0 dump' first."
+
+    if docker ps -a --format '{{.Names}}' | grep -q "^${LOCAL_CONTAINER}$"; then
+        msg "Stopping existing container..."
+        docker rm -f "${LOCAL_CONTAINER}" >/dev/null
+    fi
+
+    msg "Starting local Postgres container..."
+    docker run -d --name "${LOCAL_CONTAINER}" \
+        -e POSTGRES_DB="${DB_NAME}" \
+        -e POSTGRES_USER="${DB_USER}" \
+        -e POSTGRES_PASSWORD="${LOCAL_PASSWORD}" \
+        -p "${LOCAL_PORT}:5432" \
+        postgres:16 >/dev/null
+
+    for i in $(seq 1 15); do
+        if PGPASSWORD="${LOCAL_PASSWORD}" pg_isready -h 127.0.0.1 -p "${LOCAL_PORT}" -U "${DB_USER}" >/dev/null 2>&1; then
+            break
+        fi
+        [[ "$i" -eq 15 ]] && err "Local Postgres failed to start after 15s"
+        sleep 1
+    done
+
+    msg "Restoring dump..."
+    gunzip -c "${DUMP_FILE}" | PGPASSWORD="${LOCAL_PASSWORD}" psql \
+        -h 127.0.0.1 -p "${LOCAL_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+        --quiet 2>/dev/null || true
+
+    msg "Restore complete. Connect with:"
+    msg "  DATABASE_URL=\"postgres://${DB_USER}:${LOCAL_PASSWORD}@localhost:${LOCAL_PORT}/${DB_NAME}?sslmode=disable\" make server"
+}
+
+do_clean() {
+    if docker ps -a --format '{{.Names}}' | grep -q "^${LOCAL_CONTAINER}$"; then
+        msg "Removing container ${LOCAL_CONTAINER}..."
+        docker rm -f "${LOCAL_CONTAINER}" >/dev/null
+    fi
+    if [[ -f "${DUMP_FILE}" ]]; then
+        msg "Removing ${DUMP_FILE}..."
+        rm -f "${DUMP_FILE}"
+    fi
+    msg "Clean complete."
+}
+
+do_set_plan() {
+    local plan="${1:-}"
+    [[ -z "$plan" ]] && err "Usage: $0 set-plan <free|starter|pro|enterprise>"
+
+    local max_repos max_events
+    case "$plan" in
+        free)       max_repos=1;  max_events=500 ;;
+        starter)    max_repos=5;  max_events=2500 ;;
+        pro)        max_repos=25; max_events=15000 ;;
+        enterprise) max_repos=0;  max_events=0 ;;
+        *) err "Unknown plan: $plan (must be free, starter, pro, or enterprise)" ;;
+    esac
+
+    PGPASSWORD="${LOCAL_PASSWORD}" psql \
+        -h 127.0.0.1 -p "${LOCAL_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+        -c "UPDATE tenant SET plan = '${plan}', max_repos = ${max_repos}, max_events_per_week = ${max_events}, updated_at = NOW();" \
+        --quiet
+
+    msg "All tenants set to '${plan}' (repos: ${max_repos}, events/week: ${max_events}). Refresh the dashboard."
+}
+
+case "${1}" in
+    dump)     do_dump ;;
+    restore)  do_restore ;;
+    all)      do_dump; do_restore ;;
+    clean)    do_clean ;;
+    set-plan) do_set_plan "${2:-}" ;;
+    *)        usage ;;
+esac

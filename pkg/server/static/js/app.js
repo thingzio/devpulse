@@ -228,10 +228,10 @@ $(function () {
         $("#pdf-download").on("click", function () {
             if (!$(this).prop("disabled")) { generatePDF(); }
         });
-        $("#csv-download").on("click", function () { downloadCSV(); });
-        $("#pdf-export-tab").on("click", function () {
-            if (!$(this).prop("disabled")) { generatePDF(); }
+        $("#csv-download").on("click", function () {
+            if (!$(this).prop("disabled")) { downloadCSV(true); }
         });
+        $("#csv-export-all").on("click", function () { downloadCSV(false); });
         var params = new URLSearchParams(window.location.search);
         var paramOrg = params.get("o") || "";
         var paramRepo = params.get("r") || "";
@@ -444,7 +444,8 @@ function applySelection(scope, item, skipPushState) {
 
     searchItem = item;
     $("#pdf-download").prop("disabled", scope !== "repo");
-    $("#pdf-export-tab").prop("disabled", scope !== "repo");
+    $("#csv-download").prop("disabled", scope !== "repo");
+    $("#csv-export-all-wrap").toggle(scope !== "repo");
     $(".header-term").html(item.value);
 
     resetCharts();
@@ -613,7 +614,8 @@ function resetSearch() {
     $("#search-results-wrap").hide();
     searchCriteria.reset();
     $("#pdf-download").prop("disabled", true);
-    $("#pdf-export-tab").prop("disabled", true);
+    $("#csv-download").prop("disabled", true);
+    $("#csv-export-all-wrap").show();
     clearFilterInputs();
     $("#bus-factor-val").text("—");
     $("#pony-factor-val").text("—");
@@ -1529,24 +1531,32 @@ function loadRepoOverview(url) {
         var $banner = $('#usage-banner');
         if ($banner.length) {
             var unlimited = u.max_events_per_week === 0;
-            var pct = unlimited ? 0 : Math.min(u.weekly_pct || 0, 100).toFixed(1);
-            var color = !unlimited && pct >= 100 ? 'var(--red)' : !unlimited && pct >= 80 ? '#d29a00' : 'var(--accent)';
+            var eventsPct = unlimited ? 0 : parseFloat((u.weekly_pct || 0).toFixed(1));
+            var eventsColor = !unlimited && eventsPct > 100 ? 'var(--red)' : !unlimited && eventsPct >= 80 ? '#d29a00' : 'var(--accent)';
             var reposMax = u.max_repos === 0 ? '∞' : u.max_repos;
             var reposPct = u.max_repos > 0 ? Math.round(u.active_repos / u.max_repos * 100) : 0;
+            var reposColor = u.max_repos > 0 && reposPct > 100 ? 'var(--red)' : u.max_repos > 0 && reposPct >= 80 ? '#d29a00' : 'var(--accent)';
             var eventsMax = unlimited ? '∞' : (u.max_events_per_week || 0).toLocaleString();
             var planName = (u.plan || 'free').charAt(0).toUpperCase() + (u.plan || 'free').slice(1);
             $banner.html(
                 '<div class="banner-stat"><span class="banner-val">' + planName +
                 '</span><span class="banner-label">Plan</span></div>' +
-                '<div class="banner-stat"><span class="banner-val">' +
+                '<div class="banner-stat"><span class="banner-val" style="color:' + reposColor + '">' +
                 (u.active_repos || 0) + ' / ' + reposMax +
                 '</span><span class="banner-label">Repos' + (u.max_repos > 0 ? ' (' + reposPct + '%)' : '') + '</span></div>' +
-                '<div class="banner-stat"><span class="banner-val" style="color:' + color + '">' +
+                '<div class="banner-stat"><span class="banner-val" style="color:' + eventsColor + '">' +
                 (u.weekly_events || 0).toLocaleString() + ' / ' + eventsMax +
-                '</span><span class="banner-label">Events This Week' + (!unlimited ? ' (' + pct + '%)' : '') + '</span></div>'
+                '</span><span class="banner-label">Events This Week' + (!unlimited ? ' (' + eventsPct + '%)' : '') + '</span></div>'
             );
             if (u.limit_reached) {
                 $banner.append('<div class="banner-stat"><span class="banner-val" style="color:var(--red)">LIMIT REACHED</span><span class="banner-label">Imports paused until next week</span></div>');
+            }
+
+            // Hide add-repo panel when at or over repo limit
+            if (u.max_repos > 0 && (u.active_repos || 0) >= u.max_repos) {
+                $("#add-repo-panel").hide();
+            } else {
+                $("#add-repo-panel").show();
             }
         }
 
@@ -2388,7 +2398,7 @@ function addTrackedRepo(org, repo) {
         var limitMatch = msg.match(/^repo_limit_reached:(\d+)$/);
         if (limitMatch) {
             var limit = limitMatch[1];
-            $status.html('Repo limit for current plan reached (' + limit + '). <a href="#" id="request-upgrade-link">Request Upgrade</a>');
+            $status.html('<span style="color:var(--red)">Repo limit for current plan reached (' + limit + ').</span> <a href="#" id="request-upgrade-link">Request Upgrade</a>');
             $('#request-upgrade-link').on('click', function(e) {
                 e.preventDefault();
                 $.post('/api/upgrade-request', function() {
@@ -2579,13 +2589,14 @@ function pdfDualAxisLineBarConfig(labels, barDatasets, lineDatasets) {
     return { type: 'bar', data: { labels: labels, datasets: allDS }, options: pdfLightScales(opts) };
 }
 
-function downloadCSV() {
+function downloadCSV(selectedOnly) {
     var months = $("#period_months").val();
-    var org = searchCriteria.org || "";
-    var repo = searchCriteria.repo || "";
     var url = "/data/export/csv?m=" + months;
-    if (org && repo) {
-        url += "&o=" + encodeURIComponent(org) + "&r=" + encodeURIComponent(repo);
+    if (selectedOnly) {
+        var repo = searchCriteria.repo || "";
+        if (repo) {
+            url += "&r=" + encodeURIComponent(repo);
+        }
     }
     window.location.href = url;
 }
@@ -3061,7 +3072,7 @@ function generatePDF() {
         doc.save('devpulse-' + org + '-' + repo + '-' + new Date().toISOString().slice(0, 10) + '.pdf');
     }).catch(function (err) {
         console.error('PDF generation failed:', err);
-    }).always(function () {
+    }).finally(function () {
         btn.removeClass("loading").prop("disabled", false);
     });
 }
