@@ -631,32 +631,23 @@ func insightsHealthScorecardHandler(store data.Store) http.HandlerFunc {
 	}
 }
 
-func buildScorecard(
-	momentum *data.MomentumSeries,
-	ttm *data.VelocitySeries,
-	ttfr *data.FirstResponseSeries,
+func buildDemandInput(
 	metricHistory []*data.RepoMetricHistory,
-	aging *data.AgingPRsSeries,
-	unanswered *data.UnansweredSeries,
-	slo *data.ResponseSLOSeries,
+	momentum *data.MomentumSeries,
 	prRatio *data.PRReviewRatioSeries,
 	issueRatio *data.IssueRatioSeries,
-) *data.HealthScorecard {
-	// --- Demand inputs ---
+) health.DemandInput {
 	di := health.DemandInput{}
 	if len(metricHistory) >= 2 {
 		latest := metricHistory[len(metricHistory)-1]
-		// Use ~30 days ago snapshot for star growth
 		refIdx := len(metricHistory) - 31
 		if refIdx < 0 {
 			refIdx = 0
 		}
 		ref := metricHistory[refIdx]
 		if ref.Stars >= 10 {
-			// Percentage growth is meaningful with a reasonable base
 			di.StarGrowthPct = float64(latest.Stars-ref.Stars) / float64(ref.Stars) * 100
 		} else if latest.Stars > ref.Stars {
-			// For small repos, use the absolute gain capped at 100% signal
 			gain := float64(latest.Stars - ref.Stars)
 			if gain > 100 {
 				gain = 100
@@ -671,42 +662,43 @@ func buildScorecard(
 			di.ExternalContributorDelta = float64(curr-prev) / float64(prev) * 100
 		}
 	}
-	if prRatio != nil && len(prRatio.PRs) >= 2 {
-		prev := prRatio.PRs[len(prRatio.PRs)-2]
-		curr := prRatio.PRs[len(prRatio.PRs)-1]
-		if prev > 0 {
-			di.NewPRDelta = float64(curr-prev) / float64(prev) * 100
+	di.NewPRDelta = monthOverMonthDelta(prRatio != nil, func() (int, int) {
+		if prRatio == nil || len(prRatio.PRs) < 2 {
+			return 0, 0
 		}
-	}
-	if issueRatio != nil && len(issueRatio.Opened) >= 2 {
-		prev := issueRatio.Opened[len(issueRatio.Opened)-2]
-		curr := issueRatio.Opened[len(issueRatio.Opened)-1]
-		if prev > 0 {
-			di.NewIssueDelta = float64(curr-prev) / float64(prev) * 100
+		return prRatio.PRs[len(prRatio.PRs)-2], prRatio.PRs[len(prRatio.PRs)-1]
+	})
+	di.NewIssueDelta = monthOverMonthDelta(issueRatio != nil, func() (int, int) {
+		if issueRatio == nil || len(issueRatio.Opened) < 2 {
+			return 0, 0
 		}
-	}
-	demandScore := health.DemandScore(di)
+		return issueRatio.Opened[len(issueRatio.Opened)-2], issueRatio.Opened[len(issueRatio.Opened)-1]
+	})
+	return di
+}
 
-	// --- Throughput inputs ---
+func buildThroughputInput(ttm *data.VelocitySeries, aging *data.AgingPRsSeries) health.ThroughputInput {
 	ti := health.ThroughputInput{}
 	if ttm != nil && len(ttm.AvgDays) >= 1 {
-		lastAvg := ttm.AvgDays[len(ttm.AvgDays)-1]
-		ti.MedianMergeHours = lastAvg * 24 // convert days to hours
+		ti.MedianMergeHours = ttm.AvgDays[len(ttm.AvgDays)-1] * 24
 	}
 	if aging != nil {
 		ti.AgingPRsPct = aging.AgingPct
 	}
-	// PR backlog delta: compare last two months of merge velocity counts as proxy.
-	if ttm != nil && len(ttm.Count) >= 2 {
-		prev := ttm.Count[len(ttm.Count)-2]
-		curr := ttm.Count[len(ttm.Count)-1]
-		if prev > 0 {
-			ti.PRBacklogDelta = float64(curr-prev) / float64(prev) * 100
+	ti.PRBacklogDelta = monthOverMonthDelta(ttm != nil, func() (int, int) {
+		if ttm == nil || len(ttm.Count) < 2 {
+			return 0, 0
 		}
-	}
-	throughputScore := health.ThroughputScore(ti)
+		return ttm.Count[len(ttm.Count)-2], ttm.Count[len(ttm.Count)-1]
+	})
+	return ti
+}
 
-	// --- Responsiveness inputs ---
+func buildResponsivenessInput(
+	ttfr *data.FirstResponseSeries,
+	slo *data.ResponseSLOSeries,
+	unanswered *data.UnansweredSeries,
+) health.ResponsivenessInput {
 	ri := health.ResponsivenessInput{}
 	if ttfr != nil && len(ttfr.PRAvg) >= 1 {
 		ri.FirstResponsePRHours = ttfr.PRAvg[len(ttfr.PRAvg)-1]
@@ -720,6 +712,38 @@ func buildScorecard(
 	if unanswered != nil {
 		ri.UnansweredPct = unanswered.UnansweredPct
 	}
+	return ri
+}
+
+func monthOverMonthDelta(valid bool, vals func() (int, int)) float64 {
+	if !valid {
+		return 0
+	}
+	prev, curr := vals()
+	if prev > 0 {
+		return float64(curr-prev) / float64(prev) * 100
+	}
+	return 0
+}
+
+func buildScorecard(
+	momentum *data.MomentumSeries,
+	ttm *data.VelocitySeries,
+	ttfr *data.FirstResponseSeries,
+	metricHistory []*data.RepoMetricHistory,
+	aging *data.AgingPRsSeries,
+	unanswered *data.UnansweredSeries,
+	slo *data.ResponseSLOSeries,
+	prRatio *data.PRReviewRatioSeries,
+	issueRatio *data.IssueRatioSeries,
+) *data.HealthScorecard {
+	di := buildDemandInput(metricHistory, momentum, prRatio, issueRatio)
+	demandScore := health.DemandScore(di)
+
+	ti := buildThroughputInput(ttm, aging)
+	throughputScore := health.ThroughputScore(ti)
+
+	ri := buildResponsivenessInput(ttfr, slo, unanswered)
 	responsivenessScore := health.ResponsivenessScore(ri)
 
 	overallScore := health.Overall(demandScore, throughputScore, responsivenessScore)
