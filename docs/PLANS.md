@@ -272,14 +272,4 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 |---------|-----------|--------|
 | Webhook Notifications | New table + dispatch + UI | High |
 
----
 
-## Open Questions
-
-1. ~~**Downgrade behavior:**~~ Resolved: downgrade takes effect immediately — data range, features, and limits switch to the new plan with no grace period.
-3. ~~**AI action items format:**~~ Resolved: always generate full insights + action items (single prompt). Gate at the display layer — only show action items to Pro+ tenants. Avoids complexity when the same repo is shared across tenants on different plans.
-4. ~~**On-demand import throttle:**~~ Resolved: 30-minute cooldown per repo for on-demand imports.
-5. ~~**CSV export scope:**~~ Resolved: new "Export" tab in the UI. Both PDF and CSV exports move there. User selects "All repos" or specific repos from their imported list. ZIP contains one CSV per dataset per selected repo.
-6. ~~**Events-per-week limits:**~~ Resolved: Free: 500/week, Starter: 1,000/week, Pro: 15,000/week, Enterprise: unlimited. Enterprise also includes option for a dedicated instance (pricing based on configuration, users, and access patterns).
-7. ~~**API key limits per tenant:**~~ Resolved: no custom API keys — use GitHub PATs. No per-tenant key limit needed; GitHub manages token lifecycle.
-8. ~~**API rate limits:**~~ Resolved: Pro: 100 req/min, Enterprise: 500 req/min.
