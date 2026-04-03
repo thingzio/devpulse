@@ -619,6 +619,25 @@ func TestGetContributorProfile_WithData(t *testing.T) {
 	assert.Greater(t, series.Averages[0], float64(0))
 }
 
+func TestGetAgingPRs_EmptyDB(t *testing.T) {
+	ctx := context.Background()
+	s := setupTestDB(t)
+
+	res, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.GreaterOrEqual(t, res.TotalOpen, 0)
+	assert.GreaterOrEqual(t, res.AgingPct, 0.0)
+	assert.LessOrEqual(t, res.AgingPct, 100.0)
+}
+
+func TestGetAgingPRs_NilDB(t *testing.T) {
+	ctx := context.Background()
+	s := &Store{db: nil}
+	_, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	assert.Error(t, err)
+}
+
 func padDay(i int) string {
 	return fmt.Sprintf("%02d", (i%28)+1)
 }

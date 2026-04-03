@@ -497,6 +497,23 @@ const (
 	ORDER BY month
 `
 
+	// selectAgingPRsSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectAgingPRsSQL = `SELECT
+		COUNT(*) AS total_open,
+		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END) AS over_30,
+		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END) AS over_90
+	FROM event e
+	JOIN developer d ON e.username = d.username
+	WHERE e.type = 'pr'
+	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
+	  AND e.created_at IS NOT NULL
+	  AND e.org = COALESCE($1, e.org)
+	  AND e.repo = COALESCE($2, e.repo)
+	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+	  AND e.created_at >= $4
+	  ` + botExcludeSQL + `
+	`
+
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
 	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
 		FROM event e
@@ -1042,6 +1059,31 @@ func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *s
 		return nil, err
 	}
 	return &data.FirstResponseSeries{Months: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
+}
+
+func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*data.AgingPRsSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, over30, over90 int
+
+	if err := s.db.QueryRowContext(ctx, selectAgingPRsSQL, org, repo, entity, since).Scan(&total, &over30, &over90); err != nil {
+		return nil, fmt.Errorf("failed to query aging PRs: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(over30) / float64(total) * 100
+	}
+
+	return &data.AgingPRsSeries{
+		TotalOpen:  total,
+		Over30Days: over30,
+		Over90Days: over90,
+		AgingPct:   pct,
+	}, nil
 }
 
 func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {

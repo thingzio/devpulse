@@ -242,6 +242,14 @@ type FirstResponseSeries struct {
 	PRAvg    []float64 `json:"pr_avg" yaml:"prAvg"`
 }
 
+// AgingPRsSeries holds counts of open PRs by age bucket.
+type AgingPRsSeries struct {
+	TotalOpen  int     `json:"total_open"`
+	Over30Days int     `json:"over_30_days"`
+	Over90Days int     `json:"over_90_days"`
+	AgingPct   float64 `json:"aging_pct"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`
