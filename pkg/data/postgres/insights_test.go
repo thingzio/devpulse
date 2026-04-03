@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 func TestGetInsightsSummary_EmptyDB(t *testing.T) {
@@ -617,6 +618,49 @@ func TestGetContributorProfile_WithData(t *testing.T) {
 	assert.Equal(t, 4, series.Values[5])
 	// Averages > 0
 	assert.Greater(t, series.Averages[0], float64(0))
+}
+
+func TestGetAgingPRs_EmptyDB(t *testing.T) {
+	ctx := context.Background()
+	s := setupTestDB(t)
+
+	res, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.GreaterOrEqual(t, res.TotalOpen, 0)
+	assert.GreaterOrEqual(t, res.AgingPct, 0.0)
+	assert.LessOrEqual(t, res.AgingPct, 100.0)
+}
+
+func TestGetAgingPRs_NilDB(t *testing.T) {
+	ctx := context.Background()
+	s := &Store{db: nil}
+	_, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	assert.Error(t, err)
+}
+
+func TestGetUnansweredRate_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+func TestGetResponseSLO_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetResponseSLO(context.Background(), nil, nil, nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+func TestGetPortfolioSummary_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetPortfolioSummary(context.Background(), nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+func TestGetSignals_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetSignals(context.Background(), nil, 10)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
 func padDay(i int) string {

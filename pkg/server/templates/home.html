@@ -92,6 +92,31 @@
         </div>
     </section>
 
+    <section class="summary-banner" id="portfolio-banner" style="display:none;">
+        <div class="banner-stat">
+            <span class="banner-val" id="pb-stars">—</span>
+            <span class="banner-delta" id="pb-stars-delta"></span>
+            <span class="banner-label">Stars</span>
+        </div>
+        <div class="banner-stat">
+            <span class="banner-val" id="pb-forks">—</span>
+            <span class="banner-delta" id="pb-forks-delta"></span>
+            <span class="banner-label">Forks</span>
+        </div>
+        <div class="banner-stat">
+            <span class="banner-val" id="pb-prs">—</span>
+            <span class="banner-label">Closed PRs</span>
+        </div>
+        <div class="banner-stat">
+            <span class="banner-val" id="pb-issues">—</span>
+            <span class="banner-label">Open Issues</span>
+        </div>
+        <div class="banner-stat">
+            <span class="banner-val" id="pb-merge">—</span>
+            <span class="banner-label">Median Merge (hrs)</span>
+        </div>
+    </section>
+
     <nav class="tab-bar" id="tab-bar">
         <button class="tab-btn active" data-tab="health">Health</button>
         <button class="tab-btn" data-tab="activity">Activity</button>
@@ -105,6 +130,37 @@
     <!-- Health Tab -->
     <div class="tab-content active" data-tab="health">
         <section class="grid">
+            <article class="grid-full-width" id="health-scorecard-panel" style="display:none;">
+                <div class="tbl">
+                    <div class="content-header">
+                        Health Scorecard
+                        <span class="overall-grade" id="sc-overall-grade"></span>
+                    </div>
+                    <div class="scorecard-row">
+                        <div class="scorecard-category" id="sc-demand">
+                            <div class="scorecard-grade" id="sc-demand-grade">-</div>
+                            <div class="scorecard-name">Demand</div>
+                            <div class="scorecard-metrics" id="sc-demand-metrics"></div>
+                        </div>
+                        <div class="scorecard-category" id="sc-throughput">
+                            <div class="scorecard-grade" id="sc-throughput-grade">-</div>
+                            <div class="scorecard-name">Throughput</div>
+                            <div class="scorecard-metrics" id="sc-throughput-metrics"></div>
+                        </div>
+                        <div class="scorecard-category" id="sc-responsiveness">
+                            <div class="scorecard-grade" id="sc-responsiveness-grade">-</div>
+                            <div class="scorecard-name">Responsiveness</div>
+                            <div class="scorecard-metrics" id="sc-responsiveness-metrics"></div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            <article class="grid-full-width" id="signals-feed-panel" style="display:none;">
+                <div class="tbl">
+                    <div class="content-header">Trending This Week</div>
+                    <div id="signals-list" class="signals-list"></div>
+                </div>
+            </article>
             <article>
                 <div class="tbl">
                     <div class="content-header">

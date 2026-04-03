@@ -334,6 +334,7 @@ function loadSummaryBanner(months, org, repo, entity) {
         $("#banner-last-import").text(formatImportDate(data.last_import, repo));
         $("#bus-factor-val").text(data.bus_factor);
         $("#pony-factor-val").text(data.pony_factor);
+        loadPortfolioSummary(months, org);
     });
 }
 
@@ -341,6 +342,8 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
+            loadHealthScorecard('/data/insights/health-scorecard?' + q);
+            loadSignals('/data/insights/signals?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
@@ -1011,6 +1014,83 @@ function loadRightChart(url, fn, cb) {
     });
 }
 
+
+function loadSignals(url) {
+    $.get(url, function (data) {
+        if (!data || data.length === 0) {
+            $('#signals-feed-panel').hide();
+            return;
+        }
+        $('#signals-feed-panel').show();
+        var html = '';
+        data.forEach(function (s) {
+            var cls = s.severity === 'critical' ? 'signal-critical' : s.severity === 'warning' ? 'signal-warning' : 'signal-info';
+            html += '<div class="signal-item">';
+            html += '<span class="signal-repo">' + s.org + '/' + s.repo + '</span>';
+            html += '<span class="signal-message ' + cls + '">' + s.message + '</span>';
+            html += '</div>';
+        });
+        $('#signals-list').html(html);
+    }).fail(function () {
+        $('#signals-feed-panel').hide();
+    });
+}
+
+function loadHealthScorecard(url) {
+    $.get(url, function (data) {
+        if (!data || !data.overall) {
+            $('#health-scorecard-panel').hide();
+            return;
+        }
+        $('#health-scorecard-panel').show();
+        $('#sc-overall-grade').text(data.overall).attr('class', 'overall-grade grade-' + data.overall.toLowerCase());
+        renderScorecardCategory('demand', data.demand);
+        renderScorecardCategory('throughput', data.throughput);
+        renderScorecardCategory('responsiveness', data.responsiveness);
+    }).fail(function () {
+        $('#health-scorecard-panel').hide();
+    });
+}
+
+function renderScorecardCategory(id, cat) {
+    var el = $('#sc-' + id + '-grade');
+    el.text(cat.grade);
+    el.attr('class', 'scorecard-grade grade-' + cat.grade.toLowerCase());
+    var html = '';
+    if (cat.metrics) {
+        for (var key in cat.metrics) {
+            var val = cat.metrics[key];
+            if (typeof val === 'number') {
+                val = val % 1 === 0 ? val.toLocaleString() : val.toFixed(1);
+            }
+            html += '<div class="scorecard-metric"><span class="scorecard-metric-label">' + key + '</span><span class="scorecard-metric-val">' + val + '</span></div>';
+        }
+    }
+    $('#sc-' + id + '-metrics').html(html);
+}
+
+function loadPortfolioSummary(months, org) {
+    $.get('/data/insights/portfolio-summary?m=' + months + '&o=' + org, function (d) {
+        if (!d) { $('#portfolio-banner').hide(); return; }
+        $('#portfolio-banner').show();
+        $('#pb-stars').text(d.total_stars.toLocaleString());
+        $('#pb-forks').text(d.total_forks.toLocaleString());
+        $('#pb-prs').text(d.total_closed_prs.toLocaleString());
+        $('#pb-issues').text(d.total_open_issues.toLocaleString());
+        $('#pb-merge').text(d.median_merge_hours.toFixed(1));
+        renderDelta('#pb-stars-delta', d.stars_delta, d.stars_delta_pct);
+        renderDelta('#pb-forks-delta', d.forks_delta, d.forks_delta_pct);
+    }).fail(function () {
+        $('#portfolio-banner').hide();
+    });
+}
+
+function renderDelta(sel, delta, pct) {
+    if (delta === 0 && pct === 0) { $(sel).text(''); return; }
+    var sign = delta >= 0 ? '+' : '';
+    var cls = delta >= 0 ? 'delta-positive' : 'delta-negative';
+    $(sel).html('<span class="' + cls + '">' + sign + delta.toLocaleString() + ' (' + sign + pct.toFixed(1) + '%)</span>');
+}
 
 function loadHealthActivitySparkline(url) {
     $.get(url, function (data) {

@@ -242,6 +242,72 @@ type FirstResponseSeries struct {
 	PRAvg    []float64 `json:"pr_avg" yaml:"prAvg"`
 }
 
+// AgingPRsSeries holds counts of open PRs by age bucket.
+type AgingPRsSeries struct {
+	TotalOpen  int     `json:"total_open"`
+	Over30Days int     `json:"over_30_days"`
+	Over90Days int     `json:"over_90_days"`
+	AgingPct   float64 `json:"aging_pct"`
+}
+
+// UnansweredSeries holds counts of unanswered issues and PRs.
+type UnansweredSeries struct {
+	TotalItems    int     `json:"total_items"`
+	Unanswered    int     `json:"unanswered"`
+	UnansweredPct float64 `json:"unanswered_pct"`
+}
+
+// ResponseSLOSeries tracks percentage of issues/PRs responded to within a threshold.
+type ResponseSLOSeries struct {
+	TotalItems    int     `json:"total_items"`
+	WithinSLO     int     `json:"within_slo"`
+	WithinSLOPct  float64 `json:"within_slo_pct"`
+	SLOThresholdH int     `json:"slo_threshold_hours"`
+}
+
+// HealthCategory is a single scored category in the health scorecard.
+type HealthCategory struct {
+	Name    string         `json:"name"`
+	Grade   string         `json:"grade"`
+	Score   float64        `json:"score"`
+	Metrics map[string]any `json:"metrics"`
+}
+
+// HealthScorecard is the composite health assessment.
+type HealthScorecard struct {
+	Overall        string         `json:"overall"`
+	OverallScore   float64        `json:"overall_score"`
+	Demand         HealthCategory `json:"demand"`
+	Throughput     HealthCategory `json:"throughput"`
+	Responsiveness HealthCategory `json:"responsiveness"`
+}
+
+// PortfolioSummary holds aggregated KPIs across all repos.
+type PortfolioSummary struct {
+	TotalStars        int     `json:"total_stars"`
+	TotalForks        int     `json:"total_forks"`
+	TotalOpenIssues   int     `json:"total_open_issues"`
+	TotalClosedPRs    int     `json:"total_closed_prs"`
+	TotalContributors int     `json:"total_contributors"`
+	StarsDelta        int     `json:"stars_delta"`
+	StarsDeltaPct     float64 `json:"stars_delta_pct"`
+	ForksDelta        int     `json:"forks_delta"`
+	ForksDeltaPct     float64 `json:"forks_delta_pct"`
+	AvgMergeHours     float64 `json:"avg_merge_hours"`
+	MedianMergeHours  float64 `json:"median_merge_hours"`
+}
+
+// Signal represents a notable week-over-week change detected in the data.
+type Signal struct {
+	Org      string  `json:"org"`
+	Repo     string  `json:"repo"`
+	Metric   string  `json:"metric"`
+	Message  string  `json:"message"`
+	Delta    int     `json:"delta"`
+	DeltaPct float64 `json:"delta_pct"`
+	Severity string  `json:"severity"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`

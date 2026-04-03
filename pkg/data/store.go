@@ -94,6 +94,11 @@ type InsightsStore interface {
 	GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, months int) (*ContributorProfileSeries, error)
 	GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*IssueRatioSeries, error)
 	GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*FirstResponseSeries, error)
+	GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*AgingPRsSeries, error)
+	GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*UnansweredSeries, error)
+	GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*ResponseSLOSeries, error)
+	GetPortfolioSummary(ctx context.Context, org *string, months int) (*PortfolioSummary, error)
+	GetSignals(ctx context.Context, org *string, limit int) ([]*Signal, error)
 }
 
 // ReleaseStore manages release imports and queries.

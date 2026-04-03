@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
 )
@@ -495,6 +496,155 @@ const (
 	FULL OUTER JOIN (SELECT month, AVG(hours_to_first) AS avg_hours FROM pr_first GROUP BY month) p
 		ON i.month = p.month
 	ORDER BY month
+`
+
+	// selectAgingPRsSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectAgingPRsSQL = `SELECT
+		COUNT(*) AS total_open,
+		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END) AS over_30,
+		SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END) AS over_90
+	FROM event e
+	JOIN developer d ON e.username = d.username
+	WHERE e.type = 'pr'
+	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
+	  AND e.created_at IS NOT NULL
+	  AND e.org = COALESCE($1, e.org)
+	  AND e.repo = COALESCE($2, e.repo)
+	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+	  AND e.created_at >= $4
+	  ` + botExcludeSQL + `
+	`
+
+	// selectUnansweredRateSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectUnansweredRateSQL = `WITH items AS (
+    SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
+    FROM event e
+    JOIN developer d ON e.username = d.username
+    WHERE e.type IN ('issue', 'pr')
+      AND e.number IS NOT NULL
+      AND e.created_at IS NOT NULL
+      AND EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 7
+      AND e.org = COALESCE($1, e.org)
+      AND e.repo = COALESCE($2, e.repo)
+      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+      AND e.created_at >= $4
+      ` + botExcludeSQL + `
+),
+responded AS (
+    SELECT DISTINCT i.org, i.repo, i.number
+    FROM items i
+    JOIN event r ON r.org = i.org AND r.repo = i.repo AND r.number = i.number
+      AND r.type IN ('issue_comment', 'pr_review')
+      AND r.username != i.username
+      AND r.created_at > i.created_at
+)
+SELECT
+    (SELECT COUNT(DISTINCT (i.org, i.repo, i.number)) FROM items i) AS total,
+    (SELECT COUNT(DISTINCT (i.org, i.repo, i.number)) FROM items i
+     WHERE NOT EXISTS (SELECT 1 FROM responded r WHERE r.org = i.org AND r.repo = i.repo AND r.number = i.number)
+    ) AS unanswered
+`
+
+	// selectResponseSLOSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectResponseSLOSQL = `WITH first_response AS (
+    SELECT e.org, e.repo, e.number,
+        MIN(EXTRACT(EPOCH FROM (r.created_at::timestamp - e.created_at::timestamp)) / 3600.0) AS hours
+    FROM event e
+    JOIN event r ON r.org = e.org AND r.repo = e.repo AND r.number = e.number
+        AND r.type IN ('issue_comment', 'pr_review')
+        AND r.username != e.username
+        AND r.created_at > e.created_at
+    JOIN developer d ON e.username = d.username
+    WHERE e.type IN ('issue', 'pr')
+      AND e.number IS NOT NULL
+      AND e.created_at IS NOT NULL
+      AND e.org = COALESCE($1, e.org)
+      AND e.repo = COALESCE($2, e.repo)
+      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+      AND e.created_at >= $4
+      ` + botExcludeSQL + `
+    GROUP BY e.org, e.repo, e.number
+)
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN hours <= 48 THEN 1 ELSE 0 END) AS within_slo
+FROM first_response
+`
+
+	// selectPortfolioSummarySQL: $1=org, $2=since, $3=30_days_ago_date
+	selectPortfolioSummarySQL = `WITH current_totals AS (
+    SELECT
+        COALESCE(SUM(stars), 0) AS stars,
+        COALESCE(SUM(forks), 0) AS forks,
+        COALESCE(SUM(open_issues), 0) AS open_issues
+    FROM repo_meta
+    WHERE org = COALESCE($1, org)
+),
+prev_snapshot AS (
+    SELECT
+        COALESCE(SUM(h.stars), 0) AS stars,
+        COALESCE(SUM(h.forks), 0) AS forks
+    FROM (
+        SELECT DISTINCT ON (org, repo) org, repo, stars, forks
+        FROM repo_metric_history
+        WHERE org = COALESCE($1, org)
+          AND date <= $3
+        ORDER BY org, repo, date DESC
+    ) h
+),
+pr_stats AS (
+    SELECT
+        COUNT(*) FILTER (WHERE e.state IN ('merged', 'closed')) AS closed_prs,
+        COUNT(DISTINCT e.username) AS contributors,
+        COALESCE(AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 3600.0)
+            FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS avg_merge_h,
+        COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (
+            ORDER BY EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 3600.0
+        ) FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS median_merge_h
+    FROM event e
+    WHERE e.type = 'pr'
+      AND e.org = COALESCE($1, e.org)
+      AND e.date >= $2
+      ` + botExcludeSQL + `
+)
+SELECT c.stars, c.forks, c.open_issues,
+       c.stars - p.stars, c.forks - p.forks,
+       ps.closed_prs, ps.contributors,
+       ps.avg_merge_h, ps.median_merge_h
+FROM current_totals c, prev_snapshot p, pr_stats ps
+`
+
+	// selectSignalsSQL: $1=org, $2=7_days_ago, $3=14_days_ago, $4=limit
+	selectSignalsSQL = `WITH this_week AS (
+    SELECT org, repo, COUNT(*) AS events
+    FROM event
+    WHERE org = COALESCE($1, org)
+      AND date >= $2
+      ` + botExcludeSQL + `
+      ` + forkExcludeSQL + `
+    GROUP BY org, repo
+),
+last_week AS (
+    SELECT org, repo, COUNT(*) AS events
+    FROM event
+    WHERE org = COALESCE($1, org)
+      AND date >= $3 AND date < $2
+      ` + botExcludeSQL + `
+      ` + forkExcludeSQL + `
+    GROUP BY org, repo
+)
+SELECT
+    COALESCE(t.org, l.org) AS org,
+    COALESCE(t.repo, l.repo) AS repo,
+    COALESCE(t.events, 0) - COALESCE(l.events, 0) AS delta,
+    CASE WHEN COALESCE(l.events, 0) > 0
+        THEN (COALESCE(t.events, 0) - l.events)::float / l.events * 100
+        ELSE 0 END AS delta_pct
+FROM this_week t
+FULL OUTER JOIN last_week l ON t.org = l.org AND t.repo = l.repo
+WHERE ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) > 0
+ORDER BY ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) DESC
+LIMIT $4
 `
 
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
@@ -1044,6 +1194,31 @@ func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *s
 	return &data.FirstResponseSeries{Months: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
 }
 
+func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*data.AgingPRsSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, over30, over90 int
+
+	if err := s.db.QueryRowContext(ctx, selectAgingPRsSQL, org, repo, entity, since).Scan(&total, &over30, &over90); err != nil {
+		return nil, fmt.Errorf("failed to query aging PRs: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(over30) / float64(total) * 100
+	}
+
+	return &data.AgingPRsSeries{
+		TotalOpen:  total,
+		Over30Days: over30,
+		Over90Days: over90,
+		AgingPct:   pct,
+	}, nil
+}
+
 func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
 	ms, opened, closed, err := getMonthDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
 	if err != nil {
@@ -1051,3 +1226,144 @@ func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *s
 	}
 	return &data.IssueRatioSeries{Months: ms, Opened: opened, Closed: closed}, nil
 }
+
+func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*data.UnansweredSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, unanswered int
+
+	if err := s.db.QueryRowContext(ctx, selectUnansweredRateSQL, org, repo, entity, since).Scan(&total, &unanswered); err != nil {
+		return nil, fmt.Errorf("failed to query unanswered rate: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(unanswered) / float64(total) * 100
+	}
+
+	return &data.UnansweredSeries{
+		TotalItems:    total,
+		Unanswered:    unanswered,
+		UnansweredPct: pct,
+	}, nil
+}
+
+func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*data.ResponseSLOSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, withinSLO int
+
+	if err := s.db.QueryRowContext(ctx, selectResponseSLOSQL, org, repo, entity, since).Scan(&total, &withinSLO); err != nil {
+		return nil, fmt.Errorf("failed to query response SLO: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(withinSLO) / float64(total) * 100
+	}
+
+	return &data.ResponseSLOSeries{
+		TotalItems:    total,
+		WithinSLO:     withinSLO,
+		WithinSLOPct:  pct,
+		SLOThresholdH: 48,
+	}, nil
+}
+
+func (s *Store) GetPortfolioSummary(ctx context.Context, org *string, months int) (*data.PortfolioSummary, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	thirtyDaysAgo := sinceDate(1)
+
+	var ps data.PortfolioSummary
+	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, since, thirtyDaysAgo).Scan(
+		&ps.TotalStars, &ps.TotalForks, &ps.TotalOpenIssues,
+		&ps.StarsDelta, &ps.ForksDelta,
+		&ps.TotalClosedPRs, &ps.TotalContributors,
+		&ps.AvgMergeHours, &ps.MedianMergeHours,
+	); err != nil {
+		return nil, fmt.Errorf("failed to query portfolio summary: %w", err)
+	}
+
+	prevStars := ps.TotalStars - ps.StarsDelta
+	if prevStars > 0 {
+		ps.StarsDeltaPct = float64(ps.StarsDelta) / float64(prevStars) * 100
+	}
+	prevForks := ps.TotalForks - ps.ForksDelta
+	if prevForks > 0 {
+		ps.ForksDeltaPct = float64(ps.ForksDelta) / float64(prevForks) * 100
+	}
+
+	return &ps, nil
+}
+
+func (s *Store) GetSignals(ctx context.Context, org *string, limit int) ([]*data.Signal, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+
+	now := time.Now().UTC()
+	weekAgo := now.AddDate(0, 0, -7).Format("2006-01-02")
+	twoWeeksAgo := now.AddDate(0, 0, -14).Format("2006-01-02")
+
+	rows, err := s.db.QueryContext(ctx, selectSignalsSQL, org, weekAgo, twoWeeksAgo, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query signals: %w", err)
+	}
+	defer rows.Close()
+
+	var signals []*data.Signal
+	for rows.Next() {
+		var sig data.Signal
+		var delta int
+		var deltaPct float64
+		if err := rows.Scan(&sig.Org, &sig.Repo, &delta, &deltaPct); err != nil {
+			return nil, fmt.Errorf("failed to scan signal row: %w", err)
+		}
+		sig.Metric = "events"
+		sig.Delta = delta
+		sig.DeltaPct = deltaPct
+
+		absPct := deltaPct
+		if absPct < 0 {
+			absPct = -absPct
+		}
+
+		switch {
+		case absPct >= 200:
+			sig.Severity = "critical"
+		case absPct >= 50:
+			sig.Severity = "warning"
+		default:
+			sig.Severity = "info"
+		}
+
+		if delta > 0 {
+			sig.Message = fmt.Sprintf("+%d events WoW (+%.0f%%)", delta, deltaPct)
+		} else {
+			sig.Message = fmt.Sprintf("%d events WoW (%.0f%%)", delta, deltaPct)
+		}
+
+		signals = append(signals, &sig)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating signal rows: %w", err)
+	}
+
+	return signals, nil
+}
+
