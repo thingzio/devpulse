@@ -571,7 +571,7 @@ SELECT
 FROM first_response
 `
 
-	// selectPortfolioSummarySQL: $1=org, $2=since, $3=30_days_ago_date
+	// selectPortfolioSummarySQL: $1=org, $2=repo, $3=since, $4=30_days_ago_date
 	selectPortfolioSummarySQL = `WITH current_totals AS (
     SELECT
         COALESCE(SUM(stars), 0) AS stars,
@@ -579,6 +579,7 @@ FROM first_response
         COALESCE(SUM(open_issues), 0) AS open_issues
     FROM repo_meta
     WHERE org = COALESCE($1, org)
+      AND repo = COALESCE($2, repo)
 ),
 prev_snapshot AS (
     SELECT
@@ -588,7 +589,8 @@ prev_snapshot AS (
         SELECT DISTINCT ON (org, repo) org, repo, stars, forks
         FROM repo_metric_history
         WHERE org = COALESCE($1, org)
-          AND date <= $3
+          AND repo = COALESCE($2, repo)
+          AND date <= $4
         ORDER BY org, repo, date DESC
     ) h
 ),
@@ -604,7 +606,8 @@ pr_stats AS (
     FROM event e
     WHERE e.type = 'pr'
       AND e.org = COALESCE($1, e.org)
-      AND e.date >= $2
+      AND e.repo = COALESCE($2, e.repo)
+      AND e.date >= $3
       ` + botExcludeSQL + `
 )
 SELECT c.stars, c.forks, c.open_issues,
@@ -1276,7 +1279,7 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, m
 	}, nil
 }
 
-func (s *Store) GetPortfolioSummary(ctx context.Context, org *string, months int) (*data.PortfolioSummary, error) {
+func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, months int) (*data.PortfolioSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -1285,7 +1288,7 @@ func (s *Store) GetPortfolioSummary(ctx context.Context, org *string, months int
 	thirtyDaysAgo := sinceDate(1)
 
 	var ps data.PortfolioSummary
-	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, since, thirtyDaysAgo).Scan(
+	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, repo, since, thirtyDaysAgo).Scan(
 		&ps.TotalStars, &ps.TotalForks, &ps.TotalOpenIssues,
 		&ps.StarsDelta, &ps.ForksDelta,
 		&ps.TotalClosedPRs, &ps.TotalContributors,

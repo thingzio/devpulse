@@ -598,7 +598,7 @@ func insightsPortfolioSummaryHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetPortfolioSummary(r.Context(), p.org, p.months)
+		res, err := s.GetPortfolioSummary(r.Context(), p.org, p.repo, p.months)
 		if err != nil {
 			slog.Error("failed to get portfolio summary", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying portfolio summary")

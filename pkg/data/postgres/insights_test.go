@@ -653,7 +653,7 @@ func TestGetResponseSLO_NilDB(t *testing.T) {
 
 func TestGetPortfolioSummary_NilDB(t *testing.T) {
 	s := &Store{}
-	_, err := s.GetPortfolioSummary(context.Background(), nil, 6)
+	_, err := s.GetPortfolioSummary(context.Background(), nil, nil, 6)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
