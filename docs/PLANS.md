@@ -72,36 +72,42 @@ This is a UI-level date range clamp, not data purging. Most data queries already
 1. **Server-side only (recommended):** Compute the earliest allowed date (`NOW() - interval`) in each data handler and pass it as a floor to the store query. Simple, tamper-proof.
 2. **Server + client:** Also disable UI date ranges beyond the plan limit for better UX. Slightly more work but avoids confusing "no data" responses.
 
-### 3. Data Export — PDF (Starter+)
-
-**Effort:** Low
-
-PDF generation is client-side via jsPDF in `pkg/server/static/js/app.js:2570`. No server cost.
-
-**Changes:**
-- Templates — conditionally render the PDF download button based on plan (hide for Free)
-- Frontend JS — check plan before enabling the button (defense in depth)
-
-**Implementation:** Pass `plan` to the template's `pageData`. The template uses a conditional to show/hide the button.
-
-### 4. Data Export — CSV/ZIP (Pro+)
+### 3. Data Export — PDF (Starter+) and CSV/ZIP (Pro+)
 
 **Effort:** Low-Medium
 
-New server-side export handler. All data is already available via existing store methods.
+Both export types live under a new **Export tab** in the dashboard. The tab is hidden for Free users. Users select "All repos" or specific repos from their imported list before exporting.
+
+**PDF export** is client-side via jsPDF in `pkg/server/static/js/app.js:2570`. No server cost. Currently triggered from the dashboard toolbar — moves to the Export tab.
+
+**CSV/ZIP export** is a new server-side handler. All data is already available via existing store methods.
 
 **Changes:**
-- `pkg/server/data.go` — new `csvExportHandler` returning a ZIP archive
+- Templates — new Export tab/page with repo selector (multi-select from imported repos, or "All")
+- Templates — PDF and CSV download buttons on the Export tab, gated by plan (PDF: Starter+, CSV: Pro+)
+- `pkg/server/data.go` — new `csvExportHandler` accepting repo list, returning a ZIP archive
 - `pkg/server/server.go` — register `GET /data/export` with `scopedWrap`
-- Templates — add "Download CSV" button, gated by plan
-- `pkg/plan/plan.go` — add `CSVExport bool` to Limits
+- `pkg/plan/plan.go` — add `PDFExport bool` and `CSVExport bool` to Limits
+- Frontend JS — move `generatePDF` trigger to Export tab, add repo selection logic
 
-**Implementation options:**
+**CSV implementation:**
 
-1. **Single ZIP with multiple CSVs (recommended):** One endpoint, one request. Returns a ZIP containing one CSV per dataset (events, developers, insights time-series, reputation scores, etc.). Uses Go stdlib `encoding/csv` + `archive/zip`. ~150-200 lines.
-2. **Per-dataset endpoints:** Separate `/data/export/events.csv`, `/data/export/developers.csv`, etc. More granular but more routes and UI complexity.
+Single ZIP with multiple CSVs per selected repo. One endpoint, one request. Uses Go stdlib `encoding/csv` + `archive/zip`. ~150-200 lines.
 
-**Datasets to include:**
+ZIP structure:
+```
+export-2026-04-02/
+  org-repo1/
+    events.csv
+    developers.csv
+    insights.csv
+    reputation.csv
+  org-repo2/
+    events.csv
+    ...
+```
+
+**Datasets per repo:**
 - Event search results (commits, PRs, issues)
 - Developer list with reputation scores
 - Insight time-series (PR velocity, review latency, retention, etc.)
@@ -284,7 +290,7 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 1. ~~**Downgrade behavior:**~~ Resolved: downgrade takes effect immediately — data range, features, and limits switch to the new plan with no grace period.
 3. ~~**AI action items format:**~~ Resolved: always generate full insights + action items (single prompt). Gate at the display layer — only show action items to Pro+ tenants. Avoids complexity when the same repo is shared across tenants on different plans.
 4. ~~**On-demand import throttle:**~~ Resolved: 30-minute cooldown per repo for on-demand imports.
-5. **CSV export scope:** Export current repo only, or all repos for the tenant in one ZIP?
+5. ~~**CSV export scope:**~~ Resolved: new "Export" tab in the UI. Both PDF and CSV exports move there. User selects "All repos" or specific repos from their imported list. ZIP contains one CSV per dataset per selected repo.
 6. **Events-per-week limits:** The current `MaxEventsPerWeek` limits (1000/15000) need re-evaluation against the new repo counts (1/5/25). Should they scale proportionally?
 7. **API key limits per tenant:** How many API keys can a Pro tenant create? Suggest 5 for Pro, unlimited for Enterprise.
 8. **API rate limits:** 100 req/min for Pro is a starting point — should Enterprise get a higher or configurable limit?
