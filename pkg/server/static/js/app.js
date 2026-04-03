@@ -725,7 +725,14 @@ function onLeftChartSelect(label) {
 }
 
 function onRightChartSelect(label) {
-    window.open('https://github.com/' + encodeURIComponent(label), '_blank');
+    // Load contributor profile in the panel
+    var m = $("#period_months").val();
+    var o = searchCriteria.org || "";
+    var r = searchCriteria.repo || "";
+    var e = searchCriteria.entity || "";
+    var q = 'm=' + m + '&o=' + o + '&r=' + r + '&e=' + e;
+    $("#contributor-search").val(label);
+    loadContributorProfileChart('/data/insights/contributor-profile?u=' + encodeURIComponent(label) + '&' + q);
 }
 
 function submitSearch() {
@@ -751,14 +758,19 @@ function parseOptional(val, prefix) {
     return "";
 }
 
+var lastSearchResults = [];
+
 function displaySearchResults(table, data) {
+    lastSearchResults = data;
     $("#page-number").html(searchCriteria.page);
     table.empty();
     if (data.length == 0) {
         table.append("<tr><td colspan='5'>No results found.</td></tr>");
         $("#search-results-wrap").show();
+        $("#export-search-btn").hide();
         return;
     }
+    $("#export-search-btn").show();
     $.each(data, function (key, item) {
         $("<tr>")
             .append(`<td>${item.event.date}</td>`)
@@ -2683,6 +2695,25 @@ function pdfDualAxisLineBarConfig(labels, barDatasets, lineDatasets) {
         }
     };
     return { type: 'bar', data: { labels: labels, datasets: allDS }, options: pdfLightScales(opts) };
+}
+
+function exportSearchResults() {
+    if (!lastSearchResults || !lastSearchResults.length) return;
+    var rows = [['date', 'org', 'repo', 'type', 'username', 'entity', 'url']];
+    lastSearchResults.forEach(function (item) {
+        var e = item.event || {};
+        var d = item.developer || {};
+        rows.push([e.date, e.org, e.repo, e.type, d.username, d.entity || '', e.url || '']);
+    });
+    var csv = rows.map(function (r) {
+        return r.map(function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'devpulse-events-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 function downloadCSV(selectedOnly) {
