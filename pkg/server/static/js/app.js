@@ -1918,6 +1918,12 @@ function updatePeriodOptions(org, repo, cb) {
             );
         }
 
+        // Cap by plan data retention limit (0 = unlimited)
+        const planMax = parseInt($("#max_data_months").val(), 10) || 0;
+        if (planMax > 0 && maxMonths > planMax) {
+            maxMonths = planMax;
+        }
+
         const steps = [3, 6, 9, 12, 18, 24, 36, 48, 60];
         const options = [];
         for (let i = 0; i < steps.length; i++) {
