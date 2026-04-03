@@ -145,63 +145,50 @@ Deep reputation is computed in `pkg/importer/importer.go:207` via `store.ImportD
 
 ### 7. API Access (Pro+)
 
-**Effort:** Medium
+**Effort:** Low-Medium
 
-The `/data/*` endpoints already return JSON and are RLS-scoped via `ScopedStoreMiddleware`. They currently require session cookie auth (`RequireAuth` in `pkg/middleware/auth.go`). API access adds an alternative auth path using API keys.
+The `/data/*` endpoints already return JSON and are RLS-scoped via `ScopedStoreMiddleware`. They currently require session cookie auth (`RequireAuth` in `pkg/middleware/auth.go`). API access adds an alternative auth path using GitHub Personal Access Tokens (PATs) — no custom key storage needed.
 
 **Auth chain today:**
 ```
 Request → RequireAuth (cookie → ValidateSession → tenant) → ScopedStoreMiddleware (conn → set_config → scoped Store) → handler
 ```
 
-**Auth chain with API keys:**
+**Auth chain with GitHub PAT:**
 ```
-Request → RequireAuthOrAPIKey (cookie OR Bearer token → tenant) → ScopedStoreMiddleware (unchanged) → handler
-```
-
-The key insight is that `ScopedStoreMiddleware` only needs a `*tenant.Tenant` in context — it doesn't care how the tenant was resolved. So the only new code is an alternative auth path that resolves tenant from an API key instead of a session cookie.
-
-**Data model:**
-
-New `tenant_api_key` table:
-
-```sql
-CREATE TABLE tenant_api_key (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id  UUID NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,              -- user-provided label ("CI key", "Grafana")
-    key_prefix TEXT NOT NULL,              -- first 8 chars, for display ("dp_a1b2...")
-    key_hash   TEXT NOT NULL,              -- SHA-256 of the full key
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_used_at TIMESTAMPTZ,
-    revoked_at TIMESTAMPTZ                -- soft-delete, NULL = active
-);
-
--- RLS: tenant can only see/manage their own keys
-ALTER TABLE tenant_api_key ENABLE ROW LEVEL SECURITY;
-CREATE POLICY tenant_api_key_policy ON tenant_api_key
-    USING (tenant_id = current_setting('app.tenant_id')::uuid);
+Request → RequireAuthOrToken (cookie OR Bearer <github PAT> → resolve GitHub user → tenant) → ScopedStoreMiddleware (unchanged) → handler
 ```
 
-**Key format:** `dp_<32 random hex chars>` (prefix makes keys greppable in logs, 128 bits of entropy).
+The key insight is that `ScopedStoreMiddleware` only needs a `*tenant.Tenant` in context — it doesn't care how the tenant was resolved. By using GitHub PATs, devpulse delegates token lifecycle (creation, scoping, revocation) entirely to GitHub. No custom key storage, no key management UI.
+
+**How it works:**
+
+1. User creates a GitHub PAT (classic or fine-grained) — no special scopes required, just `read:user` to resolve identity
+2. API request includes `Authorization: Bearer ghp_...`
+3. Middleware calls GitHub `GET /user` with the token → gets GitHub user ID
+4. Look up tenant via `getTenantByGitHubIDSQL` (already exists)
+5. Check tenant plan allows API access → inject tenant into context
+6. `ScopedStoreMiddleware` handles RLS as usual
+
+**Token resolution caching:**
+
+GitHub API call per request is expensive. Cache the `token_hash → (github_id, resolved_at)` mapping in-memory with a short TTL (e.g., 5 minutes). This means:
+- First request: GitHub API call to validate token and resolve user
+- Subsequent requests within TTL: cache hit, no GitHub call
+- Revoked tokens stop working within TTL window (acceptable trade-off)
+- Cache key is SHA-256 of the token (never store plaintext)
 
 **Changes:**
 
-- `pkg/data/postgres/sql/migrations_saas/` — new migration for `tenant_api_key` table
-- `pkg/tenant/apikey.go` — CRUD: `CreateAPIKey`, `ListAPIKeys`, `RevokeAPIKey`, `ValidateAPIKey`
-  - `CreateAPIKey` generates key, stores SHA-256 hash, returns plaintext once
-  - `ValidateAPIKey` hashes the provided key, looks up by hash where `revoked_at IS NULL`, updates `last_used_at`
-- `pkg/middleware/auth.go` — extend `RequireAuth` (or add `RequireAuthOrAPIKey`) to check `Authorization: Bearer dp_...` header before falling back to cookie. On match, call `ValidateAPIKey`, inject tenant into context. On API key auth, return 401 JSON instead of redirect.
-- `pkg/server/server.go` — swap `RequireAuth` for `RequireAuthOrAPIKey` on the data route group (no route changes needed)
-- `pkg/server/settings.go` — new handlers for API key management UI (list, create, revoke)
-- Templates — settings page section for API keys (name, prefix, created, last used, revoke button)
+- `pkg/middleware/auth.go` — extend `RequireAuth` (or add `RequireAuthOrToken`) to check `Authorization: Bearer ghp_...` header before falling back to cookie. On match, resolve GitHub user via API, look up tenant, inject into context. On token auth, return 401/403 JSON instead of redirect.
+- `pkg/middleware/token_cache.go` — in-memory token resolution cache (map + mutex + TTL eviction). ~50-80 lines.
+- `pkg/server/server.go` — swap `RequireAuth` for `RequireAuthOrToken` on the data route group (no route changes needed)
 - `pkg/plan/plan.go` — add `APIAccess bool` to `Limits`
-- Plan gate — `RequireAuthOrAPIKey` checks plan before accepting API key auth; returns 403 if plan doesn't allow it
 
 **Implementation options:**
 
-1. **Extend existing auth middleware (recommended):** Modify `RequireAuth` to first check for `Authorization: Bearer dp_...` header. If present, validate API key and inject tenant. If not present, fall back to cookie auth as today. `ScopedStoreMiddleware` remains unchanged. This means all 30+ `/data/*` endpoints get API access for free — no route duplication. ~200-250 lines of new Go code.
-2. **Separate `/api/v1/` prefix:** Mount a second route group with its own middleware stack. Cleaner separation and allows independent versioning, but duplicates route registration and requires maintaining two sets of paths. Only justified if the API needs different response shapes than the dashboard.
+1. **Extend existing auth middleware (recommended):** Modify `RequireAuth` to first check for `Authorization: Bearer ghp_...` header. If present, resolve via GitHub API (cached), look up tenant, inject into context. Fall back to cookie auth if no header. `ScopedStoreMiddleware` remains unchanged. All 30+ `/data/*` endpoints get API access for free — no route duplication. ~100-150 lines of new Go code (significantly less than custom key management).
+2. **Separate `/api/v1/` prefix:** Mount a second route group with its own middleware stack. Cleaner separation but duplicates route registration. Only justified if the API needs different response shapes than the dashboard.
 
 **Rate limiting:**
 
@@ -212,19 +199,19 @@ CREATE POLICY tenant_api_key_policy ON tenant_api_key
 
 **Security considerations:**
 
-- Keys are hashed (SHA-256) at rest — plaintext shown only once at creation
-- `key_prefix` stored separately for display without exposing the full key
-- API key auth returns JSON errors (401/403), never redirects
-- `last_used_at` tracking enables stale key detection
-- Soft-delete via `revoked_at` preserves audit trail
-- RLS policy on `tenant_api_key` table ensures tenants can only manage their own keys
+- No secrets stored — GitHub manages the token lifecycle
+- Token is never stored; only SHA-256 hash used as cache key
+- API token auth returns JSON errors (401/403), never redirects
+- Cache TTL bounds the window for revoked tokens (5 min default)
+- GitHub rate limits on `GET /user` are 5,000/hr per token — caching ensures devpulse stays well under this
 
-**UI:**
+**Advantages over custom API keys:**
 
-Settings page gains an "API Keys" section:
-- Table: name, prefix (`dp_a1b2...`), created date, last used date, revoke button
-- "Create Key" form: name input, submit → modal showing the full key once with copy button
-- Plan gate: section hidden or shows upgrade prompt for Free/Starter tenants
+- Zero key storage — no migration, no `tenant_api_key` table, no hashing at rest
+- Zero key management UI — no create/revoke/list UI needed
+- Users already know how to manage GitHub PATs
+- Token scoping handled by GitHub (fine-grained PATs can be scoped to specific permissions)
+- Revocation handled by GitHub — user deletes PAT, access stops (within cache TTL)
 
 ### 8. Import Frequency (Daily / Hourly / Hourly + On-demand)
 
@@ -294,5 +281,5 @@ Prerequisites: Stripe integration (feature branch pending), Starter tier added.
 4. ~~**On-demand import throttle:**~~ Resolved: 30-minute cooldown per repo for on-demand imports.
 5. ~~**CSV export scope:**~~ Resolved: new "Export" tab in the UI. Both PDF and CSV exports move there. User selects "All repos" or specific repos from their imported list. ZIP contains one CSV per dataset per selected repo.
 6. ~~**Events-per-week limits:**~~ Resolved: Free: 500/week, Starter: 1,000/week, Pro: 15,000/week, Enterprise: unlimited. Enterprise also includes option for a dedicated instance (pricing based on configuration, users, and access patterns).
-7. **API key limits per tenant:** How many API keys can a Pro tenant create? Suggest 5 for Pro, unlimited for Enterprise.
+7. ~~**API key limits per tenant:**~~ Resolved: no custom API keys — use GitHub PATs. No per-tenant key limit needed; GitHub manages token lifecycle.
 8. **API rate limits:** 100 req/min for Pro is a starting point — should Enterprise get a higher or configurable limit?
