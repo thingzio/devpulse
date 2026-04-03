@@ -96,6 +96,7 @@ type InsightsStore interface {
 	GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*FirstResponseSeries, error)
 	GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*AgingPRsSeries, error)
 	GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*UnansweredSeries, error)
+	GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*ResponseSLOSeries, error)
 }
 
 // ReleaseStore manages release imports and queries.

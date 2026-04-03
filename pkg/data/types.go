@@ -257,6 +257,14 @@ type UnansweredSeries struct {
 	UnansweredPct float64 `json:"unanswered_pct"`
 }
 
+// ResponseSLOSeries tracks percentage of issues/PRs responded to within a threshold.
+type ResponseSLOSeries struct {
+	TotalItems    int     `json:"total_items"`
+	WithinSLO     int     `json:"within_slo"`
+	WithinSLOPct  float64 `json:"within_slo_pct"`
+	SLOThresholdH int     `json:"slo_threshold_hours"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`

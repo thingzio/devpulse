@@ -645,6 +645,12 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
+func TestGetResponseSLO_NilDB(t *testing.T) {
+	s := &Store{}
+	_, err := s.GetResponseSLO(context.Background(), nil, nil, nil, 6)
+	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
 func padDay(i int) string {
 	return fmt.Sprintf("%02d", (i%28)+1)
 }

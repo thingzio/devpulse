@@ -544,6 +544,32 @@ SELECT
     ) AS unanswered
 `
 
+	// selectResponseSLOSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectResponseSLOSQL = `WITH first_response AS (
+    SELECT e.org, e.repo, e.number,
+        MIN(EXTRACT(EPOCH FROM (r.created_at::timestamp - e.created_at::timestamp)) / 3600.0) AS hours
+    FROM event e
+    JOIN event r ON r.org = e.org AND r.repo = e.repo AND r.number = e.number
+        AND r.type IN ('issue_comment', 'pr_review')
+        AND r.username != e.username
+        AND r.created_at > e.created_at
+    JOIN developer d ON e.username = d.username
+    WHERE e.type IN ('issue', 'pr')
+      AND e.number IS NOT NULL
+      AND e.created_at IS NOT NULL
+      AND e.org = COALESCE($1, e.org)
+      AND e.repo = COALESCE($2, e.repo)
+      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+      AND e.created_at >= $4
+      ` + botExcludeSQL + `
+    GROUP BY e.org, e.repo, e.number
+)
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN hours <= 48 THEN 1 ELSE 0 END) AS within_slo
+FROM first_response
+`
+
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
 	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
 		FROM event e
@@ -1145,6 +1171,31 @@ func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string
 		TotalItems:    total,
 		Unanswered:    unanswered,
 		UnansweredPct: pct,
+	}, nil
+}
+
+func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*data.ResponseSLOSeries, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	since := sinceDate(months)
+	var total, withinSLO int
+
+	if err := s.db.QueryRowContext(ctx, selectResponseSLOSQL, org, repo, entity, since).Scan(&total, &withinSLO); err != nil {
+		return nil, fmt.Errorf("failed to query response SLO: %w", err)
+	}
+
+	var pct float64
+	if total > 0 {
+		pct = float64(withinSLO) / float64(total) * 100
+	}
+
+	return &data.ResponseSLOSeries{
+		TotalItems:    total,
+		WithinSLO:     withinSLO,
+		WithinSLOPct:  pct,
+		SLOThresholdH: 48,
 	}, nil
 }
 
