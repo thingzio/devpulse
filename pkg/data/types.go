@@ -265,6 +265,23 @@ type ResponseSLOSeries struct {
 	SLOThresholdH int     `json:"slo_threshold_hours"`
 }
 
+// HealthCategory is a single scored category in the health scorecard.
+type HealthCategory struct {
+	Name    string         `json:"name"`
+	Grade   string         `json:"grade"`
+	Score   float64        `json:"score"`
+	Metrics map[string]any `json:"metrics"`
+}
+
+// HealthScorecard is the composite health assessment.
+type HealthScorecard struct {
+	Overall        string         `json:"overall"`
+	OverallScore   float64        `json:"overall_score"`
+	Demand         HealthCategory `json:"demand"`
+	Throughput     HealthCategory `json:"throughput"`
+	Responsiveness HealthCategory `json:"responsiveness"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`

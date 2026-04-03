@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/health"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/plan"
 )
@@ -575,5 +576,132 @@ func insightsGeneratedAPIHandler(store data.Store) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, res)
+	}
+}
+
+func insightsHealthScorecardHandler(store data.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s := storeFromRequest(r, store)
+		p := parseInsightParams(r)
+		entity := optional(r.URL.Query().Get("e"))
+		ctx := r.Context()
+
+		// Gather sub-metrics (individual failures are non-fatal).
+		momentum, _ := s.GetContributorMomentum(ctx, p.org, p.repo, entity, p.months)
+		ttm, _ := s.GetTimeToMerge(ctx, p.org, p.repo, entity, p.months)
+		ttfr, _ := s.GetTimeToFirstResponse(ctx, p.org, p.repo, entity, p.months)
+		metricHistory, _ := s.GetRepoMetricHistory(ctx, p.org, p.repo, p.months)
+		aging, _ := s.GetAgingPRs(ctx, p.org, p.repo, entity, p.months)
+		unanswered, _ := s.GetUnansweredRate(ctx, p.org, p.repo, entity, p.months)
+		slo, _ := s.GetResponseSLO(ctx, p.org, p.repo, entity, p.months)
+
+		sc := buildScorecard(momentum, ttm, ttfr, metricHistory, aging, unanswered, slo)
+		writeJSON(w, http.StatusOK, sc)
+	}
+}
+
+func buildScorecard(
+	momentum *data.MomentumSeries,
+	ttm *data.VelocitySeries,
+	ttfr *data.FirstResponseSeries,
+	metricHistory []*data.RepoMetricHistory,
+	aging *data.AgingPRsSeries,
+	unanswered *data.UnansweredSeries,
+	slo *data.ResponseSLOSeries,
+) *data.HealthScorecard {
+	// --- Demand inputs ---
+	di := health.DemandInput{}
+	if len(metricHistory) >= 2 {
+		latest := metricHistory[len(metricHistory)-1]
+		first := metricHistory[0]
+		if first.Stars > 0 {
+			di.StarGrowthPct = float64(latest.Stars-first.Stars) / float64(first.Stars) * 100
+		}
+	}
+	if momentum != nil && len(momentum.Active) >= 2 {
+		prev := momentum.Active[len(momentum.Active)-2]
+		curr := momentum.Active[len(momentum.Active)-1]
+		if prev > 0 {
+			di.ExternalContributorDelta = float64(curr-prev) / float64(prev) * 100
+		}
+	}
+	if momentum != nil && len(momentum.Delta) >= 1 {
+		di.NewPRDelta = float64(momentum.Delta[len(momentum.Delta)-1])
+		di.NewIssueDelta = di.NewPRDelta * 0.5 // approximate from momentum
+	}
+	demandScore := health.DemandScore(di)
+
+	// --- Throughput inputs ---
+	ti := health.ThroughputInput{}
+	if ttm != nil && len(ttm.AvgDays) >= 1 {
+		lastAvg := ttm.AvgDays[len(ttm.AvgDays)-1]
+		ti.MedianMergeHours = lastAvg * 24 // convert days to hours
+	}
+	if aging != nil {
+		ti.AgingPRsPct = aging.AgingPct
+	}
+	// PR backlog delta: compare last two months of merge velocity counts as proxy.
+	if ttm != nil && len(ttm.Count) >= 2 {
+		prev := ttm.Count[len(ttm.Count)-2]
+		curr := ttm.Count[len(ttm.Count)-1]
+		if prev > 0 {
+			ti.PRBacklogDelta = float64(curr-prev) / float64(prev) * 100
+		}
+	}
+	throughputScore := health.ThroughputScore(ti)
+
+	// --- Responsiveness inputs ---
+	ri := health.ResponsivenessInput{}
+	if ttfr != nil && len(ttfr.PRAvg) >= 1 {
+		ri.FirstResponsePRHours = ttfr.PRAvg[len(ttfr.PRAvg)-1]
+	}
+	if ttfr != nil && len(ttfr.IssueAvg) >= 1 {
+		ri.FirstResponseIssueHours = ttfr.IssueAvg[len(ttfr.IssueAvg)-1]
+	}
+	if slo != nil {
+		ri.RespondedWithin48hPct = slo.WithinSLOPct
+	}
+	if unanswered != nil {
+		ri.UnansweredPct = unanswered.UnansweredPct
+	}
+	responsivenessScore := health.ResponsivenessScore(ri)
+
+	overallScore := health.Overall(demandScore, throughputScore, responsivenessScore)
+
+	return &data.HealthScorecard{
+		Overall:      health.Grade(overallScore),
+		OverallScore: overallScore,
+		Demand: data.HealthCategory{
+			Name:  "Demand",
+			Grade: health.Grade(demandScore),
+			Score: demandScore,
+			Metrics: map[string]any{
+				"Star Growth (%)":        di.StarGrowthPct,
+				"Contributor Growth (%)": di.ExternalContributorDelta,
+				"New PR Delta (%)":       di.NewPRDelta,
+				"New Issue Delta (%)":    di.NewIssueDelta,
+			},
+		},
+		Throughput: data.HealthCategory{
+			Name:  "Throughput",
+			Grade: health.Grade(throughputScore),
+			Score: throughputScore,
+			Metrics: map[string]any{
+				"Median Merge (hrs)":   ti.MedianMergeHours,
+				"PR Backlog Delta (%)": ti.PRBacklogDelta,
+				"Aging PRs (%)":       ti.AgingPRsPct,
+			},
+		},
+		Responsiveness: data.HealthCategory{
+			Name:  "Responsiveness",
+			Grade: health.Grade(responsivenessScore),
+			Score: responsivenessScore,
+			Metrics: map[string]any{
+				"PR Response (hrs)":    ri.FirstResponsePRHours,
+				"Issue Response (hrs)": ri.FirstResponseIssueHours,
+				"Responded <48h (%)":   ri.RespondedWithin48hPct,
+				"Unanswered (%)":       ri.UnansweredPct,
+			},
+		},
 	}
 }
