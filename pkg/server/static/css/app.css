@@ -388,6 +388,20 @@ fieldset {
   transform: translateY(-50%);
 }
 
+/* Banner Group */
+.banner-group {
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.banner-group .summary-banner {
+  margin-bottom: 0;
+}
+.banner-group .portfolio-row {
+  border-top: 1px solid var(--border-color, #333);
+}
+
 /* Summary Banner */
 .summary-banner {
   display: flex;

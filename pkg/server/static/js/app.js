@@ -334,7 +334,7 @@ function loadSummaryBanner(months, org, repo, entity) {
         $("#banner-last-import").text(formatImportDate(data.last_import, repo));
         $("#bus-factor-val").text(data.bus_factor);
         $("#pony-factor-val").text(data.pony_factor);
-        loadPortfolioSummary(months, org);
+        loadPortfolioSummary(months, org, repo);
     });
 }
 
@@ -342,11 +342,11 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
-            loadHealthScorecard('/data/insights/health-scorecard?' + q);
             loadSignals('/data/insights/signals?' + q);
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
             if (repo) {
+                loadHealthScorecard('/data/insights/health-scorecard?' + q);
                 $("#stars-trend-panel").show();
                 $("#forks-trend-panel").show();
                 $("#repo-overview-panel").hide();
@@ -354,6 +354,7 @@ function loadTabCharts(tab, months, org, repo, entity) {
                 loadStarsTrendChart('/data/insights/repo-metric-history?' + q);
                 loadForksTrendChart('/data/insights/repo-metric-history?' + q);
             } else {
+                $("#health-scorecard-panel").hide();
                 $("#stars-trend-panel").hide();
                 $("#forks-trend-panel").hide();
                 $("#repo-overview-panel").show();
@@ -1069,8 +1070,10 @@ function renderScorecardCategory(id, cat) {
     $('#sc-' + id + '-metrics').html(html);
 }
 
-function loadPortfolioSummary(months, org) {
-    $.get('/data/insights/portfolio-summary?m=' + months + '&o=' + org, function (d) {
+function loadPortfolioSummary(months, org, repo) {
+    var url = '/data/insights/portfolio-summary?m=' + months + '&o=' + org;
+    if (repo) url += '&r=' + repo;
+    $.get(url, function (d) {
         if (!d) { $('#portfolio-banner').hide(); return; }
         $('#portfolio-banner').show();
         $('#pb-stars').text(d.total_stars.toLocaleString());
