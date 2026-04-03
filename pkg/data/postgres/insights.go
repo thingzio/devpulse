@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
 )
@@ -611,6 +612,39 @@ SELECT c.stars, c.forks, c.open_issues,
        ps.closed_prs, ps.contributors,
        ps.avg_merge_h, ps.median_merge_h
 FROM current_totals c, prev_snapshot p, pr_stats ps
+`
+
+	// selectSignalsSQL: $1=org, $2=7_days_ago, $3=14_days_ago, $4=limit
+	selectSignalsSQL = `WITH this_week AS (
+    SELECT org, repo, COUNT(*) AS events
+    FROM event
+    WHERE org = COALESCE($1, org)
+      AND date >= $2
+      ` + botExcludeSQL + `
+      ` + forkExcludeSQL + `
+    GROUP BY org, repo
+),
+last_week AS (
+    SELECT org, repo, COUNT(*) AS events
+    FROM event
+    WHERE org = COALESCE($1, org)
+      AND date >= $3 AND date < $2
+      ` + botExcludeSQL + `
+      ` + forkExcludeSQL + `
+    GROUP BY org, repo
+)
+SELECT
+    COALESCE(t.org, l.org) AS org,
+    COALESCE(t.repo, l.repo) AS repo,
+    COALESCE(t.events, 0) - COALESCE(l.events, 0) AS delta,
+    CASE WHEN COALESCE(l.events, 0) > 0
+        THEN (COALESCE(t.events, 0) - l.events)::float / l.events * 100
+        ELSE 0 END AS delta_pct
+FROM this_week t
+FULL OUTER JOIN last_week l ON t.org = l.org AND t.repo = l.repo
+WHERE ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) > 0
+ORDER BY ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) DESC
+LIMIT $4
 `
 
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
@@ -1270,5 +1304,66 @@ func (s *Store) GetPortfolioSummary(ctx context.Context, org *string, months int
 	}
 
 	return &ps, nil
+}
+
+func (s *Store) GetSignals(ctx context.Context, org *string, limit int) ([]*data.Signal, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+
+	now := time.Now().UTC()
+	weekAgo := now.AddDate(0, 0, -7).Format("2006-01-02")
+	twoWeeksAgo := now.AddDate(0, 0, -14).Format("2006-01-02")
+
+	rows, err := s.db.QueryContext(ctx, selectSignalsSQL, org, weekAgo, twoWeeksAgo, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query signals: %w", err)
+	}
+	defer rows.Close()
+
+	var signals []*data.Signal
+	for rows.Next() {
+		var sig data.Signal
+		var delta int
+		var deltaPct float64
+		if err := rows.Scan(&sig.Org, &sig.Repo, &delta, &deltaPct); err != nil {
+			return nil, fmt.Errorf("failed to scan signal row: %w", err)
+		}
+		sig.Metric = "events"
+		sig.Delta = delta
+		sig.DeltaPct = deltaPct
+
+		absPct := deltaPct
+		if absPct < 0 {
+			absPct = -absPct
+		}
+
+		switch {
+		case absPct >= 200:
+			sig.Severity = "critical"
+		case absPct >= 50:
+			sig.Severity = "warning"
+		default:
+			sig.Severity = "info"
+		}
+
+		if delta > 0 {
+			sig.Message = fmt.Sprintf("+%d events WoW (+%.0f%%)", delta, deltaPct)
+		} else {
+			sig.Message = fmt.Sprintf("%d events WoW (%.0f%%)", delta, deltaPct)
+		}
+
+		signals = append(signals, &sig)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating signal rows: %w", err)
+	}
+
+	return signals, nil
 }
 

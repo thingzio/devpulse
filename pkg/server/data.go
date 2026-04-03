@@ -579,6 +579,21 @@ func insightsGeneratedAPIHandler(store data.Store) http.HandlerFunc {
 	}
 }
 
+func insightsSignalsHandler(store data.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s := storeFromRequest(r, store)
+		p := parseInsightParams(r)
+		limit := queryParamInt(r, "n", 10)
+		res, err := s.GetSignals(r.Context(), p.org, limit)
+		if err != nil {
+			slog.Error("failed to get signals", "error", err)
+			writeError(w, http.StatusInternalServerError, "error querying signals")
+			return
+		}
+		writeJSON(w, http.StatusOK, res)
+	}
+}
+
 func insightsPortfolioSummaryHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)

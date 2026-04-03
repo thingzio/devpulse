@@ -297,6 +297,17 @@ type PortfolioSummary struct {
 	MedianMergeHours  float64 `json:"median_merge_hours"`
 }
 
+// Signal represents a notable week-over-week change detected in the data.
+type Signal struct {
+	Org      string  `json:"org"`
+	Repo     string  `json:"repo"`
+	Metric   string  `json:"metric"`
+	Message  string  `json:"message"`
+	Delta    int     `json:"delta"`
+	DeltaPct float64 `json:"delta_pct"`
+	Severity string  `json:"severity"`
+}
+
 type RetentionSeries struct {
 	Months    []string `json:"months" yaml:"months"`
 	New       []int    `json:"new" yaml:"new"`
