@@ -1565,3 +1565,16 @@ a.link {
 .grade-c { color: #eab308; }
 .grade-d { color: #f97316; }
 .grade-f { color: #ef4444; }
+
+/* Portfolio Banner */
+.banner-delta {
+    display: block;
+    font-size: 0.7rem;
+    margin-top: -2px;
+}
+.delta-positive {
+    color: #22c55e;
+}
+.delta-negative {
+    color: #ef4444;
+}

@@ -334,6 +334,7 @@ function loadSummaryBanner(months, org, repo, entity) {
         $("#banner-last-import").text(formatImportDate(data.last_import, repo));
         $("#bus-factor-val").text(data.bus_factor);
         $("#pony-factor-val").text(data.pony_factor);
+        loadPortfolioSummary(months, org);
     });
 }
 
@@ -1044,6 +1045,29 @@ function renderScorecardCategory(id, cat) {
         }
     }
     $('#sc-' + id + '-metrics').html(html);
+}
+
+function loadPortfolioSummary(months, org) {
+    $.get('/data/insights/portfolio-summary?m=' + months + '&o=' + org, function (d) {
+        if (!d) { $('#portfolio-banner').hide(); return; }
+        $('#portfolio-banner').show();
+        $('#pb-stars').text(d.total_stars.toLocaleString());
+        $('#pb-forks').text(d.total_forks.toLocaleString());
+        $('#pb-prs').text(d.total_closed_prs.toLocaleString());
+        $('#pb-issues').text(d.total_open_issues.toLocaleString());
+        $('#pb-merge').text(d.median_merge_hours.toFixed(1));
+        renderDelta('#pb-stars-delta', d.stars_delta, d.stars_delta_pct);
+        renderDelta('#pb-forks-delta', d.forks_delta, d.forks_delta_pct);
+    }).fail(function () {
+        $('#portfolio-banner').hide();
+    });
+}
+
+function renderDelta(sel, delta, pct) {
+    if (delta === 0 && pct === 0) { $(sel).text(''); return; }
+    var sign = delta >= 0 ? '+' : '';
+    var cls = delta >= 0 ? 'delta-positive' : 'delta-negative';
+    $(sel).html('<span class="' + cls + '">' + sign + delta.toLocaleString() + ' (' + sign + pct.toFixed(1) + '%)</span>');
 }
 
 function loadHealthActivitySparkline(url) {
