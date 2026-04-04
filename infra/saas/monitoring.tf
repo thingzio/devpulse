@@ -348,3 +348,26 @@ resource "google_monitoring_alert_policy" "import_failure" {
     }
   }
 }
+
+resource "google_monitoring_alert_policy" "import_repo_errors" {
+  display_name          = "${var.prefix}-import-repo-errors"
+  project               = var.project_id
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.name]
+
+  conditions {
+    display_name = "Import repo errors > 5 per hour"
+    condition_threshold {
+      filter          = "metric.type = \"logging.googleapis.com/user/devpulse-saas-import-repo-errors\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 5
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "3600s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+      }
+    }
+  }
+}
