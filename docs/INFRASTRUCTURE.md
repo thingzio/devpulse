@@ -47,6 +47,18 @@ Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (
 
 The serve service runs with `min_instance_count=1` to avoid cold-start latency on the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
 
+## Response Caching
+
+Dashboard data only changes at import time (hourly). Two-layer caching eliminates redundant DB queries:
+
+**Server-side (in-memory):** `sync.Map` with 5-minute TTL, keyed by `(tenant_id, path, query_params)`. Protects the DB from concurrent requests across all users viewing the same data. Covers all 25+ insight endpoints via the `insightHandler` and `insightWithEntityHandler` factories. Memory footprint: ~50KB per active tenant (~4MB at 80 tenants).
+
+**Browser-side:** `Cache-Control: private, max-age=1800` on all `/data/` responses. Prevents repeat fetches on tab switches, page reloads, and back-button navigation. `private` ensures CDNs don't cache tenant-scoped data.
+
+Combined effect: first request in a 5-minute window hits the DB; subsequent requests served from memory (sub-millisecond). Browser won't re-request for 30 minutes. Worst-case staleness is ~40 minutes (visit 10 min before import + 30 min browser cache), well within the hourly refresh cadence.
+
+**Excluded from caching:** `/data/export/csv`, `/data/search` (POST), `/data/developer/search` (autocomplete).
+
 ## Anthropic API (LLM Insights)
 
 The import worker calls the Claude Haiku 4.5 Messages API (`claude-haiku-4-5-20251001`) to generate per-repo insights during each import. The call is gated by the tenant's plan AI level:
@@ -271,6 +283,41 @@ Secondary (abuse) limits return HTTP 403 with `Retry-After`. The importer detect
 | Connection pool | `too many clients` errors | Increase pool size in DATABASE_URL |
 | Cloud SQL CPU | High latency on upserts | Scale to `db-custom-*` tier |
 
+## Database Indexes
+
+Performance indexes beyond primary keys, defined in migration files:
+
+**Event table** (`migrations/001_initial.sql`, `migrations/003_performance_indexes.sql`):
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_event_org_repo_date` | `(org, repo, date)` | Time-range queries on dashboard charts |
+| `idx_event_org_repo_type_date` | `(org, repo, type, date)` | Event type distribution, filtered time series |
+| `idx_event_org_repo_created_at` | `(org, repo, created_at)` | Timestamp-based queries (merge time, restore time) |
+| `idx_event_username` | `(username)` | Developer lookup, profile queries |
+| `idx_event_org_repo_number` | `(org, repo, number)` | PR/issue self-joins in insight queries |
+| `idx_event_username_org_repo` | `(username, org, repo)` | RLS policy EXISTS joins |
+| `idx_event_org_repo_number_type` | `(org, repo, number, type, created_at)` | Covering index for heaviest self-join queries (time-to-first-response, unanswered rate, review latency) |
+
+**Developer table:**
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_developer_reputation` | `(reputation)` | Reputation ranking queries |
+| `idx_developer_entity_null` | `(username) WHERE entity IS NULL` | Enrichment batch: find un-enriched developers |
+
+**SaaS tables** (`migrations_saas/`):
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_session_tenant` | `(tenant_id)` | Session lookup by tenant |
+| `idx_session_expires` | `(expires_at)` | Session expiry cleanup |
+| `idx_tenant_repo_tenant` | `(tenant_id, active)` | Active repo listing per tenant |
+| `idx_tenant_member_github` | `(github_id)` | OAuth login lookup |
+| `idx_github_app_installation_tenant` | `(tenant_id)` | Installation token minting |
+| `idx_tenant_repo_rls` | `(tenant_id, org, repo) WHERE active` | RLS policy performance |
+| `idx_tenant_repo_import_queue` | `(active, import_claimed_at, import_done_at) WHERE active` | SKIP LOCKED claim queue |
+
 ## Terraform
 
 All infrastructure is defined in `infra/saas/`:
@@ -293,8 +340,10 @@ All infrastructure is defined in `infra/saas/`:
 
 ## Cost Optimization
 
+- **Response caching** — two-layer cache (5 min server + 30 min browser) eliminates ~95% of DB queries on the dashboard
 - **AI gating by plan** — Free tenants generate zero Anthropic API cost
-- **Insight caching** — generated insights stored in DB, not regenerated unnecessarily
+- **Insight caching** — 7-day age gate + 10% event delta gate reduces LLM calls by ~85%
+- **Covering indexes** — heaviest self-join queries use index-only scans, 2-5x faster on cache miss
 - **Import job exits after completion** — no idle compute
 - **Admin service scale-to-zero** — no cost when not in use
 - **Shared data model** — repos imported by one tenant are visible to others (no duplicate imports)
