@@ -78,7 +78,7 @@ func handleMetricsReview(cfg *metricsConfig) http.HandlerFunc {
 		token, err := gcpAccessToken(r.Context())
 		if err != nil {
 			slog.Error("getting GCP access token", "error", err)
-			http.Error(w, "failed to get GCP credentials", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("failed to get GCP credentials: %v", err), http.StatusInternalServerError)
 			return
 		}
 
@@ -87,7 +87,7 @@ func handleMetricsReview(cfg *metricsConfig) http.HandlerFunc {
 		analysis, err := analyzeMetrics(r.Context(), cfg, metrics)
 		if err != nil {
 			slog.Error("analyzing metrics", "error", err)
-			http.Error(w, "failed to analyze metrics", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("failed to analyze metrics: %v", err), http.StatusInternalServerError)
 			return
 		}
 
