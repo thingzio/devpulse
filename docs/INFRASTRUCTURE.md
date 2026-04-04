@@ -6,32 +6,33 @@ DevPulse runs on GCP: Cloud Run for compute, Cloud SQL (PostgreSQL) for storage,
 
 ```
 Internet
-   │
-   ├── Cloud Run service (serve mode)
-   │     ├── OAuth sign-in
-   │     ├── Dashboard (Chart.js)
-   │     ├── Webhook endpoint (GitHub App)
-   │     └── Data API (30+ chart endpoints)
-   │
-   ├── Cloud Run job (import mode, hourly)
-   │     └── Per-tenant repo import via GitHub API
-   │
-   ├── Cloud Run service (admin, IAM-gated)
-   │     └── Tenant plan management (upgrade/downgrade)
-   │
-   └── GitHub
-         ├── OAuth (user identity)
-         ├── App webhooks (installation events)
-         └── API (events, metadata, releases)
+   |
+   +-- Cloud Run service (serve mode)
+   |     +-- OAuth sign-in
+   |     +-- Dashboard (Chart.js)
+   |     +-- Webhook endpoint (GitHub App)
+   |     +-- Data API (30+ chart endpoints)
+   |
+   +-- Cloud Run job (import mode, hourly)
+   |     +-- Per-tenant repo import via GitHub API
+   |     +-- LLM insights generation (Claude Haiku 4.5)
+   |
+   +-- Cloud Run service (admin, IAM-gated)
+   |     +-- Tenant plan management (upgrade/downgrade)
+   |
+   +-- GitHub
+         +-- OAuth (user identity)
+         +-- App webhooks (installation events)
+         +-- API (events, metadata, releases)
 
-Cloud SQL PostgreSQL
-   ├── Base tables (event, developer, repo_meta, release, ...)
-   ├── SaaS tables (tenant, session, tenant_repo, ...)
-   └── RLS policies (tenant isolation)
+Cloud SQL PostgreSQL (db-g1-small)
+   +-- Base tables (event, developer, repo_meta, release, ...)
+   +-- SaaS tables (tenant, session, tenant_repo, ...)
+   +-- RLS policies (tenant isolation)
 
-Cloud Scheduler → triggers import job hourly
-Secret Manager  → GitHub App key, OAuth secret, webhook secret, Anthropic API key
-Cloud DNS       → devpulse.thingz.io
+Cloud Scheduler -> triggers import job hourly
+Secret Manager  -> GitHub App key, OAuth secret, webhook secret, Anthropic API key
+Cloud DNS       -> devpulse.thingz.io
 ```
 
 ## Compute
@@ -40,86 +41,154 @@ Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
-| Serve | Cloud Run service | 0-10 instances, scale-to-zero | Public |
+| Serve | Cloud Run service | 1-10 instances (always-on) | Public |
 | Import | Cloud Run job | Hourly, parallelism=3 (SKIP LOCKED queue) | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
-Cloud Run scales to zero when idle — no cost when no one is using the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) for tenant management operations.
+The serve service runs with `min_instance_count=1` to avoid cold-start latency on the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
 
-## Database Scaling Plan
+## Anthropic API (LLM Insights)
 
-Start small, upgrade in-place as tenant count grows. Each Cloud SQL tier change is a Terraform apply with zero downtime (with HA) or ~1-3 minutes (without). The AlloyDB migration is a planned maintenance event.
+The import worker calls the Claude Haiku 4.5 Messages API (`claude-haiku-4-5-20251001`) to generate per-repo insights during each import. The call is gated by the tenant's plan AI level:
 
-### Tier 1: Minimal (0-100 tenants)
+| Plan | AI Level | Behavior |
+|------|----------|----------|
+| Free | 0 | No LLM calls |
+| Starter | 1 | 1 insight call per repo per import |
+| Pro | 2 | 1 insight call per repo per import (richer analysis) |
 
-**Cloud SQL db-f1-micro** — shared vCPU, 614MB RAM.
+Each call sends ~2-4K input tokens (JSON metrics payload + DORA benchmarks + instructions) and receives ~500-1K output tokens (structured JSON with 5 observations + 3 actions). Max output capped at 4,096 tokens.
+
+**Per-call cost estimate** (Claude Haiku 4.5 pricing: $0.80/MTok input, $4.00/MTok output):
+- Input: ~3K tokens = ~$0.0024
+- Output: ~750 tokens = ~$0.003
+- **~$0.005 per repo per call**
+
+**Caching:** Insights are regenerated only when both gates pass: (1) last generation > 7 days ago, and (2) event count changed by > 10%. This reduces calls from ~720/day to ~4-5/week per repo for active repos, and near-zero for quiet repos. Effective cost: **~$0.02/repo/month** (vs $0.17 without caching).
+
+## Current Cost (Actual)
+
+Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 
 | Service | Details | Estimate |
 |---------|---------|----------|
-| Cloud SQL | db-f1-micro, 10GB storage | $9/mo |
-| Cloud Run Service | scale-to-zero, 1 vCPU/512MB | $1-2/mo |
-| Cloud Run Job | hourly, ~1 min/run | $0.50/mo |
-| Anthropic API | Claude Haiku insights, per-repo/per-import | $1-5/mo |
+| Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
+| Cloud Run Service (serve) | always-on (min=1), 1 vCPU/512MB | $15/mo |
+| Cloud Run Job (import) | hourly, ~3 tasks, ~5 min/run | $2/mo |
+| Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
+| Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
 | Cloud Scheduler | 1 hourly job | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
 | Cloud Monitoring | log-based metrics, 6 alert policies, email | free tier |
-| **Total** | | **~$12-17/mo** |
+| **Total** | | **~$46/mo** |
 
-Handles low traffic dashboards and hourly imports for up to ~100 tenants. Import job completes in under 15 minutes. Anthropic cost scales with repo count and import frequency.
+## Cost by Tenant Scale
+
+The tables below estimate monthly costs at different tenant counts. Plan mix assumptions: 60% Free, 25% Starter, 15% Pro. Repos per tenant use plan maximums as upper bound (actual usage is typically 40-60% of limit). Anthropic costs reflect insight caching (7-day age gate + 10% event delta gate).
+
+### 25 Tenants
+
+15 Free (1 repo each), 6 Starter (avg 3 repos), 4 Pro (avg 15 repos).
+Total repos: ~93. Paid repos with AI: ~78.
+
+| Service | Details | Estimate |
+|---------|---------|----------|
+| Cloud SQL | db-g1-small, ~15GB storage | $29/mo |
+| Cloud Run (serve) | always-on, light load | $15/mo |
+| Cloud Run (import) | hourly, ~10 min/run | $4/mo |
+| Cloud Run (admin) | scale-to-zero | $0.50/mo |
+| Anthropic API | ~78 repos x $0.02/mo (cached) | $1.50/mo |
+| Fixed (scheduler, DNS, secrets, AR, monitoring) | | $1/mo |
+| **Total** | | **~$51/mo** |
+
+### 100 Tenants
+
+60 Free (1 repo each), 25 Starter (avg 3 repos), 15 Pro (avg 15 repos).
+Total repos: ~360. Paid repos with AI: ~300.
+
+| Service | Details | Estimate |
+|---------|---------|----------|
+| Cloud SQL | db-g1-small, ~25GB storage | $31/mo |
+| Cloud Run (serve) | always-on, moderate load | $18/mo |
+| Cloud Run (import) | hourly, ~20 min/run | $8/mo |
+| Cloud Run (admin) | scale-to-zero | $0.50/mo |
+| Anthropic API | ~300 repos x $0.02/mo (cached) | $6/mo |
+| Fixed | | $1/mo |
+| **Total** | | **~$65/mo** |
 
 **Upgrade signal:** DB CPU sustained > 80%, or import duration > 30 minutes.
 
-### Tier 2: Small (100-300 tenants)
+### 300 Tenants
 
-**Cloud SQL db-g1-small** — shared vCPU, 1.7GB RAM.
+180 Free (1 repo each), 75 Starter (avg 3 repos), 45 Pro (avg 15 repos).
+Total repos: ~1,080. Paid repos with AI: ~900.
 
-| Service | Estimate |
-|---------|----------|
-| Cloud SQL | $25/mo |
-| Storage (25GB) | $4/mo |
-| Cloud Run | $15/mo |
-| Anthropic API | $5-15/mo |
-| Fixed (scheduler, DNS, secrets) | $1/mo |
-| **Total** | **~$50-60/mo** |
+| Service | Details | Estimate |
+|---------|---------|----------|
+| Cloud SQL | db-custom-1-3840, 1 vCPU, 3.75GB, ~50GB storage | $59/mo |
+| Cloud Run (serve) | always-on, higher concurrency | $25/mo |
+| Cloud Run (import) | parallelism=5, ~30 min/run | $15/mo |
+| Cloud Run (admin) | scale-to-zero | $0.50/mo |
+| PgBouncer sidecar | connection pooling | $10/mo |
+| Anthropic API | ~900 repos x $0.02/mo (cached) | $18/mo |
+| Fixed | | $1/mo |
+| **Total** | | **~$129/mo** |
 
-Migration: `terraform apply` (change `db_tier` variable). Zero downtime with HA enabled.
+**Upgrade signal:** connection count approaching limits, query latency > 500ms.
 
-**Upgrade signal:** connection count approaching limits, query latency > 500ms on dashboard.
+### 1,000 Tenants
 
-### Tier 3: Dedicated (300-1,000 tenants)
+600 Free (1 repo each), 250 Starter (avg 3 repos), 150 Pro (avg 15 repos).
+Total repos: ~3,600. Paid repos with AI: ~3,000.
 
-**Cloud SQL db-custom-1-3840** — 1 dedicated vCPU, 3.75GB RAM.
+| Service | Details | Estimate |
+|---------|---------|----------|
+| AlloyDB primary | 2 vCPU, ~100GB storage | $185/mo |
+| AlloyDB read pool (optional) | 2 vCPU | $150/mo |
+| Cloud Run (serve) | always-on, 2-5 instances avg | $50/mo |
+| Cloud Run (import) | parallelism=10+, Cloud Tasks | $25/mo |
+| Cloud Run (admin) | scale-to-zero | $0.50/mo |
+| Cloud Tasks | parallel import dispatch | $10/mo |
+| Anthropic API | ~3,000 repos x $0.02/mo (cached) | $60/mo |
+| Fixed | | $1/mo |
+| **Total** | | **~$482/mo** |
 
-| Service | Estimate |
-|---------|----------|
-| Cloud SQL | $50/mo |
-| Storage (50GB) | $9/mo |
-| Cloud Run | $30/mo |
-| PgBouncer sidecar | $10/mo |
-| Anthropic API | $15-40/mo |
-| **Total** | **~$115-140/mo** |
+### Cost Scaling Summary
 
-Adds PgBouncer as a Cloud Run sidecar for connection pooling. Import parallelism can be increased to 5–10 via `import_parallelism` variable.
+| Tenants | DB Tier | Repos (est) | Anthropic | Total |
+|---------|---------|-------------|-----------|-------|
+| 5 (current) | db-g1-small | ~15 | $0.30 | ~$46 |
+| 25 | db-g1-small | ~93 | $1.50 | ~$51 |
+| 100 | db-g1-small | ~360 | $6 | ~$65 |
+| 300 | db-custom-1-3840 | ~1,080 | $18 | ~$129 |
+| 1,000 | AlloyDB | ~3,600 | $60 | ~$482 |
 
-Migration: `terraform apply`. Zero downtime.
+With insight caching, the Anthropic API drops from the dominant cost to a minor line item (~12% at 1K tenants vs ~55% without caching). The database and compute are now the primary cost drivers at scale. Key cost levers:
+1. **AI gating by plan** — Free tenants generate zero LLM cost
+2. **Insight caching** — 7-day age gate + 10% event delta gate reduces LLM calls by ~85%
+3. **Incremental imports** — only new data fetched from GitHub API
 
-**Upgrade signal:** import job approaching 45-minute duration, analytics queries slow under concurrent load.
+## Database Scaling Plan
 
-### Tier 4: Production (1,000+ tenants)
+Start small, upgrade in-place as tenant count grows. Each Cloud SQL tier change is a Terraform apply with zero downtime (with HA) or ~1-3 minutes (without). The AlloyDB migration is a planned maintenance event.
 
-**AlloyDB** — 2+ vCPUs, built-in connection pooling, columnar analytics engine.
+### Tier upgrades via Terraform
 
-| Service | Estimate |
-|---------|----------|
-| AlloyDB primary (2 vCPU) | $150/mo |
-| Storage (100GB) | $35/mo |
-| Read pool (optional, 2 vCPU) | $150/mo |
-| Cloud Run | $50/mo |
-| Cloud Tasks (parallel import) | $10/mo |
-| Anthropic API | $40-100/mo |
-| **Total** | **~$300-500/mo** |
+```hcl
+# Change one variable to upgrade DB tier
+variable "db_tier" {
+  default = "db-custom-1-3840"  # was "db-g1-small"
+}
+```
+
+```shell
+terraform plan   # review changes
+terraform apply  # zero downtime upgrade
+```
+
+### AlloyDB Migration (1,000+ tenants)
 
 Why AlloyDB at this tier:
 - **Connection pooling built-in** — no PgBouncer sidecar needed
@@ -134,9 +203,9 @@ The import job uses a PostgreSQL SKIP LOCKED claim queue. Each Cloud Run task cl
 
 | Tenants | ~Repos | `import_parallelism` | Est. Duration | Strategy |
 |---------|--------|---------------------|--------------|----------|
-| 1–10 | 5–100 | 3 (current) | < 15 min | Current settings |
-| 10–50 | 50–500 | 3–5 | 15–30 min | Bump parallelism, increase DB pool |
-| 50–200 | 250–2000 | 5–10 | 30–50 min | Scale DB tier + pool |
+| 1-10 | 5-100 | 3 (current) | < 15 min | Current settings |
+| 10-50 | 50-500 | 3-5 | 15-30 min | Bump parallelism, increase DB pool |
+| 50-200 | 250-2000 | 5-10 | 30-50 min | Scale DB tier + pool |
 | 200+ | 2000+ | 10+ | Variable | Cloud Tasks for unbounded parallelism |
 
 Cloud Tasks migration path (for 200+ tenants):
@@ -162,23 +231,23 @@ Each repo runs 7 import phases:
 | Phase | Incremental | First import | Notes |
 |-------|------------:|-------------:|-------|
 | Metadata | 2 | 2 | `Repositories.Get` + `GetCommunityHealthMetrics` |
-| Events (5 concurrent) | 10–30 | 50–200+ | PRs, reviews, issues, comments, forks (100/page) |
-| PR size backfill | 0–20 | 50–200 | `PullRequests.Get` per new PR |
-| Releases | 1–3 | 1–5 | `ListReleases` paginated |
-| Metric history | 3–10 | 5–15 | Stars + forks pagination |
-| Containers | 0–5 | 2–10 | Packages + versions |
-| Reputation | 5–10/dev | 5–10/dev | User profile + org membership + search |
+| Events (5 concurrent) | 10-30 | 50-200+ | PRs, reviews, issues, comments, forks (100/page) |
+| PR size backfill | 0-20 | 50-200 | `PullRequests.Get` per new PR |
+| Releases | 1-3 | 1-5 | `ListReleases` paginated |
+| Metric history | 3-10 | 5-15 | Stars + forks pagination |
+| Containers | 0-5 | 2-10 | Packages + versions |
+| Reputation | 5-10/dev | 5-10/dev | User profile + org membership + search |
 
-Typical totals: **~60–100 calls/repo** incremental, **~150–300** first import. The free tier (3 repos) and pro tier (15 repos) are well within the 5,000/hr budget. Enterprise is unlimited.
+Typical totals: **~60-100 calls/repo** incremental, **~150-300** first import. The free tier (1 repo) and starter tier (5 repos) are well within the 5,000/hr budget.
 
 ### Throughput Per Tenant
 
 | Repo activity | Repos/hour |
 |---------------|-----------|
-| Low activity (incremental) | ~100–160 |
-| Moderate activity (incremental) | ~50–80 |
-| High activity (incremental) | ~12–25 |
-| First import (moderate) | ~15–30 |
+| Low activity (incremental) | ~100-160 |
+| Moderate activity (incremental) | ~50-80 |
+| High activity (incremental) | ~12-25 |
+| First import (moderate) | ~15-30 |
 
 First imports of large repos may span multiple hourly cycles — the importer resumes from saved page state automatically.
 
@@ -222,24 +291,12 @@ All infrastructure is defined in `infra/saas/`:
 | `registry.tf` | Artifact Registry remote repo (GHCR proxy) |
 | `outputs.tf` | Service URL, DB connection, DNS nameservers |
 
-### Tier upgrades via Terraform
-
-```hcl
-# Tier 1 → Tier 2: change one variable
-variable "db_tier" {
-  default = "db-g1-small"  # was "db-f1-micro"
-}
-```
-
-```shell
-terraform plan   # review changes
-terraform apply  # zero downtime upgrade
-```
-
 ## Cost Optimization
 
-- **Cloud Run scale-to-zero** — no cost when no dashboard users are active
+- **AI gating by plan** — Free tenants generate zero Anthropic API cost
+- **Insight caching** — generated insights stored in DB, not regenerated unnecessarily
 - **Import job exits after completion** — no idle compute
+- **Admin service scale-to-zero** — no cost when not in use
 - **Shared data model** — repos imported by one tenant are visible to others (no duplicate imports)
 - **Incremental imports** — pagination state ensures only new data is fetched
 - **Staleness checks** — metadata skipped if fresh (< 24h)

@@ -238,10 +238,70 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 
 const (
 	insightsPeriodMonths       = 3
+	insightsMinAgeDays         = 7
+	insightsEventDeltaPct      = 0.10
 	deepReputationDefaultLimit = 100
 )
 
+// checkInsightStaleness determines whether insights should be regenerated
+// based on age and event count delta. Returns (shouldRegenerate, reason).
+func checkInsightStaleness(generatedAt string, savedEventCount, currentEventCount int) (bool, string) {
+	if generatedAt == "" {
+		return true, "first generation"
+	}
+
+	ts, err := time.Parse("2006-01-02T15:04:05Z", generatedAt)
+	if err != nil {
+		return true, fmt.Sprintf("invalid generated_at timestamp: %v", err)
+	}
+
+	ageDays := int(time.Since(ts).Hours() / 24)
+	if ageDays < insightsMinAgeDays {
+		return false, fmt.Sprintf("insights are only %d days old (min %d)", ageDays, insightsMinAgeDays)
+	}
+
+	if savedEventCount == 0 {
+		return true, "no prior event count"
+	}
+
+	delta := float64(currentEventCount-savedEventCount) / float64(savedEventCount)
+	if delta < 0 {
+		delta = -delta
+	}
+	pct := delta * 100
+
+	if delta < insightsEventDeltaPct {
+		return false, fmt.Sprintf("event delta %.1f%% below threshold (%.0f%%)", pct, insightsEventDeltaPct*100)
+	}
+
+	return true, fmt.Sprintf("event delta %.1f%% exceeds threshold (%.0f%%)", pct, insightsEventDeltaPct*100)
+}
+
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
+	// Check staleness: age gate + event delta gate
+	generatedAt, err := store.GetRepoInsightsGeneratedAt(ctx, org, repo)
+	if err != nil {
+		return fmt.Errorf("checking insights age: %w", err)
+	}
+
+	savedCount, err := store.GetRepoInsightsEventCount(ctx, org, repo)
+	if err != nil {
+		return fmt.Errorf("checking insights event count: %w", err)
+	}
+
+	// Get current event count from summary (cheap DB query)
+	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightsPeriodMonths)
+	if err != nil {
+		return fmt.Errorf("getting insights summary for staleness check: %w", err)
+	}
+
+	shouldRegen, reason := checkInsightStaleness(generatedAt, savedCount, summary.Events)
+	if !shouldRegen {
+		slog.Debug("skipping insights generation", "org", org, "repo", repo, "reason", reason)
+		return nil
+	}
+	slog.Info("regenerating insights", "org", org, "repo", repo, "reason", reason)
+
 	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
 
 	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodMonths)
@@ -256,13 +316,15 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 		PeriodMonths: insightsPeriodMonths,
 		Model:        model,
 		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		EventCount:   summary.Events,
 	}
 
 	if err := store.SaveRepoInsights(ctx, org, repo, ri); err != nil {
 		return fmt.Errorf("saving insights: %w", err)
 	}
 
-	slog.Info("insights generated", "org", org, "repo", repo, "model", model)
+	slog.Info("insights generated", "org", org, "repo", repo, "model", model,
+		"event_count", summary.Events, "prev_count", savedCount)
 	return nil
 }
 

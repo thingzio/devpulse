@@ -503,4 +503,5 @@ type RepoInsights struct {
 	PeriodMonths int                `json:"period_months" yaml:"periodMonths"`
 	Model        string             `json:"model" yaml:"model"`
 	GeneratedAt  string             `json:"generated_at" yaml:"generatedAt"`
+	EventCount   int                `json:"event_count" yaml:"eventCount"`
 }

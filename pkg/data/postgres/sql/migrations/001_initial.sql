@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS repo_insights (
     period_months INTEGER NOT NULL DEFAULT 3,
     model TEXT NOT NULL DEFAULT '',
     generated_at TEXT NOT NULL,
+    event_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (org, repo)
 );
 

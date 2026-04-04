@@ -146,6 +146,7 @@ type InsightsGenerationStore interface {
 	GetRepoInsights(ctx context.Context, org, repo *string) ([]*RepoInsights, error)
 	SaveRepoInsights(ctx context.Context, org, repo string, insights *RepoInsights) error
 	GetRepoInsightsGeneratedAt(ctx context.Context, org, repo string) (string, error)
+	GetRepoInsightsEventCount(ctx context.Context, org, repo string) (int, error)
 }
 
 // Store is the top-level interface composing all sub-interfaces.
