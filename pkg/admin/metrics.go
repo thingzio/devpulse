@@ -22,12 +22,16 @@ const (
 	anthropicAPIVersion  = "2023-06-01"
 	defaultInsightsModel = "claude-sonnet-4-6"
 	metricsHTTPTimeout   = 30 * time.Second
+	analysisHTTPTimeout  = 90 * time.Second
 	analysisMaxTokens    = 4096
 	defaultDays          = 2
 	maxDays              = 30
 )
 
-var metricsClient = &http.Client{Timeout: metricsHTTPTimeout}
+var (
+	metricsClient  = &http.Client{Timeout: metricsHTTPTimeout}
+	analysisClient = &http.Client{Timeout: analysisHTTPTimeout}
+)
 
 // metricsConfig holds config loaded once at handler creation.
 type metricsConfig struct {
@@ -365,7 +369,7 @@ Be concise. Use bullet points. Skip metrics that look normal. If everything look
 	req.Header.Set("x-api-key", cfg.anthropicKey)
 	req.Header.Set("anthropic-version", anthropicAPIVersion)
 
-	resp, err := metricsClient.Do(req)
+	resp, err := analysisClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("calling Anthropic API: %w", err)
 	}
