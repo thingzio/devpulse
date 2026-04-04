@@ -20,7 +20,7 @@ const (
 	metadataTokenURL     = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" //nolint:gosec // GCP metadata URL, not a credential
 	anthropicAPIURL      = "https://api.anthropic.com/v1/messages"
 	anthropicAPIVersion  = "2023-06-01"
-	defaultInsightsModel = "claude-sonnet-4-6-20250514"
+	defaultInsightsModel = "claude-sonnet-4-5-20250514"
 	metricsHTTPTimeout   = 30 * time.Second
 	analysisMaxTokens    = 4096
 	defaultDays          = 2
