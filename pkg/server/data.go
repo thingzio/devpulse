@@ -7,12 +7,61 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/health"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/plan"
 )
+
+const (
+	serverCacheTTL        = 5 * time.Minute
+	browserCacheMaxAge    = "private, max-age=1800"
+	cacheControlHeaderKey = "Cache-Control"
+)
+
+// responseCache is a TTL-based in-memory cache for JSON API responses.
+type responseCache struct {
+	entries sync.Map
+}
+
+type cacheEntry struct {
+	data    []byte
+	expires time.Time
+}
+
+var apiCache = &responseCache{}
+
+func (c *responseCache) get(key string) ([]byte, bool) {
+	v, ok := c.entries.Load(key)
+	if !ok {
+		return nil, false
+	}
+	e := v.(*cacheEntry)
+	if time.Now().After(e.expires) {
+		c.entries.Delete(key)
+		return nil, false
+	}
+	return e.data, true
+}
+
+func (c *responseCache) set(key string, val []byte) {
+	c.entries.Store(key, &cacheEntry{
+		data:    val,
+		expires: time.Now().Add(serverCacheTTL),
+	})
+}
+
+// dataCacheKey builds a cache key from tenant ID, path, and query string.
+func dataCacheKey(r *http.Request) string {
+	tid := ""
+	if tn := middleware.TenantFromContext(r.Context()); tn != nil {
+		tid = tn.ID
+	}
+	return tid + "|" + r.URL.Path + "?" + r.URL.RawQuery
+}
 
 const (
 	percentageListLimit           = 9
@@ -333,6 +382,15 @@ func storeFromRequest(r *http.Request, fallback data.Store) data.Store {
 
 func insightWithEntityHandler(defaultStore data.Store, label string, fn func(context.Context, data.Store, *string, *string, *string, int) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		key := dataCacheKey(r)
+		if cached, ok := apiCache.get(key); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			return
+		}
+
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
 		entity := optional(r.URL.Query().Get("e"))
@@ -342,12 +400,33 @@ func insightWithEntityHandler(defaultStore data.Store, label string, fn func(con
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
 			return
 		}
-		writeJSON(w, http.StatusOK, res)
+
+		b, err := json.Marshal(res)
+		if err != nil {
+			slog.Error("failed to marshal "+label, "error", err)
+			writeError(w, http.StatusInternalServerError, "error encoding "+label)
+			return
+		}
+		apiCache.set(key, b)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
 	}
 }
 
 func insightHandler(defaultStore data.Store, label string, fn func(context.Context, data.Store, *string, *string, int) (any, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		key := dataCacheKey(r)
+		if cached, ok := apiCache.get(key); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			return
+		}
+
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
 		res, err := fn(r.Context(), s, p.org, p.repo, p.months)
@@ -356,7 +435,19 @@ func insightHandler(defaultStore data.Store, label string, fn func(context.Conte
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
 			return
 		}
-		writeJSON(w, http.StatusOK, res)
+
+		b, err := json.Marshal(res)
+		if err != nil {
+			slog.Error("failed to marshal "+label, "error", err)
+			writeError(w, http.StatusInternalServerError, "error encoding "+label)
+			return
+		}
+		apiCache.set(key, b)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
 	}
 }
 

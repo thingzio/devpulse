@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -185,3 +187,65 @@ func TestQueryAPIHandler_DefaultScope(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestResponseCache_GetSet(t *testing.T) {
+	c := &responseCache{}
+
+	// Miss on empty cache.
+	_, ok := c.get("k1")
+	assert.False(t, ok)
+
+	// Hit after set.
+	c.set("k1", []byte(`{"a":1}`))
+	got, ok := c.get("k1")
+	require.True(t, ok)
+	assert.Equal(t, `{"a":1}`, string(got))
+
+	// Different key is still a miss.
+	_, ok = c.get("k2")
+	assert.False(t, ok)
+}
+
+func TestResponseCache_TTLExpiry(t *testing.T) {
+	c := &responseCache{}
+
+	// Insert with an already-expired entry.
+	c.entries.Store("old", &cacheEntry{
+		data:    []byte(`{}`),
+		expires: time.Now().Add(-1 * time.Second),
+	})
+
+	_, ok := c.get("old")
+	assert.False(t, ok, "expired entry should not be returned")
+}
+
+func TestDataCacheKey(t *testing.T) {
+	r := httptest.NewRequest("GET", "/data/insights/summary?m=3&o=org1", nil)
+	key := dataCacheKey(r)
+	// No tenant in context, so key starts with "|".
+	assert.Equal(t, "|/data/insights/summary?m=3&o=org1", key)
+}
+
+func TestInsightHandler_CacheHit(t *testing.T) {
+	callCount := 0
+	h := insightHandler(nil, "test", func(_ context.Context, _ data.Store, _, _ *string, _ int) (any, error) {
+		callCount++
+		return map[string]int{"count": 42}, nil
+	})
+
+	// First request — cache miss, calls the store function.
+	r1 := httptest.NewRequest("GET", "/data/test?m=3", nil)
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, r1)
+	assert.Equal(t, http.StatusOK, w1.Code)
+	assert.Equal(t, 1, callCount)
+	assert.Equal(t, browserCacheMaxAge, w1.Header().Get(cacheControlHeaderKey))
+
+	// Second request — cache hit, store function NOT called again.
+	r2 := httptest.NewRequest("GET", "/data/test?m=3", nil)
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, r2)
+	assert.Equal(t, http.StatusOK, w2.Code)
+	assert.Equal(t, 1, callCount, "store function should not be called on cache hit")
+	assert.Equal(t, w1.Body.String(), w2.Body.String(), "cached response should match")
+}
