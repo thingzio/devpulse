@@ -112,17 +112,18 @@ jobs:
           TFSEC_VERSION=$(yq -r '.build_tools.tfsec' .settings.yaml)
           TFSEC_VERSION="${TFSEC_VERSION#v}"
           TFSEC_BASE="https://github.com/aquasecurity/tfsec/releases/download/v${TFSEC_VERSION}"
-          TFSEC_BIN="tfsec-linux-amd64"
+          TFSEC_TAR="tfsec_${TFSEC_VERSION}_linux_amd64.tar.gz"
           TFSEC_TMP="$(mktemp -d)"
-          curl -fsSL -o "${TFSEC_TMP}/${TFSEC_BIN}" "${TFSEC_BASE}/${TFSEC_BIN}"
+          curl -fsSL -o "${TFSEC_TMP}/${TFSEC_TAR}" "${TFSEC_BASE}/${TFSEC_TAR}"
           curl -fsSL -o "${TFSEC_TMP}/checksums.txt" "${TFSEC_BASE}/tfsec_${TFSEC_VERSION}_checksums.txt"
-          EXPECTED=$(grep "${TFSEC_BIN}" "${TFSEC_TMP}/checksums.txt" | head -1 | awk '{print $1}')
-          ACTUAL=$(sha256sum "${TFSEC_TMP}/${TFSEC_BIN}" | awk '{print $1}')
+          EXPECTED=$(grep "${TFSEC_TAR}" "${TFSEC_TMP}/checksums.txt" | head -1 | awk '{print $1}')
+          ACTUAL=$(sha256sum "${TFSEC_TMP}/${TFSEC_TAR}" | awk '{print $1}')
           if [[ "${ACTUAL}" != "${EXPECTED}" ]]; then
             echo "::error::tfsec checksum mismatch: expected ${EXPECTED}, got ${ACTUAL}"
             exit 1
           fi
-          sudo mv "${TFSEC_TMP}/${TFSEC_BIN}" /usr/local/bin/tfsec
+          tar -xzf "${TFSEC_TMP}/${TFSEC_TAR}" -C "${TFSEC_TMP}"
+          sudo mv "${TFSEC_TMP}/tfsec" /usr/local/bin/tfsec
           sudo chmod +x /usr/local/bin/tfsec
           rm -rf "${TFSEC_TMP}"
           tfsec --version
