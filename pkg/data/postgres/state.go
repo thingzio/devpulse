@@ -12,8 +12,6 @@ import (
 
 var stateQueries = map[string]string{
 	"developer": "SELECT COUNT(*) FROM developer",
-	"identity":  "SELECT COUNT(*) FROM identity",
-	"entity":    "SELECT COUNT(*) FROM entity",
 	"event":     "SELECT COUNT(*) FROM event",
 	"type":      "SELECT COUNT(DISTINCT type) FROM event",
 }

@@ -125,28 +125,25 @@ func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []Or
 	if err != nil {
 		return fmt.Errorf("beginning tx: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
 
 	for _, r := range repos {
 		if _, err := tx.ExecContext(ctx, addTenantRepoSQL, tenantID, r.Org, r.Repo); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("adding repo %s/%s: %w", r.Org, r.Repo, err)
 		}
 	}
 
 	var maxRepos int
 	if err := tx.QueryRowContext(ctx, getTenantMaxReposSQL, tenantID).Scan(&maxRepos); err != nil {
-		_ = tx.Rollback()
 		return fmt.Errorf("getting max repos: %w", err)
 	}
 
 	var currentCount int
 	if err := tx.QueryRowContext(ctx, countTenantReposSQL, tenantID).Scan(&currentCount); err != nil {
-		_ = tx.Rollback()
 		return fmt.Errorf("counting repos: %w", err)
 	}
 
 	if maxRepos > 0 && currentCount > maxRepos {
-		_ = tx.Rollback()
 		return fmt.Errorf("adding repos would exceed plan limit (%d): %w", maxRepos, ErrRepoLimitExceeded)
 	}
 

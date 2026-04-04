@@ -28,19 +28,6 @@ var UpdatableProperties = []string{
 // Database state types
 // ---------------------------------------------------------------------------
 
-type Query struct {
-	On    int64  `json:"on,omitempty" yaml:"on,omitempty"`
-	Type  string `json:"type,omitempty" yaml:"type,omitempty"`
-	Value string `json:"value,omitempty" yaml:"value,omitempty"`
-	Limit int    `json:"limit,omitempty" yaml:"limit,omitempty"`
-}
-
-type CountedResult struct {
-	Query   Query            `json:"query,omitempty" yaml:"query,omitempty"`
-	Results int              `json:"results,omitempty" yaml:"results,omitempty"`
-	Data    map[string]int64 `json:"data,omitempty" yaml:"data,omitempty"`
-}
-
 type State struct {
 	Since time.Time `json:"since" yaml:"since"`
 	Page  int       `json:"page" yaml:"page"`
@@ -84,13 +71,6 @@ type EntityResult struct {
 type CountedItem struct {
 	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
 	Count int    `json:"count,omitempty" yaml:"count,omitempty"`
-}
-
-type Repo struct {
-	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
-	FullName    string `json:"full_name,omitempty" yaml:"fullName,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
 }
 
 type ListItem struct {

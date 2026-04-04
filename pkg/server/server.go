@@ -42,7 +42,10 @@ var templateFuncs = template.FuncMap{
 		if n < 1000 {
 			return fmt.Sprintf("%d", n)
 		}
-		return fmt.Sprintf("%d,%03d", n/1000, n%1000)
+		if n < 1000000 {
+			return fmt.Sprintf("%d,%03d", n/1000, n%1000)
+		}
+		return fmt.Sprintf("%d,%03d,%03d", n/1000000, (n/1000)%1000, n%1000)
 	},
 }
 

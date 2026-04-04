@@ -203,6 +203,7 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 	}
 
 	txStmt := tx.Stmt(updateStmt)
+	defer txStmt.Close()
 	for old, new := range m {
 		if _, err = txStmt.ExecContext(ctx, new, old); err != nil {
 			rollbackTransaction(tx)

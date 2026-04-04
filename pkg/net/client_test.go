@@ -12,13 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetHTTPClient(t *testing.T) {
-	client, err := GetHTTPClient()
-	require.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.NotNil(t, client.Jar)
-}
-
 func TestGetOAuthClient(t *testing.T) {
 	ctx := context.Background()
 	client := GetOAuthClient(ctx, "test-token")

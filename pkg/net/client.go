@@ -2,24 +2,17 @@ package net
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/http/cookiejar"
 	"time"
 )
 
-// GetHTTPClient returns a new HTTP client.
-func GetHTTPClient() (*http.Client, error) {
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
-	}
+const timeoutInSeconds = 60
 
-	return &http.Client{
-		Timeout:   time.Duration(timeoutInSeconds) * time.Second,
-		Transport: reqTransport,
-		Jar:       jar,
-	}, nil
+var reqTransport = &http.Transport{
+	MaxIdleConns:          50,
+	MaxIdleConnsPerHost:   20,
+	IdleConnTimeout:       time.Duration(timeoutInSeconds) * time.Second,
+	ResponseHeaderTimeout: time.Duration(timeoutInSeconds) * time.Second,
 }
 
 // GetOAuthClient returns an HTTP client that injects a Bearer token into every request.

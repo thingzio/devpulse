@@ -4,10 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/go-github/v83/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/thingzio/devpulse/pkg/data/ghutil"
 )
 
 func TestGetRepoLike(t *testing.T) {
@@ -41,22 +39,4 @@ func TestGetRepoLike_NoResults(t *testing.T) {
 	items, err := store.GetRepoLike(ctx, "nonexistent", 10)
 	require.NoError(t, err)
 	assert.Empty(t, items)
-}
-
-func TestMapRepo(t *testing.T) {
-	name := "my-repo"
-	fullName := "org/my-repo"
-	desc := "A test repo"
-	htmlURL := "https://github.com/org/my-repo"
-	r := &github.Repository{
-		Name:        &name,
-		FullName:    &fullName,
-		Description: &desc,
-		HTMLURL:     &htmlURL,
-	}
-	repo := ghutil.MapRepo(r)
-	assert.Equal(t, "my-repo", repo.Name)
-	assert.Equal(t, "org/my-repo", repo.FullName)
-	assert.Equal(t, "A test repo", repo.Description)
-	assert.Equal(t, "https://github.com/org/my-repo", repo.URL)
 }

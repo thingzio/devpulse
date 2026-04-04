@@ -4,10 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/go-github/v83/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/thingzio/devpulse/pkg/data/ghutil"
 )
 
 func TestGetAllOrgRepos(t *testing.T) {
@@ -55,23 +53,6 @@ func TestGetAllOrgRepos_EmptyDB(t *testing.T) {
 	repos, err := store.GetAllOrgRepos(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, repos)
-}
-
-func TestMapOrg(t *testing.T) {
-	login := "testorg"
-	company := "TestCo"
-	desc := "An org"
-	url := "https://github.com/testorg"
-	o := &github.Organization{
-		Login:       &login,
-		Company:     &company,
-		Description: &desc,
-		URL:         &url,
-	}
-	org := ghutil.MapOrg(o)
-	assert.Equal(t, "testorg", org.Name)
-	assert.Equal(t, "TestCo", org.Company)
-	assert.Equal(t, "An org", org.Description)
 }
 
 func TestGetDeveloperPercentages_NilDB(t *testing.T) {

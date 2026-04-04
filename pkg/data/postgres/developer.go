@@ -229,6 +229,7 @@ func (s *Store) UpdateDeveloperNames(ctx context.Context, devs map[string]string
 	}
 
 	txStmt2 := tx.Stmt(updateStmt)
+	defer txStmt2.Close()
 	for username, name := range devs {
 		if _, err = txStmt2.ExecContext(ctx, name, username); err != nil {
 			rollbackTransaction(tx)

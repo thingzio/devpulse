@@ -35,13 +35,6 @@ func Deref(s *string) string {
 	return ""
 }
 
-func MapGitHubUserToDeveloperListItem(u *github.User) *data.DeveloperListItem {
-	return &data.DeveloperListItem{
-		Username: Trim(u.Login),
-		Entity:   Trim(u.Company),
-	}
-}
-
 func Trim(s *string) string {
 	if s != nil {
 		return strings.ReplaceAll(strings.TrimSpace(*s), "@", "")
@@ -78,42 +71,6 @@ func GetGitHubDeveloper(ctx context.Context, client *http.Client, username strin
 	return MapUserToDeveloper(usr), nil
 }
 
-func SearchGitHubUsers(ctx context.Context, client *http.Client, query string, limit int) ([]*data.DeveloperListItem, error) {
-	if query == "" {
-		return nil, errors.New("query is required")
-	}
-
-	opts := &github.SearchOptions{
-		ListOptions: github.ListOptions{
-			PerPage: limit,
-		},
-	}
-	list, resp, err := github.NewClient(client).Search.Users(ctx, query, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search users for: %s: %w", query, err)
-	}
-
-	if list == nil || len(list.Users) == 0 {
-		return nil, nil
-	}
-
-	slog.Debug("get user",
-		"query", query,
-		"status", resp.Status,
-		"status_code", resp.StatusCode,
-		"has_more", list.IncompleteResults,
-		"matched", list.Total,
-		"returned", len(list.Users),
-	)
-
-	r := make([]*data.DeveloperListItem, len(list.Users))
-	for i, u := range list.Users {
-		r[i] = MapGitHubUserToDeveloperListItem(u)
-	}
-
-	return r, nil
-}
-
 func GetLabels(labels []*github.Label) []string {
 	if labels == nil {
 		return make([]string, 0)
@@ -147,107 +104,4 @@ func ParseUsers(body *string) []string {
 		return make([]string, 0)
 	}
 	return usernameRegEx.FindAllString(*body, -1)
-}
-
-func MapRepo(r *github.Repository) *data.Repo {
-	return &data.Repo{
-		Name:        Trim(r.Name),
-		FullName:    Trim(r.FullName),
-		Description: Trim(r.Description),
-		URL:         Trim(r.HTMLURL),
-	}
-}
-
-func MapOrg(r *github.Organization) *data.Org {
-	return &data.Org{
-		Name:        Trim(r.Login),
-		Company:     Trim(r.Company),
-		Description: Trim(r.Description),
-		URL:         Trim(r.URL),
-	}
-}
-
-func GetUserOrgs(ctx context.Context, client *http.Client, username string, limit int) ([]*data.Org, error) {
-	if username == "" {
-		return nil, errors.New("username is required")
-	}
-
-	slog.Debug("listing organizations", "username", username, "limit", limit)
-
-	opt := &github.ListOptions{}
-	if limit > 0 {
-		opt.PerPage = limit
-	}
-
-	items, _, err := github.NewClient(client).Organizations.List(ctx, username, opt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list organizations for: %s: %w", username, err)
-	}
-
-	list := make([]*data.Org, 0)
-	for _, r := range items {
-		slog.Debug("org", "value", r)
-		list = append(list, MapOrg(r))
-	}
-
-	return list, nil
-}
-
-func GetOrgRepos(ctx context.Context, client *http.Client, org string) ([]*data.Repo, error) {
-	if org == "" {
-		return nil, errors.New("org is required")
-	}
-
-	ghClient := github.NewClient(client)
-	opt := &github.RepositoryListByUserOptions{
-		ListOptions: github.ListOptions{PerPage: 100},
-	}
-
-	const maxPages = 50
-
-	var list []*data.Repo
-	var page int
-
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		page++
-		if page > maxPages {
-			slog.Warn("pagination limit reached for org repos", "org", org, "max_pages", maxPages)
-			break
-		}
-
-		items, resp, err := ghClient.Repositories.ListByUser(ctx, org, opt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list repositories for: %s: %w", org, err)
-		}
-		if err := CheckRateLimit(ctx, resp); err != nil {
-			return nil, err
-		}
-
-		for _, r := range items {
-			list = append(list, MapRepo(r))
-		}
-
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-
-	return list, nil
-}
-
-func GetOrgRepoNames(ctx context.Context, client *http.Client, org string) ([]string, error) {
-	list, err := GetOrgRepos(ctx, client, org)
-	if err != nil {
-		return nil, err
-	}
-	repos := make([]string, 0)
-	for _, r := range list {
-		repos = append(repos, r.Name)
-	}
-	return repos, nil
 }
