@@ -278,7 +278,7 @@ resource "google_cloud_run_v2_service" "admin" {
 
       env {
         name  = "ANTHROPIC_MODEL"
-        value = "claude-sonnet-4-5-20250514"
+        value = "claude-haiku-4-5-20251001"
       }
 
       resources {
