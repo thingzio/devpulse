@@ -359,11 +359,17 @@ if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
 
 Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly."
 
+    # Write metrics to temp file to avoid argv size limits
+    METRICS_FILE="$(mktemp)"
+    trap 'rm -f "${METRICS_FILE}"' EXIT
+    echo "${METRICS}" > "${METRICS_FILE}"
+
     # Build JSON request body and call API via python3 (handles escaping safely)
-    RESPONSE="$(python3 -c "
+    if ! RESPONSE="$(python3 -c "
 import json, sys, urllib.request, urllib.error
 
-metrics = sys.argv[1]
+with open(sys.argv[1]) as f:
+    metrics = f.read()
 system = sys.argv[2]
 model = sys.argv[3]
 api_key = sys.argv[4]
@@ -386,19 +392,22 @@ req = urllib.request.Request(
 )
 
 try:
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         r = json.loads(resp.read())
         for block in r.get('content', []):
             if block.get('type') == 'text':
                 print(block['text'])
 except urllib.error.HTTPError as e:
-    print(f'API error: {e.code} {e.read().decode()[:200]}', file=sys.stderr)
+    sys.stderr.write(f'API error: {e.code} {e.read().decode()[:300]}\n')
     sys.exit(1)
-" "${METRICS}" "${SYSTEM_PROMPT}" "${MODEL}" "${ANTHROPIC_API_KEY}" 2>&1)" || {
+except Exception as e:
+    sys.stderr.write(f'Error: {e}\n')
+    sys.exit(1)
+" "${METRICS_FILE}" "${SYSTEM_PROMPT}" "${MODEL}" "${ANTHROPIC_API_KEY}")"; then
         msg "API call failed, falling back to raw metrics."
         echo "${METRICS}"
         exit 0
-    }
+    fi
 
     echo "${RESPONSE}"
 else
