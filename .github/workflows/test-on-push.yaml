@@ -14,8 +14,10 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   test:
     uses: ./.github/workflows/test-on-call.yaml
+    permissions:
+      contents: read
+      id-token: write  # required for Codecov OIDC in unit job

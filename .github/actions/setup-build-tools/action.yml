@@ -6,10 +6,6 @@ inputs:
     description: 'Install ko (true/false)'
     required: false
     default: 'true'
-  ko_version:
-    description: 'ko version (e.g. v0.18.0)'
-    required: false
-    default: 'v0.18.0'  # keep in sync with project tooling (.settings.yaml)
   install_goreleaser:
     description: 'Install goreleaser (true/false)'
     required: false
@@ -23,7 +19,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        KO_VERSION="${{ inputs.ko_version }}"
+        KO_VERSION="$(yq -r '.build_tools.ko' .settings.yaml)"
         KO_VERSION="${KO_VERSION#v}"
         KO_BASE="https://github.com/ko-build/ko/releases/download/v${KO_VERSION}"
         KO_OS="$(uname -s)"

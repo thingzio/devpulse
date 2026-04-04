@@ -7,7 +7,9 @@ languages:
 
 # Build Tools
 build_tools:
-  goreleaser: '~> v2'
+  goreleaser: 'v2.15.2'
+  ko: 'v0.18.0'
+  tfsec: 'v1.28.14'
 
 # Linting
 linting:
