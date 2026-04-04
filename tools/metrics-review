@@ -17,8 +17,15 @@ TOKEN="$(gcloud auth print-identity-token 2>/dev/null)" \
 
 msg "Fetching metrics analysis for last ${DAYS} day(s)..."
 
-RESPONSE="$(curl -sf --max-time 120 -H "Authorization: Bearer ${TOKEN}" \
-    "${ADMIN_URL}/metrics/review?days=${DAYS}" 2>/dev/null)" \
-    || err "Failed to call admin service. Check IAM permissions and service status."
+BODY_FILE="$(mktemp)"
+trap 'rm -f "${BODY_FILE}"' EXIT
 
-echo "${RESPONSE}"
+STATUS="$(curl -s -o "${BODY_FILE}" -w '%{http_code}' --max-time 120 \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "${ADMIN_URL}/metrics/review?days=${DAYS}")" || true
+
+if [[ "${STATUS}" != "200" ]]; then
+    err "Admin service returned HTTP ${STATUS}: $(cat "${BODY_FILE}")"
+fi
+
+cat "${BODY_FILE}"
