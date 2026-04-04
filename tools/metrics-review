@@ -359,36 +359,48 @@ if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
 
 Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly."
 
-    # Escape the metrics for JSON embedding
-    ESCAPED_METRICS="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "${METRICS}")"
-    ESCAPED_SYSTEM="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "${SYSTEM_PROMPT}")"
+    # Build JSON request body and call API via python3 (handles escaping safely)
+    RESPONSE="$(python3 -c "
+import json, sys, urllib.request, urllib.error
 
-    RESPONSE="$(curl -sf "https://api.anthropic.com/v1/messages" \
-        -H "Content-Type: application/json" \
-        -H "x-api-key: ${ANTHROPIC_API_KEY}" \
-        -H "anthropic-version: 2023-06-01" \
-        -d "{
-            \"model\": \"${MODEL}\",
-            \"max_tokens\": 4096,
-            \"system\": ${ESCAPED_SYSTEM},
-            \"messages\": [{\"role\": \"user\", \"content\": ${ESCAPED_METRICS}}]
-        }" 2>/dev/null)" || {
+metrics = sys.argv[1]
+system = sys.argv[2]
+model = sys.argv[3]
+api_key = sys.argv[4]
+
+body = json.dumps({
+    'model': model,
+    'max_tokens': 4096,
+    'system': system,
+    'messages': [{'role': 'user', 'content': metrics}],
+}).encode()
+
+req = urllib.request.Request(
+    'https://api.anthropic.com/v1/messages',
+    data=body,
+    headers={
+        'Content-Type': 'application/json',
+        'x-api-key': api_key,
+        'anthropic-version': '2023-06-01',
+    },
+)
+
+try:
+    with urllib.request.urlopen(req) as resp:
+        r = json.loads(resp.read())
+        for block in r.get('content', []):
+            if block.get('type') == 'text':
+                print(block['text'])
+except urllib.error.HTTPError as e:
+    print(f'API error: {e.code} {e.read().decode()[:200]}', file=sys.stderr)
+    sys.exit(1)
+" "${METRICS}" "${SYSTEM_PROMPT}" "${MODEL}" "${ANTHROPIC_API_KEY}" 2>&1)" || {
         msg "API call failed, falling back to raw metrics."
         echo "${METRICS}"
         exit 0
     }
 
-    # Extract text from response
-    python3 -c "
-import json,sys
-r=json.loads(sys.stdin.read())
-for block in r.get('content',[]):
-    if block.get('type')=='text':
-        print(block['text'])
-" <<< "${RESPONSE}" 2>/dev/null || {
-        msg "Failed to parse response, falling back to raw metrics."
-        echo "${METRICS}"
-    }
+    echo "${RESPONSE}"
 else
     echo "${METRICS}"
 fi
