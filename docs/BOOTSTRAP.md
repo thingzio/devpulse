@@ -142,8 +142,8 @@ cd ../..  # back to repo root
 ./tools/setup-gh-env
 ```
 
-This creates 7 variables in the GitHub `saas` environment:
-`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`
+This creates 8 variables in the GitHub `saas` environment:
+`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
 
 ## 9. Delegate DNS
 

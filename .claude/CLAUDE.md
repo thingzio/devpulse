@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-site` (HTTP server) and `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
+`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Three binaries: `devpulse-site` (HTTP server), `devpulse-import` (batch worker), and `devpulse-admin` (IAM-protected admin service). PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
 
 ## Build & Test
 
 ```shell
 make test          # unit tests with race detector
-make lint          # go vet + golangci-lint
-make qualify       # test + lint + govulncheck vulnerability scan
+make lint          # go vet + golangci-lint + yamllint + tfsec
+make qualify       # test-coverage + lint + govulncheck + e2e
 make build         # goreleaser single-target build
 make server        # run dev server with --debug
 ```

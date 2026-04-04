@@ -28,6 +28,7 @@ devpulse/
 ├── cmd/devpulse-import/   Batch import worker entrypoint
 ├── cmd/devpulse-admin/    IAM-protected admin service (tenant management)
 ├── pkg/
+│   ├── admin/              IAM-protected admin service handlers
 │   ├── server/             HTTP server, handlers, templates, static assets
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
 │   │   └── templates/      HTML templates: layout, header, footer, home, landing, dashboard, help, tos
@@ -37,8 +38,10 @@ devpulse/
 │   │   ├── postgres/       PostgreSQL Store implementation + migrations
 │   │   └── ghutil/         Shared GitHub API helpers (rate limiting, user mapping)
 │   ├── tenant/             Tenant CRUD, sessions, GitHub App JWT, installations
+│   ├── health/             Health check endpoint
 │   ├── middleware/         Auth middleware, tenant scope (RLS via dedicated conn)
 │   ├── oauth/              GitHub OAuth web flow
+│   ├── plan/               Plan limits (Free, Starter, Pro, Enterprise) and feature gating
 │   ├── logging/            JSON structured logging setup
 │   └── net/                HTTP client utilities with rate limit handling
 ├── infra/saas/             Terraform for GCP infrastructure

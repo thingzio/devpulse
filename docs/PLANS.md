@@ -1,8 +1,6 @@
 # Plan Feature Gating
 
-> Status: **Design** (brainstorming, not yet implemented)
->
-> Date: 2026-04-02
+> Status: **Implemented**
 
 This document defines the plan tiers, per-feature gating, and implementation options for devpulse SaaS.
 
