@@ -29,7 +29,6 @@ jobs:
       contents: write
       packages: write
       id-token: write
-      attestations: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -57,44 +56,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install crane
-        uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987  # v0.5
-
-      - name: Extract Image Digests
-        id: digests
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          for img in devpulse-site devpulse-import devpulse-admin; do
-            DIGEST=$(crane digest "ghcr.io/thingzio/${img}:${TAG}" 2>/dev/null || true)
-            echo "${img}=${DIGEST}" >> "$GITHUB_OUTPUT"
-          done
-
-      - name: Attest devpulse-site
-        if: steps.digests.outputs.devpulse-site != ''
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
-        with:
-          subject-name: ghcr.io/thingzio/devpulse-site
-          subject-digest: ${{ steps.digests.outputs.devpulse-site }}
-          push-to-registry: true
-
-      - name: Attest devpulse-import
-        if: steps.digests.outputs.devpulse-import != ''
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
-        with:
-          subject-name: ghcr.io/thingzio/devpulse-import
-          subject-digest: ${{ steps.digests.outputs.devpulse-import }}
-          push-to-registry: true
-
-      - name: Attest devpulse-admin
-        if: steps.digests.outputs.devpulse-admin != ''
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
-        with:
-          subject-name: ghcr.io/thingzio/devpulse-admin
-          subject-digest: ${{ steps.digests.outputs.devpulse-admin }}
-          push-to-registry: true
 
   deploy:
     needs: release
