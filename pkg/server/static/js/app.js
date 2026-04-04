@@ -421,21 +421,13 @@ function loadAllCharts(months, org, repo, entity) {
 
 function checkInsightsAvailable(org, repo) {
     var btn = $('.tab-btn[data-tab="insights"]');
-    if (!repo) {
+    var aiLevel = parseInt(btn.data("ai-level") || "0", 10);
+    if (!repo || aiLevel < 1) {
         btn.hide();
         if (activeTab === "insights") { activeTab = "health"; }
         return;
     }
-    $.get('/data/insights/generated?o=' + org + '&r=' + repo, function (data) {
-        if (data && data.length > 0 && data[0].insights) {
-            btn.show();
-        } else {
-            btn.hide();
-            if (activeTab === "insights") { activeTab = "health"; activateTab(activeTab); }
-        }
-    }).fail(function () {
-        btn.hide();
-    });
+    btn.show();
 }
 
 function applySelection(scope, item, skipPushState) {
