@@ -17,6 +17,7 @@ locals {
     "roles/cloudsql.instanceUser",
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
+    "roles/monitoring.viewer",
   ]
 
   import_roles = [

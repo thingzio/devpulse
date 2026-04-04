@@ -261,6 +261,26 @@ resource "google_cloud_run_v2_service" "admin" {
         value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
       }
 
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "ANTHROPIC_MODEL"
+        value = "claude-sonnet-4-6-20250514"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"

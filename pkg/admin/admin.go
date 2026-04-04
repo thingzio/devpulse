@@ -18,7 +18,8 @@ import (
 
 const (
 	portDefault       = "8080"
-	readWriteTimeout  = 10 * time.Second
+	readTimeout       = 10 * time.Second
+	writeTimeout      = 90 * time.Second
 	shutdownTimeout   = 5 * time.Second
 	maxRequestBodyLen = 1 << 20
 
@@ -79,6 +80,7 @@ func Run(ctx context.Context) error {
 
 	db := store.DB()
 	port := config.GetEnv("PORT", portDefault)
+	mcfg := newMetricsConfig()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -88,13 +90,14 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("GET /tenant", handleGetTenant(db))
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
 	mux.HandleFunc("POST /invite", handleInvite(db))
+	mux.HandleFunc("GET /metrics/review", handleMetricsReview(mcfg))
 
 	address := "0.0.0.0:" + port
 	srv := &http.Server{
 		Addr:         address,
 		Handler:      mux,
-		ReadTimeout:  readWriteTimeout,
-		WriteTimeout: readWriteTimeout,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
 	}
 
 	errCh := make(chan error, 1)
