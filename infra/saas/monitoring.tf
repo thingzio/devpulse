@@ -358,7 +358,7 @@ resource "google_monitoring_alert_policy" "import_repo_errors" {
   conditions {
     display_name = "Import repo errors > 5 per hour"
     condition_threshold {
-      filter          = "metric.type = \"logging.googleapis.com/user/devpulse-saas-import-repo-errors\""
+      filter          = "resource.type = \"cloud_run_job\" AND metric.type = \"logging.googleapis.com/user/devpulse-saas-import-repo-errors\""
       comparison      = "COMPARISON_GT"
       threshold_value = 5
       duration        = "0s"
