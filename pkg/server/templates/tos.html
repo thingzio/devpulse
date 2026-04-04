@@ -7,16 +7,26 @@
 
   <div style="max-width:700px;margin:0 auto 30px">
     <div class="landing-feature" style="margin-bottom:20px">
-      <h3>Data Collection &amp; Access</h3>
+      <h3>1. Data Collection &amp; Access</h3>
       <ul>
-        <li>DevPulse collects and analyzes publicly available data from GitHub repositories you add to your dashboard.</li>
-        <li>Data collected includes contribution events (pull requests, issues, reviews, comments), repository metadata (stars, forks, language, license), releases, and contributor profiles.</li>
-        <li>Private repository data is only accessible when you explicitly grant access through a GitHub App installation.</li>
+        <li>DevPulse collects and processes <strong>only data that is already publicly accessible</strong> via the GitHub API. No information is gathered that is not available to any user of github.com.</li>
+        <li>Data collected includes contribution event metadata (pull requests, issues, reviews, comments), repository metadata (stars, forks, language, license), releases, and public contributor profiles.</li>
+        <li><strong>DevPulse does not access, read, or store source code.</strong> Only event metadata and repository statistics are imported.</li>
+        <li>Enterprise plans may support private repositories. In that case, access requires an explicit GitHub App installation with repository-level permissions granted by the repository owner. Even then, only the same event metadata is collected&mdash;never source code.</li>
       </ul>
     </div>
 
     <div class="landing-feature" style="margin-bottom:20px">
-      <h3>Data Storage &amp; Use</h3>
+      <h3>2. Authentication &amp; Credentials</h3>
+      <ul>
+        <li>DevPulse authenticates you via the standard GitHub OAuth web flow. The OAuth token is used only during the sign-in process to verify your identity and is <strong>not stored</strong>.</li>
+        <li>Data imports use GitHub App installation tokens that are <strong>short-lived (1 hour), minted on-demand</strong> for each import run, and never persisted to disk or database.</li>
+        <li>Your dashboard session is maintained via an encrypted, HTTP-only cookie. No GitHub credentials, tokens, or secrets are stored by DevPulse at any time.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>3. Data Storage &amp; Use</h3>
       <ul>
         <li>Imported data is stored in our database and used solely to generate project health analytics and insights for your dashboard.</li>
         <li>Your data is isolated from other users through row-level security. Other users cannot view your tracked repositories or analytics.</li>
@@ -25,20 +35,67 @@
     </div>
 
     <div class="landing-feature" style="margin-bottom:20px">
-      <h3>Your Controls</h3>
+      <h3>4. AI-Powered Features</h3>
       <ul>
-        <li>You can add or remove repositories from your dashboard at any time.</li>
-        <li>You can revoke DevPulse access by uninstalling the GitHub App from your organization or account settings.</li>
-        <li>You can sign out and clear your session at any time from the dashboard or via <a href="/auth/reset">/auth/reset</a>.</li>
+        <li>DevPulse may send aggregated, non-identifying repository statistics to a third-party large language model provider (currently Anthropic) to generate AI-powered observations and action items.</li>
+        <li>No personally identifiable information, source code, or raw event data is included in these requests. Only pre-computed metrics and summary statistics are sent.</li>
+        <li>AI-generated insights are informational only and should not be treated as professional advice.</li>
       </ul>
     </div>
 
     <div class="landing-feature" style="margin-bottom:20px">
-      <h3>Usage Limits</h3>
+      <h3>5. Your Controls</h3>
+      <ul>
+        <li>You can add or remove repositories from your dashboard at any time.</li>
+        <li>You can revoke DevPulse access by uninstalling the GitHub App from your organization or account settings.</li>
+        <li>You can sign out and clear your session at any time from the dashboard or via <a href="/auth/reset">/auth/reset</a>.</li>
+        <li>You may request deletion of all your data by contacting us. Upon account deletion, all associated data is permanently removed.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>6. Usage Limits</h3>
       <ul>
         <li>Free accounts are limited to {{(index .Plans "free").MaxRepos}} tracked repositories and {{comma (index .Plans "free").MaxEventsPerWeek}} imported events per week.</li>
         <li>When weekly limits are reached, data imports are paused until the following week.</li>
-        <li>Higher limits are available on paid plans.</li>
+        <li>Higher limits are available on paid plans. See <a href="/#plans">Plans</a> for details.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>7. Service Availability</h3>
+      <ul>
+        <li>DevPulse is provided on an <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;</strong> basis. We do not guarantee any specific level of uptime or availability.</li>
+        <li>We reserve the right to <strong>modify, suspend, or discontinue</strong> the service (or any part of it) at any time, with or without notice.</li>
+        <li>We will make reasonable efforts to provide advance notice of material changes or planned discontinuation via the email address associated with your GitHub account.</li>
+        <li>In the event of service discontinuation, a reasonable wind-down period will be provided during which you may export your data.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>8. Changes to These Terms</h3>
+      <ul>
+        <li>We may update these Terms of Service from time to time. When we make material changes, we will notify you by posting the updated terms on this page and, where possible, via email.</li>
+        <li>Your continued use of DevPulse after changes are posted constitutes acceptance of the revised terms.</li>
+        <li>If you do not agree with the updated terms, you should discontinue use and may request deletion of your data.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>9. Account Eligibility &amp; Conduct</h3>
+      <ul>
+        <li>You must be at least 13 years old (or 16 in jurisdictions where required) to use DevPulse.</li>
+        <li>You are responsible for all activity under your account.</li>
+        <li>We reserve the right to suspend or terminate accounts that engage in abusive behavior, violate these terms, or place unreasonable burden on the service.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>10. Limitation of Liability</h3>
+      <ul>
+        <li>To the maximum extent permitted by applicable law, DevPulse and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or goodwill, arising out of or related to your use of the service.</li>
+        <li>Our total aggregate liability for any claims arising from your use of the service shall not exceed the amount you paid to us (if any) in the twelve months preceding the claim.</li>
+        <li>DevPulse makes no warranties, express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and non-infringement.</li>
       </ul>
     </div>
   </div>

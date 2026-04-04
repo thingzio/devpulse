@@ -74,6 +74,102 @@
     </div>
   </div>
 
+  <div id="plans" class="landing-plans">
+    <h2>Plans</h2>
+    <div class="plans-table-wrap">
+      <table class="plans-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th id="plan-free"><a href="#plan-free">Free</a></th>
+            <th id="plan-starter"><a href="#plan-starter">Starter</a></th>
+            <th id="plan-pro"><a href="#plan-pro">Pro</a></th>
+            <th id="plan-enterprise"><a href="#plan-enterprise">Enterprise</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr id="feature-repos">
+            <td><a href="#feature-repos">Repos</a></td>
+            <td>1</td>
+            <td>5</td>
+            <td>25</td>
+            <td>Unlimited</td>
+          </tr>
+          <tr id="feature-private-repos">
+            <td><a href="#feature-private-repos">Private Repos</a></td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>Yes</td>
+          </tr>
+          <tr id="feature-events">
+            <td><a href="#feature-events">Events/Week</a></td>
+            <td>500</td>
+            <td>2,500</td>
+            <td>15,000</td>
+            <td>Unlimited</td>
+          </tr>
+          <tr id="feature-retention">
+            <td><a href="#feature-retention">Data Retention</a></td>
+            <td>3 months</td>
+            <td>1 year</td>
+            <td>3 years</td>
+            <td>Unlimited</td>
+          </tr>
+          <tr id="feature-export-pdf">
+            <td><a href="#feature-export-pdf">Data Export (PDF)</a></td>
+            <td>&mdash;</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr id="feature-export-csv">
+            <td><a href="#feature-export-csv">Data Export (CSV/ZIP)</a></td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>Yes</td>
+            <td>Yes</td>
+          </tr>
+          <tr id="feature-ai">
+            <td><a href="#feature-ai">AI</a></td>
+            <td>&mdash;</td>
+            <td>Insights</td>
+            <td>Insights + Actions</td>
+            <td>Insights + Actions</td>
+          </tr>
+          <tr id="feature-reputation">
+            <td><a href="#feature-reputation">Reputation Score</a></td>
+            <td>Shallow</td>
+            <td>Shallow</td>
+            <td>Deep</td>
+            <td>Deep</td>
+          </tr>
+          <tr id="feature-api">
+            <td><a href="#feature-api">API Access</a></td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>Yes</td>
+          </tr>
+          <tr id="feature-import">
+            <td><a href="#feature-import">Import Frequency</a></td>
+            <td>Daily</td>
+            <td>Hourly</td>
+            <td>Hourly</td>
+            <td>Hourly + On-demand</td>
+          </tr>
+          <tr id="feature-dedicated">
+            <td><a href="#feature-dedicated">Dedicated Instance</a></td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>&mdash;</td>
+            <td>Optional (quoted)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="landing-footer">
     <p><strong>Free to start</strong> &mdash; {{(index .Plans "free").MaxRepos}} repos and {{comma (index .Plans "free").MaxEventsPerWeek}} events/week. No credit card required.</p>
     <p style="margin-top:8px"><a href="/auth/github" style="color:var(--accent);font-weight:600;">Sign in with GitHub</a> to get started.</p>
