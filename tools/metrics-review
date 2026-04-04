@@ -96,6 +96,7 @@ for ts in series:
 " 2>/dev/null
 }
 
+collect_metrics() {
 printf "\n"
 echo "================================================================="
 echo " DevPulse Metrics Review — Last ${DAYS} day(s)"
@@ -341,4 +342,53 @@ query_ts \
     | fmt_points 3
 
 printf "\n=================================================================\n"
-msg "Review complete."
+} # end of collect_metrics
+
+METRICS="$(collect_metrics)"
+
+# If ANTHROPIC_API_KEY is set, analyze metrics with Claude; otherwise print raw.
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    MODEL="${ANTHROPIC_MODEL:-claude-sonnet-4-6-20250514}"
+    msg "Analyzing metrics with ${MODEL}..."
+
+    SYSTEM_PROMPT="You are a DevOps analyst reviewing GCP infrastructure metrics for DevPulse, a multi-tenant SaaS running on Cloud Run + Cloud SQL PostgreSQL. Analyze the raw metrics below and provide:
+
+1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
+2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 500ms, errors, deadlocks, disk growth).
+3. **Recommended Actions** — Concrete steps to address any issues found.
+
+Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly."
+
+    # Escape the metrics for JSON embedding
+    ESCAPED_METRICS="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "${METRICS}")"
+    ESCAPED_SYSTEM="$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "${SYSTEM_PROMPT}")"
+
+    RESPONSE="$(curl -sf "https://api.anthropic.com/v1/messages" \
+        -H "Content-Type: application/json" \
+        -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+        -H "anthropic-version: 2023-06-01" \
+        -d "{
+            \"model\": \"${MODEL}\",
+            \"max_tokens\": 4096,
+            \"system\": ${ESCAPED_SYSTEM},
+            \"messages\": [{\"role\": \"user\", \"content\": ${ESCAPED_METRICS}}]
+        }" 2>/dev/null)" || {
+        msg "API call failed, falling back to raw metrics."
+        echo "${METRICS}"
+        exit 0
+    }
+
+    # Extract text from response
+    python3 -c "
+import json,sys
+r=json.loads(sys.stdin.read())
+for block in r.get('content',[]):
+    if block.get('type')=='text':
+        print(block['text'])
+" <<< "${RESPONSE}" 2>/dev/null || {
+        msg "Failed to parse response, falling back to raw metrics."
+        echo "${METRICS}"
+    }
+else
+    echo "${METRICS}"
+fi
