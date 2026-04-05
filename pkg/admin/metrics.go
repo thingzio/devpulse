@@ -40,6 +40,7 @@ type metricsConfig struct {
 	model        string
 	service      string
 	job          string
+	deeprep      string
 	admin        string
 	dbID         string
 }
@@ -60,6 +61,7 @@ func newMetricsConfig() *metricsConfig {
 		model:        model,
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
+		deeprep:      prefix + "-deeprep",
 		admin:        prefix + "-admin",
 		dbID:         project + ":" + prefix + "-pg",
 	}
@@ -216,6 +218,16 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			label:  "Import: Repo Errors (by org/repo)",
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-errors"`,
 			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.org&aggregation.groupByFields=metric.labels.repo",
+		},
+		{
+			label:  "Deep Reputation: Job Execution Results",
+			filter: fmt.Sprintf(`resource.type="cloud_run_job" AND resource.labels.job_name="%s" AND metric.type="run.googleapis.com/job/completed_execution_count"`, cfg.deeprep),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.result",
+		},
+		{
+			label:  "Deep Reputation: Errors (by username)",
+			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-errors"`, "devpulse-saas"),
+			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.username",
 		},
 		{
 			label:  "Cloud SQL: CPU Utilization",
