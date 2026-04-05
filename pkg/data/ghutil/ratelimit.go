@@ -69,3 +69,58 @@ func AbuseRetryAfter(err error) time.Duration {
 	}
 	return 0
 }
+
+// WaitForRateReset checks whether err is a GitHub primary or secondary rate
+// limit error. If so it sleeps until the reset time (plus jitter) and returns
+// true so the caller can retry. Returns false for non-rate-limit errors or if
+// the wait would exceed maxWait.
+func WaitForRateReset(ctx context.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+
+	const maxWait = 15 * time.Minute
+
+	// Secondary (abuse) rate limit.
+	if wait := AbuseRetryAfter(err); wait > 0 {
+		if wait > maxWait {
+			return false
+		}
+		slog.Warn("abuse rate limit hit, waiting",
+			"wait_sec", wait.Seconds())
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(wait):
+			return true
+		}
+	}
+
+	// Primary rate limit (403 "API rate limit exceeded").
+	var rlErr *github.RateLimitError
+	if !errors.As(err, &rlErr) {
+		return false
+	}
+
+	wait := time.Until(rlErr.Rate.Reset.Time)
+	if wait <= 0 {
+		return true // already past reset
+	}
+	if wait > maxWait {
+		return false
+	}
+
+	jitter := time.Duration(rand.IntN(3000)) * time.Millisecond //nolint:gosec // jitter, not security-sensitive
+	total := wait + jitter
+
+	slog.Warn("rate limit hit, waiting for reset",
+		"reset_at", rlErr.Rate.Reset.Time.Format(time.RFC3339),
+		"wait_sec", total.Seconds())
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(total):
+		return true
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
@@ -166,38 +167,47 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 
 	var errs int
 
+	// retryRL retries fn once after waiting for a GitHub rate limit reset.
+	retryRL := func(fn func() error) error {
+		err := fn()
+		if err != nil && ghutil.WaitForRateReset(ctx, err) {
+			return fn()
+		}
+		return err
+	}
+
 	slog.Info("phase: metadata", "org", org, "repo", repo)
-	if err := store.ImportRepoMeta(ctx, token, org, repo); err != nil {
+	if err := retryRL(func() error { return store.ImportRepoMeta(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing repo meta", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
 	slog.Info("phase: events", "org", org, "repo", repo)
-	if _, _, err := store.ImportEvents(ctx, token, org, repo, 6); err != nil {
+	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 6); return err }); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
 	slog.Info("phase: releases", "org", org, "repo", repo)
-	if err := store.ImportReleases(ctx, token, org, repo); err != nil {
+	if err := retryRL(func() error { return store.ImportReleases(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing releases", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
 	slog.Info("phase: metrics", "org", org, "repo", repo)
-	if err := store.ImportRepoMetricHistory(ctx, token, org, repo); err != nil {
+	if err := retryRL(func() error { return store.ImportRepoMetricHistory(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing metric history", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
 	slog.Info("phase: containers", "org", org, "repo", repo)
-	if err := store.ImportContainerVersions(ctx, token, org, repo); err != nil {
+	if err := retryRL(func() error { return store.ImportContainerVersions(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing container versions", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
 	slog.Info("phase: reputation", "org", org, "repo", repo)
-	if _, err := store.ImportReputation(ctx, &org, &repo); err != nil {
+	if err := retryRL(func() error { _, err := store.ImportReputation(ctx, &org, &repo); return err }); err != nil {
 		slog.Error("importing reputation", "org", org, "repo", repo, "error", err)
 		errs++
 	}
@@ -207,7 +217,12 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 	if token != "" && limits.DeepReputation {
 		slog.Info("phase: deep reputation", "org", org, "repo", repo)
 		tokenFn := func() string { return token }
-		if res, err := store.ImportDeepReputation(ctx, tokenFn, deepReputationDefaultLimit, 0, &org, &repo); err != nil {
+		var res *data.DeepReputationResult
+		if err := retryRL(func() error {
+			var drErr error
+			res, drErr = store.ImportDeepReputation(ctx, tokenFn, deepReputationDefaultLimit, 0, &org, &repo)
+			return drErr
+		}); err != nil {
 			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
 			errs++
 		} else {
