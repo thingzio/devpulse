@@ -107,9 +107,14 @@ func runImport(ctx context.Context, mode string) error {
 				"org", claim.Org,
 				"repo", claim.Repo,
 				"error", importErr)
-			// Do not call MarkRepoDone on failure — leaving done_at NULL means
-			// this repo re-enters the queue on the next execution.
+			if incErr := tenant.IncrementImportErrors(ctx, db, claim.ID, importErr.Error()); incErr != nil {
+				slog.Warn("incrementing import errors", "error", incErr)
+			}
 			continue
+		}
+
+		if err := tenant.ResetImportErrors(ctx, db, claim.ID); err != nil {
+			slog.Warn("resetting import errors", "error", err)
 		}
 
 		if err := tenant.MarkRepoDone(ctx, db, claim.ID); err != nil {
