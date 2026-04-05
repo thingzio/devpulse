@@ -9,20 +9,22 @@ import (
 
 // RepoOverview holds repo metadata and activity stats for the dashboard table.
 type RepoOverview struct {
-	Org          string  `json:"org"`
-	Repo         string  `json:"repo"`
-	Stars        int     `json:"stars"`
-	Forks        int     `json:"forks"`
-	OpenIssues   int     `json:"open_issues"`
-	Events       int     `json:"events"`
-	WeeklyEvents int     `json:"weekly_events"`
-	WeeklyPct    float64 `json:"weekly_pct"`
-	Contributors int     `json:"contributors"`
-	Scored       int     `json:"scored"`
-	Language     string  `json:"language"`
-	License      string  `json:"license"`
-	LastImport   string  `json:"last_import"`
-	LimitReached bool    `json:"limit_reached"`
+	Org             string  `json:"org"`
+	Repo            string  `json:"repo"`
+	Stars           int     `json:"stars"`
+	Forks           int     `json:"forks"`
+	OpenIssues      int     `json:"open_issues"`
+	Events          int     `json:"events"`
+	WeeklyEvents    int     `json:"weekly_events"`
+	WeeklyPct       float64 `json:"weekly_pct"`
+	Contributors    int     `json:"contributors"`
+	Scored          int     `json:"scored"`
+	Language        string  `json:"language"`
+	License         string  `json:"license"`
+	LastImport      string  `json:"last_import"`
+	LimitReached    bool    `json:"limit_reached"`
+	ImportErrors    int     `json:"import_errors"`
+	ImportLastError string  `json:"import_last_error,omitempty"`
 }
 
 // UsageSummary holds tenant-level usage stats for the dashboard.
@@ -53,14 +55,17 @@ const tenantRepoOverviewSQL = `
 		COUNT(DISTINCT CASE WHEN d.reputation IS NOT NULL THEN e.username END),
 		COALESCE(rm.language, ''),
 		COALESCE(rm.license, ''),
-		COALESCE(rm.last_import_at, '')
+		COALESCE(rm.last_import_at, ''),
+		tr.import_errors,
+		COALESCE(tr.import_last_error, '')
 	FROM tenant_repo tr
 	LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 	LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo AND e.date >= $2
 	LEFT JOIN developer d ON e.username = d.username
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE
 	GROUP BY tr.org, tr.repo, rm.stars, rm.forks, rm.open_issues,
-		rm.language, rm.license, rm.last_import_at
+		rm.language, rm.license, rm.last_import_at,
+		tr.import_errors, tr.import_last_error
 	ORDER BY tr.org, tr.repo`
 
 const tenantLimitsSQL = `
@@ -102,7 +107,8 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (
 		if err := rows.Scan(&r.Org, &r.Repo, &r.Stars, &r.Forks, &r.OpenIssues,
 			&r.Events, &r.WeeklyEvents,
 			&r.Contributors, &r.Scored,
-			&r.Language, &r.License, &r.LastImport); err != nil {
+			&r.Language, &r.License, &r.LastImport,
+			&r.ImportErrors, &r.ImportLastError); err != nil {
 			return nil, fmt.Errorf("scanning repo overview: %w", err)
 		}
 		totalWeeklyEvents += r.WeeklyEvents
