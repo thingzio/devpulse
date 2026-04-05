@@ -7,18 +7,17 @@ resource "google_artifact_registry_repository" "images" {
   mode          = "STANDARD_REPOSITORY"
 
   cleanup_policies {
-    id     = "keep-tagged"
+    id     = "keep-recent"
     action = "KEEP"
-    condition {
-      tag_state = "TAGGED"
+    most_recent_versions {
+      keep_count = 10
     }
   }
 
   cleanup_policies {
-    id     = "delete-untagged"
+    id     = "delete-old"
     action = "DELETE"
     condition {
-      tag_state  = "UNTAGGED"
       older_than = "604800s" # 7 days
     }
   }
