@@ -74,24 +74,17 @@ export GITHUB_APP_ID="your-app-id"
 Terraform needs images to exist before creating Cloud Run resources. Push manually (one-time):
 
 ```shell
-# Authenticate to GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+# Authenticate to Artifact Registry
+gcloud auth configure-docker us-west1-docker.pkg.dev --quiet
 
-# Build and push (repo must include full image name)
-KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
-KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
-KO_DOCKER_REPO=ghcr.io/thingzio/devpulse-admin ko build ./cmd/devpulse-admin/ --bare --tags latest
+# Set the AR registry path
+AR_REGISTRY=us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images
+
+# Build and push
+KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
+KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
+KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-admin ko build ./cmd/devpulse-admin/ --bare --tags latest
 ```
-
-**Make all GHCR packages public** (required for AR remote repo):
-- `https://github.com/orgs/thingzio/packages/container/devpulse-site/settings` → Visibility → Public
-- `https://github.com/orgs/thingzio/packages/container/devpulse-import/settings` → Visibility → Public
-- `https://github.com/orgs/thingzio/packages/container/devpulse-admin/settings` → Visibility → Public
-
-**Link all packages to the repo** (required for GitHub Actions write access):
-- Each package → Settings → Repository source → Connect to `thingzio/devpulse`
-
-If "Public" is disabled, enable it in org settings: `https://github.com/organizations/thingzio/settings/packages`
 
 ## 6. Store Secrets
 
@@ -129,7 +122,7 @@ terraform init
 terraform apply
 ```
 
-This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + jobs (import + deeprep), Cloud Scheduler (2 hourly triggers), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + jobs (import + deeprep), Cloud Scheduler (2 hourly triggers), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
 
 > **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
 

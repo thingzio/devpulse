@@ -192,5 +192,5 @@ GitHub Actions workflows in `.github/workflows/`:
 Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`, or `make bump-major` to tag and push.
 
 - **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
-- **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to `ghcr.io/thingzio/`
+- **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to Artifact Registry (`devpulse-saas-images`)
 - **Deploy**: Cloud Run service + jobs (import + deeprep) + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`

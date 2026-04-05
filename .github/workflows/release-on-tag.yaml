@@ -11,7 +11,6 @@ concurrency:
 
 permissions:
   contents: write
-  packages: write
   id-token: write
 
 jobs:
@@ -27,8 +26,8 @@ jobs:
     needs: test
     permissions:
       contents: write
-      packages: write
       id-token: write
+    environment: saas
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -48,6 +47,16 @@ jobs:
       - name: Setup Build Tools
         uses: ./.github/actions/setup-build-tools
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - name: Configure Docker for Artifact Registry
+        shell: bash
+        run: gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
+
       - name: Build and Push Images
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29  # v7.0.0
         with:
@@ -56,6 +65,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AR_REGISTRY: ${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPO }}
 
   deploy:
     needs: release

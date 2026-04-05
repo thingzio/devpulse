@@ -23,7 +23,7 @@ ADMIN_SERVICE_NAME="devpulse-saas-admin"
 DEEPREP_JOB_NAME="devpulse-saas-deeprep"
 REGION="us-west1"
 PROJECT_ID=$(terraform -chdir="$TF_DIR" output -raw project_id 2>/dev/null || echo "devpulseio")
-AR_REPO="devpulse-saas-ghcr"
+AR_REPO="devpulse-saas-images"
 
 echo "==> Creating GitHub environment '${ENV_NAME}'..."
 # gh doesn't have a direct 'create environment' command, but setting a

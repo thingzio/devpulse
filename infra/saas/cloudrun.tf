@@ -21,7 +21,7 @@ resource "google_cloud_run_v2_service" "serve" {
     }
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-site:latest"
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-site:latest"
 
       ports {
         container_port = 8080
@@ -152,7 +152,7 @@ resource "google_cloud_run_v2_job" "import" {
       }
 
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-import:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-import:latest"
 
         env {
           name  = "DATABASE_URL"
@@ -253,7 +253,7 @@ resource "google_cloud_run_v2_job" "deeprep" {
       }
 
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-import:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-import:latest"
 
         env {
           name  = "DATABASE_URL"
@@ -341,7 +341,7 @@ resource "google_cloud_run_v2_service" "admin" {
     }
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-admin:latest"
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-admin:latest"
 
       ports {
         container_port = 8080

@@ -97,7 +97,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
 | Cloud Scheduler | 2 hourly jobs | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
-| Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
+| Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
 | Cloud Monitoring | log-based metrics, 8 alert policies, email | free tier |
 | **Total** | | **~$47/mo** |
@@ -345,7 +345,7 @@ All infrastructure is defined in `infra/saas/`:
 | `scheduler.tf` | Hourly import trigger |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
-| `registry.tf` | Artifact Registry remote repo (GHCR proxy) |
+| `registry.tf` | Artifact Registry standard repo (direct push from CI) |
 | `outputs.tf` | Service URL, DB connection, DNS nameservers |
 
 ## Cost Optimization

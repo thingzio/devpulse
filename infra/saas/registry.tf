@@ -1,16 +1,25 @@
-resource "google_artifact_registry_repository" "ghcr" {
+resource "google_artifact_registry_repository" "images" {
   location      = var.region
-  repository_id = "${var.prefix}-ghcr"
-  description   = "Remote proxy for GitHub Container Registry"
+  repository_id = "${var.prefix}-images"
+  description   = "Container images for DevPulse services"
   format        = "DOCKER"
   project       = var.project_id
-  mode          = "REMOTE_REPOSITORY"
+  mode          = "STANDARD_REPOSITORY"
 
-  remote_repository_config {
-    docker_repository {
-      custom_repository {
-        uri = "https://ghcr.io"
-      }
+  cleanup_policies {
+    id     = "keep-tagged"
+    action = "KEEP"
+    condition {
+      tag_state = "TAGGED"
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-untagged"
+    action = "DELETE"
+    condition {
+      tag_state  = "UNTAGGED"
+      older_than = "604800s" # 7 days
     }
   }
 

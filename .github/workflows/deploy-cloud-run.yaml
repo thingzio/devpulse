@@ -39,13 +39,13 @@ jobs:
           echo "Deploying ${TAG} via ${AR}..."
           gcloud run services update ${{ vars.SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
-            --image="${AR}/thingzio/devpulse-site:${TAG}"
+            --image="${AR}/devpulse-site:${TAG}"
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
-            --image="${AR}/thingzio/devpulse-import:${TAG}"
+            --image="${AR}/devpulse-import:${TAG}"
           gcloud run jobs update ${{ vars.DEEPREP_JOB_NAME }} \
             --region=${{ vars.REGION }} \
-            --image="${AR}/thingzio/devpulse-import:${TAG}"
+            --image="${AR}/devpulse-import:${TAG}"
           gcloud run services update ${{ vars.ADMIN_SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
-            --image="${AR}/thingzio/devpulse-admin:${TAG}"
+            --image="${AR}/devpulse-admin:${TAG}"

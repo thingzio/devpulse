@@ -183,7 +183,7 @@ GitHub Actions workflows in `.github/workflows/`:
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, image push, Cloud Run deploy |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
 
-Supply chain: container images built via ko, pushed to GHCR (`ghcr.io/thingzio/devpulse`). govulncheck in CI. All GitHub Actions pinned by commit hash. Tool versions centralized in `.settings.yaml`.
+Supply chain: container images built via ko, pushed to Artifact Registry (`us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images`). govulncheck in CI. All GitHub Actions pinned by commit hash. Tool versions centralized in `.settings.yaml`.
 
 ## Related Documentation
 
