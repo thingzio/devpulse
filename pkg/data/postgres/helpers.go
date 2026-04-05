@@ -111,6 +111,8 @@ var (
 		"OCULUS":         "META",
 
 		// ---- Microsoft ----
+		"AZURE":                 "MICROSOFT",
+		"AZURE CLOUD":           "MICROSOFT",
 		"GITHUB":                "MICROSOFT",
 		"MICROSOFT CHINA":       "MICROSOFT",
 		"MICROSOFT CORPORATION": "MICROSOFT",
