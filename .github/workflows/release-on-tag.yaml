@@ -55,13 +55,7 @@ jobs:
 
       - name: Configure Docker for Artifact Registry
         shell: bash
-        run: |
-          gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
-          CREDS_DEST="${RUNNER_TEMP}/gha-creds.json"
-          mv "$GOOGLE_GHA_CREDS_PATH" "$CREDS_DEST"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=${CREDS_DEST}" >> "$GITHUB_ENV"
-          echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=${CREDS_DEST}" >> "$GITHUB_ENV"
-          echo "GOOGLE_GHA_CREDS_PATH=${CREDS_DEST}" >> "$GITHUB_ENV"
+        run: gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
 
       - name: Build and Push Images
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29  # v7.0.0

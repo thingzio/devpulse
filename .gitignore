@@ -21,6 +21,9 @@ dist
 # Keys
 *.pem
 
+# GCP credentials (created by google-github-actions/auth)
+gha-creds-*.json
+
 
 # Configs
 pkg/config/config.yaml
