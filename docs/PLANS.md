@@ -1,6 +1,7 @@
 # Plan Feature Gating
 
-> Status: **Implemented**
+> **Phase 1:** Implemented (repos, retention, exports, AI, reputation)
+> **Phase 2:** Planned (API access, private repos, import frequency, on-demand)
 
 This document defines the plan tiers, per-feature gating, and implementation options for devpulse SaaS.
 
