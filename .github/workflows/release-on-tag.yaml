@@ -52,6 +52,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
+          credentials_file_path: ${{ runner.temp }}/gha-creds.json
 
       - name: Configure Docker for Artifact Registry
         shell: bash
