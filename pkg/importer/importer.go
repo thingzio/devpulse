@@ -16,9 +16,42 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
-// Run iterates active repos via a SKIP LOCKED claim queue and imports each one.
-// Multiple concurrent executions safely share work without overlap.
+const (
+	ModeAll        = "all"
+	ModeImport     = "import"
+	ModeReputation = "reputation"
+)
+
+// Run reads IMPORT_MODE env var and dispatches to the appropriate workflow.
+// Supported modes: "all" (default), "import" (skip deep reputation), "reputation" (deep reputation only).
 func Run(ctx context.Context) error {
+	mode := os.Getenv("IMPORT_MODE")
+	if mode == "" {
+		mode = ModeAll
+	}
+
+	slog.Info("import mode selected", "mode", mode)
+
+	switch mode {
+	case ModeReputation:
+		return RunDeepReputation(ctx)
+	case ModeImport, ModeAll:
+		return runImport(ctx, mode)
+	default:
+		return fmt.Errorf("unknown IMPORT_MODE: %q", mode)
+	}
+}
+
+// RunDeepReputation runs only the deep reputation phase for all eligible repos.
+// TODO: implement in Task 2.
+func RunDeepReputation(ctx context.Context) error {
+	slog.Info("deep reputation mode not yet implemented")
+	return nil
+}
+
+// runImport iterates active repos via a SKIP LOCKED claim queue and imports each one.
+// Multiple concurrent executions safely share work without overlap.
+func runImport(ctx context.Context, mode string) error {
 	store, err := postgres.NewFromEnv(postgres.ImportPoolConfig())
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
@@ -48,7 +81,7 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("preparing import queue: %w", err)
 	}
 
-	slog.Info("import worker starting", "execution", executionID)
+	slog.Info("import worker starting", "execution", executionID, "mode", mode)
 
 	// Cache tokens per tenant to avoid re-minting for each repo of the same tenant.
 	// Installation tokens are valid for 1 hour — safe to reuse within a single run.
@@ -75,7 +108,7 @@ func Run(ctx context.Context) error {
 			"tenant_id", claim.TenantID,
 			"execution", executionID)
 
-		if importErr := importClaim(ctx, db, store, claim, tokenCache, ghAppConfig, llmCfg); importErr != nil {
+		if importErr := importClaim(ctx, db, store, claim, tokenCache, ghAppConfig, llmCfg, mode); importErr != nil {
 			totalErrors++
 			slog.Error("repo import failed",
 				"org", claim.Org,
@@ -118,7 +151,7 @@ func Run(ctx context.Context) error {
 
 func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 	claim *tenant.ClaimedRepo, tokenCache map[string]string,
-	ghAppConfig *tenant.GitHubAppConfig, llmCfg *data.LLMConfig) error {
+	ghAppConfig *tenant.GitHubAppConfig, llmCfg *data.LLMConfig, mode string) error {
 	tn, err := tenant.GetTenantByID(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting tenant: %w", err)
@@ -158,10 +191,10 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 		}
 	}
 
-	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg, tn.Plan)
+	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg, tn.Plan, mode)
 }
 
-func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig, planName string) error {
+func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig, planName, mode string) error {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
 
@@ -214,7 +247,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 
 	limits, _ := plan.Get(planName)
 
-	if token != "" && limits.DeepReputation {
+	if token != "" && limits.DeepReputation && mode != ModeImport {
 		slog.Info("phase: deep reputation", "org", org, "repo", repo)
 		tokenFn := func() string { return token }
 		var res *data.DeepReputationResult
