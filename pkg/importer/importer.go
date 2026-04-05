@@ -135,6 +135,13 @@ func runImport(ctx context.Context, mode string) error {
 		break
 	}
 
+	// Normalize entity names for all developers (fixes casing, suffixes,
+	// and applies canonical name substitutions).
+	slog.Info("phase: entity normalization")
+	if cleanErr := store.CleanEntities(ctx); cleanErr != nil {
+		slog.Warn("cleaning entity names", "error", cleanErr)
+	}
+
 	slog.Info("import worker complete",
 		"repos", totalRepos,
 		"errors", totalErrors,

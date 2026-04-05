@@ -55,22 +55,122 @@ var (
 	}
 
 	entitySubstitutions = map[string]string{
-		"CHAINGUARDDEV":       "CHAINGUARD",
+		// ---- Original mappings ----
+		"CHAINGUARDDEV": "CHAINGUARD",
+		"INTERNATIONAL INSTITUTE OF INFORMATION TECHNOLOGY BANGALORE": "IIIT BANGALORE",
+		"LINE PLUS": "LINE",
+		"SP GLOBAL": "SP GLOBAL",
+		"VERVERICA ORIGINAL CREATORS OF APACHE FLINK": "VERVERICA",
+
+		// ---- Adobe (acquired brands) ----
+		"AVIARY":  "ADOBE",
+		"BEHANCE": "ADOBE",
+		"FOTOLIA": "ADOBE",
+		"MAGENTO": "ADOBE",
+
+		// ---- Amazon / AWS ----
+		"AMAZON WEB SERVICES": "AMAZON",
+		"AMAZONCOM":           "AMAZON",
+		"AMZN":                "AMAZON",
+		"AWS":                 "AMAZON",
+
+		// ---- Cisco ----
+		"APPDYNAMICS":   "CISCO",
+		"CISCO SYSTEMS": "CISCO",
+		"DUO SECURITY":  "CISCO",
+		"EPSAGON":       "CISCO",
+
+		// ---- Cloudera ----
+		"HORTONWORKS": "CLOUDERA",
+
+		// ---- Equinix ----
+		"EQUINIX METAL": "EQUINIX",
+		"PACKET HOST":   "EQUINIX",
+
+		// ---- Google ----
 		"GCP":                 "GOOGLE",
+		"GOOGLE CLOUD":        "GOOGLE",
 		"GOOGLECLOUD":         "GOOGLE",
 		"GOOGLECLOUDPLATFORM": "GOOGLE",
-		"HUAWEICLOUD":         "HUAWEI",
-		"IBM CODAITY":         "IBM",
-		"IBM RESEARCH":        "IBM",
-		"INTERNATIONAL BUSINESS MACHINES CORPORATION":                 "IBM",
-		"INTERNATIONAL BUSINESS MACHINES":                             "IBM",
-		"INTERNATIONAL INSTITUTE OF INFORMATION TECHNOLOGY BANGALORE": "IIIT BANGALORE",
-		"LINE PLUS":       "LINE",
-		"MICROSOFT CHINA": "MICROSOFT",
-		"REDHATOFFICIAL":  "REDHAT",
-		"S&P GLOBAL INC":  "S&P",
-		"S&P GLOBAL":      "S&P",
-		"VERVERICA ORIGINAL CREATORS OF APACHE FLINK": "VERVERICA",
+
+		// ---- Huawei ----
+		"FUTUREWEI":              "HUAWEI",
+		"FUTUREWEI TECHNOLOGIES": "HUAWEI",
+		"HUAWEI TECHNOLOGIES":    "HUAWEI",
+		"HUAWEICLOUD":            "HUAWEI",
+
+		// ---- IBM ----
+		"IBM CODAITY":                                 "IBM",
+		"IBM RESEARCH":                                "IBM",
+		"INTERNATIONAL BUSINESS MACHINES":             "IBM",
+		"INTERNATIONAL BUSINESS MACHINES CORPORATION": "IBM",
+
+		// ---- Meta (Facebook rebrand) ----
+		"FACEBOOK":       "META",
+		"META PLATFORMS": "META",
+		"OCULUS":         "META",
+
+		// ---- Microsoft ----
+		"GITHUB":                "MICROSOFT",
+		"MICROSOFT CHINA":       "MICROSOFT",
+		"MICROSOFT CORPORATION": "MICROSOFT",
+		"XAMARIN":               "MICROSOFT",
+
+		// ---- NVIDIA ----
+		"NVIDIA CORPORATION": "NVIDIA",
+
+		// ---- Oracle ----
+		"ORACLE AMERICA": "ORACLE",
+		"WERCKER":        "ORACLE",
+
+		// ---- Red Hat ----
+		"COREOS":         "RED HAT",
+		"REDHAT":         "RED HAT",
+		"REDHATOFFICIAL": "RED HAT",
+
+		// ---- Salesforce ----
+		"SALESFORCECOM": "SALESFORCE",
+
+		// ---- SUSE ----
+		"RANCHER LABS": "SUSE",
+
+		// ---- Twilio ----
+		"SENDGRID": "TWILIO",
+
+		// ---- VMware ----
+		"BITNAMI": "VMWARE",
+		"HEPTIO":  "VMWARE",
+		"PIVOTAL": "VMWARE",
+
+		// ---- Other well-known tech companies (canonical forms) ----
+		"ALIBABA GROUP":            "ALIBABA",
+		"ATLASSIAN PTY":            "ATLASSIAN",
+		"BOOKING":                  "BOOKING.COM",
+		"BOOKING COM":              "BOOKING.COM",
+		"CAPITAL ONE":              "CAPITAL ONE",
+		"DATADOG":                  "DATADOG",
+		"ELASTIC NV":               "ELASTIC",
+		"ELASTIC SEARCH":           "ELASTIC",
+		"ELASTICSEARCH":            "ELASTIC",
+		"EMBL EBI":                 "EMBL-EBI",
+		"EPAM SYSTEMS":             "EPAM",
+		"GRAFANA LABS":             "GRAFANA",
+		"JETBRAINS SRO":            "JETBRAINS",
+		"JPMORGAN":                 "JPMORGAN CHASE",
+		"JPMORGAN CHASE":           "JPMORGAN CHASE",
+		"JP MORGAN":                "JPMORGAN CHASE",
+		"JPMORGAN CHASE CO":        "JPMORGAN CHASE",
+		"MASTERCARD INTERNATIONAL": "MASTERCARD",
+		"MONGODB":                  "MONGODB",
+		"NETEASE":                  "NETEASE",
+		"PALANTIR TECHNOLOGIES":    "PALANTIR",
+		"PUPPET LABS":              "PUPPET",
+		"SAP SE":                   "SAP",
+		"SQUARE":                   "BLOCK",
+		"THE GUARDIAN":             "THE GUARDIAN",
+		"TRAVIS CI":                "TRAVIS CI",
+		"UNITY TECHNOLOGIES":       "UNITY",
+		"WIKIMEDIA FOUNDATION":     "WIKIMEDIA",
 	}
 )
 

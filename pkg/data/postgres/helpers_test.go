@@ -52,15 +52,52 @@ func TestCleanEntityName(t *testing.T) {
 		{name: "GOOGLECLOUD → GOOGLE", input: "GOOGLECLOUD", want: "GOOGLE"},
 		{name: "GOOGLECLOUDPLATFORM → GOOGLE", input: "GOOGLECLOUDPLATFORM", want: "GOOGLE"},
 		{name: "HUAWEICLOUD → HUAWEI", input: "HUAWEICLOUD", want: "HUAWEI"},
-		{name: "REDHATOFFICIAL → REDHAT", input: "REDHATOFFICIAL", want: "REDHAT"},
+		{name: "REDHATOFFICIAL → RED HAT", input: "REDHATOFFICIAL", want: "RED HAT"},
 		{name: "CHAINGUARDDEV → CHAINGUARD", input: "CHAINGUARDDEV", want: "CHAINGUARD"},
 		{name: "IBM RESEARCH → IBM", input: "IBM RESEARCH", want: "IBM"},
 		{name: "IBM CODAITY → IBM", input: "IBM CODAITY", want: "IBM"},
 		{name: "LINE PLUS → LINE", input: "LINE PLUS", want: "LINE"},
 		{name: "MICROSOFT CHINA → MICROSOFT", input: "MICROSOFT CHINA", want: "MICROSOFT"},
 
-		// S&P: & stripped by regex → "SP GLOBAL INC"; GLOBAL and INC are noise → "SP".
-		{name: "S&P GLOBAL INC regex strips amp and noise", input: "S&P GLOBAL INC", want: "SP"},
+		// S&P: & stripped by regex → "SP GLOBAL INC"; noise stripped → "SP GLOBAL"; sub → "SP GLOBAL".
+		{name: "S&P GLOBAL INC", input: "S&P GLOBAL INC", want: "SP GLOBAL"},
+
+		// New substitutions: Amazon/AWS
+		{name: "AWS → AMAZON", input: "AWS", want: "AMAZON"},
+		{name: "Amazon Web Services Inc → AMAZON", input: "Amazon Web Services Inc", want: "AMAZON"},
+		{name: "amzn → AMAZON", input: "amzn", want: "AMAZON"},
+
+		// New substitutions: Meta/Facebook
+		{name: "Facebook → META", input: "Facebook", want: "META"},
+		{name: "Meta Platforms → META", input: "Meta Platforms", want: "META"},
+		{name: "Oculus → META", input: "Oculus", want: "META"},
+
+		// New substitutions: Microsoft subsidiaries
+		{name: "GitHub → MICROSOFT", input: "GitHub", want: "MICROSOFT"},
+		{name: "Xamarin → MICROSOFT", input: "Xamarin", want: "MICROSOFT"},
+
+		// New substitutions: Red Hat
+		{name: "Red Hat → RED HAT", input: "Red Hat", want: "RED HAT"},
+		{name: "redhat → RED HAT", input: "redhat", want: "RED HAT"},
+		{name: "CoreOS → RED HAT", input: "CoreOS", want: "RED HAT"},
+
+		// New substitutions: VMware acquisitions
+		{name: "Pivotal → VMWARE", input: "Pivotal", want: "VMWARE"},
+		{name: "Heptio → VMWARE", input: "Heptio", want: "VMWARE"},
+		{name: "Bitnami → VMWARE", input: "Bitnami", want: "VMWARE"},
+
+		// New substitutions: NVIDIA
+		{name: "NVIDIA Corporation → NVIDIA", input: "NVIDIA Corporation", want: "NVIDIA"},
+
+		// New substitutions: other
+		{name: "Sendgrid → TWILIO", input: "Sendgrid", want: "TWILIO"},
+		{name: "Rancher Labs → SUSE", input: "Rancher Labs", want: "SUSE"},
+		{name: "Elastic NV → ELASTIC", input: "Elastic NV", want: "ELASTIC"},
+		{name: "Grafana Labs → GRAFANA", input: "Grafana Labs", want: "GRAFANA"},
+		{name: "SAP SE → SAP", input: "SAP SE", want: "SAP"},
+		{name: "JPMorgan Chase → JPMORGAN CHASE", input: "JPMorgan Chase", want: "JPMORGAN CHASE"},
+		{name: "Puppet Labs → PUPPET", input: "Puppet Labs", want: "PUPPET"},
+		{name: "Magento → ADOBE", input: "Magento", want: "ADOBE"},
 
 		// Regex strips non-alphanumeric (except spaces)
 		{name: "strips punctuation", input: "Tech, Inc.", want: "TECH"},
@@ -77,7 +114,7 @@ func TestCleanEntityName(t *testing.T) {
 
 		// Case normalisation
 		{name: "lowercase input uppercased", input: "apple", want: "APPLE"},
-		{name: "mixed case uppercased", input: "GitHub", want: "GITHUB"},
+		{name: "mixed case uppercased", input: "JetBrains", want: "JETBRAINS"},
 
 		// Long multi-word substitution
 		{

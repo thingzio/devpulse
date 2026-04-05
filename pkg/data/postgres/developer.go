@@ -295,7 +295,8 @@ func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error
 			continue
 		}
 
-		if _, execErr := stmt.ExecContext(ctx, username, dev.Entity); execErr != nil {
+		entity := cleanEntityName(dev.Entity)
+		if _, execErr := stmt.ExecContext(ctx, username, entity); execErr != nil {
 			slog.Warn("updating developer entity", "username", username, "error", execErr)
 			skipped++
 			continue
