@@ -92,14 +92,15 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
 | Cloud Run Service (serve) | always-on (min=1), 1 vCPU/512MB | $15/mo |
 | Cloud Run Job (import) | hourly, ~3 tasks, ~5 min/run | $2/mo |
+| Cloud Run Job (deeprep) | hourly, 1 task, ~10-30 min/run | $1.50/mo |
 | Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
 | Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
-| Cloud Scheduler | 1 hourly job | free (3 free) |
+| Cloud Scheduler | 2 hourly jobs | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 7 alert policies, email | free tier |
-| **Total** | | **~$46/mo** |
+| Cloud Monitoring | log-based metrics, 8 alert policies, email | free tier |
+| **Total** | | **~$47/mo** |
 
 ## Cost by Tenant Scale
 
@@ -115,10 +116,11 @@ Total repos: ~93. Paid repos with AI: ~78.
 | Cloud SQL | db-g1-small, ~15GB storage | $29/mo |
 | Cloud Run (serve) | always-on, light load | $15/mo |
 | Cloud Run (import) | hourly, ~10 min/run | $4/mo |
+| Cloud Run (deeprep) | hourly, ~30 min/run | $2/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~78 repos x $0.02/mo (cached) | $1.50/mo |
 | Fixed (scheduler, DNS, secrets, AR, monitoring) | | $1/mo |
-| **Total** | | **~$51/mo** |
+| **Total** | | **~$53/mo** |
 
 ### 100 Tenants
 
@@ -130,10 +132,11 @@ Total repos: ~360. Paid repos with AI: ~300.
 | Cloud SQL | db-g1-small, ~25GB storage | $31/mo |
 | Cloud Run (serve) | always-on, moderate load | $18/mo |
 | Cloud Run (import) | hourly, ~20 min/run | $8/mo |
+| Cloud Run (deeprep) | hourly, ~45 min/run | $3/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~300 repos x $0.02/mo (cached) | $6/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$65/mo** |
+| **Total** | | **~$68/mo** |
 
 **Upgrade signal:** DB CPU sustained > 80%, or import duration > 30 minutes.
 
@@ -147,11 +150,12 @@ Total repos: ~1,080. Paid repos with AI: ~900.
 | Cloud SQL | db-custom-1-3840, 1 vCPU, 3.75GB, ~50GB storage | $59/mo |
 | Cloud Run (serve) | always-on, higher concurrency | $25/mo |
 | Cloud Run (import) | parallelism=5, ~30 min/run | $15/mo |
+| Cloud Run (deeprep) | hourly, ~60 min/run | $5/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | PgBouncer sidecar | connection pooling | $10/mo |
 | Anthropic API | ~900 repos x $0.02/mo (cached) | $18/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$129/mo** |
+| **Total** | | **~$134/mo** |
 
 **Upgrade signal:** connection count approaching limits, query latency > 500ms.
 
@@ -166,21 +170,22 @@ Total repos: ~3,600. Paid repos with AI: ~3,000.
 | AlloyDB read pool (optional) | 2 vCPU | $150/mo |
 | Cloud Run (serve) | always-on, 2-5 instances avg | $50/mo |
 | Cloud Run (import) | parallelism=10+, Cloud Tasks | $25/mo |
+| Cloud Run (deeprep) | hourly, ~90 min/run, multi-token | $8/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Cloud Tasks | parallel import dispatch | $10/mo |
 | Anthropic API | ~3,000 repos x $0.02/mo (cached) | $60/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$482/mo** |
+| **Total** | | **~$490/mo** |
 
 ### Cost Scaling Summary
 
 | Tenants | DB Tier | Repos (est) | Anthropic | Total |
 |---------|---------|-------------|-----------|-------|
-| 5 (current) | db-g1-small | ~15 | $0.30 | ~$46 |
-| 25 | db-g1-small | ~93 | $1.50 | ~$51 |
-| 100 | db-g1-small | ~360 | $6 | ~$65 |
-| 300 | db-custom-1-3840 | ~1,080 | $18 | ~$129 |
-| 1,000 | AlloyDB | ~3,600 | $60 | ~$482 |
+| 5 (current) | db-g1-small | ~15 | $0.30 | ~$47 |
+| 25 | db-g1-small | ~93 | $1.50 | ~$53 |
+| 100 | db-g1-small | ~360 | $6 | ~$68 |
+| 300 | db-custom-1-3840 | ~1,080 | $18 | ~$134 |
+| 1,000 | AlloyDB | ~3,600 | $60 | ~$490 |
 
 With insight caching, the Anthropic API drops from the dominant cost to a minor line item (~12% at 1K tenants vs ~55% without caching). The database and compute are now the primary cost drivers at scale. Key cost levers:
 1. **AI gating by plan** — Free tenants generate zero LLM cost
