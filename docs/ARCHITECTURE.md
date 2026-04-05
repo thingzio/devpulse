@@ -6,7 +6,8 @@ Multi-tenant SaaS for GitHub project health analytics. Three binaries: `devpulse
 
 ```
 GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
-Cloud Scheduler ──→ devpulse (import) ──→ per-tenant install tokens ──→ PostgreSQL
+Cloud Scheduler :00 ──→ devpulse (import) ──→ per-tenant install tokens ──→ PostgreSQL
+Cloud Scheduler :30 ──→ devpulse (deeprep) ──→ round-robin token pool ──→ PostgreSQL
 Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
 Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo
 Admin  ──→ devpulse (admin) ──→ IAM auth ──→ tenant plan management ──→ PostgreSQL
@@ -16,7 +17,7 @@ Admin  ──→ devpulse (admin) ──→ IAM auth ──→ tenant plan manag
 
 Adding a repo requires two conditions:
 1. **Public repo** — verified via HEAD request to GitHub API
-2. **Active GitHub App installation** — tenant must have at least one installation (org-specific preferred, falls back to any). This ensures the import job can mint installation tokens for authenticated API access (12,500 req/hr).
+2. **Active GitHub App installation** — tenant must have at least one installation (org-specific preferred, falls back to any). This ensures the import job can mint installation tokens for authenticated API access (5,000 req/hr per installation).
 
 The GitHub App installation is separate from OAuth login. Users must install the DevPulseThingz app on their org/account after signing in. The webhook handler records installations in `github_app_installation`.
 
@@ -51,9 +52,9 @@ devpulse/
 └── .settings.yaml          Centralized tool versions and quality thresholds
 ```
 
-## Mode Selection
+## Binaries
 
-Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports, `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
+Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports (supports `IMPORT_MODE` for import vs deep reputation), `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
 
 ## Data Layer
 
@@ -102,9 +103,7 @@ PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
 
 ## Import Pipeline
 
-The `devpulse-import` binary supports an `IMPORT_MODE` env var (`all`, `import`, or `reputation`) to select which phases run. Two Cloud Run jobs use the same binary with different modes:
-
-The import worker (`pkg/importer/`) uses a PostgreSQL SKIP LOCKED claim queue (`pkg/tenant/import.go`) to distribute repos across concurrent tasks. Cloud Run runs with `parallelism=3`, so 3 tasks process the queue concurrently with no overlap.
+The `devpulse-import` binary supports an `IMPORT_MODE` env var (`all`, `import`, or `reputation`) to select which phases run. Two Cloud Run jobs use the same binary with different modes: the import job runs at :00 with `IMPORT_MODE=import` (3 parallel tasks via SKIP LOCKED claim queue), and the deeprep job runs at :30 with `IMPORT_MODE=reputation` (single task, sequential scoring).
 
 ### Import Job (`IMPORT_MODE=import`)
 
