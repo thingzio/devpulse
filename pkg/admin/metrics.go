@@ -225,6 +225,16 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.result",
 		},
 		{
+			label:  "Deep Reputation: Contributors Scored (hourly)",
+			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-scored"`, "devpulse-saas"),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Deep Reputation: Rate Limit Pauses (hourly)",
+			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-rate-limit-pauses"`, "devpulse-saas"),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
 			label:  "Deep Reputation: Errors (by username)",
 			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-errors"`, "devpulse-saas"),
 			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.username",

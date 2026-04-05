@@ -195,6 +195,30 @@ resource "google_logging_metric" "deeprep_duration" {
   }
 }
 
+resource "google_logging_metric" "deeprep_scored" {
+  name    = "${var.prefix}-deeprep-scored"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"deep reputation worker complete\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.scored)"
+}
+
+resource "google_logging_metric" "deeprep_rate_limit_pauses" {
+  name    = "${var.prefix}-deeprep-rate-limit-pauses"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"rate limit approaching, pausing until reset\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
 resource "google_logging_metric" "deeprep_errors" {
   name    = "${var.prefix}-deeprep-errors"
   project = var.project_id
