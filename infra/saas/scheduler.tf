@@ -15,3 +15,21 @@ resource "google_cloud_scheduler_job" "import" {
 
   depends_on = [google_project_service.default]
 }
+
+resource "google_cloud_scheduler_job" "deeprep" {
+  name     = "${var.prefix}-deeprep-hourly"
+  schedule = "30 * * * *"
+  project  = var.project_id
+  region   = var.region
+
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${google_cloud_run_v2_job.deeprep.name}:run"
+
+    oauth_token {
+      service_account_email = google_service_account.deployer.email
+    }
+  }
+
+  depends_on = [google_project_service.default]
+}
