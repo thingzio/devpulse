@@ -68,7 +68,7 @@ kos:
   - id: devpulse-site
     build: devpulse-site
     repositories:
-      - "{{ .Env.AR_REGISTRY }}/devpulse-site"
+      - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-site
     platforms:
       - linux/amd64
       - linux/arm64
@@ -81,7 +81,7 @@ kos:
   - id: devpulse-import
     build: devpulse-import
     repositories:
-      - "{{ .Env.AR_REGISTRY }}/devpulse-import"
+      - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-import
     platforms:
       - linux/amd64
       - linux/arm64
@@ -94,7 +94,7 @@ kos:
   - id: devpulse-admin
     build: devpulse-admin
     repositories:
-      - "{{ .Env.AR_REGISTRY }}/devpulse-admin"
+      - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-admin
     platforms:
       - linux/amd64
       - linux/arm64
