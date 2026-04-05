@@ -15,6 +15,10 @@ build_tools:
 linting:
   golangci_lint: 'v2.11.3'
 
+# Container Registry
+registry:
+  host: 'us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images'
+
 # Quality Thresholds
 quality:
   coverage_threshold: '10'
