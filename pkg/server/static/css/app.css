@@ -550,6 +550,23 @@ fieldset {
   color: var(--dark-color);
   padding: 6px 8px;
   border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+#repo-overview-table th:last-child {
+  cursor: default;
+}
+
+#repo-overview-table th .sort-arrow {
+  font-size: 0.75em;
+  margin-left: 3px;
+  opacity: 0.4;
+}
+
+#repo-overview-table th.sort-active .sort-arrow {
+  opacity: 1;
 }
 
 #repo-overview-table td {

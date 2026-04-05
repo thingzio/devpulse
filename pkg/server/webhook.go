@@ -114,12 +114,11 @@ func handleInstallationEvent(ctx context.Context, db *sql.DB, body []byte) error
 			return fmt.Errorf("saving installation: %w", err)
 		}
 
-		repos := parseRepoNames(payload.Repositories)
-		if len(repos) > 0 {
-			if err := tenant.AddTenantRepos(ctx, db, tn.ID, repos); err != nil {
-				return fmt.Errorf("adding repos from installation: %w", err)
-			}
-		}
+		slog.Info("installation created, repos must be added manually via dashboard",
+			"tenant_id", tn.ID,
+			"installation_id", payload.Installation.ID,
+			"repos_in_payload", len(payload.Repositories),
+		)
 
 	case "deleted", "suspend":
 		if err := tenant.SuspendInstallation(ctx, db, payload.Installation.ID); err != nil {
@@ -138,9 +137,6 @@ func handleInstallationReposEvent(ctx context.Context, db *sql.DB, body []byte) 
 		Sender struct {
 			ID int64 `json:"id"`
 		} `json:"sender"`
-		RepositoriesAdded []struct {
-			FullName string `json:"full_name"`
-		} `json:"repositories_added"`
 		RepositoriesRemoved []struct {
 			FullName string `json:"full_name"`
 		} `json:"repositories_removed"`
@@ -149,16 +145,15 @@ func handleInstallationReposEvent(ctx context.Context, db *sql.DB, body []byte) 
 		return fmt.Errorf("parsing installation_repositories webhook: %w", err)
 	}
 
+	// Only process removals — repos must be added manually via the dashboard.
+	if len(payload.RepositoriesRemoved) == 0 {
+		slog.Debug("installation_repositories webhook with no removals, skipping")
+		return nil
+	}
+
 	tn, err := tenant.GetTenantByGitHubID(ctx, db, payload.Sender.ID)
 	if err != nil {
 		return fmt.Errorf("tenant not found (sender_id=%d): %w", payload.Sender.ID, err)
-	}
-
-	if len(payload.RepositoriesAdded) > 0 {
-		repos := parseRepoNames(payload.RepositoriesAdded)
-		if err := tenant.AddTenantRepos(ctx, db, tn.ID, repos); err != nil {
-			return fmt.Errorf("adding repos: %w", err)
-		}
 	}
 
 	for _, r := range payload.RepositoriesRemoved {
@@ -171,17 +166,4 @@ func handleInstallationReposEvent(ctx context.Context, db *sql.DB, body []byte) 
 	}
 
 	return nil
-}
-
-func parseRepoNames(repos []struct {
-	FullName string `json:"full_name"`
-}) []tenant.OrgRepo {
-	result := make([]tenant.OrgRepo, 0, len(repos))
-	for _, r := range repos {
-		parts := strings.SplitN(r.FullName, "/", 2)
-		if len(parts) == 2 {
-			result = append(result, tenant.OrgRepo{Org: parts[0], Repo: parts[1]})
-		}
-	}
-	return result
 }

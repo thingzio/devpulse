@@ -1,9 +1,70 @@
-function formatImportDate(ts, withTime) {
+function formatImportDate(ts) {
     if (!ts) return '—';
     var d = new Date(ts);
     if (isNaN(d)) return ts.substring(0, 10);
-    if (withTime) return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-    return d.toLocaleDateString();
+    var diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}
+
+function initTableSort(tableId) {
+    var $table = $('#' + tableId);
+    if (!$table.length) return;
+    var $headers = $table.find('thead th');
+    // Remove previous sort state if re-initialized
+    $headers.off('click.tablesort').removeClass('sort-active sort-asc sort-desc').removeData('sorted');
+    $headers.find('.sort-arrow').remove();
+    // Add sort arrows to all headers except the last (actions) column
+    $headers.each(function(i) {
+        if (i < $headers.length - 1) {
+            $(this).append('<span class="sort-arrow">\u25B2</span>');
+        }
+    });
+    $headers.on('click.tablesort', function() {
+        var $th = $(this);
+        var colIdx = $th.index();
+        if (colIdx === $headers.length - 1) return; // skip actions column
+        var isNum = $th.hasClass('num');
+        var isAsc = $th.hasClass('sort-asc');
+        // Reset all headers
+        $headers.removeClass('sort-active sort-asc sort-desc');
+        $headers.find('.sort-arrow').text('\u25B2');
+        // Set new sort state — numbers and dates default descending, text ascending
+        var sortAsc;
+        if ($th.data('sorted')) {
+            sortAsc = !isAsc;
+        } else {
+            sortAsc = !isNum && colIdx !== $headers.length - 2; // last-1 is import col
+        }
+        $th.addClass('sort-active').addClass(sortAsc ? 'sort-asc' : 'sort-desc');
+        $th.data('sorted', true);
+        $th.find('.sort-arrow').text(sortAsc ? '\u25B2' : '\u25BC');
+        // Sort rows
+        var $tbody = $table.find('tbody');
+        var rows = $tbody.find('tr').toArray();
+        rows.sort(function(a, b) {
+            var $cellA = $(a).children().eq(colIdx);
+            var $cellB = $(b).children().eq(colIdx);
+            var valA, valB;
+            // Use data-sort-value if present (for import dates)
+            if ($cellA.attr('data-sort-value') !== undefined) {
+                valA = parseFloat($cellA.attr('data-sort-value')) || 0;
+                valB = parseFloat($cellB.attr('data-sort-value')) || 0;
+            } else if (isNum) {
+                valA = parseFloat($cellA.text().replace(/[^0-9.\-]/g, '')) || 0;
+                valB = parseFloat($cellB.text().replace(/[^0-9.\-]/g, '')) || 0;
+            } else {
+                valA = $cellA.text().toLowerCase();
+                valB = $cellB.text().toLowerCase();
+            }
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        });
+        $tbody.append(rows);
+    });
 }
 
 function isDarkMode() {
@@ -331,7 +392,10 @@ function loadSummaryBanner(months, org, repo, entity) {
         $("#banner-repos").text(data.repos.toLocaleString());
         $("#banner-events").text(data.events.toLocaleString());
         $("#banner-contributors").text(data.contributors.toLocaleString());
-        $("#banner-last-import").text(formatImportDate(data.last_import, repo));
+        $("#banner-last-import").text(formatImportDate(data.last_import));
+        if (data.last_import) {
+            $("#banner-last-import").attr('title', new Date(data.last_import).toLocaleString());
+        }
         $("#bus-factor-val").text(data.bus_factor);
         $("#pony-factor-val").text(data.pony_factor);
         loadPortfolioSummary(months, org, repo);
@@ -1699,9 +1763,13 @@ function loadRepoOverview(url) {
             $row.append($('<td class="num"></td>').text(r.scored + '/' + r.contributors));
             var $importCell = $('<td></td>');
             if (r.last_import) {
-                $importCell.text(formatImportDate(r.last_import, false));
+                var importDate = new Date(r.last_import);
+                $importCell.text(formatImportDate(r.last_import))
+                    .attr('title', importDate.toLocaleString())
+                    .attr('data-sort-value', importDate.getTime());
             } else {
-                $importCell.text('Pending').css({'color': 'var(--gray)', 'font-style': 'italic'});
+                $importCell.text('Pending').css({'color': 'var(--gray)', 'font-style': 'italic'})
+                    .attr('data-sort-value', '0');
             }
             $row.append($importCell);
             var $removeBtn = $('<button style="color:var(--gray);font-size:0.85em;padding:2px 8px;border:1px solid var(--border-color);border-radius:var(--border-radius);cursor:pointer">Remove</button>');
@@ -1709,6 +1777,7 @@ function loadRepoOverview(url) {
             $row.append($('<td></td>').append($removeBtn));
             $tbody.append($row);
         });
+        initTableSort('repo-overview-table');
     });
     }); // end signals .always
 }

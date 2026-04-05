@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func TestVerifyWebhookSignature(t *testing.T) {
@@ -116,63 +115,4 @@ func TestWebhookHandler(t *testing.T) {
 		h(w, r)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
-}
-
-func TestParseRepoNames(t *testing.T) {
-	tests := []struct {
-		name  string
-		input []struct {
-			FullName string `json:"full_name"`
-		}
-		want []tenant.OrgRepo
-	}{
-		{
-			name:  "empty input",
-			input: nil,
-			want:  []tenant.OrgRepo{},
-		},
-		{
-			name: "valid repos",
-			input: []struct {
-				FullName string `json:"full_name"`
-			}{
-				{FullName: "org1/repo1"},
-				{FullName: "org2/repo2"},
-			},
-			want: []tenant.OrgRepo{
-				{Org: "org1", Repo: "repo1"},
-				{Org: "org2", Repo: "repo2"},
-			},
-		},
-		{
-			name: "missing slash skipped",
-			input: []struct {
-				FullName string `json:"full_name"`
-			}{
-				{FullName: "noslash"},
-				{FullName: "org/repo"},
-			},
-			want: []tenant.OrgRepo{
-				{Org: "org", Repo: "repo"},
-			},
-		},
-		{
-			name: "extra slash uses first two parts",
-			input: []struct {
-				FullName string `json:"full_name"`
-			}{
-				{FullName: "org/repo/extra"},
-			},
-			want: []tenant.OrgRepo{
-				{Org: "org", Repo: "repo/extra"},
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := parseRepoNames(tc.input)
-			assert.Equal(t, tc.want, got)
-		})
-	}
 }
