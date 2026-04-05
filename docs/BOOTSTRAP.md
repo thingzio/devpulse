@@ -111,6 +111,11 @@ gcloud secrets versions add devpulse-saas-webhook-secret \
 # GitHub App private key
 gcloud secrets versions add devpulse-saas-github-app-key \
     --project=$PROJECT_ID --data-file=path/to/devpulse.pem
+
+# Anthropic API key (optional, enables LLM insights)
+echo -n "YOUR_ANTHROPIC_API_KEY" | \
+gcloud secrets versions add devpulse-saas-anthropic-api-key \
+    --project=$PROJECT_ID --data-file=-
 ```
 
 > **Note:** Secret Manager resources are created by Terraform, but you must add versions (values) manually. Terraform creates empty secret containers — Cloud Run fails if it references a secret with no versions.
@@ -124,7 +129,7 @@ terraform init
 terraform apply
 ```
 
-This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + job, Cloud Scheduler, Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry remote repo (GHCR proxy), Cloud Run service + jobs (import + deeprep), Cloud Scheduler (2 hourly triggers), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
 
 > **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
 
@@ -191,7 +196,7 @@ open https://$DOMAIN
 # on the org to grant API access for imports.
 
 # Trigger manual import (after signing in, installing app, and adding repos)
-gcloud run jobs execute devpulse-saas-import --region=$REGION
+gcloud run jobs execute devpulse-saas-import --region=$REGION --project=$PROJECT_ID
 # Note: the deep reputation job (devpulse-saas-deeprep) runs automatically at :30 via Cloud Scheduler
 
 # Check logs
@@ -218,7 +223,7 @@ gcloud run jobs update devpulse-saas-import --region=$REGION \
 
 After verifying everything works:
 ```shell
-# Edit infra/saas/cloudrun.tf — set deletion_protection = true on both resources
+# Edit infra/saas/cloudrun.tf — set deletion_protection = true on all three resources (serve, import, deeprep)
 cd infra/saas && terraform apply
 ```
 
