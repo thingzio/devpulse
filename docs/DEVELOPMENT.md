@@ -10,6 +10,8 @@ make import         # run import worker (needs GITHUB_TOKEN)
 make qualify        # full check: test-coverage + lint + vulncheck + e2e
 ```
 
+> **Start here:** Read [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) for coding conventions, anti-patterns, and the decision framework used across the codebase.
+
 ## Prerequisites
 
 ### Required
@@ -87,6 +89,16 @@ make down           # stop Postgres (data preserved)
 
 `make server` runs `devpulse-site` (HTTP server on :8080). `make import` runs `devpulse-import` (batch worker, exits when done). `devpulse-admin` is an IAM-protected admin service for tenant management — see [ADMIN.md](ADMIN.md).
 
+The import binary supports `IMPORT_MODE` to select which phases run:
+
+```bash
+make import                          # default (all phases including deep reputation)
+IMPORT_MODE=import make import       # fast phases only, skip deep reputation
+IMPORT_MODE=reputation make import   # deep reputation scoring only (round-robin token pool)
+```
+
+In production, two Cloud Run jobs run the same binary: import at :00 (`IMPORT_MODE=import`), deep reputation at :30 (`IMPORT_MODE=reputation`). See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+
 Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
 ## Make Targets
@@ -148,7 +160,12 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | Import hits rate limit | Re-run; the importer uses jitter backoff automatically |
 | `make server` fails | Ensure Postgres is running (`make up`) and `DATABASE_URL` is set |
 
-### Running Specific Tests
+### Testing Patterns
+
+- **Integration tests** use `setupTestDB(t)` which creates a temporary Postgres container with all migrations applied. These require Docker.
+- **All test functions** must create `ctx := context.Background()` and pass it to Store methods — never use a bare `nil` context.
+- **Table-driven tests** are preferred. Test both nil DB and empty DB cases for query functions.
+- **Assertions** via `github.com/stretchr/testify` (`assert` for non-fatal, `require` for fatal).
 
 ```bash
 go test -v ./pkg/tenant/... -run TestSpecificFunction
@@ -180,4 +197,6 @@ make server 2>&1 | jq 'select(.level=="ERROR")'
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and design
 - [ADMIN.md](ADMIN.md) — day-2 operations, monitoring, tenant management
 - [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — GCP scaling, costs, API throughput
+- [PLANS.md](PLANS.md) — plan feature gating (Free, Starter, Pro, Enterprise)
 - [BOOTSTRAP.md](BOOTSTRAP.md) — one-time GCP deployment guide
+- [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) — coding conventions, anti-patterns, decision framework
