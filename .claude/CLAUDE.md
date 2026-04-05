@@ -135,7 +135,7 @@ When choosing between approaches, prioritize in this order:
 
 ```
 cmd/devpulse-site/     HTTP server entrypoint (dashboard, OAuth, webhooks, data API)
-cmd/devpulse-import/   Batch import worker entrypoint
+cmd/devpulse-import/   Batch import worker entrypoint (IMPORT_MODE: all|import|reputation)
 cmd/devpulse-admin/    IAM-protected admin service (tenant plan management)
 pkg/server/             HTTP server, handlers, scoped.go (RLS middleware), data.go (chart API)
 pkg/server/static/      Frontend: CSS, JS, images (embedded via go:embed)
@@ -174,6 +174,7 @@ Tenant isolation layers:
 - `BASE_URL` — public base URL (e.g. https://devpulse.thingz.io)
 - `ANTHROPIC_API_KEY` — optional, enables LLM insights generation
 - `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`
+- `IMPORT_MODE` — `all` (default), `import` (skip deep rep), `reputation` (deep rep only)
 
 ## CI/CD
 
@@ -192,4 +193,4 @@ Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`
 
 - **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
 - **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to `ghcr.io/thingzio/`
-- **Deploy**: Cloud Run service + job + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`
+- **Deploy**: Cloud Run service + jobs (import + deeprep) + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`

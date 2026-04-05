@@ -13,9 +13,13 @@ Internet
    |     +-- Webhook endpoint (GitHub App)
    |     +-- Data API (30+ chart endpoints)
    |
-   +-- Cloud Run job (import mode, hourly)
+   +-- Cloud Run job (import mode, hourly, IMPORT_MODE=import)
    |     +-- Per-tenant repo import via GitHub API
    |     +-- LLM insights generation (Claude Haiku 4.5)
+   |
+   +-- Cloud Run job (deep rep mode, hourly at :30)
+   |     +-- Sequential deep reputation scoring
+   |     +-- Round-robin token rotation
    |
    +-- Cloud Run service (admin, IAM-gated)
    |     +-- Tenant plan management (upgrade/downgrade)
@@ -37,12 +41,13 @@ Cloud DNS       -> devpulse.thingz.io
 
 ## Compute
 
-Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run job), `devpulse-admin` (Cloud Run service, IAM-protected).
+Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run jobs: import + deeprep), `devpulse-admin` (Cloud Run service, IAM-protected).
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
 | Serve | Cloud Run service | 1-10 instances (always-on) | Public |
-| Import | Cloud Run job | Hourly, parallelism=3 (SKIP LOCKED queue) | Internal |
+| Import | Cloud Run job | Hourly, parallelism=3, IMPORT_MODE=import (SKIP LOCKED queue) | Internal |
+| Deep Rep | Cloud Run job | Hourly at :30, single-task, round-robin token rotation | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
 The serve service runs with `min_instance_count=1` to avoid cold-start latency on the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
@@ -93,7 +98,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | remote repo (GHCR proxy), <1GB | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 6 alert policies, email | free tier |
+| Cloud Monitoring | log-based metrics, 7 alert policies, email | free tier |
 | **Total** | | **~$46/mo** |
 
 ## Cost by Tenant Scale
@@ -331,7 +336,7 @@ All infrastructure is defined in `infra/saas/`:
 | `database.tf` | Cloud SQL instance, database, IAM users |
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
-| `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
+| `cloudrun.tf` | Cloud Run service (serve) + job (import) + job (deeprep) + service (admin, IAM-gated) |
 | `scheduler.tf` | Hourly import trigger |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
