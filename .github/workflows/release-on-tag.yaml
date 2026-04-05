@@ -52,11 +52,12 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOYER_SA }}
-          credentials_file_path: ${{ runner.temp }}/gha-creds.json
 
       - name: Configure Docker for Artifact Registry
         shell: bash
-        run: gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
+        run: |
+          gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
+          rm -f "$GOOGLE_GHA_CREDS_PATH"
 
       - name: Build and Push Images
         uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29  # v7.0.0
