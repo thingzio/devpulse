@@ -184,6 +184,97 @@ resource "google_cloud_run_v2_job" "import" {
           value = "claude-haiku-4-5-20251001"
         }
 
+        env {
+          name  = "IMPORT_MODE"
+          value = "import"
+        }
+
+        resources {
+          limits = {
+            cpu    = "1000m"
+            memory = "512Mi"
+          }
+        }
+
+        volume_mounts {
+          name       = "github-app-key"
+          mount_path = "/secrets/github-app-key"
+        }
+
+        volume_mounts {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
+
+      volumes {
+        name = "github-app-key"
+        secret {
+          secret = google_secret_manager_secret.github_app_key.secret_id
+          items {
+            version = "latest"
+            path    = "key.pem"
+          }
+        }
+      }
+
+      volumes {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.default.connection_name]
+        }
+      }
+    }
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_cloud_run_v2_job" "deeprep" {
+  name                = "${var.prefix}-deeprep"
+  location            = var.region
+  project             = var.project_id
+  deletion_protection = false
+
+  template {
+    task_count  = 1
+    parallelism = 1
+
+    template {
+      service_account = google_service_account.import.email
+      timeout         = "${var.deeprep_timeout}s"
+
+      vpc_access {
+        network_interfaces {
+          network    = google_compute_network.default.id
+          subnetwork = google_compute_subnetwork.default.id
+        }
+        egress = "PRIVATE_RANGES_ONLY"
+      }
+
+      containers {
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.ghcr.repository_id}/thingzio/devpulse-import:latest"
+
+        env {
+          name  = "DATABASE_URL"
+          value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+        }
+
+        env {
+          name  = "GITHUB_APP_ID"
+          value = var.github_app_id
+        }
+
+        env {
+          name  = "GITHUB_APP_KEY_PATH"
+          value = "/secrets/github-app-key/key.pem"
+        }
+
+        env {
+          name  = "IMPORT_MODE"
+          value = "reputation"
+        }
+
         resources {
           limits = {
             cpu    = "1000m"

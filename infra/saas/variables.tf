@@ -63,3 +63,9 @@ variable "import_parallelism" {
   type        = number
   default     = 3
 }
+
+variable "deeprep_timeout" {
+  description = "Timeout in seconds for the deep reputation job"
+  type        = number
+  default     = 7200
+}
