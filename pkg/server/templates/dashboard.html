@@ -57,17 +57,10 @@
           '<th class="num">Scored</th>' +
           '<th>Language</th>' +
           '<th>License</th>' +
-          '<th>Last Import</th>' +
           '<th></th></tr></thead><tbody>';
         repos.forEach(r => {
           const name = esc(r.org) + '/' + esc(r.repo);
           const url = 'https://github.com/' + encodeURIComponent(r.org) + '/' + encodeURIComponent(r.repo);
-          const importTs = r.last_import ? new Date(r.last_import) : null;
-          const imported = importTs
-            ? formatImportDate(r.last_import)
-            : '<span class="pending">Pending</span>';
-          const importTitle = importTs ? ' title="' + esc(importTs.toLocaleString()) + '"' : '';
-          const importSort = importTs ? importTs.getTime() : 0;
           const scored = r.scored > 0 ? r.scored + '/' + r.contributors : '';
           html += '<tr>' +
             '<td><a href="' + url + '" target="_blank">' + name + '</a></td>' +
@@ -79,7 +72,6 @@
             '<td class="num">' + scored + '</td>' +
             '<td>' + esc(r.language) + '</td>' +
             '<td>' + esc(r.license) + '</td>' +
-            '<td data-sort-value="' + importSort + '"' + importTitle + '>' + imported + '</td>' +
             '<td><button onclick="removeRepo(\'' + esc(r.org) + '\',\'' + esc(r.repo) + '\')">Remove</button></td></tr>';
         });
         html += '</tbody></table>';

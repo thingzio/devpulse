@@ -228,27 +228,13 @@
                                     <th class="num">Weekly</th>
                                     <th class="num">Contributors</th>
                                     <th class="num">Scored</th>
-                                    <th>Last Import</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
                     </div>
-                    <span class="insight-desc">Overview of all repositories in the selected scope and period.</span>
-                    {{ if .csv_export }}
-                    <div id="csv-export-all-wrap" style="padding: 1rem 0.5rem;">
-                        <button class="pdf-btn" id="csv-export-all" aria-label="Export all repos to CSV" title="Export all repos to CSV">
-                            <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                            </svg>
-                            <span class="pdf-label">Export All (CSV)</span>
-                        </button>
-                    </div>
-                    {{ end }}
+                    <span class="insight-desc">Overview of all repositories in the selected scope and period.{{ if .csv_export }} | <a href="#" id="csv-export-all" title="Export all repos to CSV">Export All (CSV)</a>{{ end }}</span>
                 </div>
             </article>
         </section>

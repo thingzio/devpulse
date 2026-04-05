@@ -292,7 +292,7 @@ $(function () {
         $("#csv-download").on("click", function () {
             if (!$(this).prop("disabled")) { downloadCSV(true); }
         });
-        $("#csv-export-all").on("click", function () { downloadCSV(false); });
+        $("#csv-export-all").on("click", function (e) { e.preventDefault(); downloadCSV(false); });
         var params = new URLSearchParams(window.location.search);
         var paramOrg = params.get("o") || "";
         var paramRepo = params.get("r") || "";
@@ -504,7 +504,7 @@ function applySelection(scope, item, skipPushState) {
     searchItem = item;
     $("#pdf-download").prop("disabled", scope !== "repo");
     $("#csv-download").prop("disabled", scope !== "repo");
-    $("#csv-export-all-wrap").toggle(scope !== "repo");
+    $("#csv-export-all").toggle(scope !== "repo");
     $(".header-term").html(item.value);
 
     resetCharts();
@@ -674,7 +674,7 @@ function resetSearch() {
     searchCriteria.reset();
     $("#pdf-download").prop("disabled", true);
     $("#csv-download").prop("disabled", true);
-    $("#csv-export-all-wrap").show();
+    $("#csv-export-all").show();
     clearFilterInputs();
     $("#bus-factor-val").text("—");
     $("#pony-factor-val").text("—");
@@ -1761,17 +1761,6 @@ function loadRepoOverview(url) {
 
             $row.append($('<td class="num"></td>').text(r.contributors.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.scored + '/' + r.contributors));
-            var $importCell = $('<td></td>');
-            if (r.last_import) {
-                var importDate = new Date(r.last_import);
-                $importCell.text(formatImportDate(r.last_import))
-                    .attr('title', importDate.toLocaleString())
-                    .attr('data-sort-value', importDate.getTime());
-            } else {
-                $importCell.text('Pending').css({'color': 'var(--gray)', 'font-style': 'italic'})
-                    .attr('data-sort-value', '0');
-            }
-            $row.append($importCell);
             var $removeBtn = $('<button style="color:var(--gray);font-size:0.85em;padding:2px 8px;border:1px solid var(--border-color);border-radius:var(--border-radius);cursor:pointer">Remove</button>');
             $removeBtn.on('click', function() { removeTrackedRepo(r.org, r.repo); });
             $row.append($('<td></td>').append($removeBtn));
