@@ -1711,6 +1711,21 @@ function loadRepoOverview(url) {
             }
         }
 
+        // Import errors banner
+        var $errBanner = $('#import-errors-banner');
+        if ($errBanner.length) {
+            $errBanner.empty();
+            var pausedRepos = (resp.repos || []).filter(function(r) { return r.import_errors >= 5; });
+            if (pausedRepos.length > 0) {
+                var names = pausedRepos.map(function(r) { return '<strong>' + r.org + '/' + r.repo + '</strong>'; });
+                $errBanner.html(
+                    '<div class="error" style="padding:0.6rem 1rem;margin:0">' +
+                    '<p style="margin:0"><b>Import paused</b> for ' + names.join(', ') +
+                    ' due to repeated failures. Remove the repo and re-add to retry.</p></div>'
+                );
+            }
+        }
+
         var data = resp.repos || [];
         $("#banner-repos").text(data.length.toLocaleString());
         var $tbody = $("#repo-overview-table tbody");
@@ -1723,17 +1738,24 @@ function loadRepoOverview(url) {
         $("#add-repo-panel").removeClass("spotlight");
         $.each(data, function (i, r) {
             var name = r.org + '/' + r.repo;
+            var paused = r.import_errors >= 5;
             var $nameCell = $('<td></td>');
-            if (r.last_import) {
+            if (r.last_import && !paused) {
                 var $link = $('<a href="#"></a>').text(name).on('click', function (e) {
                     e.preventDefault();
                     applySelection('repo', { value: name, label: name });
                 });
                 $nameCell.append($link);
             } else {
-                $nameCell.text(name).css('color', 'var(--gray)');
+                $nameCell.text(name).css('color', paused ? 'var(--red)' : 'var(--gray)');
+            }
+            if (paused) {
+                $nameCell.append(' <span style="font-size:0.75em;font-weight:700">(paused)</span>');
             }
             var $row = $('<tr></tr>');
+            if (paused) {
+                $row.css('color', 'var(--red)');
+            }
             $row.append($nameCell);
             $row.append($('<td class="num"></td>').text(r.stars.toLocaleString()));
             $row.append($('<td class="num"></td>').text(r.forks.toLocaleString()));
