@@ -42,13 +42,6 @@ func Run(ctx context.Context) error {
 	}
 }
 
-// RunDeepReputation runs only the deep reputation phase for all eligible repos.
-// TODO: implement in Task 2.
-func RunDeepReputation(ctx context.Context) error {
-	slog.Info("deep reputation mode not yet implemented")
-	return nil
-}
-
 // runImport iterates active repos via a SKIP LOCKED claim queue and imports each one.
 // Multiple concurrent executions safely share work without overlap.
 func runImport(ctx context.Context, mode string) error {

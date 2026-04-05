@@ -65,6 +65,21 @@ func TestTokenPoolNeverReturnsComma(t *testing.T) {
 	}
 }
 
+func TestTokenPoolUsageCounts(t *testing.T) {
+	pool := NewTokenPool("a", "b", "c")
+	for range 9 {
+		pool.Token()
+	}
+	counts := pool.UsageCounts()
+	assert.Equal(t, []int{3, 3, 3}, counts)
+}
+
+func TestTokenPoolUsageCountsEmpty(t *testing.T) {
+	pool := NewTokenPool("")
+	pool.Token() // no-op on empty pool
+	assert.Equal(t, []int{}, pool.UsageCounts())
+}
+
 func TestTokenPoolConcurrentAccess(t *testing.T) {
 	pool := NewTokenPool("tok1", "tok2", "tok3")
 
