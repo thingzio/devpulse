@@ -102,9 +102,13 @@ PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
 
 ## Import Pipeline
 
+The `devpulse-import` binary supports an `IMPORT_MODE` env var (`all`, `import`, or `reputation`) to select which phases run. Two Cloud Run jobs use the same binary with different modes:
+
 The import worker (`pkg/importer/`) uses a PostgreSQL SKIP LOCKED claim queue (`pkg/tenant/import.go`) to distribute repos across concurrent tasks. Cloud Run runs with `parallelism=3`, so 3 tasks process the queue concurrently with no overlap.
 
-Each claimed repo runs 7 phases:
+### Import Job (`IMPORT_MODE=import`)
+
+Each claimed repo runs 7 phases (skips deep reputation):
 
 1. **Metadata** — repo stars, forks, language, license, community profile
 2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)
@@ -113,6 +117,10 @@ Each claimed repo runs 7 phases:
 5. **Container versions** — image version tracking
 6. **Reputation** — shallow scores from local data
 7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
+
+### Deep Reputation Job (`IMPORT_MODE=reputation`)
+
+Runs deep reputation scoring only, with round-robin token rotation across all installations. This is a separate Cloud Run job (`devpulse-saas-deeprep`) using the same `devpulse-import` binary.
 
 Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 

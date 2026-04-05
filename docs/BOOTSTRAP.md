@@ -142,8 +142,8 @@ cd ../..  # back to repo root
 ./tools/setup-gh-env
 ```
 
-This creates 8 variables in the GitHub `saas` environment:
-`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
+This creates 9 variables in the GitHub `saas` environment:
+`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `DEEPREP_JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
 
 ## 9. Delegate DNS
 
@@ -192,6 +192,7 @@ open https://$DOMAIN
 
 # Trigger manual import (after signing in, installing app, and adding repos)
 gcloud run jobs execute devpulse-saas-import --region=$REGION
+# Note: the deep reputation job (devpulse-saas-deeprep) runs automatically at :30 via Cloud Scheduler
 
 # Check logs
 gcloud logging read 'resource.type="cloud_run_revision"' \
