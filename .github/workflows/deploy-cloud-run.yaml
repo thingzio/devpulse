@@ -43,6 +43,9 @@ jobs:
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
             --image="${AR}/thingzio/devpulse-import:${TAG}"
+          gcloud run jobs update ${{ vars.DEEPREP_JOB_NAME }} \
+            --region=${{ vars.REGION }} \
+            --image="${AR}/thingzio/devpulse-import:${TAG}"
           gcloud run services update ${{ vars.ADMIN_SERVICE_NAME }} \
             --region=${{ vars.REGION }} \
             --image="${AR}/thingzio/devpulse-admin:${TAG}"
