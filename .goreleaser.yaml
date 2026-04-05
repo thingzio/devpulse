@@ -71,7 +71,6 @@ kos:
       - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-site
     platforms:
       - linux/amd64
-      - linux/arm64
     tags:
       - latest
       - "{{.Tag}}"
@@ -84,7 +83,6 @@ kos:
       - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-import
     platforms:
       - linux/amd64
-      - linux/arm64
     tags:
       - latest
       - "{{.Tag}}"
@@ -97,7 +95,6 @@ kos:
       - us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images/devpulse-admin
     platforms:
       - linux/amd64
-      - linux/arm64
     tags:
       - latest
       - "{{.Tag}}"
