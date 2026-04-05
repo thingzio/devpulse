@@ -2,6 +2,7 @@ package tenant
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"sync"
 	"testing"
@@ -160,4 +161,84 @@ func TestClaimNextRepo_ConcurrentClaims(t *testing.T) {
 		seen[key] = true
 	}
 	assert.Len(t, seen, numRepos, "all repos should be claimed exactly once")
+}
+
+func TestIncrementImportErrors(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 5001, "erruser", "e@test.com", "")
+	require.NoError(t, err)
+
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
+	require.NoError(t, PrepareImportQueue(ctx, db))
+
+	claim, err := ClaimNextRepo(ctx, db, "exec-err")
+	require.NoError(t, err)
+
+	for i := 1; i <= 3; i++ {
+		require.NoError(t, IncrementImportErrors(ctx, db, claim.ID, "test error"))
+		var count int
+		require.NoError(t, db.QueryRowContext(ctx,
+			`SELECT import_errors FROM tenant_repo WHERE id = $1`, claim.ID).Scan(&count))
+		assert.Equal(t, i, count)
+	}
+
+	var lastErr string
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT COALESCE(import_last_error, '') FROM tenant_repo WHERE id = $1`, claim.ID).Scan(&lastErr))
+	assert.Equal(t, "test error", lastErr)
+}
+
+func TestResetImportErrors(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 5002, "resetuser", "r@test.com", "")
+	require.NoError(t, err)
+
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
+	require.NoError(t, PrepareImportQueue(ctx, db))
+
+	claim, err := ClaimNextRepo(ctx, db, "exec-reset")
+	require.NoError(t, err)
+
+	require.NoError(t, IncrementImportErrors(ctx, db, claim.ID, "some error"))
+	require.NoError(t, IncrementImportErrors(ctx, db, claim.ID, "another error"))
+
+	require.NoError(t, ResetImportErrors(ctx, db, claim.ID))
+
+	var count int
+	var lastErr sql.NullString
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT import_errors, import_last_error FROM tenant_repo WHERE id = $1`, claim.ID).Scan(&count, &lastErr))
+	assert.Equal(t, 0, count)
+	assert.False(t, lastErr.Valid, "import_last_error should be NULL after reset")
+}
+
+func TestClaimNextRepo_SkipsPausedRepos(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 5003, "skipuser", "s@test.com", "")
+	require.NoError(t, err)
+
+	repos := []OrgRepo{
+		{Org: "org", Repo: "broken"},
+		{Org: "org", Repo: "healthy"},
+	}
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, repos))
+
+	_, err = db.ExecContext(ctx,
+		`UPDATE tenant_repo SET import_errors = 5 WHERE tenant_id = $1 AND repo = 'broken'`, tn.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, PrepareImportQueue(ctx, db))
+
+	claim, err := ClaimNextRepo(ctx, db, "exec-skip")
+	require.NoError(t, err)
+	assert.Equal(t, "healthy", claim.Repo)
+
+	_, err = ClaimNextRepo(ctx, db, "exec-skip")
+	assert.True(t, errors.Is(err, ErrNoWork))
 }

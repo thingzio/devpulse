@@ -38,7 +38,7 @@ const claimNextRepoSQL = `
 	SET import_claimed_at = NOW(), import_claimed_by = $1
 	WHERE id = (
 		SELECT id FROM tenant_repo
-		WHERE active = TRUE AND import_claimed_at IS NULL
+		WHERE active = TRUE AND import_claimed_at IS NULL AND import_errors < 5
 		ORDER BY org, repo
 		LIMIT 1
 		FOR UPDATE SKIP LOCKED
@@ -48,6 +48,16 @@ const claimNextRepoSQL = `
 const markRepoDoneSQL = `
 	UPDATE tenant_repo
 	SET import_done_at = NOW()
+	WHERE id = $1`
+
+const incrementImportErrorsSQL = `
+	UPDATE tenant_repo
+	SET import_errors = import_errors + 1, import_last_error = $2
+	WHERE id = $1`
+
+const resetImportErrorsSQL = `
+	UPDATE tenant_repo
+	SET import_errors = 0, import_last_error = NULL
 	WHERE id = $1`
 
 // importResetMinutes returns the IMPORT_RESET_MINUTES env var or 30 as default.
@@ -102,6 +112,22 @@ func MarkRepoDone(ctx context.Context, db *sql.DB, id string) error {
 	_, err := db.ExecContext(ctx, markRepoDoneSQL, id)
 	if err != nil {
 		return fmt.Errorf("marking repo done: %w", err)
+	}
+	return nil
+}
+
+// IncrementImportErrors increments the consecutive error counter and stores the last error.
+func IncrementImportErrors(ctx context.Context, db *sql.DB, id, errMsg string) error {
+	if _, err := db.ExecContext(ctx, incrementImportErrorsSQL, id, errMsg); err != nil {
+		return fmt.Errorf("incrementing import errors: %w", err)
+	}
+	return nil
+}
+
+// ResetImportErrors clears the error counter and last error after a successful import.
+func ResetImportErrors(ctx context.Context, db *sql.DB, id string) error {
+	if _, err := db.ExecContext(ctx, resetImportErrorsSQL, id); err != nil {
+		return fmt.Errorf("resetting import errors: %w", err)
 	}
 	return nil
 }
