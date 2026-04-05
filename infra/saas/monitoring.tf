@@ -202,10 +202,17 @@ resource "google_logging_metric" "deeprep_scored" {
 
   metric_descriptor {
     metric_kind = "DELTA"
-    value_type  = "INT64"
+    value_type  = "DISTRIBUTION"
+    unit        = "1"
   }
 
   value_extractor = "EXTRACT(jsonPayload.scored)"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [10, 25, 50, 100, 200, 500]
+    }
+  }
 }
 
 resource "google_logging_metric" "deeprep_rate_limit_pauses" {
