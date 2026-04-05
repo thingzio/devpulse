@@ -121,7 +121,7 @@ func collectTokenPool(ctx context.Context, db *sql.DB, ghAppConfig *tenant.GitHu
 		return nil, fmt.Errorf("no active installations found")
 	}
 
-	rand.Shuffle(len(tokens), func(i, j int) { tokens[i], tokens[j] = tokens[j], tokens[i] }) //nolint:gosec // shuffle for load distribution, not security
+	rand.Shuffle(len(tokens), func(i, j int) { tokens[i], tokens[j] = tokens[j], tokens[i] })
 
 	return ghutil.NewTokenPool(tokens...), nil
 }
