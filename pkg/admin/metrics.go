@@ -200,6 +200,11 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MAX&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
+			label:  "Service: Startup Latency (ms, cold starts)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/container/startup_latencies"`, cfg.service),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MAX",
+		},
+		{
 			label:  "Service: CPU Utilization",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/container/cpu/utilizations"`, cfg.service),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MAX",
@@ -265,6 +270,11 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
+			label:  "Cloud SQL: Disk Utilization",
+			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/disk/utilization"`, cfg.dbID),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+		},
+		{
 			label:  "Sign-ins (daily)",
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-sign-ins"`,
 			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
@@ -281,6 +291,11 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			label:  "Admin: Request Count",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.admin),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_RATE&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.response_code_class",
+		},
+		{
+			label:  "Admin: Request Latency p99 (ms)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_latencies"`, cfg.admin),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MEAN",
 		},
 	}
 
@@ -368,7 +383,7 @@ func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics string) (st
 	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics for DevPulse, a multi-tenant SaaS running on Cloud Run + Cloud SQL PostgreSQL. Analyze the raw metrics and provide:
 
 1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
-2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 500ms, errors, deadlocks, disk growth).
+2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 1s, cold-start latency > 3s, errors, deadlocks, disk growth).
 3. **Recommended Actions** — Concrete steps to address any issues found.
 
 Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly.`
