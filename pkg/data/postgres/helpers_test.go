@@ -202,3 +202,59 @@ func TestBuildDailyTotalsExtra(t *testing.T) {
 		}
 	})
 }
+
+func TestAutoGranularity(t *testing.T) {
+	tests := []struct {
+		months int
+		want   Granularity
+	}{
+		{1, GranWeek},
+		{3, GranWeek},
+		{6, GranWeek},
+		{7, GranMonth},
+		{12, GranMonth},
+		{36, GranMonth},
+	}
+	for _, tc := range tests {
+		got := AutoGranularity(tc.months)
+		assert.Equal(t, tc.want, got, "months=%d", tc.months)
+	}
+}
+
+func TestGroupExpr(t *testing.T) {
+	tests := []struct {
+		gran Granularity
+		col  string
+		want string
+	}{
+		{GranMonth, "e.created_at", "SUBSTRING(e.created_at, 1, 7)"},
+		{GranWeek, "e.created_at", "TO_CHAR(date_trunc('week', e.created_at::date), 'YYYY-MM-DD')"},
+		{GranMonth, "e.date", "SUBSTRING(e.date, 1, 7)"},
+		{GranWeek, "e.date", "TO_CHAR(date_trunc('week', e.date::date), 'YYYY-MM-DD')"},
+	}
+	for _, tc := range tests {
+		got := GroupExpr(tc.gran, tc.col)
+		assert.Equal(t, tc.want, got)
+	}
+}
+
+func TestMomentumInterval(t *testing.T) {
+	assert.Equal(t, "4 weeks", MomentumInterval(GranWeek))
+	assert.Equal(t, "2 months", MomentumInterval(GranMonth))
+}
+
+func TestMomentumFormat(t *testing.T) {
+	assert.Equal(t, "'YYYY-MM-DD'", MomentumFormat(GranWeek))
+	assert.Equal(t, "'YYYY-MM'", MomentumFormat(GranMonth))
+}
+
+func TestTrendWindow(t *testing.T) {
+	assert.Equal(t, 4, TrendWindow(GranWeek))
+	assert.Equal(t, 3, TrendWindow(GranMonth))
+}
+
+func TestSinceDateWeeks(t *testing.T) {
+	result := sinceDateWeeks(9)
+	expected := time.Now().UTC().AddDate(0, 0, -63).Format("2006-01-02")
+	assert.Equal(t, expected, result)
+}

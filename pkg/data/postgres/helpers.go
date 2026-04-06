@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"time"
@@ -181,6 +182,63 @@ var (
 
 func sinceDate(months int) string {
 	return time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
+}
+
+// Granularity controls how time-series data is bucketed.
+type Granularity string
+
+const (
+	GranWeek  Granularity = "week"
+	GranMonth Granularity = "month"
+
+	// autoGranularityThreshold: time ranges up to this many months use weekly grouping.
+	autoGranularityThreshold = 6
+)
+
+// AutoGranularity selects weekly or monthly grouping based on the time window.
+func AutoGranularity(months int) Granularity {
+	if months <= autoGranularityThreshold {
+		return GranWeek
+	}
+	return GranMonth
+}
+
+// GroupExpr returns the SQL expression that buckets a column by granularity.
+//   - GranMonth: "SUBSTRING(col, 1, 7)"          → "2024-03"
+//   - GranWeek:  "TO_CHAR(date_trunc(...))"       → "2024-03-04" (Monday)
+func GroupExpr(g Granularity, col string) string {
+	if g == GranWeek {
+		return fmt.Sprintf("TO_CHAR(date_trunc('week', %s::date), 'YYYY-MM-DD')", col)
+	}
+	return fmt.Sprintf("SUBSTRING(%s, 1, 7)", col)
+}
+
+// MomentumInterval returns the SQL interval for the rolling momentum window.
+func MomentumInterval(g Granularity) string {
+	if g == GranWeek {
+		return "4 weeks"
+	}
+	return "2 months"
+}
+
+// MomentumFormat returns the TO_CHAR format for momentum date comparison.
+func MomentumFormat(g Granularity) string {
+	if g == GranWeek {
+		return "'YYYY-MM-DD'"
+	}
+	return "'YYYY-MM'"
+}
+
+// TrendWindow returns the number of data points for the moving average.
+func TrendWindow(g Granularity) int {
+	if g == GranWeek {
+		return 4
+	}
+	return 3
+}
+
+func sinceDateWeeks(weeks int) string {
+	return time.Now().UTC().AddDate(0, 0, -weeks*7).Format("2006-01-02")
 }
 
 func rollbackTransaction(tx *sql.Tx) {
