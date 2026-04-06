@@ -99,7 +99,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 8 alert policies, email | free tier |
+| Cloud Monitoring | log-based metrics, 9 alert policies, email | free tier |
 | **Total** | | **~$47/mo** |
 
 ## Cost by Tenant Scale

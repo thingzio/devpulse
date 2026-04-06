@@ -444,6 +444,28 @@ resource "google_monitoring_alert_policy" "import_repo_errors" {
   }
 }
 
+resource "google_monitoring_alert_policy" "db_vacuum_lag" {
+  display_name          = "${var.prefix}-db-vacuum-lag"
+  project               = var.project_id
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email.name]
+
+  conditions {
+    display_name = "Oldest transaction age > 200M"
+    condition_threshold {
+      filter          = "resource.type = \"cloudsql_database\" AND resource.labels.database_id = \"${var.project_id}:${google_sql_database_instance.default.name}\" AND metric.type = \"cloudsql.googleapis.com/database/postgresql/vacuum/oldest_transaction_age\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 200000000
+      duration        = "300s"
+
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_MEAN"
+      }
+    }
+  }
+}
+
 resource "google_monitoring_alert_policy" "deeprep_failure" {
   display_name          = "${var.prefix}-deeprep-failure"
   project               = var.project_id
