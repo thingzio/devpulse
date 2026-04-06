@@ -11,15 +11,18 @@ import (
 func TestGetReleaseCadence_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 6)
+	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Total {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetReleaseCadence_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReleaseCadence(ctx, nil, nil, nil, 6)
+	_, err := s.GetReleaseCadence(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -34,19 +37,18 @@ func TestGetReleaseCadence_WithData(t *testing.T) {
 		('org1', 'repo1', 'v1.1.0', 'Release 1.1', '2025-02-10T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 24)
+	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 2)
 
 	// January: 2 total (1 stable + 1 prerelease)
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 2, series.Total[0])
-	assert.Equal(t, 1, series.Stable[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Total[idx])
+	assert.Equal(t, 1, series.Stable[idx])
 
 	// February: 1 total, 1 stable
-	assert.Equal(t, "2025-02", series.Labels[1])
-	assert.Equal(t, 1, series.Total[1])
-	assert.Equal(t, 1, series.Stable[1])
+	idx2 := findPeriodIdx(t, series.Labels, "2025-02")
+	assert.Equal(t, 1, series.Total[idx2])
+	assert.Equal(t, 1, series.Stable[idx2])
 }
 
 func TestGetReleaseCadence_WithFilter(t *testing.T) {
@@ -60,25 +62,28 @@ func TestGetReleaseCadence_WithFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	series, err := store.GetReleaseCadence(ctx, &org, nil, nil, 24)
+	series, err := store.GetReleaseCadence(ctx, &org, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 1, series.Total[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.Total[idx])
 }
 
 func TestGetReleaseDownloads_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReleaseDownloads(ctx, nil, nil, 6)
+	_, err := s.GetReleaseDownloads(ctx, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetReleaseDownloads_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetReleaseDownloads(ctx, nil, nil, 6)
+	series, err := store.GetReleaseDownloads(ctx, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Downloads {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetReleaseDownloads_WithData(t *testing.T) {
@@ -98,15 +103,14 @@ func TestGetReleaseDownloads_WithData(t *testing.T) {
 		('org1', 'repo1', 'v1.1.0', 'app_linux_amd64.tar.gz', 'application/gzip', 1000, 30)`)
 	require.NoError(t, err)
 
-	series, err := store.GetReleaseDownloads(ctx, nil, nil, 24)
+	series, err := store.GetReleaseDownloads(ctx, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 2)
 
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 200, series.Downloads[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 200, series.Downloads[idx])
 
-	assert.Equal(t, "2025-02", series.Labels[1])
-	assert.Equal(t, 30, series.Downloads[1])
+	idx2 := findPeriodIdx(t, series.Labels, "2025-02")
+	assert.Equal(t, 30, series.Downloads[idx2])
 }
 
 func TestGetReleaseDownloads_WithFilter(t *testing.T) {
@@ -126,23 +130,23 @@ func TestGetReleaseDownloads_WithFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	series, err := store.GetReleaseDownloads(ctx, &org, nil, 24)
+	series, err := store.GetReleaseDownloads(ctx, &org, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 100, series.Downloads[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 100, series.Downloads[idx])
 }
 
 func TestGetReleaseDownloadsByTag_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReleaseDownloadsByTag(ctx, nil, nil, 6)
+	_, err := s.GetReleaseDownloadsByTag(ctx, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetReleaseDownloadsByTag_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 6)
+	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 180)
 	require.NoError(t, err)
 	assert.Empty(t, series.Tags)
 }
@@ -180,7 +184,7 @@ func TestGetReleaseDownloadsByTag_WithData(t *testing.T) {
 		('org1', 'repo1', 'v1.1.0', 'app.tar.gz', 'application/gzip', 100, 100)`)
 	require.NoError(t, err)
 
-	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 24)
+	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 730)
 	require.NoError(t, err)
 
 	// 9 recent (v0.3.0..v1.1.0) + top (v0.1.0) = 10
@@ -203,10 +207,11 @@ func TestGetReleaseCadence_WithDeployments(t *testing.T) {
 		VALUES ('org1', 'repo1', 'v1.0', 'v1.0', '2025-01-15T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 24)
+	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
-	assert.Equal(t, 1, series.Deployments[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.Deployments[idx])
 }
 
 func TestGetReleaseCadence_MergeFallback(t *testing.T) {
@@ -224,10 +229,11 @@ func TestGetReleaseCadence_MergeFallback(t *testing.T) {
 
 	org := "org2"
 	repo := "repo2"
-	series, err := store.GetReleaseCadence(ctx, &org, &repo, nil, 24)
+	series, err := store.GetReleaseCadence(ctx, &org, &repo, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
-	assert.Equal(t, 2, series.Deployments[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Deployments[idx])
 }
 
 func TestGetReleaseDownloadsByTag_Dedup(t *testing.T) {
@@ -247,7 +253,7 @@ func TestGetReleaseDownloadsByTag_Dedup(t *testing.T) {
 		('org1', 'repo1', 'v1.2.0', 'app.tar.gz', 'application/gzip', 100, 20)`)
 	require.NoError(t, err)
 
-	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 24)
+	series, err := store.GetReleaseDownloadsByTag(ctx, nil, nil, 730)
 	require.NoError(t, err)
 
 	// Only 3 entries -- no duplicate for v1.1.0

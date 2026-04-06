@@ -11,17 +11,19 @@ import (
 func TestGetContainerActivity_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetContainerActivity(ctx, nil, nil, 6)
+	_, err := s.GetContainerActivity(ctx, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetContainerActivity_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetContainerActivity(ctx, nil, nil, 6)
+	series, err := store.GetContainerActivity(ctx, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
-	assert.Empty(t, series.Versions)
+	require.NotNil(t, series)
+	for _, v := range series.Versions {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetContainerActivity_WithData(t *testing.T) {
@@ -35,13 +37,12 @@ func TestGetContainerActivity_WithData(t *testing.T) {
 		('org1', 'repo1', 'pkg1', 3, 'v2.0.0', '2025-02-10T10:00:00Z')`)
 	require.NoError(t, err)
 
-	series, err := store.GetContainerActivity(ctx, nil, nil, 24)
+	series, err := store.GetContainerActivity(ctx, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 2)
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 2, series.Versions[0])
-	assert.Equal(t, "2025-02", series.Labels[1])
-	assert.Equal(t, 1, series.Versions[1])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Versions[idx])
+	idx2 := findPeriodIdx(t, series.Labels, "2025-02")
+	assert.Equal(t, 1, series.Versions[idx2])
 }
 
 func TestGetContainerActivity_FilterByOrg(t *testing.T) {
@@ -55,8 +56,8 @@ func TestGetContainerActivity_FilterByOrg(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	series, err := store.GetContainerActivity(ctx, &org, nil, 24)
+	series, err := store.GetContainerActivity(ctx, &org, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 1, series.Versions[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.Versions[idx])
 }

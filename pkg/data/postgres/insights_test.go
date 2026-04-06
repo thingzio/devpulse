@@ -14,7 +14,7 @@ func TestGetInsightsSummary_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	summary, err := store.GetInsightsSummary(ctx, nil, nil, nil, 6)
+	summary, err := store.GetInsightsSummary(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
 	assert.Equal(t, 0, summary.BusFactor)
 	assert.Equal(t, 0, summary.PonyFactor)
@@ -26,7 +26,7 @@ func TestGetInsightsSummary_EmptyDB(t *testing.T) {
 func TestGetInsightsSummary_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetInsightsSummary(ctx, nil, nil, nil, 6)
+	_, err := s.GetInsightsSummary(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -69,7 +69,7 @@ func TestGetInsightsSummary_WithData(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	summary, err := store.GetInsightsSummary(ctx, nil, nil, nil, 24)
+	summary, err := store.GetInsightsSummary(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, summary.BusFactor, 1)
 	assert.GreaterOrEqual(t, summary.PonyFactor, 1)
@@ -84,15 +84,18 @@ func TestGetContributorRetention_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 6)
+	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.New {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetContributorRetention_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetContributorRetention(ctx, nil, nil, nil, 6)
+	_, err := s.GetContributorRetention(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -110,34 +113,36 @@ func TestGetContributorRetention_WithData(t *testing.T) {
 		('org1', 'repo1', 'bob', 'pr', '2025-02-15', 'http://b', '', '')`)
 	require.NoError(t, err)
 
-	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 24)
+	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 2)
 
 	// January: alice is new
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 1, series.New[0])
-	assert.Equal(t, 0, series.Returning[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.New[idx])
+	assert.Equal(t, 0, series.Returning[idx])
 
 	// February: bob is new, alice is returning
-	assert.Equal(t, "2025-02", series.Labels[1])
-	assert.Equal(t, 1, series.New[1])
-	assert.Equal(t, 1, series.Returning[1])
+	idx2 := findPeriodIdx(t, series.Labels, "2025-02")
+	assert.Equal(t, 1, series.New[idx2])
+	assert.Equal(t, 1, series.Returning[idx2])
 }
 
 func TestGetPRReviewRatio_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 6)
+	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.PRs {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetPRReviewRatio_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetPRReviewRatio(ctx, nil, nil, nil, 6)
+	_, err := s.GetPRReviewRatio(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -156,26 +161,29 @@ func TestGetPRReviewRatio_WithData(t *testing.T) {
 		('org1', 'repo1', 'bob', 'pr_review', '2025-01-12', 'http://b3', '', '')`)
 	require.NoError(t, err)
 
-	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 24)
+	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 2, series.PRs[0])
-	assert.Equal(t, 3, series.Reviews[0])
-	assert.InDelta(t, 1.5, series.Ratio[0], 0.01)
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.PRs[idx])
+	assert.Equal(t, 3, series.Reviews[idx])
+	assert.InDelta(t, 1.5, series.Ratio[idx], 0.01)
 }
 
 func TestGetTimeToMerge_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 6)
+	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Count {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetTimeToMerge_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetTimeToMerge(ctx, nil, nil, nil, 6)
+	_, err := s.GetTimeToMerge(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -192,25 +200,28 @@ func TestGetTimeToMerge_WithData(t *testing.T) {
 		('org1', 'repo1', 'alice', 'pr', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-18T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
-	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 24)
+	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 2, series.Count[0])
-	assert.InDelta(t, 3.5, series.AvgDays[0], 0.01) // (5+2)/2
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Count[idx])
+	assert.InDelta(t, 3.5, series.AvgDays[idx], 0.01) // (5+2)/2
 }
 
 func TestGetTimeToClose_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 6)
+	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Count {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetTimeToClose_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetTimeToClose(ctx, nil, nil, nil, 6)
+	_, err := s.GetTimeToClose(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -227,26 +238,29 @@ func TestGetTimeToClose_WithData(t *testing.T) {
 		('org1', 'repo1', 'alice', 'issue', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-14T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
-	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 24)
+	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, 2, series.Count[0])
-	assert.InDelta(t, 5.5, series.AvgDays[0], 0.01) // (5+6)/2
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Count[idx])
+	assert.InDelta(t, 5.5, series.AvgDays[idx], 0.01) // (5+6)/2
 }
 
 func TestGetTimeToRestoreBugs_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetTimeToRestoreBugs(ctx, nil, nil, nil, 6)
+	_, err := s.GetTimeToRestoreBugs(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetTimeToRestoreBugs_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 6)
+	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Count {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
@@ -276,27 +290,29 @@ func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-02-17', 'http://c', '', 'bug', 'closed', '2025-02-17T10:00:00Z', '2025-02-20T10:00:00Z')`)
 	require.NoError(t, err)
 
-	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 24)
+	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1) // Only January has a qualifying bug
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 1, series.Count[0])
-	assert.InDelta(t, 1.0, series.AvgDays[0], 0.01) // 1 day
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.Count[idx])
+	assert.InDelta(t, 1.0, series.AvgDays[idx], 0.01) // 1 day
 }
 
 func TestGetChangeFailureRate_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetChangeFailureRate(ctx, nil, nil, nil, 6)
+	_, err := s.GetChangeFailureRate(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetChangeFailureRate_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 6)
+	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Failures {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetChangeFailureRate_WithData(t *testing.T) {
@@ -321,7 +337,7 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-16', 'http://b', '', '', 'merged', '2025-01-16T10:00:00Z', 'Revert "Add feature"')`)
 	require.NoError(t, err)
 
-	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 24)
+	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
 	assert.Equal(t, "2025-01", series.Labels[0])
@@ -333,16 +349,19 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 func TestGetReviewLatency_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReviewLatency(ctx, nil, nil, nil, 6)
+	_, err := s.GetReviewLatency(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetReviewLatency_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 6)
+	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Count {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetReviewLatency_WithData(t *testing.T) {
@@ -367,7 +386,7 @@ func TestGetReviewLatency_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'bob', 'pr_review', '2025-01-11', 'http://c', '', '', 42, '2025-01-10T22:00:00Z')`)
 	require.NoError(t, err)
 
-	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 24)
+	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
 
@@ -387,16 +406,19 @@ func TestGetReviewLatency_WithData(t *testing.T) {
 func TestGetPRSizeDistribution_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetPRSizeDistribution(ctx, nil, nil, nil, 6)
+	_, err := s.GetPRSizeDistribution(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetPRSizeDistribution_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 6)
+	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Small {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetPRSizeDistribution_WithData(t *testing.T) {
@@ -426,29 +448,31 @@ func TestGetPRSizeDistribution_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-13', 'http://d', '', '', 'merged', '2025-01-13T10:00:00Z', 1000, 500)`)
 	require.NoError(t, err)
 
-	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 24)
+	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 1)
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 1, series.Small[0])
-	assert.Equal(t, 1, series.Medium[0])
-	assert.Equal(t, 1, series.Large[0])
-	assert.Equal(t, 1, series.XLarge[0])
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 1, series.Small[idx])
+	assert.Equal(t, 1, series.Medium[idx])
+	assert.Equal(t, 1, series.Large[idx])
+	assert.Equal(t, 1, series.XLarge[idx])
 }
 
 func TestGetContributorMomentum_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetContributorMomentum(ctx, nil, nil, nil, 6)
+	_, err := s.GetContributorMomentum(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetContributorMomentum_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 6)
+	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.Active {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetContributorMomentum_WithData(t *testing.T) {
@@ -469,34 +493,34 @@ func TestGetContributorMomentum_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-02-10', 'http://c', '', '')`)
 	require.NoError(t, err)
 
-	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 24)
+	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, series.Labels, 2)
 
 	// Jan: 2 active (alice + bob)
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 2, series.Active[0])
-	assert.Equal(t, 0, series.Delta[0]) // first month, delta=0
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Active[idx])
 
 	// Feb: still 2 active (rolling 3-month window includes Jan, so bob is still counted)
-	assert.Equal(t, "2025-02", series.Labels[1])
-	assert.Equal(t, 2, series.Active[1])
-	assert.Equal(t, 0, series.Delta[1])
+	idx2 := findPeriodIdx(t, series.Labels, "2025-02")
+	assert.Equal(t, 2, series.Active[idx2])
 }
 
 func TestGetContributorFunnel_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetContributorFunnel(ctx, nil, nil, nil, 6)
+	_, err := s.GetContributorFunnel(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetContributorFunnel_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 6)
+	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, series.Labels)
+	require.NotNil(t, series)
+	for _, v := range series.FirstComment {
+		assert.Equal(t, 0, v)
+	}
 }
 
 func TestGetContributorFunnel_WithData(t *testing.T) {
@@ -518,7 +542,7 @@ func TestGetContributorFunnel_WithData(t *testing.T) {
 		VALUES ('org1', 'repo1', 'bob', 'issue_comment', '2025-01-08', 'http://c', '', '')`)
 	require.NoError(t, err)
 
-	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 24)
+	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
 
@@ -539,14 +563,14 @@ func TestGetContributorFunnel_WithData(t *testing.T) {
 func TestGetContributorProfile_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetContributorProfile(ctx, "alice", nil, nil, nil, 6)
+	_, err := s.GetContributorProfile(ctx, "alice", nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetContributorProfile_EmptyUsername(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	_, err := store.GetContributorProfile(ctx, "", nil, nil, nil, 6)
+	_, err := store.GetContributorProfile(ctx, "", nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -557,7 +581,7 @@ func TestGetContributorProfile_EmptyDB(t *testing.T) {
 	_, err := store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name, entity) VALUES ('alice', 'Alice', 'ACME')`)
 	require.NoError(t, err)
 
-	series, err := store.GetContributorProfile(ctx, "alice", nil, nil, nil, 6)
+	series, err := store.GetContributorProfile(ctx, "alice", nil, nil, nil, 180)
 	require.NoError(t, err)
 	assert.Len(t, series.Metrics, 9)
 	assert.Len(t, series.Values, 9)
@@ -605,7 +629,7 @@ func TestGetContributorProfile_WithData(t *testing.T) {
 		ON CONFLICT DO NOTHING`)
 	require.NoError(t, err)
 
-	series, err := store.GetContributorProfile(ctx, "alice", nil, nil, nil, 24)
+	series, err := store.GetContributorProfile(ctx, "alice", nil, nil, nil, 730)
 	require.NoError(t, err)
 	assert.Len(t, series.Metrics, 9)
 	// alice: PRs opened = 4 (3 open + 1 merged)
@@ -624,7 +648,7 @@ func TestGetAgingPRs_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	s := setupTestDB(t)
 
-	res, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	res, err := s.GetAgingPRs(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.GreaterOrEqual(t, res.TotalOpen, 0)
@@ -635,25 +659,25 @@ func TestGetAgingPRs_EmptyDB(t *testing.T) {
 func TestGetAgingPRs_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetAgingPRs(ctx, nil, nil, nil, 6)
+	_, err := s.GetAgingPRs(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetUnansweredRate_NilDB(t *testing.T) {
 	s := &Store{}
-	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 6)
+	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
 func TestGetResponseSLO_NilDB(t *testing.T) {
 	s := &Store{}
-	_, err := s.GetResponseSLO(context.Background(), nil, nil, nil, 6)
+	_, err := s.GetResponseSLO(context.Background(), nil, nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
 func TestGetPortfolioSummary_NilDB(t *testing.T) {
 	s := &Store{}
-	_, err := s.GetPortfolioSummary(context.Background(), nil, nil, 6)
+	_, err := s.GetPortfolioSummary(context.Background(), nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
@@ -665,4 +689,15 @@ func TestGetSignals_NilDB(t *testing.T) {
 
 func padDay(i int) string {
 	return fmt.Sprintf("%02d", (i%28)+1)
+}
+
+func findPeriodIdx(t *testing.T, labels []string, target string) int {
+	t.Helper()
+	for i, l := range labels {
+		if l == target {
+			return i
+		}
+	}
+	t.Fatalf("period %q not found in labels %v", target, labels)
+	return -1
 }
