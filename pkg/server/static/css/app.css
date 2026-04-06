@@ -1257,6 +1257,13 @@ a.link {
 .insights-summary .insight-val {
   font-size: 4rem;
 }
+#portfolio-summary-container {
+  padding: 0.5rem 1rem;
+}
+#portfolio-summary-container .insight-card {
+  gap: 2px;
+  padding: 0.5rem 0;
+}
 #portfolio-summary-container .insight-val {
   font-size: 2rem;
 }
