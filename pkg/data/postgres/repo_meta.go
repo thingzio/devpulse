@@ -228,12 +228,12 @@ func (s *Store) GetRepoMetas(ctx context.Context, org, repo *string) ([]*data.Re
 	return list, nil
 }
 
-func (s *Store) GetRepoOverview(ctx context.Context, org *string, months int) ([]*data.RepoOverview, error) {
+func (s *Store) GetRepoOverview(ctx context.Context, org *string, days int) ([]*data.RepoOverview, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectRepoOverviewSQL, since, org)
 	if err != nil {

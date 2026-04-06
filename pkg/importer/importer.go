@@ -221,7 +221,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 	}
 
 	slog.Info("phase: events", "org", org, "repo", repo)
-	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 6); return err }); err != nil {
+	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 180); return err }); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}
@@ -290,7 +290,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 }
 
 const (
-	insightsPeriodMonths       = 3
+	insightsPeriodWeeks        = 9
 	insightsMinAgeDays         = 7
 	insightsEventDeltaPct      = 0.10
 	deepReputationDefaultLimit = 100
@@ -331,6 +331,8 @@ func checkInsightStaleness(generatedAt string, savedEventCount, currentEventCoun
 }
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
+	insightDays := insightsPeriodWeeks * 7 // 63 days covers the 9-week analysis window
+
 	// Check staleness: age gate + event delta gate
 	generatedAt, err := store.GetRepoInsightsGeneratedAt(ctx, org, repo)
 	if err != nil {
@@ -343,7 +345,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 
 	// Get current event count from summary (cheap DB query)
-	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightsPeriodMonths)
+	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightDays)
 	if err != nil {
 		return fmt.Errorf("getting insights summary for staleness check: %w", err)
 	}
@@ -355,21 +357,21 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 	slog.Info("regenerating insights", "org", org, "repo", repo, "reason", reason)
 
-	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
+	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightDays)
 
-	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodMonths)
+	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodWeeks)
 	if err != nil {
 		return fmt.Errorf("generating insights: %w", err)
 	}
 
 	ri := &data.RepoInsights{
-		Org:          org,
-		Repo:         repo,
-		Insights:     insights,
-		PeriodMonths: insightsPeriodMonths,
-		Model:        model,
-		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
-		EventCount:   summary.Events,
+		Org:         org,
+		Repo:        repo,
+		Insights:    insights,
+		PeriodWeeks: insightsPeriodWeeks,
+		Model:       model,
+		GeneratedAt: time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		EventCount:  summary.Events,
 	}
 
 	if err := store.SaveRepoInsights(ctx, org, repo, ri); err != nil {

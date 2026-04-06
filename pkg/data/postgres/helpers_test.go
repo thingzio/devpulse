@@ -10,25 +10,37 @@ import (
 )
 
 func TestSinceDate(t *testing.T) {
-	tests := []struct {
-		months int
-	}{
-		{1}, {3}, {6}, {12},
-	}
-	for _, tc := range tests {
-		got := sinceDate(tc.months)
-		_, err := time.Parse("2006-01-02", got)
-		require.NoError(t, err, "sinceDate(%d) returned non-date %q", tc.months, got)
-
-		expected := time.Now().UTC().AddDate(0, -tc.months, 0)
-		// Allow ±1 day tolerance for clock skew at midnight.
-		parsed, _ := time.Parse("2006-01-02", got)
+	t.Run("monthly range returns expected date", func(t *testing.T) {
+		// 365 days > threshold → no Monday-snapping
+		got := sinceDate(365)
+		parsed, err := time.Parse("2006-01-02", got)
+		require.NoError(t, err)
+		expected := time.Now().UTC().AddDate(0, 0, -365)
 		diff := expected.Sub(parsed)
 		if diff < 0 {
 			diff = -diff
 		}
-		assert.Less(t, diff.Hours(), 48.0, "sinceDate(%d) too far from expected", tc.months)
-	}
+		assert.Less(t, diff.Hours(), 48.0)
+	})
+
+	t.Run("weekly range snaps to Monday", func(t *testing.T) {
+		// 14 days ≤ threshold → snaps to previous Monday
+		got := sinceDate(14)
+		parsed, err := time.Parse("2006-01-02", got)
+		require.NoError(t, err)
+		assert.Equal(t, time.Monday, parsed.Weekday(),
+			"sinceDate(14) should snap to Monday, got %s (%s)", got, parsed.Weekday())
+	})
+
+	t.Run("all weekly ranges snap to Monday", func(t *testing.T) {
+		for _, days := range []int{14, 21, 28, 90, 180} {
+			got := sinceDate(days)
+			parsed, err := time.Parse("2006-01-02", got)
+			require.NoError(t, err)
+			assert.Equal(t, time.Monday, parsed.Weekday(),
+				"sinceDate(%d) = %s should be Monday", days, got)
+		}
+	})
 }
 
 func TestCleanEntityName(t *testing.T) {
@@ -201,4 +213,109 @@ func TestBuildDailyTotalsExtra(t *testing.T) {
 			assert.Len(t, parts, 3)
 		}
 	})
+}
+
+func TestAutoGranularity(t *testing.T) {
+	tests := []struct {
+		days int
+		want Granularity
+	}{
+		{14, GranWeek},
+		{28, GranWeek},
+		{90, GranWeek},
+		{180, GranWeek},
+		{181, GranMonth},
+		{365, GranMonth},
+	}
+	for _, tc := range tests {
+		got := AutoGranularity(tc.days)
+		assert.Equal(t, tc.want, got, "days=%d", tc.days)
+	}
+}
+
+func TestGroupExpr(t *testing.T) {
+	tests := []struct {
+		gran Granularity
+		col  string
+		want string
+	}{
+		{GranMonth, "e.created_at", "SUBSTRING(e.created_at, 1, 7)"},
+		{GranWeek, "e.created_at", "TO_CHAR(date_trunc('week', e.created_at::date), 'YYYY-MM-DD')"},
+		{GranMonth, "e.date", "SUBSTRING(e.date, 1, 7)"},
+		{GranWeek, "e.date", "TO_CHAR(date_trunc('week', e.date::date), 'YYYY-MM-DD')"},
+	}
+	for _, tc := range tests {
+		got := GroupExpr(tc.gran, tc.col)
+		assert.Equal(t, tc.want, got)
+	}
+}
+
+func TestMomentumInterval(t *testing.T) {
+	assert.Equal(t, "4 weeks", MomentumInterval(GranWeek))
+	assert.Equal(t, "2 months", MomentumInterval(GranMonth))
+}
+
+func TestMomentumFormat(t *testing.T) {
+	assert.Equal(t, "'YYYY-MM-DD'", MomentumFormat(GranWeek))
+	assert.Equal(t, "'YYYY-MM'", MomentumFormat(GranMonth))
+}
+
+func TestTrendWindow(t *testing.T) {
+	assert.Equal(t, 4, TrendWindow(GranWeek))
+	assert.Equal(t, 3, TrendWindow(GranMonth))
+}
+
+func TestSinceDateWeeks(t *testing.T) {
+	result := sinceDateWeeks(9)
+	expected := time.Now().UTC().AddDate(0, 0, -63).Format("2006-01-02")
+	assert.Equal(t, expected, result)
+}
+
+func TestGeneratePeriods_Weekly(t *testing.T) {
+	periods := generatePeriods(28) // 4 weeks
+	// Should produce 4-5 entries (4 full weeks + possible current partial)
+	assert.GreaterOrEqual(t, len(periods), 4)
+	assert.LessOrEqual(t, len(periods), 6)
+	for _, p := range periods {
+		assert.Len(t, p, 10, "weekly period should be YYYY-MM-DD: %s", p)
+		parsed, err := time.Parse("2006-01-02", p)
+		require.NoError(t, err)
+		assert.Equal(t, time.Monday, parsed.Weekday(), "period %s should be Monday", p)
+	}
+}
+
+func TestGeneratePeriods_Monthly(t *testing.T) {
+	periods := generatePeriods(365) // 12 months
+	assert.GreaterOrEqual(t, len(periods), 12)
+	assert.LessOrEqual(t, len(periods), 14)
+	for _, p := range periods {
+		assert.Len(t, p, 7, "monthly period should be YYYY-MM: %s", p)
+	}
+}
+
+func TestGapFiller(t *testing.T) {
+	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+
+	intData := gf.fillInt([]int{10, 30})
+	found := 0
+	for _, v := range intData {
+		if v > 0 {
+			found++
+		}
+	}
+	assert.Equal(t, 2, found, "should have exactly 2 non-zero values")
+	assert.Equal(t, len(gf.periods), len(intData), "output length should match periods")
+
+	floatData := gf.fillFloat64([]float64{1.5, 3.5})
+	assert.Equal(t, len(gf.periods), len(floatData))
+}
+
+func TestGapFillSlice(t *testing.T) {
+	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+
+	intResult := gapFillSlice(gf, []int{5, 15})
+	assert.Equal(t, len(gf.periods), len(intResult))
+
+	floatResult := gapFillSlice(gf, []float64{2.5, 7.5})
+	assert.Equal(t, len(gf.periods), len(floatResult))
 }

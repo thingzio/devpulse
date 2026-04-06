@@ -147,7 +147,7 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 
 	slog.Info("scoring reputation", "users", len(usernames))
 
-	since := sinceDate(data.EventAgeMonthsDefault)
+	since := sinceDate(data.EventAgeDaysDefault)
 
 	stats, err := s.computeGlobalStats(ctx, since)
 	if err != nil {
@@ -297,7 +297,7 @@ func (s *Store) ComputeDeepReputation(ctx context.Context, token, username strin
 		return nil, errors.New("token and username are required")
 	}
 
-	since := sinceDate(data.EventAgeMonthsDefault)
+	since := sinceDate(data.EventAgeDaysDefault)
 
 	stats, err := s.computeGlobalStats(ctx, since)
 	if err != nil {
@@ -359,12 +359,12 @@ func (s *Store) ComputeDeepReputation(ctx context.Context, token, username strin
 	}, nil
 }
 
-func (s *Store) GetReputationDistribution(ctx context.Context, org, repo, entity *string, months int) (*data.ReputationDistribution, error) {
+func (s *Store) GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationDistribution, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectReputationSQL, org, repo, entity, since)
 	if err != nil {

@@ -13,7 +13,7 @@ func TestGetReleaseCadence_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetReleaseCadence_NilDB(t *testing.T) {
@@ -36,15 +36,15 @@ func TestGetReleaseCadence_WithData(t *testing.T) {
 
 	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 2)
+	require.Len(t, series.Labels, 2)
 
 	// January: 2 total (1 stable + 1 prerelease)
-	assert.Equal(t, "2025-01", series.Months[0])
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 2, series.Total[0])
 	assert.Equal(t, 1, series.Stable[0])
 
 	// February: 1 total, 1 stable
-	assert.Equal(t, "2025-02", series.Months[1])
+	assert.Equal(t, "2025-02", series.Labels[1])
 	assert.Equal(t, 1, series.Total[1])
 	assert.Equal(t, 1, series.Stable[1])
 }
@@ -62,7 +62,7 @@ func TestGetReleaseCadence_WithFilter(t *testing.T) {
 	org := "org1"
 	series, err := store.GetReleaseCadence(ctx, &org, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 1, series.Total[0])
 }
 
@@ -78,7 +78,7 @@ func TestGetReleaseDownloads_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetReleaseDownloads(ctx, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetReleaseDownloads_WithData(t *testing.T) {
@@ -100,12 +100,12 @@ func TestGetReleaseDownloads_WithData(t *testing.T) {
 
 	series, err := store.GetReleaseDownloads(ctx, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 2)
+	require.Len(t, series.Labels, 2)
 
-	assert.Equal(t, "2025-01", series.Months[0])
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 200, series.Downloads[0])
 
-	assert.Equal(t, "2025-02", series.Months[1])
+	assert.Equal(t, "2025-02", series.Labels[1])
 	assert.Equal(t, 30, series.Downloads[1])
 }
 
@@ -128,7 +128,7 @@ func TestGetReleaseDownloads_WithFilter(t *testing.T) {
 	org := "org1"
 	series, err := store.GetReleaseDownloads(ctx, &org, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 100, series.Downloads[0])
 }
 
@@ -205,7 +205,7 @@ func TestGetReleaseCadence_WithDeployments(t *testing.T) {
 
 	series, err := store.GetReleaseCadence(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.NotEmpty(t, series.Months)
+	require.NotEmpty(t, series.Labels)
 	assert.Equal(t, 1, series.Deployments[0])
 }
 
@@ -226,7 +226,7 @@ func TestGetReleaseCadence_MergeFallback(t *testing.T) {
 	repo := "repo2"
 	series, err := store.GetReleaseCadence(ctx, &org, &repo, nil, 24)
 	require.NoError(t, err)
-	require.NotEmpty(t, series.Months)
+	require.NotEmpty(t, series.Labels)
 	assert.Equal(t, 2, series.Deployments[0])
 }
 

@@ -44,12 +44,12 @@ const (
 	backfillDays = 30
 )
 
-func (s *Store) GetRepoMetricHistory(ctx context.Context, org, repo *string, months int) ([]*data.RepoMetricHistory, error) {
+func (s *Store) GetRepoMetricHistory(ctx context.Context, org, repo *string, days int) ([]*data.RepoMetricHistory, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	var rows *sql.Rows
 	var err error

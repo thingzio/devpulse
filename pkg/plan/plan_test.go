@@ -20,8 +20,8 @@ func TestGet(t *testing.T) {
 		wantCSVExport      bool
 	}{
 		{Free, true, 1, 500, 3, 0, false, false, false},
-		{Starter, true, 5, 2500, 12, 1, false, true, false},
-		{Pro, true, 25, 15000, 36, 2, true, true, true},
+		{Starter, true, 5, 2500, 6, 1, false, true, false},
+		{Pro, true, 25, 15000, 12, 2, true, true, true},
 		{Enterprise, true, 0, 0, 0, 2, true, true, true},
 		{"unknown", false, 0, 0, 0, 0, false, false, false},
 		{"", false, 0, 0, 0, 0, false, false, false},

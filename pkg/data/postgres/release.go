@@ -21,17 +21,18 @@ const (
 			name = $7, published_at = $8, prerelease = $9
 	`
 
-	// selectReleaseCadenceSQL: $1=org, $2=repo, $3=since
-	selectReleaseCadenceSQL = `SELECT
-			SUBSTRING(published_at, 1, 7) AS month,
+	// selectReleaseCadenceTpl: $1=org, $2=repo, $3=since
+	// %s = GroupExpr(gran, "published_at")
+	selectReleaseCadenceTpl = `SELECT
+			%s AS period,
 			COUNT(*) AS total,
 			SUM(CASE WHEN prerelease = 0 THEN 1 ELSE 0 END) AS stable
 		FROM release
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 		  AND published_at >= $3
-		GROUP BY month
-		ORDER BY month
+		GROUP BY period
+		ORDER BY period
 	`
 
 	// insertReleaseAssetSQL: 10 params
@@ -41,22 +42,24 @@ const (
 			content_type = $8, size = $9, download_count = $10
 	`
 
-	// selectReleaseDownloadsSQL: $1=org, $2=repo, $3=since
-	selectReleaseDownloadsSQL = `SELECT
-			SUBSTRING(r.published_at, 1, 7) AS month,
+	// selectReleaseDownloadsTpl: $1=org, $2=repo, $3=since
+	// %s = GroupExpr(gran, "r.published_at")
+	selectReleaseDownloadsTpl = `SELECT
+			%s AS period,
 			SUM(ra.download_count) AS downloads
 		FROM release_asset ra
 		JOIN release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
 		WHERE ra.org = COALESCE($1, ra.org)
 		  AND ra.repo = COALESCE($2, ra.repo)
 		  AND r.published_at >= $3
-		GROUP BY month
-		ORDER BY month
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectMergedPRDeploymentsSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectMergedPRDeploymentsSQL = `SELECT
-			SUBSTRING(e.merged_at, 1, 7) AS month,
+	// selectMergedPRDeploymentsTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.merged_at")
+	selectMergedPRDeploymentsTpl = `SELECT
+			%s AS period,
 			COUNT(*) AS cnt
 		FROM event e
 		JOIN developer d ON e.username = d.username
@@ -67,9 +70,9 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.merged_at >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
 	// selectLatestReleaseSQL: $1=org, $2=repo
@@ -238,33 +241,35 @@ func (s *Store) ImportAllReleases(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string, months int) (*data.ReleaseCadenceSeries, error) {
+func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string, days int) (*data.ReleaseCadenceSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	cadenceQuery := fmt.Sprintf(selectReleaseCadenceTpl, GroupExpr(gran, "published_at"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectReleaseCadenceSQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, cadenceQuery, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release cadence: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.ReleaseCadenceSeries{
-		Months:      make([]string, 0),
+		Labels:      make([]string, 0),
 		Total:       make([]int, 0),
 		Stable:      make([]int, 0),
 		Deployments: make([]int, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var total, stable int
-		if scanErr := rows.Scan(&month, &total, &stable); scanErr != nil {
+		if scanErr := rows.Scan(&label, &total, &stable); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan release cadence row: %w", scanErr)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Total = append(sr.Total, total)
 		sr.Stable = append(sr.Stable, stable)
 	}
@@ -273,24 +278,30 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	if len(sr.Months) > 0 {
+	if len(sr.Labels) > 0 {
 		sr.Deployments = append(sr.Deployments, sr.Total...)
+		gf := newGapFiller(days, sr.Labels)
+		sr.Labels = gf.periods
+		sr.Total = gf.fillInt(sr.Total)
+		sr.Stable = gf.fillInt(sr.Stable)
+		sr.Deployments = gf.fillInt(sr.Deployments)
 		return sr, nil
 	}
 
-	fallbackRows, err := s.db.QueryContext(ctx, selectMergedPRDeploymentsSQL, org, repo, entity, since)
+	fallbackQuery := fmt.Sprintf(selectMergedPRDeploymentsTpl, GroupExpr(gran, "e.merged_at"))
+	fallbackRows, err := s.db.QueryContext(ctx, fallbackQuery, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query merged PR deployments: %w", err)
 	}
 	defer fallbackRows.Close()
 
 	for fallbackRows.Next() {
-		var month string
+		var label string
 		var cnt int
-		if scanErr := fallbackRows.Scan(&month, &cnt); scanErr != nil {
+		if scanErr := fallbackRows.Scan(&label, &cnt); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan merged PR deployment row: %w", scanErr)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Deployments = append(sr.Deployments, cnt)
 	}
 
@@ -298,34 +309,42 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Total = gf.fillInt(sr.Total)
+	sr.Stable = gf.fillInt(sr.Stable)
+	sr.Deployments = gf.fillInt(sr.Deployments)
+
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint
+func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, days int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectReleaseDownloadsTpl, GroupExpr(gran, "r.published_at"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsSQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.ReleaseDownloadsSeries{
-		Months:    make([]string, 0),
+		Labels:    make([]string, 0),
 		Downloads: make([]int, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var downloads int
-		if err := rows.Scan(&month, &downloads); err != nil {
+		if err := rows.Scan(&label, &downloads); err != nil {
 			return nil, fmt.Errorf("failed to scan release downloads row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Downloads = append(sr.Downloads, downloads)
 	}
 
@@ -333,15 +352,19 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, mont
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Downloads = gf.fillInt(sr.Downloads)
+
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsByTagSeries, error) {
+func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, days int) (*data.ReleaseDownloadsByTagSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
 	if err != nil {

@@ -109,12 +109,12 @@ func (s *Store) GetAllOrgRepos(ctx context.Context) ([]*data.OrgRepoItem, error)
 	return list, nil
 }
 
-func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
+func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	// First 4 params are $1-$4 (since, entity, org, repo).
 	// The exclusion list starts at $5.
@@ -162,15 +162,15 @@ func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, ent
 	return list, nil
 }
 
-func (s *Store) GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
-	return s.getPercentages(ctx, selectDeveloperPercentSQL, "d.username", entity, org, repo, ex, months)
+func (s *Store) GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
+	return s.getPercentages(ctx, selectDeveloperPercentSQL, "d.username", entity, org, repo, ex, days)
 }
 
-func (s *Store) GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error) {
-	return s.getPercentages(ctx, selectOrgEntityPercentSQL, "d.entity", entity, org, repo, ex, months)
+func (s *Store) GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
+	return s.getPercentages(ctx, selectOrgEntityPercentSQL, "d.entity", entity, org, repo, ex, days)
 }
 
-func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org, repo *string, months, limit int) ([]string, error) {
+func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org, repo *string, days, limit int) ([]string, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -179,7 +179,7 @@ func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org,
 		return nil, fmt.Errorf("query is required")
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	pattern := fmt.Sprintf("%%%s%%", query)
 
 	rows, err := s.db.QueryContext(ctx, selectDeveloperSearchSQL, pattern, org, repo, since, limit)

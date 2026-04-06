@@ -72,63 +72,63 @@ type InsightsMetrics struct {
 // GatherInsightsMetrics calls Store methods to collect all metrics for a repo.
 // Individual metric failures are logged as warnings; the function always returns
 // whatever metrics were successfully gathered.
-func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, months int) *InsightsMetrics {
+func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, days int) *InsightsMetrics {
 	o, r := &org, &repo
 	m := &InsightsMetrics{}
 	var err error
 
-	if m.Summary, err = store.GetInsightsSummary(ctx, o, r, nil, months); err != nil {
+	if m.Summary, err = store.GetInsightsSummary(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get summary", "error", err)
 	}
-	if m.Momentum, err = store.GetContributorMomentum(ctx, o, r, nil, months); err != nil {
+	if m.Momentum, err = store.GetContributorMomentum(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get momentum", "error", err)
 	}
-	if m.PRRatio, err = store.GetPRReviewRatio(ctx, o, r, nil, months); err != nil {
+	if m.PRRatio, err = store.GetPRReviewRatio(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get pr review ratio", "error", err)
 	}
-	if m.TimeToMerge, err = store.GetTimeToMerge(ctx, o, r, nil, months); err != nil {
+	if m.TimeToMerge, err = store.GetTimeToMerge(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get time to merge", "error", err)
 	}
-	if m.Retention, err = store.GetContributorRetention(ctx, o, r, nil, months); err != nil {
+	if m.Retention, err = store.GetContributorRetention(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get retention", "error", err)
 	}
-	if m.Funnel, err = store.GetContributorFunnel(ctx, o, r, nil, months); err != nil {
+	if m.Funnel, err = store.GetContributorFunnel(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get funnel", "error", err)
 	}
-	if m.ChangeFailure, err = store.GetChangeFailureRate(ctx, o, r, nil, months); err != nil {
+	if m.ChangeFailure, err = store.GetChangeFailureRate(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get change failure rate", "error", err)
 	}
-	if m.ReviewLatency, err = store.GetReviewLatency(ctx, o, r, nil, months); err != nil {
+	if m.ReviewLatency, err = store.GetReviewLatency(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get review latency", "error", err)
 	}
-	if m.PRSize, err = store.GetPRSizeDistribution(ctx, o, r, nil, months); err != nil {
+	if m.PRSize, err = store.GetPRSizeDistribution(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get pr size distribution", "error", err)
 	}
-	if m.ForksAndActivity, err = store.GetForksAndActivity(ctx, o, r, nil, months); err != nil {
+	if m.ForksAndActivity, err = store.GetForksAndActivity(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get forks and activity", "error", err)
 	}
-	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(ctx, o, r, nil, months); err != nil {
+	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get issue ratio", "error", err)
 	}
-	if m.FirstResponse, err = store.GetTimeToFirstResponse(ctx, o, r, nil, months); err != nil {
+	if m.FirstResponse, err = store.GetTimeToFirstResponse(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get first response", "error", err)
 	}
-	if m.ReleaseCadence, err = store.GetReleaseCadence(ctx, o, r, nil, months); err != nil {
+	if m.ReleaseCadence, err = store.GetReleaseCadence(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get release cadence", "error", err)
 	}
-	if m.ReleaseDownloads, err = store.GetReleaseDownloads(ctx, o, r, months); err != nil {
+	if m.ReleaseDownloads, err = store.GetReleaseDownloads(ctx, o, r, days); err != nil {
 		slog.Warn("insights: failed to get release downloads", "error", err)
 	}
 	if m.RepoMeta, err = store.GetRepoMetas(ctx, o, r); err != nil {
 		slog.Warn("insights: failed to get repo metas", "error", err)
 	}
-	if m.AgingPRs, err = store.GetAgingPRs(ctx, o, r, nil, months); err != nil {
+	if m.AgingPRs, err = store.GetAgingPRs(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get aging PRs", "error", err)
 	}
-	if m.Unanswered, err = store.GetUnansweredRate(ctx, o, r, nil, months); err != nil {
+	if m.Unanswered, err = store.GetUnansweredRate(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get unanswered rate", "error", err)
 	}
-	if m.ResponseSLO, err = store.GetResponseSLO(ctx, o, r, nil, months); err != nil {
+	if m.ResponseSLO, err = store.GetResponseSLO(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get response SLO", "error", err)
 	}
 
@@ -137,7 +137,7 @@ func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, m
 
 // buildInsightsPrompt assembles the JSON metrics and DORA benchmarks into a
 // prompt suitable for the Claude Messages API.
-func buildInsightsPrompt(metrics *InsightsMetrics, months int) string {
+func buildInsightsPrompt(metrics *InsightsMetrics, weeks int) string {
 	metricsJSON, err := json.Marshal(metrics)
 	if err != nil {
 		slog.Warn("insights: failed to marshal metrics", "error", err)
@@ -145,7 +145,7 @@ func buildInsightsPrompt(metrics *InsightsMetrics, months int) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "You are an expert open-source project analyst. Analyze the following %d months of GitHub repository metrics and provide actionable insights.\n\n", months)
+	fmt.Fprintf(&b, "You are an expert open-source project analyst. Analyze the following %d weeks of GitHub repository metrics and provide actionable insights.\n\n", weeks)
 	fmt.Fprintf(&b, "## Metrics (JSON)\n\n%s\n\n", string(metricsJSON))
 	b.WriteString("## DORA Benchmarks (for context)\n\n")
 	b.WriteString("- Elite: Deployment frequency multiple times per day, lead time < 1 hour, change failure rate < 5%%, time to restore < 1 hour\n")
@@ -188,7 +188,7 @@ type claudeContentBlock struct {
 
 // GenerateInsights calls the Claude Messages API to generate insights from
 // the provided metrics. Returns the parsed insights, the model used, and any error.
-func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetrics, months int) (*GeneratedInsights, string, error) {
+func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetrics, weeks int) (*GeneratedInsights, string, error) {
 	model := cfg.Model
 	if model == "" {
 		model = DefaultInsightsModel
@@ -198,7 +198,7 @@ func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetr
 		baseURL = claudeAPIURL
 	}
 
-	prompt := buildInsightsPrompt(metrics, months)
+	prompt := buildInsightsPrompt(metrics, weeks)
 
 	reqBody := claudeRequest{
 		Model:     model,

@@ -5,9 +5,9 @@
 <!-- Middle  -->
 
     <input type="hidden" id="base_path" value="{{ .base_path }}" />
-    <input type="hidden" id="period_months" value="{{ .period_months }}" />
-    <input type="hidden" id="default_months" value="{{ .period_months }}" />
-    <input type="hidden" id="max_data_months" value="{{ .max_data_months }}" />
+    <input type="hidden" id="period_days" value="{{ .period_days }}" />
+    <input type="hidden" id="default_days" value="{{ .period_days }}" />
+    <input type="hidden" id="max_data_days" value="{{ .max_data_days }}" />
 
     {{ if .err }}
         <div class="error">
@@ -33,7 +33,7 @@
         <div class="period-wrap">
             <label for="period-select" class="period-label">Period</label>
             <select id="period-select">
-                <option value="{{ .period_months }}">{{ .period_months }} months</option>
+                <option value="{{ .period_days }}">6 months</option>
             </select>
         </div>
         {{ if .csv_export }}
@@ -58,40 +58,116 @@
             <span class="pdf-label">PDF</span>
         </button>
         {{ end }}
-        <button class="theme-toggle-btn" id="theme-toggle" aria-label="toggle theme">
-            <svg class="icon-moon" aria-hidden="true">
-                <use xlink:href="#moon"></use>
-            </svg>
-            <svg class="icon-sun" aria-hidden="true">
-                <use xlink:href="#sun"></use>
-            </svg>
-        </button>
+        <div class="user-menu-wrap">
+            <button class="user-avatar-btn" id="user-menu-toggle" aria-label="User menu">
+                <img src="{{ .avatar_url }}" alt="{{ .username }}" class="user-avatar" />
+            </button>
+            <div class="user-menu" id="user-menu" style="display:none;">
+                <div class="user-menu-header">{{ .username }}</div>
+                <div class="user-menu-plan">{{ .plan }} plan</div>
+                <div class="user-menu-divider"></div>
+                <button class="user-menu-item" id="theme-toggle">
+                    <span class="theme-label-light">Dark mode</span>
+                    <span class="theme-label-dark">Light mode</span>
+                </button>
+            </div>
+        </div>
     </section>
     <b class="header-term" style="display:none;">All imported events</b>
 
-    <div class="banner-group">
-    <section class="summary-banner" id="summary-banner">
-        <div class="banner-stat">
-            <span class="banner-val" id="banner-orgs">—</span>
-            <span class="banner-label">Organizations</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="banner-repos">—</span>
-            <span class="banner-label">Repositories</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="banner-events">—</span>
-            <span class="banner-label">Events</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="banner-contributors">—</span>
-            <span class="banner-label">Contributors</span>
-        </div>
-        <div class="banner-stat">
-            <span class="banner-val" id="banner-last-import">—</span>
-            <span class="banner-label">Last Import</span>
-        </div>
-    </section>
+    <div id="portfolio-view" style="display:none;">
+        <section class="grid">
+            <article class="grid-full-width" id="portfolio-summary-panel">
+                <div class="tbl">
+                    <div class="content-header">Portfolio Summary</div>
+                    <div class="tbl-chart tbl-home insights-summary" id="portfolio-summary-container">
+                        <div class="insight-card">
+                            <span class="insight-label">Organizations</span>
+                            <span class="insight-val" id="ps-orgs">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Repositories</span>
+                            <span class="insight-val" id="ps-repos">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Events</span>
+                            <span class="insight-val" id="ps-events">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Contributors</span>
+                            <span class="insight-val" id="ps-contributors">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Total Stars</span>
+                            <span class="insight-val" id="ps-stars">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Total Forks</span>
+                            <span class="insight-val" id="ps-forks">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Open Issues</span>
+                            <span class="insight-val" id="ps-issues">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Closed PRs</span>
+                            <span class="insight-val" id="ps-prs">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Avg Merge (hrs)</span>
+                            <span class="insight-val" id="ps-merge">—</span>
+                        </div>
+                        <div class="insight-card">
+                            <span class="insight-label">Last Import</span>
+                            <span class="insight-val" id="ps-last-import">—</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            <article id="add-repo-panel" class="grid-full-width" style="overflow:visible">
+                <div class="tbl" style="overflow:visible">
+                    <div class="content-header">Add Repository</div>
+                    <div class="tbl-content" style="padding:12px 15px;overflow:visible">
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <div style="position:relative;max-width:500px;flex:0 0 auto;width:500px">
+                                <input type="text" id="repo-search" class="contributor-search" placeholder="Search repos (e.g. kubernetes, thingzio/devpulse)..." autocomplete="off">
+                                <ul id="repo-search-results" class="contributor-suggestions" style="position:absolute;z-index:999;max-height:300px"></ul>
+                            </div>
+                            <p id="repo-search-status" style="color:var(--gray);font-size:0.85em;margin:0"></p>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            <article id="repo-overview-panel" class="grid-full-width">
+                <div class="tbl">
+                    <div class="content-header">
+                        Repository Overview
+                    </div>
+                    <div id="usage-banner" class="summary-banner" style="border-bottom:1px solid var(--border-color)"></div>
+                    <div id="import-errors-banner"></div>
+                    <div class="tbl-chart">
+                        <table id="repo-overview-table">
+                            <thead>
+                                <tr>
+                                    <th>Repository</th>
+                                    <th class="num">Stars</th>
+                                    <th class="num">Forks</th>
+                                    <th class="num">Issues</th>
+                                    <th class="num">Events</th>
+                                    <th class="num">WoW</th>
+                                    <th class="num">Weekly</th>
+                                    <th class="num">Contributors</th>
+                                    <th class="num">Scored</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <span class="insight-desc">Overview of all repositories in the selected scope and period.{{ if .csv_export }} | <a href="#" id="csv-export-all" title="Export all repos to CSV">Export All (CSV)</a>{{ end }}</span>
+                </div>
+            </article>
+        </section>
     </div>
 
     <nav class="tab-bar" id="tab-bar">
@@ -193,49 +269,6 @@
                         <canvas class="chart" id="forks-trend-chart"></canvas>
                     </div>
                     <span class="insight-desc" id="forks-trend-desc">Daily fork count.</span>
-                </div>
-            </article>
-            <article id="add-repo-panel" class="grid-full-width" style="overflow:visible">
-                <div class="tbl" style="overflow:visible">
-                    <div class="content-header">Add Repos</div>
-                    <div class="tbl-content" style="padding:12px 15px;overflow:visible">
-                        <div style="display:flex;align-items:center;gap:12px">
-                            <div style="position:relative;max-width:500px;flex:0 0 auto;width:500px">
-                                <input type="text" id="repo-search" class="contributor-search" placeholder="Search repos (e.g. kubernetes, thingzio/devpulse)..." autocomplete="off">
-                                <ul id="repo-search-results" class="contributor-suggestions" style="position:absolute;z-index:999;max-height:300px"></ul>
-                            </div>
-                            <p id="repo-search-status" style="color:var(--gray);font-size:0.85em;margin:0"></p>
-                        </div>
-                    </div>
-                </div>
-            </article>
-            <article id="repo-overview-panel" class="grid-full-width">
-                <div class="tbl">
-                    <div class="content-header">
-                        Repository Overview
-                    </div>
-                    <div id="usage-banner" class="summary-banner" style="border-bottom:1px solid var(--border-color)"></div>
-                    <div id="import-errors-banner"></div>
-                    <div class="tbl-chart">
-                        <table id="repo-overview-table">
-                            <thead>
-                                <tr>
-                                    <th>Repository</th>
-                                    <th class="num">Stars</th>
-                                    <th class="num">Forks</th>
-                                    <th class="num">Issues</th>
-                                    <th class="num">Events</th>
-                                    <th class="num">WoW</th>
-                                    <th class="num">Weekly</th>
-                                    <th class="num">Contributors</th>
-                                    <th class="num">Scored</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                    <span class="insight-desc">Overview of all repositories in the selected scope and period.{{ if .csv_export }} | <a href="#" id="csv-export-all" title="Export all repos to CSV">Export All (CSV)</a>{{ end }}</span>
                 </div>
             </article>
         </section>

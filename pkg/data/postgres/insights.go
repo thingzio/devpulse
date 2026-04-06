@@ -57,42 +57,44 @@ const (
 		SELECT COUNT(*) FROM running WHERE cumsum - cnt < total * 0.5
 	`
 
-	// selectRetentionSQL: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	selectRetentionSQL = `WITH first_seen AS (
-			SELECT e.username, MIN(SUBSTRING(e.date, 1, 7)) AS first_month
+	// selectRetentionTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
+	// %[1]s = GroupExpr(gran, "e.date")
+	selectRetentionTpl = `WITH first_seen AS (
+			SELECT e.username, MIN(%[1]s) AS first_period
 			FROM event e
 			JOIN developer d ON e.username = d.username
 			WHERE e.org = COALESCE($1, e.org)
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 			  AND e.date >= $4
-			  ` + botExcludeSQL + `
+			  ` + botExcludeTpl + `
 			  ` + forkExcludeSQL + `
 			GROUP BY e.username
 		),
-		monthly AS (
-			SELECT DISTINCT e.username, SUBSTRING(e.date, 1, 7) AS month
+		periods AS (
+			SELECT DISTINCT e.username, %[1]s AS period
 			FROM event e
 			JOIN developer d ON e.username = d.username
 			WHERE e.org = COALESCE($5, e.org)
 			  AND e.repo = COALESCE($6, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
 			  AND e.date >= $8
-			  ` + botExcludeSQL + `
+			  ` + botExcludeTpl + `
 			  ` + forkExcludeSQL + `
 		)
-		SELECT m.month,
-			SUM(CASE WHEN f.first_month = m.month THEN 1 ELSE 0 END) AS new_contributors,
-			SUM(CASE WHEN f.first_month < m.month THEN 1 ELSE 0 END) AS returning_contributors
-		FROM monthly m
-		JOIN first_seen f ON m.username = f.username
-		GROUP BY m.month
-		ORDER BY m.month
+		SELECT p.period,
+			SUM(CASE WHEN f.first_period = p.period THEN 1 ELSE 0 END) AS new_contributors,
+			SUM(CASE WHEN f.first_period < p.period THEN 1 ELSE 0 END) AS returning_contributors
+		FROM periods p
+		JOIN first_seen f ON p.username = f.username
+		GROUP BY p.period
+		ORDER BY p.period
 	`
 
-	// selectTimeToMergeSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectTimeToMergeSQL = `SELECT
-			SUBSTRING(e.created_at, 1, 7) AS month,
+	// selectTimeToMergeTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.created_at")
+	selectTimeToMergeTpl = `SELECT
+			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM event e
@@ -104,14 +106,15 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.created_at >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectTimeToRestoreBugsSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectTimeToRestoreBugsSQL = `SELECT
-			SUBSTRING(e.created_at, 1, 7) AS month,
+	// selectTimeToRestoreBugsTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.created_at")
+	selectTimeToRestoreBugsTpl = `SELECT
+			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM event e
@@ -120,7 +123,7 @@ const (
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
-		  AND LOWER(e.labels) LIKE '%bug%'
+		  AND LOWER(e.labels) LIKE '%%bug%%'
 		  AND EXISTS (
 		      SELECT 1 FROM release r
 		      WHERE r.org = e.org AND r.repo = e.repo
@@ -130,14 +133,15 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.created_at >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectTimeToCloseSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectTimeToCloseSQL = `SELECT
-			SUBSTRING(e.created_at, 1, 7) AS month,
+	// selectTimeToCloseTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.created_at")
+	selectTimeToCloseTpl = `SELECT
+			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM event e
@@ -150,14 +154,15 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.created_at >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectForksAndActivitySQL: $1=org, $2=repo, $3=entity, $4=since
-	selectForksAndActivitySQL = `SELECT
-			SUBSTRING(e.date, 1, 7) AS month,
+	// selectForksAndActivityTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.date")
+	selectForksAndActivityTpl = `SELECT
+			%s AS period,
 			SUM(CASE WHEN e.type = 'fork' THEN 1 ELSE 0 END) AS forks,
 			COUNT(*) AS events
 		FROM event e
@@ -166,14 +171,15 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.date >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectPRReviewRatioSQL: $1=pr_type, $2=review_type, $3=org, $4=repo, $5=entity, $6=since, $7=pr_type, $8=review_type
-	selectPRReviewRatioSQL = `SELECT
-			SUBSTRING(e.date, 1, 7) AS month,
+	// selectPRReviewRatioTpl: $1=pr_type, $2=review_type, $3=org, $4=repo, $5=entity, $6=since, $7=pr_type, $8=review_type
+	// %s = GroupExpr(gran, "e.date")
+	selectPRReviewRatioTpl = `SELECT
+			%s AS period,
 			SUM(CASE WHEN e.type = $1 THEN 1 ELSE 0 END) AS prs,
 			SUM(CASE WHEN e.type = $2 THEN 1 ELSE 0 END) AS reviews
 		FROM event e
@@ -183,57 +189,60 @@ const (
 		  AND COALESCE(d.entity, '') = COALESCE($5, COALESCE(d.entity, ''))
 		  AND e.date >= $6
 		  AND e.type IN ($7, $8)
-		  ` + botExcludeSQL + `
-		GROUP BY month
-		ORDER BY month
+		  ` + botExcludeTpl + `
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectChangeFailuresSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectChangeFailuresSQL = `SELECT
-		SUBSTRING(e.created_at, 1, 7) AS month,
+	// selectChangeFailuresTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.created_at")
+	selectChangeFailuresTpl = `SELECT
+		%s AS period,
 		COUNT(*) AS failures
 	FROM event e
 	JOIN developer d ON e.username = d.username
 	WHERE (
-	    (e.type = 'issue' AND LOWER(e.labels) LIKE '%bug%'
+	    (e.type = 'issue' AND LOWER(e.labels) LIKE '%%bug%%'
 	     AND EXISTS (
 	        SELECT 1 FROM release r
 	        WHERE r.org = e.org AND r.repo = e.repo
 	          AND EXTRACT(EPOCH FROM (e.created_at::timestamp - r.published_at::timestamp)) / 86400.0 BETWEEN 0 AND 7
 	     ))
 	    OR
-	    (e.type = 'pr' AND LOWER(e.title) LIKE '%revert%')
+	    (e.type = 'pr' AND LOWER(e.title) LIKE '%%revert%%')
 	)
 	  AND e.org = COALESCE($1, e.org)
 	  AND e.repo = COALESCE($2, e.repo)
 	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 	  AND e.created_at >= $4
-	  ` + botExcludeSQL + `
-	GROUP BY month
-	ORDER BY month
+	  ` + botExcludeTpl + `
+	GROUP BY period
+	ORDER BY period
 	`
 
-	// selectDeploymentCountSQL: $1=org, $2=repo, $3=since
-	selectDeploymentCountSQL = `SELECT
-		SUBSTRING(published_at, 1, 7) AS month,
+	// selectDeploymentCountTpl: $1=org, $2=repo, $3=since
+	// %s = GroupExpr(gran, "published_at")
+	selectDeploymentCountTpl = `SELECT
+		%s AS period,
 		COUNT(*) AS cnt
 	FROM release
 	WHERE org = COALESCE($1, org)
 	  AND repo = COALESCE($2, repo)
 	  AND published_at >= $3
-	GROUP BY month
-	ORDER BY month
+	GROUP BY period
+	ORDER BY period
 	`
 
-	// selectReviewLatencySQL: $1=since, $2=org, $3=repo, $4=entity, $5=since
-	selectReviewLatencySQL = `WITH months AS (
-		SELECT DISTINCT SUBSTRING(date, 1, 7) AS month
+	// selectReviewLatencyTpl: $1=since, $2=org, $3=repo, $4=entity, $5=since
+	// %[1]s = GroupExpr(gran, "date"), %[2]s = GroupExpr(gran, "pr.created_at")
+	selectReviewLatencyTpl = `WITH periods AS (
+		SELECT DISTINCT %[1]s AS period
 		FROM event
 		WHERE date >= $1
 	),
 	latency AS (
 		SELECT
-			SUBSTRING(pr.created_at, 1, 7) AS month,
+			%[2]s AS period,
 			(EXTRACT(EPOCH FROM (MIN(rev.created_at::timestamp) - MIN(pr.created_at::timestamp))) / 3600.0) AS hours
 		FROM event pr
 		JOIN event rev ON pr.org = rev.org AND pr.repo = rev.repo AND pr.number = rev.number
@@ -247,22 +256,23 @@ const (
 		  AND pr.repo = COALESCE($3, pr.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
 		  AND pr.created_at >= $5
-		  ` + botExcludePrSQL + `
+		  ` + botExcludePrTpl + `
 		GROUP BY pr.org, pr.repo, pr.number, pr.created_at
 	)
 	SELECT
-		m.month,
+		p.period,
 		COALESCE(COUNT(l.hours), 0) AS cnt,
 		COALESCE(AVG(l.hours), 0) AS avg_hours
-	FROM months m
-	LEFT JOIN latency l ON m.month = l.month
-	GROUP BY m.month
-	ORDER BY m.month
+	FROM periods p
+	LEFT JOIN latency l ON p.period = l.period
+	GROUP BY p.period
+	ORDER BY p.period
 	`
 
-	// selectPRSizeDistributionSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectPRSizeDistributionSQL = `SELECT
-		SUBSTRING(e.created_at, 1, 7) AS month,
+	// selectPRSizeDistributionTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %s = GroupExpr(gran, "e.created_at")
+	selectPRSizeDistributionTpl = `SELECT
+		%s AS period,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS small,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS medium,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS large,
@@ -275,35 +285,41 @@ const (
 	  AND e.repo = COALESCE($2, e.repo)
 	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 	  AND e.created_at >= $4
-	  ` + botExcludeSQL + `
-	GROUP BY month
-	ORDER BY month
+	  ` + botExcludeTpl + `
+	GROUP BY period
+	ORDER BY period
 	`
 
-	// selectContributorMomentumSQL: $1=since, $2=org, $3=repo, $4=entity
-	selectContributorMomentumSQL = `WITH months AS (
-		SELECT DISTINCT SUBSTRING(date, 1, 7) AS month
+	// selectContributorMomentumTpl: $1=since, $2=org, $3=repo, $4=entity
+	// %[1]s = GroupExpr(gran, "date"), %[2]s = MomentumInterval(gran), %[3]s = MomentumFormat(gran)
+	selectContributorMomentumTpl = `WITH periods AS (
+		SELECT DISTINCT %[1]s AS period
 		FROM event
 		WHERE date >= $1
 	)
 	SELECT
-		m.month,
+		p.period,
 		COUNT(DISTINCT e.username) AS active
-	FROM months m
-	JOIN event e ON SUBSTRING(e.date, 1, 7) >= TO_CHAR((m.month || '-01')::date - INTERVAL '2 months', 'YYYY-MM')
-		AND SUBSTRING(e.date, 1, 7) <= m.month
+	FROM periods p
+	JOIN event e ON %[1]s >= TO_CHAR((p.period::date - INTERVAL '%[2]s'), %[3]s)
+		AND %[1]s <= p.period
 	JOIN developer d ON e.username = d.username
 	WHERE e.org = COALESCE($2, e.org)
 	  AND e.repo = COALESCE($3, e.repo)
 	  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
-	  ` + botExcludeSQL + `
+	  ` + botExcludeTpl + `
 	  ` + forkExcludeSQL + `
-	GROUP BY m.month
-	ORDER BY m.month
+	GROUP BY p.period
+	ORDER BY p.period
 	`
 
-	// selectContributorFunnelSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectContributorFunnelSQL = `WITH firsts AS (
+	// selectContributorFunnelTpl: $1=org, $2=repo, $3=entity, $4=since
+	// %[1]s = GroupExpr(gran, "date")
+	// %[2]s = GroupExpr(gran, "f.first_comment")
+	// %[3]s = GroupExpr(gran, "f.first_pr")
+	// %[4]s = GroupExpr(gran, "f.first_merge")
+	// %[5]s = GroupExpr(gran, "COALESCE(f.first_comment, f.first_pr, f.first_merge)")
+	selectContributorFunnelTpl = `WITH firsts AS (
 		SELECT
 			e.username,
 			MIN(CASE WHEN e.type = 'issue_comment' THEN e.date END) AS first_comment,
@@ -314,25 +330,25 @@ const (
 		WHERE e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  ` + botExcludeSQL + `
+		  ` + botExcludeTpl + `
 		GROUP BY e.username
 	),
-	months AS (
-		SELECT DISTINCT SUBSTRING(date, 1, 7) AS month FROM event WHERE date >= $4
+	periods AS (
+		SELECT DISTINCT %[1]s AS period FROM event WHERE date >= $4
 	)
 	SELECT
-		m.month,
-		SUM(CASE WHEN f.first_comment IS NOT NULL AND SUBSTRING(f.first_comment, 1, 7) = m.month THEN 1 ELSE 0 END) AS fc,
-		SUM(CASE WHEN f.first_pr IS NOT NULL AND SUBSTRING(f.first_pr, 1, 7) = m.month THEN 1 ELSE 0 END) AS fp,
-		SUM(CASE WHEN f.first_merge IS NOT NULL AND SUBSTRING(f.first_merge, 1, 7) = m.month THEN 1 ELSE 0 END) AS fm
-	FROM months m
+		p.period,
+		SUM(CASE WHEN f.first_comment IS NOT NULL AND %[2]s = p.period THEN 1 ELSE 0 END) AS fc,
+		SUM(CASE WHEN f.first_pr IS NOT NULL AND %[3]s = p.period THEN 1 ELSE 0 END) AS fp,
+		SUM(CASE WHEN f.first_merge IS NOT NULL AND %[4]s = p.period THEN 1 ELSE 0 END) AS fm
+	FROM periods p
 	CROSS JOIN firsts f
-	WHERE SUBSTRING(COALESCE(f.first_comment, f.first_pr, f.first_merge), 1, 7) >= (SELECT MIN(month) FROM months)
-	GROUP BY m.month
-	HAVING SUM(CASE WHEN f.first_comment IS NOT NULL AND SUBSTRING(f.first_comment, 1, 7) = m.month THEN 1 ELSE 0 END) > 0
-	    OR SUM(CASE WHEN f.first_pr IS NOT NULL AND SUBSTRING(f.first_pr, 1, 7) = m.month THEN 1 ELSE 0 END) > 0
-	    OR SUM(CASE WHEN f.first_merge IS NOT NULL AND SUBSTRING(f.first_merge, 1, 7) = m.month THEN 1 ELSE 0 END) > 0
-	ORDER BY m.month
+	WHERE %[5]s >= (SELECT MIN(period) FROM periods)
+	GROUP BY p.period
+	HAVING SUM(CASE WHEN f.first_comment IS NOT NULL AND %[2]s = p.period THEN 1 ELSE 0 END) > 0
+	    OR SUM(CASE WHEN f.first_pr IS NOT NULL AND %[3]s = p.period THEN 1 ELSE 0 END) > 0
+	    OR SUM(CASE WHEN f.first_merge IS NOT NULL AND %[4]s = p.period THEN 1 ELSE 0 END) > 0
+	ORDER BY p.period
 	`
 
 	// selectContributorProfileSQL:
@@ -417,10 +433,11 @@ const (
 	  ` + forkExcludeSQL + `
 	`
 
-	// selectIssueOpenCloseRatioSQL: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	selectIssueOpenCloseRatioSQL = `SELECT month, SUM(opened) AS opened, SUM(closed) AS closed
+	// selectIssueOpenCloseRatioTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = GroupExpr(gran, "e.closed_at")
+	selectIssueOpenCloseRatioTpl = `SELECT period, SUM(opened) AS opened, SUM(closed) AS closed
 		FROM (
-			SELECT SUBSTRING(e.created_at, 1, 7) AS month, 1 AS opened, 0 AS closed
+			SELECT %[1]s AS period, 1 AS opened, 0 AS closed
 			FROM event e
 			JOIN developer d ON e.username = d.username
 			WHERE e.type = 'issue'
@@ -429,9 +446,9 @@ const (
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 			  AND e.created_at >= $4
-			  ` + botExcludeSQL + `
+			  ` + botExcludeTpl + `
 			UNION ALL
-			SELECT SUBSTRING(e.closed_at, 1, 7) AS month, 0 AS opened, 1 AS closed
+			SELECT %[2]s AS period, 0 AS opened, 1 AS closed
 			FROM event e
 			JOIN developer d ON e.username = d.username
 			WHERE e.type = 'issue'
@@ -440,17 +457,18 @@ const (
 			  AND e.repo = COALESCE($6, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
 			  AND e.closed_at >= $8
-			  ` + botExcludeSQL + `
+			  ` + botExcludeTpl + `
 		) sub
-		GROUP BY month
-		ORDER BY month
+		GROUP BY period
+		ORDER BY period
 	`
 
-	// selectTimeToFirstResponseSQL: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	selectTimeToFirstResponseSQL = `WITH issue_first AS (
+	// selectTimeToFirstResponseTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
+	// %[1]s = GroupExpr(gran, "e.created_at")
+	selectTimeToFirstResponseTpl = `WITH issue_first AS (
 		SELECT
 			e.org, e.repo, e.number,
-			SUBSTRING(e.created_at, 1, 7) AS month,
+			%[1]s AS period,
 			MIN(
 				EXTRACT(EPOCH FROM (c.created_at::timestamp - e.created_at::timestamp)) / 3600.0
 			) AS hours_to_first
@@ -465,12 +483,12 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 		  AND e.created_at >= $4
-		  ` + botExcludeSQL + `
-		GROUP BY e.org, e.repo, e.number, month
+		  ` + botExcludeTpl + `
+		GROUP BY e.org, e.repo, e.number, period
 	), pr_first AS (
 		SELECT
 			e.org, e.repo, e.number,
-			SUBSTRING(e.created_at, 1, 7) AS month,
+			%[1]s AS period,
 			MIN(
 				EXTRACT(EPOCH FROM (c.created_at::timestamp - e.created_at::timestamp)) / 3600.0
 			) AS hours_to_first
@@ -485,17 +503,17 @@ const (
 		  AND e.repo = COALESCE($6, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
 		  AND e.created_at >= $8
-		  ` + botExcludeSQL + `
-		GROUP BY e.org, e.repo, e.number, month
+		  ` + botExcludeTpl + `
+		GROUP BY e.org, e.repo, e.number, period
 	)
 	SELECT
-		COALESCE(i.month, p.month) AS month,
+		COALESCE(i.period, p.period) AS period,
 		COALESCE(i.avg_hours, 0),
 		COALESCE(p.avg_hours, 0)
-	FROM (SELECT month, AVG(hours_to_first) AS avg_hours FROM issue_first GROUP BY month) i
-	FULL OUTER JOIN (SELECT month, AVG(hours_to_first) AS avg_hours FROM pr_first GROUP BY month) p
-		ON i.month = p.month
-	ORDER BY month
+	FROM (SELECT period, AVG(hours_to_first) AS avg_hours FROM issue_first GROUP BY period) i
+	FULL OUTER JOIN (SELECT period, AVG(hours_to_first) AS avg_hours FROM pr_first GROUP BY period) p
+		ON i.period = p.period
+	ORDER BY period
 `
 
 	// selectAgingPRsSQL: $1=org, $2=repo, $3=entity, $4=since
@@ -665,12 +683,12 @@ LIMIT $4
 	`
 )
 
-func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *string, months int) (*data.InsightsSummary, error) {
+func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*data.InsightsSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	summary := &data.InsightsSummary{}
 
 	if err := s.db.QueryRowContext(ctx, selectBusFactorSQL, org, repo, entity, since).Scan(&summary.BusFactor); err != nil {
@@ -690,12 +708,12 @@ func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *strin
 	return summary, nil
 }
 
-func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string, months int) (*data.DailyActivitySeries, error) {
+func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string, days int) (*data.DailyActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectDailyActivitySQL, org, repo, entity, since)
 	if err != nil {
@@ -721,16 +739,22 @@ func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string,
 	return series, nil
 }
 
-func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
+func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl string, cols []string, org, repo, entity *string, days int) ([]string, []T, []T, error) {
 	if db == nil {
 		return nil, nil, nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	fmtArgs := make([]any, len(cols))
+	for i, col := range cols {
+		fmtArgs[i] = GroupExpr(gran, col)
+	}
+	query := fmt.Sprintf(queryTpl, fmtArgs...)
+	since := sinceDate(days)
 
 	rows, err := db.QueryContext(ctx, query, org, repo, entity, since, org, repo, entity, since)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to query month dual series: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to query dual series: %w", err)
 	}
 	defer rows.Close()
 
@@ -738,12 +762,12 @@ func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query str
 	var a, b []T
 
 	for rows.Next() {
-		var month string
+		var label string
 		var v1, v2 T
-		if err := rows.Scan(&month, &v1, &v2); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to scan month dual row: %w", err)
+		if err := rows.Scan(&label, &v1, &v2); err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to scan dual row: %w", err)
 		}
-		ms = append(ms, month)
+		ms = append(ms, label)
 		a = append(a, v1)
 		b = append(b, v2)
 	}
@@ -752,25 +776,28 @@ func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query str
 		return nil, nil, nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	return ms, a, b, nil
+	gf := newGapFiller(days, ms)
+	return gf.periods, gapFillSlice(gf, a), gapFillSlice(gf, b), nil
 }
 
-func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, months int) (*data.RetentionSeries, error) {
-	ms, newC, retC, err := getMonthDualSeries[int](ctx, s.db, selectRetentionSQL, org, repo, entity, months)
+func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, days int) (*data.RetentionSeries, error) {
+	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionTpl, []string{"e.date"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
-	return &data.RetentionSeries{Months: ms, New: newC, Returning: retC}, nil
+	return &data.RetentionSeries{Labels: ms, New: newC, Returning: retC}, nil
 }
 
-func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, months int) (*data.PRReviewRatioSeries, error) {
+func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, days int) (*data.PRReviewRatioSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectPRReviewRatioSQL,
+	rows, err := s.db.QueryContext(ctx, query,
 		data.EventTypePR, data.EventTypePRReview,
 		org, repo, entity, since,
 		data.EventTypePR, data.EventTypePRReview)
@@ -780,19 +807,19 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	defer rows.Close()
 
 	sr := &data.PRReviewRatioSeries{
-		Months:  make([]string, 0),
+		Labels:  make([]string, 0),
 		PRs:     make([]int, 0),
 		Reviews: make([]int, 0),
 		Ratio:   make([]float64, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var prs, reviews int
-		if err := rows.Scan(&month, &prs, &reviews); err != nil {
+		if err := rows.Scan(&label, &prs, &reviews); err != nil {
 			return nil, fmt.Errorf("failed to scan PR review ratio row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.PRs = append(sr.PRs, prs)
 		sr.Reviews = append(sr.Reviews, reviews)
 
@@ -807,31 +834,40 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.PRs = gf.fillInt(sr.PRs)
+	sr.Reviews = gf.fillInt(sr.Reviews)
+	sr.Ratio = gf.fillFloat64(sr.Ratio)
+
 	return sr, nil
 }
 
-func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *string, months int) (*data.ChangeFailureRateSeries, error) {
+func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *string, days int) (*data.ChangeFailureRateSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"))
+	deployQuery := fmt.Sprintf(selectDeploymentCountTpl, GroupExpr(gran, "published_at"))
+	since := sinceDate(days)
 
 	failureMap := make(map[string]int)
 
-	rows, err := s.db.QueryContext(ctx, selectChangeFailuresSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, failQuery, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query change failures: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var month string
+		var label string
 		var failures int
-		if scanErr := rows.Scan(&month, &failures); scanErr != nil {
+		if scanErr := rows.Scan(&label, &failures); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan change failure row: %w", scanErr)
 		}
-		failureMap[month] = failures
+		failureMap[label] = failures
 	}
 
 	if err = rows.Err(); err != nil {
@@ -840,19 +876,19 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 
 	deployMap := make(map[string]int)
 
-	dRows, err := s.db.QueryContext(ctx, selectDeploymentCountSQL, org, repo, since)
+	dRows, err := s.db.QueryContext(ctx, deployQuery, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deployment count: %w", err)
 	}
 	defer dRows.Close()
 
 	for dRows.Next() {
-		var month string
+		var label string
 		var cnt int
-		if scanErr := dRows.Scan(&month, &cnt); scanErr != nil {
+		if scanErr := dRows.Scan(&label, &cnt); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan deployment count row: %w", scanErr)
 		}
-		deployMap[month] = cnt
+		deployMap[label] = cnt
 	}
 
 	if err := dRows.Err(); err != nil {
@@ -874,7 +910,7 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	sort.Strings(sortedMonths)
 
 	sr := &data.ChangeFailureRateSeries{
-		Months:      make([]string, 0, len(sortedMonths)),
+		Labels:      make([]string, 0, len(sortedMonths)),
 		Failures:    make([]int, 0, len(sortedMonths)),
 		Deployments: make([]int, 0, len(sortedMonths)),
 		Rate:        make([]float64, 0, len(sortedMonths)),
@@ -887,42 +923,50 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 		if d > 0 {
 			rate = float64(f) / float64(d) * 100
 		}
-		sr.Months = append(sr.Months, m)
+		sr.Labels = append(sr.Labels, m)
 		sr.Failures = append(sr.Failures, f)
 		sr.Deployments = append(sr.Deployments, d)
 		sr.Rate = append(sr.Rate, rate)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Failures = gf.fillInt(sr.Failures)
+	sr.Deployments = gf.fillInt(sr.Deployments)
+	sr.Rate = gf.fillFloat64(sr.Rate)
+
 	return sr, nil
 }
 
-func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string, months int) (*data.ReviewLatencySeries, error) {
+func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string, days int) (*data.ReviewLatencySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectReviewLatencyTpl, GroupExpr(gran, "date"), GroupExpr(gran, "pr.created_at"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectReviewLatencySQL, since, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query review latency: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.ReviewLatencySeries{
-		Months:   make([]string, 0),
+		Labels:   make([]string, 0),
 		Count:    make([]int, 0),
 		AvgHours: make([]float64, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var cnt int
 		var avgHours float64
-		if err := rows.Scan(&month, &cnt, &avgHours); err != nil {
+		if err := rows.Scan(&label, &cnt, &avgHours); err != nil {
 			return nil, fmt.Errorf("failed to scan review latency row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Count = append(sr.Count, cnt)
 		sr.AvgHours = append(sr.AvgHours, avgHours)
 	}
@@ -931,15 +975,22 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Count = gf.fillInt(sr.Count)
+	sr.AvgHours = gf.fillFloat64(sr.AvgHours)
+
 	return sr, nil
 }
 
-func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(queryTpl, GroupExpr(gran, col))
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
@@ -948,19 +999,19 @@ func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, 
 	defer rows.Close()
 
 	sr := &data.VelocitySeries{
-		Months:  make([]string, 0),
+		Labels:  make([]string, 0),
 		Count:   make([]int, 0),
 		AvgDays: make([]float64, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var cnt int
 		var avgDays float64
-		if err := rows.Scan(&month, &cnt, &avgDays); err != nil {
+		if err := rows.Scan(&label, &cnt, &avgDays); err != nil {
 			return nil, fmt.Errorf("failed to scan velocity row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Count = append(sr.Count, cnt)
 		sr.AvgDays = append(sr.AvgDays, avgDays)
 	}
@@ -969,36 +1020,43 @@ func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, 
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Count = gf.fillInt(sr.Count)
+	sr.AvgDays = gf.fillFloat64(sr.AvgDays)
+
 	return sr, nil
 }
 
-func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToMergeSQL, org, repo, entity, months)
+func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToMergeTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToCloseSQL, org, repo, entity, months)
+func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToCloseTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsSQL, org, repo, entity, months)
+func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, months int) (*data.PRSizeSeries, error) {
+func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.PRSizeSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectPRSizeDistributionSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query PR size distribution: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.PRSizeSeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Small:  make([]int, 0),
 		Medium: make([]int, 0),
 		Large:  make([]int, 0),
@@ -1006,12 +1064,12 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var small, medium, large, xlarge int
-		if err := rows.Scan(&month, &small, &medium, &large, &xlarge); err != nil {
+		if err := rows.Scan(&label, &small, &medium, &large, &xlarge); err != nil {
 			return nil, fmt.Errorf("failed to scan PR size row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Small = append(sr.Small, small)
 		sr.Medium = append(sr.Medium, medium)
 		sr.Large = append(sr.Large, large)
@@ -1022,35 +1080,44 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Small = gf.fillInt(sr.Small)
+	sr.Medium = gf.fillInt(sr.Medium)
+	sr.Large = gf.fillInt(sr.Large)
+	sr.XLarge = gf.fillInt(sr.XLarge)
+
 	return sr, nil
 }
 
-func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *string, months int) (*data.ForksAndActivitySeries, error) {
+func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *string, days int) (*data.ForksAndActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectForksAndActivitySQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query forks and activity: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.ForksAndActivitySeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Forks:  make([]int, 0),
 		Events: make([]int, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var forks, events int
-		if err := rows.Scan(&month, &forks, &events); err != nil {
+		if err := rows.Scan(&label, &forks, &events); err != nil {
 			return nil, fmt.Errorf("failed to scan forks and activity row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Forks = append(sr.Forks, forks)
 		sr.Events = append(sr.Events, events)
 	}
@@ -1059,36 +1126,49 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Forks = gf.fillInt(sr.Forks)
+	sr.Events = gf.fillInt(sr.Events)
+
 	return sr, nil
 }
 
-func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *string, months int) (*data.ContributorFunnelSeries, error) {
+func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *string, days int) (*data.ContributorFunnelSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectContributorFunnelTpl,
+		GroupExpr(gran, "date"),
+		GroupExpr(gran, "f.first_comment"),
+		GroupExpr(gran, "f.first_pr"),
+		GroupExpr(gran, "f.first_merge"),
+		GroupExpr(gran, "COALESCE(f.first_comment, f.first_pr, f.first_merge)"),
+	)
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectContributorFunnelSQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor funnel: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.ContributorFunnelSeries{
-		Months:       make([]string, 0),
+		Labels:       make([]string, 0),
 		FirstComment: make([]int, 0),
 		FirstPR:      make([]int, 0),
 		FirstMerge:   make([]int, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var fc, fp, fm int
-		if err := rows.Scan(&month, &fc, &fp, &fm); err != nil {
+		if err := rows.Scan(&label, &fc, &fp, &fm); err != nil {
 			return nil, fmt.Errorf("failed to scan contributor funnel row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.FirstComment = append(sr.FirstComment, fc)
 		sr.FirstPR = append(sr.FirstPR, fp)
 		sr.FirstMerge = append(sr.FirstMerge, fm)
@@ -1098,35 +1178,43 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.FirstComment = gf.fillInt(sr.FirstComment)
+	sr.FirstPR = gf.fillInt(sr.FirstPR)
+	sr.FirstMerge = gf.fillInt(sr.FirstMerge)
+
 	return sr, nil
 }
 
-func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *string, months int) (*data.MomentumSeries, error) {
+func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *string, days int) (*data.MomentumSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	gran := AutoGranularity(days)
+	query := fmt.Sprintf(selectContributorMomentumTpl, GroupExpr(gran, "date"), MomentumInterval(gran), MomentumFormat(gran))
+	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectContributorMomentumSQL, since, org, repo, entity)
+	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor momentum: %w", err)
 	}
 	defer rows.Close()
 
 	sr := &data.MomentumSeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Active: make([]int, 0),
 		Delta:  make([]int, 0),
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var active int
-		if err := rows.Scan(&month, &active); err != nil {
+		if err := rows.Scan(&label, &active); err != nil {
 			return nil, fmt.Errorf("failed to scan contributor momentum row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Active = append(sr.Active, active)
 	}
 
@@ -1134,18 +1222,22 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Active = gf.fillInt(sr.Active)
+	sr.Delta = make([]int, len(sr.Active))
 	for i := range sr.Active {
 		if i == 0 {
-			sr.Delta = append(sr.Delta, 0)
+			sr.Delta[i] = 0
 		} else {
-			sr.Delta = append(sr.Delta, sr.Active[i]-sr.Active[i-1])
+			sr.Delta[i] = sr.Active[i] - sr.Active[i-1]
 		}
 	}
 
 	return sr, nil
 }
 
-func (s *Store) GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, months int) (*data.ContributorProfileSeries, error) {
+func (s *Store) GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, days int) (*data.ContributorProfileSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -1154,7 +1246,7 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 		return nil, fmt.Errorf("username is required")
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	var prs, prsMerged, reviews, issues, comments int
 	var prSmall, prMedium, prLarge, prXLarge int
@@ -1189,20 +1281,20 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	return result, nil
 }
 
-func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*data.FirstResponseSeries, error) {
-	ms, issueAvg, prAvg, err := getMonthDualSeries[float64](ctx, s.db, selectTimeToFirstResponseSQL, org, repo, entity, months)
+func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, days int) (*data.FirstResponseSeries, error) {
+	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseTpl, []string{"e.created_at"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
-	return &data.FirstResponseSeries{Months: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
+	return &data.FirstResponseSeries{Labels: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
 }
 
-func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*data.AgingPRsSeries, error) {
+func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, days int) (*data.AgingPRsSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, over30, over90 int
 
 	if err := s.db.QueryRowContext(ctx, selectAgingPRsSQL, org, repo, entity, since).Scan(&total, &over30, &over90); err != nil {
@@ -1222,20 +1314,20 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, mont
 	}, nil
 }
 
-func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
-	ms, opened, closed, err := getMonthDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
+func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, days int) (*data.IssueRatioSeries, error) {
+	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioTpl, []string{"e.created_at", "e.closed_at"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
-	return &data.IssueRatioSeries{Months: ms, Opened: opened, Closed: closed}, nil
+	return &data.IssueRatioSeries{Labels: ms, Opened: opened, Closed: closed}, nil
 }
 
-func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*data.UnansweredSeries, error) {
+func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, days int) (*data.UnansweredSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, unanswered int
 
 	if err := s.db.QueryRowContext(ctx, selectUnansweredRateSQL, org, repo, entity, since).Scan(&total, &unanswered); err != nil {
@@ -1254,12 +1346,12 @@ func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string
 	}, nil
 }
 
-func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*data.ResponseSLOSeries, error) {
+func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, days int) (*data.ResponseSLOSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, withinSLO int
 
 	if err := s.db.QueryRowContext(ctx, selectResponseSLOSQL, org, repo, entity, since).Scan(&total, &withinSLO); err != nil {
@@ -1279,12 +1371,12 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, m
 	}, nil
 }
 
-func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, months int) (*data.PortfolioSummary, error) {
+func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, days int) (*data.PortfolioSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	thirtyDaysAgo := sinceDate(1)
 
 	var ps data.PortfolioSummary

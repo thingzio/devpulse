@@ -45,8 +45,8 @@ type RepoStore interface {
 // OrgStore manages organization-level queries.
 type OrgStore interface {
 	GetAllOrgRepos(ctx context.Context) ([]*OrgRepoItem, error)
-	GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*CountedItem, error)
-	GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*CountedItem, error)
+	GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*CountedItem, error)
+	GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*CountedItem, error)
 	SearchDeveloperUsernames(ctx context.Context, query string, org, repo *string, months, limit int) ([]string, error)
 	GetOrgLike(ctx context.Context, query string, limit int) ([]*ListItem, error)
 }
@@ -67,37 +67,37 @@ type DeveloperStore interface {
 type QueryStore interface {
 	SearchEvents(ctx context.Context, q *EventSearchCriteria) ([]*EventDetails, error)
 	GetMinEventDate(ctx context.Context, org, repo *string) (string, error)
-	GetEventTypeSeries(ctx context.Context, org, repo, entity *string, months int) (*EventTypeSeries, error)
+	GetEventTypeSeries(ctx context.Context, org, repo, entity *string, days int) (*EventTypeSeries, error)
 }
 
 // EventStore manages event imports.
 type EventStore interface {
-	ImportEvents(ctx context.Context, token, owner, repo string, months int) (map[string]int, *ImportSummary, error)
+	ImportEvents(ctx context.Context, token, owner, repo string, days int) (map[string]int, *ImportSummary, error)
 	UpdateEvents(ctx context.Context, token string, concurrency int) (map[string]int, error)
 }
 
 // InsightsStore provides analytics and insights queries.
 type InsightsStore interface {
-	GetInsightsSummary(ctx context.Context, org, repo, entity *string, months int) (*InsightsSummary, error)
-	GetDailyActivity(ctx context.Context, org, repo, entity *string, months int) (*DailyActivitySeries, error)
-	GetContributorRetention(ctx context.Context, org, repo, entity *string, months int) (*RetentionSeries, error)
-	GetPRReviewRatio(ctx context.Context, org, repo, entity *string, months int) (*PRReviewRatioSeries, error)
-	GetChangeFailureRate(ctx context.Context, org, repo, entity *string, months int) (*ChangeFailureRateSeries, error)
-	GetReviewLatency(ctx context.Context, org, repo, entity *string, months int) (*ReviewLatencySeries, error)
-	GetTimeToMerge(ctx context.Context, org, repo, entity *string, months int) (*VelocitySeries, error)
-	GetTimeToClose(ctx context.Context, org, repo, entity *string, months int) (*VelocitySeries, error)
-	GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, months int) (*VelocitySeries, error)
-	GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, months int) (*PRSizeSeries, error)
-	GetForksAndActivity(ctx context.Context, org, repo, entity *string, months int) (*ForksAndActivitySeries, error)
-	GetContributorFunnel(ctx context.Context, org, repo, entity *string, months int) (*ContributorFunnelSeries, error)
-	GetContributorMomentum(ctx context.Context, org, repo, entity *string, months int) (*MomentumSeries, error)
-	GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, months int) (*ContributorProfileSeries, error)
-	GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*IssueRatioSeries, error)
-	GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*FirstResponseSeries, error)
-	GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*AgingPRsSeries, error)
-	GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*UnansweredSeries, error)
-	GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*ResponseSLOSeries, error)
-	GetPortfolioSummary(ctx context.Context, org, repo *string, months int) (*PortfolioSummary, error)
+	GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*InsightsSummary, error)
+	GetDailyActivity(ctx context.Context, org, repo, entity *string, days int) (*DailyActivitySeries, error)
+	GetContributorRetention(ctx context.Context, org, repo, entity *string, days int) (*RetentionSeries, error)
+	GetPRReviewRatio(ctx context.Context, org, repo, entity *string, days int) (*PRReviewRatioSeries, error)
+	GetChangeFailureRate(ctx context.Context, org, repo, entity *string, days int) (*ChangeFailureRateSeries, error)
+	GetReviewLatency(ctx context.Context, org, repo, entity *string, days int) (*ReviewLatencySeries, error)
+	GetTimeToMerge(ctx context.Context, org, repo, entity *string, days int) (*VelocitySeries, error)
+	GetTimeToClose(ctx context.Context, org, repo, entity *string, days int) (*VelocitySeries, error)
+	GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, days int) (*VelocitySeries, error)
+	GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, days int) (*PRSizeSeries, error)
+	GetForksAndActivity(ctx context.Context, org, repo, entity *string, days int) (*ForksAndActivitySeries, error)
+	GetContributorFunnel(ctx context.Context, org, repo, entity *string, days int) (*ContributorFunnelSeries, error)
+	GetContributorMomentum(ctx context.Context, org, repo, entity *string, days int) (*MomentumSeries, error)
+	GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, days int) (*ContributorProfileSeries, error)
+	GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, days int) (*IssueRatioSeries, error)
+	GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, days int) (*FirstResponseSeries, error)
+	GetAgingPRs(ctx context.Context, org, repo, entity *string, days int) (*AgingPRsSeries, error)
+	GetUnansweredRate(ctx context.Context, org, repo, entity *string, days int) (*UnansweredSeries, error)
+	GetResponseSLO(ctx context.Context, org, repo, entity *string, days int) (*ResponseSLOSeries, error)
+	GetPortfolioSummary(ctx context.Context, org, repo *string, days int) (*PortfolioSummary, error)
 	GetSignals(ctx context.Context, org *string, limit int) ([]*Signal, error)
 }
 
@@ -105,16 +105,16 @@ type InsightsStore interface {
 type ReleaseStore interface {
 	ImportReleases(ctx context.Context, token, owner, repo string) error
 	ImportAllReleases(ctx context.Context, token string) error
-	GetReleaseCadence(ctx context.Context, org, repo, entity *string, months int) (*ReleaseCadenceSeries, error)
-	GetReleaseDownloads(ctx context.Context, org, repo *string, months int) (*ReleaseDownloadsSeries, error)
-	GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, months int) (*ReleaseDownloadsByTagSeries, error)
+	GetReleaseCadence(ctx context.Context, org, repo, entity *string, days int) (*ReleaseCadenceSeries, error)
+	GetReleaseDownloads(ctx context.Context, org, repo *string, days int) (*ReleaseDownloadsSeries, error)
+	GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, days int) (*ReleaseDownloadsByTagSeries, error)
 }
 
 // ContainerStore manages container version imports and queries.
 type ContainerStore interface {
 	ImportContainerVersions(ctx context.Context, token, org, repo string) error
 	ImportAllContainerVersions(ctx context.Context, token string) error
-	GetContainerActivity(ctx context.Context, org, repo *string, months int) (*ContainerActivitySeries, error)
+	GetContainerActivity(ctx context.Context, org, repo *string, days int) (*ContainerActivitySeries, error)
 }
 
 // RepoMetaStore manages repository metadata imports and queries.
@@ -122,14 +122,14 @@ type RepoMetaStore interface {
 	ImportRepoMeta(ctx context.Context, token, owner, repo string) error
 	ImportAllRepoMeta(ctx context.Context, token string) error
 	GetRepoMetas(ctx context.Context, org, repo *string) ([]*RepoMeta, error)
-	GetRepoOverview(ctx context.Context, org *string, months int) ([]*RepoOverview, error)
+	GetRepoOverview(ctx context.Context, org *string, days int) ([]*RepoOverview, error)
 }
 
 // MetricHistoryStore manages repository metric history imports and queries.
 type MetricHistoryStore interface {
 	ImportRepoMetricHistory(ctx context.Context, token, owner, repo string) error
 	ImportAllRepoMetricHistory(ctx context.Context, token string) error
-	GetRepoMetricHistory(ctx context.Context, org, repo *string, months int) ([]*RepoMetricHistory, error)
+	GetRepoMetricHistory(ctx context.Context, org, repo *string, days int) ([]*RepoMetricHistory, error)
 }
 
 // ReputationStore manages reputation scoring.
@@ -138,7 +138,7 @@ type ReputationStore interface {
 	ImportDeepReputation(ctx context.Context, tokenFn TokenFunc, limit, staleHours int, org, repo *string) (*DeepReputationResult, error)
 	GetOrComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
 	ComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
-	GetReputationDistribution(ctx context.Context, org, repo, entity *string, months int) (*ReputationDistribution, error)
+	GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*ReputationDistribution, error)
 }
 
 // InsightsGenerationStore manages LLM-generated repo insights.

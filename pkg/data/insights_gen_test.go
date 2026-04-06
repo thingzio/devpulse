@@ -18,7 +18,7 @@ func TestBuildInsightsPrompt(t *testing.T) {
 	}
 	prompt := buildInsightsPrompt(metrics, 3)
 	assert.Contains(t, prompt, "bus_factor")
-	assert.Contains(t, prompt, "3 months")
+	assert.Contains(t, prompt, "3 weeks")
 	assert.Contains(t, prompt, "DORA")
 }
 

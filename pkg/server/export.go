@@ -78,23 +78,23 @@ func csvExportHandler(defaultStore data.Store, db *sql.DB) http.HandlerFunc {
 
 		for _, rp := range active {
 			prefix := fmt.Sprintf("export-%s/%s-%s/", today, rp.Org, rp.Repo)
-			exportRepoCSVs(ctx, zw, s, rp.Org, rp.Repo, p.months, prefix)
+			exportRepoCSVs(ctx, zw, s, rp.Org, rp.Repo, p.days, prefix)
 		}
 	}
 }
 
-func exportRepoCSVs(ctx context.Context, zw *zip.Writer, s data.Store, org, repo string, months int, prefix string) {
+func exportRepoCSVs(ctx context.Context, zw *zip.Writer, s data.Store, org, repo string, days int, prefix string) {
 	o := &org
 	r := &repo
-	exportSummaryCSV(ctx, zw, s, o, r, months, prefix)
-	exportEventsCSV(ctx, zw, s, o, r, months, prefix)
-	exportDevelopersCSV(ctx, zw, s, o, r, months, prefix)
+	exportSummaryCSV(ctx, zw, s, o, r, days, prefix)
+	exportEventsCSV(ctx, zw, s, o, r, days, prefix)
+	exportDevelopersCSV(ctx, zw, s, o, r, days, prefix)
 	exportInsightsCSV(ctx, zw, s, o, r, prefix)
-	exportReputationCSV(ctx, zw, s, o, r, months, prefix)
+	exportReputationCSV(ctx, zw, s, o, r, days, prefix)
 }
 
-func exportSummaryCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, months int, prefix string) {
-	summary, err := s.GetInsightsSummary(ctx, o, r, nil, months)
+func exportSummaryCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
+	summary, err := s.GetInsightsSummary(ctx, o, r, nil, days)
 	if err != nil || summary == nil {
 		return
 	}
@@ -106,15 +106,15 @@ func exportSummaryCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *s
 	})
 }
 
-func exportEventsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, months int, prefix string) {
+func exportEventsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
 	criteria := &data.EventSearchCriteria{
 		Org:      o,
 		Repo:     r,
 		Page:     1,
 		PageSize: 1000,
 	}
-	if months > 0 {
-		from := time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
+	if days > 0 {
+		from := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
 		criteria.FromDate = &from
 	}
 	events, err := s.SearchEvents(ctx, criteria)
@@ -132,8 +132,8 @@ func exportEventsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *st
 	writeCSVFile(zw, prefix+"events.csv", rows)
 }
 
-func exportDevelopersCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, months int, prefix string) {
-	devs, err := s.GetDeveloperPercentages(ctx, nil, o, r, nil, months)
+func exportDevelopersCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
+	devs, err := s.GetDeveloperPercentages(ctx, nil, o, r, nil, days)
 	if err != nil || len(devs) == 0 {
 		return
 	}
@@ -167,8 +167,8 @@ func exportInsightsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *
 	}
 }
 
-func exportReputationCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, months int, prefix string) {
-	rep, err := s.GetReputationDistribution(ctx, o, r, nil, months)
+func exportReputationCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
+	rep, err := s.GetReputationDistribution(ctx, o, r, nil, days)
 	if err != nil || rep == nil || len(rep.Labels) == 0 {
 		return
 	}

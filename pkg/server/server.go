@@ -291,17 +291,18 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 		t := pageTemplates["home.html"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := t.ExecuteTemplate(w, "home", map[string]any{
-			"base_path":       "",
-			"version":         opts.Version,
-			"commit":          opts.Commit,
-			"build_date":      opts.Date,
-			"period_months":   6,
-			"username":        tn.Username,
-			"plan":            tn.Plan,
-			"pdf_export":      limits.PDFExport,
-			"csv_export":      limits.CSVExport,
-			"max_data_months": limits.MaxDataRangeMonths,
-			"ai_level":        limits.AILevel,
+			"base_path":     "",
+			"version":       opts.Version,
+			"commit":        opts.Commit,
+			"build_date":    opts.Date,
+			"period_days":   180,
+			"username":      tn.Username,
+			"avatar_url":    tn.AvatarURL,
+			"plan":          tn.Plan,
+			"pdf_export":    limits.PDFExport,
+			"csv_export":    limits.CSVExport,
+			"max_data_days": limits.MaxDataRangeMonths * 30,
+			"ai_level":      limits.AILevel,
 		}); err != nil {
 			slog.Error("rendering dashboard", "error", err)
 		}
@@ -568,8 +569,8 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		months := queryParamInt(r, "m", 6)
-		overview, err := tenant.GetOverview(r.Context(), db, tn.ID, months)
+		days := queryParamInt(r, "d", 180)
+		overview, err := tenant.GetOverview(r.Context(), db, tn.ID, days)
 		if err != nil {
 			slog.Error("getting repo overview", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
