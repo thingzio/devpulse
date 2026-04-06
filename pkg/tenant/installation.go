@@ -103,7 +103,10 @@ func ListInstallations(ctx context.Context, db *sql.DB, tenantID string) ([]Inst
 		}
 		result = append(result, i)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating installations: %w", err)
+	}
+	return result, nil
 }
 
 // SuspendInstallation marks an installation as suspended.
@@ -166,7 +169,10 @@ func ListTenantRepos(ctx context.Context, db *sql.DB, tenantID string) ([]Tenant
 		}
 		result = append(result, r)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating tenant repos: %w", err)
+	}
+	return result, nil
 }
 
 // DeactivateTenantRepo marks a repo as inactive.
@@ -182,7 +188,7 @@ func DeactivateTenantRepo(ctx context.Context, db *sql.DB, tenantID, org, repo s
 func GetInstallationForOrg(ctx context.Context, db *sql.DB, tenantID, org string) (*ActiveInstallation, error) {
 	var inst ActiveInstallation
 	err := db.QueryRowContext(ctx, getInstallationForOrgSQL, tenantID, org).Scan(&inst.ID, &inst.Login)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

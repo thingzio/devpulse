@@ -246,6 +246,7 @@ func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, his
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	stmt, err := tx.PrepareContext(ctx, upsertRepoMetricHistorySQL)
 	if err != nil {

@@ -34,6 +34,29 @@ type cacheEntry struct {
 
 var apiCache = &responseCache{}
 
+// startEviction runs a background goroutine that periodically removes expired
+// cache entries. It stops when ctx is canceled.
+func (c *responseCache) startEviction(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				now := time.Now()
+				c.entries.Range(func(key, value any) bool {
+					if e, ok := value.(*cacheEntry); ok && now.After(e.expires) {
+						c.entries.Delete(key)
+					}
+					return true
+				})
+			}
+		}
+	}()
+}
+
 func (c *responseCache) get(key string) ([]byte, bool) {
 	v, ok := c.entries.Load(key)
 	if !ok {

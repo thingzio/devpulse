@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -95,7 +96,7 @@ func (s *Store) GetRepoInsightsGeneratedAt(ctx context.Context, org, repo string
 
 	var ts string
 	if err := s.db.QueryRowContext(ctx, selectRepoInsightsGeneratedAtSQL, org, repo).Scan(&ts); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
 		return "", fmt.Errorf("querying repo insights generated_at for %s/%s: %w", org, repo, err)
@@ -111,7 +112,7 @@ func (s *Store) GetRepoInsightsEventCount(ctx context.Context, org, repo string)
 
 	var count int
 	if err := s.db.QueryRowContext(ctx, selectRepoInsightsEventCountSQL, org, repo).Scan(&count); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("querying repo insights event_count for %s/%s: %w", org, repo, err)

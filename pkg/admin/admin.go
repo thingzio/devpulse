@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/config"
@@ -94,10 +95,13 @@ func Run(ctx context.Context) error {
 
 	address := "0.0.0.0:" + port
 	srv := &http.Server{
-		Addr:         address,
-		Handler:      mux,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
+		Addr:              address,
+		Handler:           mux,
+		ReadTimeout:       readTimeout,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 16, // 64KB
 	}
 
 	errCh := make(chan error, 1)
@@ -348,7 +352,7 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 
 func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("https://api.github.com/users/%s", username), nil)
+		fmt.Sprintf("https://api.github.com/users/%s", url.PathEscape(username)), nil)
 	if err != nil {
 		return 0, fmt.Errorf("building request: %w", err)
 	}

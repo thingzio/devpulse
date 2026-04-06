@@ -209,9 +209,12 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 	retryRL := func(fn func() error) error {
 		err := fn()
 		if err != nil && ghutil.WaitForRateReset(ctx, err) {
-			return fn()
+			return fmt.Errorf("retryRL: %w", fn())
 		}
-		return err
+		if err != nil {
+			return fmt.Errorf("retryRL: %w", err)
+		}
+		return nil
 	}
 
 	slog.Info("phase: metadata", "org", org, "repo", repo)

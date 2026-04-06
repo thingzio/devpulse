@@ -145,6 +145,7 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	txStmt := tx.Stmt(userStmt)
 	for i, u := range devs {
@@ -233,6 +234,7 @@ func (s *Store) UpdateDeveloperNames(ctx context.Context, devs map[string]string
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	txStmt2 := tx.Stmt(updateStmt)
 	defer txStmt2.Close()

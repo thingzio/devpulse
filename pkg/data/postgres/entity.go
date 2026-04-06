@@ -201,6 +201,7 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	txStmt := tx.Stmt(updateStmt)
 	defer txStmt.Close()

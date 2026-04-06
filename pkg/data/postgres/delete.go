@@ -28,6 +28,7 @@ func (s *Store) DeleteRepoData(ctx context.Context, org, repo string) (*data.Del
 	if err != nil {
 		return nil, fmt.Errorf("beginning delete transaction: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	result := &data.DeleteResult{Org: org, Repo: repo}
 

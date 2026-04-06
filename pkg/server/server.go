@@ -108,6 +108,8 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 
+	apiCache.startEviction(ctx)
+
 	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
@@ -151,10 +153,14 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	// Static assets
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
+	// Rate limiters for abuse-sensitive endpoints.
+	oauthRL := rateLimitMiddleware(newRateLimiter(10, time.Minute))
+	repoSearchRL := rateLimitMiddleware(newRateLimiter(30, time.Minute))
+
 	// Public routes (no auth)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /{$}", landingHandler(opts))
-	mux.HandleFunc("GET /auth/github", oauthStartHandler(oauthCfg))
+	mux.Handle("GET /auth/github", oauthRL(oauthStartHandler(oauthCfg)))
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
 	mux.HandleFunc("GET /help", func(w http.ResponseWriter, _ *http.Request) {
@@ -183,7 +189,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
-	mux.Handle("GET /api/repos/available", wrap(availableReposHandler(db)))
+	mux.Handle("GET /api/repos/available", repoSearchRL(wrap(availableReposHandler(db))))
 	mux.Handle("GET /api/installations", wrap(listInstallationsHandler(db)))
 
 	// Data API (chart endpoints, authenticated + tenant-scoped via RLS)
@@ -236,6 +242,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"+
+				" img-src 'self' https://avatars.githubusercontent.com data:;"+
+				" connect-src 'self'; font-src 'self'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }

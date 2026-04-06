@@ -48,7 +48,7 @@ func (s *Store) ImportContainerVersions(ctx context.Context, token, org, repo st
 
 	matched, err := listRepoContainerPackages(ctx, client, org, repo)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing container packages for %s/%s: %w", org, repo, err)
 	}
 	if len(matched) == 0 {
 		return nil
@@ -56,7 +56,7 @@ func (s *Store) ImportContainerVersions(ctx context.Context, token, org, repo st
 
 	total, err := upsertContainerVersions(ctx, client, s.db, org, repo, matched)
 	if err != nil {
-		return err
+		return fmt.Errorf("upserting container versions for %s/%s: %w", org, repo, err)
 	}
 
 	if total > 0 {
@@ -85,7 +85,7 @@ func listRepoContainerPackages(ctx context.Context, client *github.Client, org, 
 			return nil, fmt.Errorf("listing packages for %s: %w", org, err)
 		}
 		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rate limit listing containers: %w", err)
 		}
 
 		total += len(packages)
@@ -113,6 +113,7 @@ func upsertContainerVersions(ctx context.Context, client *github.Client, db DBTX
 	if err != nil {
 		return 0, fmt.Errorf("beginning container version tx: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	stmt, err := tx.PrepareContext(ctx, upsertContainerVersionSQL)
 	if err != nil {
@@ -158,7 +159,7 @@ func fetchAndStoreVersions(ctx context.Context, client *github.Client, stmt *sql
 			return 0, fmt.Errorf("listing versions for %s/%s: %w", org, pkgName, err)
 		}
 		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("rate limit listing container versions: %w", err)
 		}
 
 		seenOld := false

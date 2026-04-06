@@ -3,6 +3,7 @@ package tenant
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -125,7 +126,7 @@ func RequestUpgrade(ctx context.Context, db *sql.DB, tenantID string) (*UpgradeR
 	err := db.QueryRowContext(ctx, requestUpgradeSQL, tenantID).Scan(
 		&req.Username, &req.Email, &req.Plan, &req.MaxRepos,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

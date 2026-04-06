@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -64,7 +65,7 @@ const (
 func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) error {
 	var lastUpdated string
 	var healthPct int
-	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct); scanErr != nil && scanErr != sql.ErrNoRows {
+	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct); scanErr != nil && !errors.Is(scanErr, sql.ErrNoRows) {
 		return fmt.Errorf("querying repo meta updated_at for %s/%s: %w", owner, repo, scanErr)
 	}
 	if lastUpdated != "" && healthPct > 0 {

@@ -183,7 +183,10 @@ func GetActiveTenants(ctx context.Context, db *sql.DB) ([]ActiveTenant, error) {
 		}
 		tenants = append(tenants, t)
 	}
-	return tenants, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating active tenants: %w", err)
+	}
+	return tenants, nil
 }
 
 // GetActiveInstallations returns non-suspended installations for a tenant.
@@ -202,7 +205,10 @@ func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string) ([
 		}
 		result = append(result, inst)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating active installations: %w", err)
+	}
+	return result, nil
 }
 
 // GetActiveReposForInstall returns active repos for a tenant's installation.
@@ -221,5 +227,8 @@ func GetActiveReposForInstall(ctx context.Context, db *sql.DB, tenantID string, 
 		}
 		repos = append(repos, r)
 	}
-	return repos, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating active repos: %w", err)
+	}
+	return repos, nil
 }

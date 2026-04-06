@@ -161,6 +161,7 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 	if err != nil {
 		return nil, fmt.Errorf("error starting reputation tx: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	stmt, err := tx.PrepareContext(ctx, updateReputationSQL)
 	if err != nil {

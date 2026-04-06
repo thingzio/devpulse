@@ -89,6 +89,7 @@ func applyMigrations(db *sql.DB, cfg migrateConfig) error {
 		if err != nil {
 			return fmt.Errorf("beginning %s migration tx %d: %w", cfg.label, ver, err)
 		}
+		defer rollbackTransaction(tx)
 
 		if _, err := tx.Exec(string(content)); err != nil {
 			_ = tx.Rollback()

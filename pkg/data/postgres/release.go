@@ -146,7 +146,7 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 			return fmt.Errorf("error listing releases %s/%s: status %d", owner, repo, resp.StatusCode)
 		}
 		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return err
+			return fmt.Errorf("rate limit during release import: %w", err)
 		}
 
 		if len(releases) == 0 {
@@ -155,7 +155,7 @@ func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) e
 
 		seenOld, upsertErr := upsertReleasePage(ctx, s.db, stmt, assetStmt, owner, repo, releases, latestPublishedAt)
 		if upsertErr != nil {
-			return upsertErr
+			return fmt.Errorf("upserting release page for %s/%s: %w", owner, repo, upsertErr)
 		}
 
 		slog.Debug("releases done", "org", owner, "repo", repo, "count", len(releases))
@@ -174,6 +174,7 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 	if err != nil {
 		return false, fmt.Errorf("error starting release tx: %w", err)
 	}
+	defer rollbackTransaction(tx)
 
 	txStmt := tx.Stmt(stmt)
 	defer txStmt.Close()
