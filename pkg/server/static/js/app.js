@@ -485,12 +485,14 @@ function loadAllCharts(months, org, repo, entity) {
     loadSummaryBanner(months, org, repo, entity);
 
     if (repo) {
-        // Analytics mode: show tabs, hide portfolio
+        // Analytics mode: show tabs, hide portfolio and banner
+        $(".banner-group").hide();
         $("#portfolio-view").hide();
         $("#tab-bar").show();
         activateTab(activeTab);
     } else {
-        // Portfolio mode: hide tabs, show portfolio
+        // Portfolio mode: show banner, hide tabs
+        $(".banner-group").show();
         $("#tab-bar").hide();
         $(".tab-content").removeClass("active");
         $("#portfolio-view").show();
