@@ -479,39 +479,49 @@ function loadTabCharts(tab, months, org, repo, entity) {
     }
 }
 
-function loadAllCharts(months, org, repo, entity) {
+function loadAllCharts(days, org, repo, entity) {
     lastTabKey = "";
     checkInsightsAvailable(org, repo);
-    loadSummaryBanner(months, org, repo, entity);
 
     if (repo) {
-        // Analytics mode: show tabs, hide portfolio and banner
-        $(".banner-group").hide();
+        // Analytics mode: show tabs, hide portfolio
         $("#portfolio-view").hide();
         $("#tab-bar").show();
+        loadSummaryBanner(days, org, repo, entity);
         activateTab(activeTab);
     } else {
-        // Portfolio mode: show banner, hide tabs
-        $(".banner-group").show();
+        // Portfolio mode: hide tabs, show portfolio
         $("#tab-bar").hide();
         $(".tab-content").removeClass("active");
         $("#portfolio-view").show();
-        loadPortfolioView(months, org);
+        loadPortfolioView(days, org, entity);
     }
 }
 
-function loadPortfolioView(days, org) {
+function loadPortfolioView(days, org, entity) {
     loadRepoOverview('/api/repos/overview');
-    var url = '/data/insights/portfolio-summary?d=' + days + '&o=' + org;
-    $.get(url, function (d) {
+
+    // Summary stats (orgs, repos, events, contributors, last import)
+    $.get('/data/insights/summary?d=' + days + '&o=' + org + '&e=' + (entity || ''), function (s) {
+        if (!s) return;
+        $("#ps-orgs").text(s.orgs ? s.orgs.toLocaleString() : '0');
+        $("#ps-repos").text(s.repos ? s.repos.toLocaleString() : '0');
+        $("#ps-events").text(s.events ? s.events.toLocaleString() : '0');
+        $("#ps-contributors").text(s.contributors ? s.contributors.toLocaleString() : '0');
+        $("#ps-last-import").html(formatImportDate(s.last_import));
+        if (s.last_import) {
+            $("#ps-last-import").attr('title', new Date(s.last_import).toLocaleString());
+        }
+    });
+
+    // Portfolio metrics (stars, forks, issues, PRs, merge time)
+    $.get('/data/insights/portfolio-summary?d=' + days + '&o=' + org, function (d) {
         if (!d) return;
         $("#ps-stars").text(d.total_stars ? d.total_stars.toLocaleString() : '0');
         $("#ps-forks").text(d.total_forks ? d.total_forks.toLocaleString() : '0');
         $("#ps-issues").text(d.total_open_issues ? d.total_open_issues.toLocaleString() : '0');
         $("#ps-prs").text(d.total_closed_prs ? d.total_closed_prs.toLocaleString() : '0');
-        $("#ps-contributors").text(d.total_contributors ? d.total_contributors.toLocaleString() : '0');
-        var mergeHrs = d.avg_merge_hours ? d.avg_merge_hours.toFixed(1) : '—';
-        $("#ps-merge").text(mergeHrs);
+        $("#ps-merge").text(d.avg_merge_hours ? d.avg_merge_hours.toFixed(1) : '—');
     });
 }
 
