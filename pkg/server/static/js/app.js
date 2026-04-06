@@ -332,8 +332,7 @@ $(function () {
         history.replaceState(null, "");
         updatePeriodOptions("", "", function () {
             var months = $("#period_days").val();
-            loadSummaryBanner(months, "", "", "");
-            activateTab(activeTab);
+            loadAllCharts(months, "", "", "");
         });
     }
 });
@@ -402,7 +401,7 @@ function activateTab(tab) {
 }
 
 function loadSummaryBanner(months, org, repo, entity) {
-    $.get('/data/insights/summary?m=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity, function (data) {
+    $.get('/data/insights/summary?d=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity, function (data) {
         $("#banner-orgs").text(data.orgs.toLocaleString());
         $("#banner-repos").text(data.repos.toLocaleString());
         $("#banner-events").text(data.events.toLocaleString());
@@ -423,22 +422,11 @@ function loadTabCharts(tab, months, org, repo, entity) {
         case 'health':
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
             loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
-            if (repo) {
-                loadHealthScorecard('/data/insights/health-scorecard?' + q);
-                $("#stars-trend-panel").show();
-                $("#forks-trend-panel").show();
-                $("#repo-overview-panel").hide();
-                $("#add-repo-panel").hide();
-                loadStarsTrendChart('/data/insights/repo-metric-history?' + q);
-                loadForksTrendChart('/data/insights/repo-metric-history?' + q);
-            } else {
-                $("#health-scorecard-panel").hide();
-                $("#stars-trend-panel").hide();
-                $("#forks-trend-panel").hide();
-                $("#repo-overview-panel").show();
-                $("#add-repo-panel").show();
-                loadRepoOverview('/api/repos/overview');
-            }
+            loadHealthScorecard('/data/insights/health-scorecard?' + q);
+            $("#stars-trend-panel").show();
+            $("#forks-trend-panel").show();
+            loadStarsTrendChart('/data/insights/repo-metric-history?' + q);
+            loadForksTrendChart('/data/insights/repo-metric-history?' + q);
             break;
         case 'activity':
             loadTimeSeriesChart('/data/type?' + q, onTimeSeriesChartSelect);
@@ -451,8 +439,8 @@ function loadTabCharts(tab, months, org, repo, entity) {
             loadVelocityChart('/data/insights/time-to-merge?' + q, 'time-to-merge-chart', 'timeToMerge');
             loadChangeFailureRateChart('/data/insights/change-failure-rate?' + q);
             loadReleaseCadenceChart('/data/insights/release-cadence?' + q);
-            loadReleaseDownloadsChart('/data/insights/release-downloads?m=' + months + '&o=' + org + '&r=' + repo);
-            loadReleaseDownloadsByTagChart('/data/insights/release-downloads-by-tag?m=' + months + '&o=' + org + '&r=' + repo);
+            loadReleaseDownloadsChart('/data/insights/release-downloads?d=' + months + '&o=' + org + '&r=' + repo);
+            loadReleaseDownloadsByTagChart('/data/insights/release-downloads-by-tag?d=' + months + '&o=' + org + '&r=' + repo);
             loadContainerActivityChart('/data/insights/container-activity?' + q);
             break;
         case 'quality':
@@ -495,7 +483,34 @@ function loadAllCharts(months, org, repo, entity) {
     lastTabKey = "";
     checkInsightsAvailable(org, repo);
     loadSummaryBanner(months, org, repo, entity);
-    activateTab(activeTab);
+
+    if (repo) {
+        // Analytics mode: show tabs, hide portfolio
+        $("#portfolio-view").hide();
+        $("#tab-bar").show();
+        activateTab(activeTab);
+    } else {
+        // Portfolio mode: hide tabs, show portfolio
+        $("#tab-bar").hide();
+        $(".tab-content").removeClass("active");
+        $("#portfolio-view").show();
+        loadPortfolioView(months, org);
+    }
+}
+
+function loadPortfolioView(days, org) {
+    loadRepoOverview('/api/repos/overview');
+    var url = '/data/insights/portfolio-summary?d=' + days + '&o=' + org;
+    $.get(url, function (d) {
+        if (!d) return;
+        $("#ps-stars").text(d.total_stars ? d.total_stars.toLocaleString() : '0');
+        $("#ps-forks").text(d.total_forks ? d.total_forks.toLocaleString() : '0');
+        $("#ps-issues").text(d.total_open_issues ? d.total_open_issues.toLocaleString() : '0');
+        $("#ps-prs").text(d.total_closed_prs ? d.total_closed_prs.toLocaleString() : '0');
+        $("#ps-contributors").text(d.total_contributors ? d.total_contributors.toLocaleString() : '0');
+        var mergeHrs = d.avg_merge_hours ? d.avg_merge_hours.toFixed(1) : '—';
+        $("#ps-merge").text(mergeHrs);
+    });
 }
 
 function checkInsightsAvailable(org, repo) {
@@ -556,9 +571,7 @@ function applySelection(scope, item, skipPushState) {
     submitSearch();
     updatePeriodOptions(org, repo, function () {
         var m = $("#period_days").val();
-        checkInsightsAvailable(org, repo);
-        loadSummaryBanner(m, org, repo, entity);
-        activateTab(activeTab);
+        loadAllCharts(m, org, repo, entity);
     });
 }
 
@@ -1144,7 +1157,7 @@ function renderScorecardCategory(id, cat) {
 }
 
 function loadPortfolioSummary(months, org, repo) {
-    var url = '/data/insights/portfolio-summary?m=' + months + '&o=' + org;
+    var url = '/data/insights/portfolio-summary?d=' + months + '&o=' + org;
     if (repo) url += '&r=' + repo;
     $.get(url, function (d) {
         if (!d) { clearPortfolioStats(); return; }
@@ -2977,7 +2990,7 @@ function generatePDF() {
         fetchJSON('/data/insights/time-to-merge?' + q),
         fetchJSON('/data/insights/change-failure-rate?' + q),
         fetchJSON('/data/insights/release-cadence?' + q),
-        fetchJSON('/data/insights/release-downloads?m=' + months + '&o=' + org + '&r=' + repo),
+        fetchJSON('/data/insights/release-downloads?d=' + months + '&o=' + org + '&r=' + repo),
         fetchJSON('/data/insights/pr-ratio?' + q),
         fetchJSON('/data/insights/review-latency?' + q),
         fetchJSON('/data/insights/time-to-close?' + q),
