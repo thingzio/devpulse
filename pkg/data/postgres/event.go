@@ -103,7 +103,7 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	for _, r := range list {
 		org, repo := r.Org, r.Repo
 		g.Go(func() error {
-			m, _, importErr := s.ImportEvents(ctx, token, org, repo, data.EventAgeMonthsDefault)
+			m, _, importErr := s.ImportEvents(ctx, token, org, repo, data.EventAgeDaysDefault)
 			if importErr != nil {
 				slog.Error("error importing events", "org", org, "repo", repo, "error", importErr)
 				return nil // log and continue, don't abort other repos
@@ -126,13 +126,13 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	return results, nil
 }
 
-func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, months int) (map[string]int, *data.ImportSummary, error) {
+func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, days int) (map[string]int, *data.ImportSummary, error) {
 	if token == "" || owner == "" || repo == "" {
 		return nil, nil, errors.New("token, owner, and repo are required")
 	}
 
-	if months < 1 {
-		months = data.EventAgeMonthsDefault
+	if days < 1 {
+		days = data.EventAgeDaysDefault
 	}
 
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
@@ -146,7 +146,7 @@ func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, mon
 		counts:       make(map[string]int),
 		users:        make(map[string]*github.User),
 		state:        make(map[string]*data.State),
-		minEventTime: time.Now().AddDate(0, -months, 0).UTC(),
+		minEventTime: time.Now().AddDate(0, 0, -days).UTC(),
 	}
 
 	importers := []importerFunc{

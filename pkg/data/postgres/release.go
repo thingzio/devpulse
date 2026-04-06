@@ -241,14 +241,14 @@ func (s *Store) ImportAllReleases(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string, months int) (*data.ReleaseCadenceSeries, error) {
+func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string, days int) (*data.ReleaseCadenceSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	cadenceQuery := fmt.Sprintf(selectReleaseCadenceTpl, GroupExpr(gran, "published_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, cadenceQuery, org, repo, since)
 	if err != nil {
@@ -307,14 +307,14 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint
+func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, days int) (*data.ReleaseDownloadsSeries, error) { //nolint:dupl,nolintlint
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectReleaseDownloadsTpl, GroupExpr(gran, "r.published_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
 	if err != nil {
@@ -344,12 +344,12 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, mont
 	return sr, nil
 }
 
-func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, months int) (*data.ReleaseDownloadsByTagSeries, error) {
+func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string, days int) (*data.ReleaseDownloadsByTagSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
 	if err != nil {

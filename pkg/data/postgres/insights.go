@@ -683,12 +683,12 @@ LIMIT $4
 	`
 )
 
-func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *string, months int) (*data.InsightsSummary, error) {
+func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*data.InsightsSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	summary := &data.InsightsSummary{}
 
 	if err := s.db.QueryRowContext(ctx, selectBusFactorSQL, org, repo, entity, since).Scan(&summary.BusFactor); err != nil {
@@ -708,12 +708,12 @@ func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *strin
 	return summary, nil
 }
 
-func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string, months int) (*data.DailyActivitySeries, error) {
+func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string, days int) (*data.DailyActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, selectDailyActivitySQL, org, repo, entity, since)
 	if err != nil {
@@ -739,18 +739,18 @@ func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string,
 	return series, nil
 }
 
-func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl string, cols []string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
+func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl string, cols []string, org, repo, entity *string, days int) ([]string, []T, []T, error) {
 	if db == nil {
 		return nil, nil, nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	fmtArgs := make([]any, len(cols))
 	for i, col := range cols {
 		fmtArgs[i] = GroupExpr(gran, col)
 	}
 	query := fmt.Sprintf(queryTpl, fmtArgs...)
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := db.QueryContext(ctx, query, org, repo, entity, since, org, repo, entity, since)
 	if err != nil {
@@ -779,22 +779,22 @@ func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl strin
 	return ms, a, b, nil
 }
 
-func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, months int) (*data.RetentionSeries, error) {
-	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionTpl, []string{"e.date"}, org, repo, entity, months)
+func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, days int) (*data.RetentionSeries, error) {
+	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionTpl, []string{"e.date"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
 	return &data.RetentionSeries{Labels: ms, New: newC, Returning: retC}, nil
 }
 
-func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, months int) (*data.PRReviewRatioSeries, error) {
+func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, days int) (*data.PRReviewRatioSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query,
 		data.EventTypePR, data.EventTypePRReview,
@@ -836,15 +836,15 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	return sr, nil
 }
 
-func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *string, months int) (*data.ChangeFailureRateSeries, error) {
+func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *string, days int) (*data.ChangeFailureRateSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"))
 	deployQuery := fmt.Sprintf(selectDeploymentCountTpl, GroupExpr(gran, "published_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	failureMap := make(map[string]int)
 
@@ -925,14 +925,14 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	return sr, nil
 }
 
-func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string, months int) (*data.ReviewLatencySeries, error) {
+func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string, days int) (*data.ReviewLatencySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectReviewLatencyTpl, GroupExpr(gran, "date"), GroupExpr(gran, "pr.created_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity, since)
 	if err != nil {
@@ -965,14 +965,14 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 	return sr, nil
 }
 
-func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
+func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(queryTpl, GroupExpr(gran, col))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
@@ -1005,26 +1005,26 @@ func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org
 	return sr, nil
 }
 
-func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToMergeTpl, "e.created_at", org, repo, entity, months)
+func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToMergeTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToCloseTpl, "e.created_at", org, repo, entity, months)
+func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToCloseTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, months int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsTpl, "e.created_at", org, repo, entity, months)
+func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
+	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsTpl, "e.created_at", org, repo, entity, days)
 }
 
-func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, months int) (*data.PRSizeSeries, error) {
+func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.PRSizeSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
@@ -1060,14 +1060,14 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	return sr, nil
 }
 
-func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *string, months int) (*data.ForksAndActivitySeries, error) {
+func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *string, days int) (*data.ForksAndActivitySeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
@@ -1099,12 +1099,12 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	return sr, nil
 }
 
-func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *string, months int) (*data.ContributorFunnelSeries, error) {
+func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *string, days int) (*data.ContributorFunnelSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectContributorFunnelTpl,
 		GroupExpr(gran, "date"),
 		GroupExpr(gran, "f.first_comment"),
@@ -1112,7 +1112,7 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 		GroupExpr(gran, "f.first_merge"),
 		GroupExpr(gran, "COALESCE(f.first_comment, f.first_pr, f.first_merge)"),
 	)
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
 	if err != nil {
@@ -1146,14 +1146,14 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 	return sr, nil
 }
 
-func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *string, months int) (*data.MomentumSeries, error) {
+func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *string, days int) (*data.MomentumSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectContributorMomentumTpl, GroupExpr(gran, "date"), MomentumInterval(gran), MomentumFormat(gran))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity)
 	if err != nil {
@@ -1192,7 +1192,7 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 	return sr, nil
 }
 
-func (s *Store) GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, months int) (*data.ContributorProfileSeries, error) {
+func (s *Store) GetContributorProfile(ctx context.Context, username string, org, repo, entity *string, days int) (*data.ContributorProfileSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -1201,7 +1201,7 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 		return nil, fmt.Errorf("username is required")
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	var prs, prsMerged, reviews, issues, comments int
 	var prSmall, prMedium, prLarge, prXLarge int
@@ -1236,20 +1236,20 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	return result, nil
 }
 
-func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*data.FirstResponseSeries, error) {
-	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseTpl, []string{"e.created_at"}, org, repo, entity, months)
+func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, days int) (*data.FirstResponseSeries, error) {
+	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseTpl, []string{"e.created_at"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
 	return &data.FirstResponseSeries{Labels: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
 }
 
-func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*data.AgingPRsSeries, error) {
+func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, days int) (*data.AgingPRsSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, over30, over90 int
 
 	if err := s.db.QueryRowContext(ctx, selectAgingPRsSQL, org, repo, entity, since).Scan(&total, &over30, &over90); err != nil {
@@ -1269,20 +1269,20 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, mont
 	}, nil
 }
 
-func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
-	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioTpl, []string{"e.created_at", "e.closed_at"}, org, repo, entity, months)
+func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, days int) (*data.IssueRatioSeries, error) {
+	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioTpl, []string{"e.created_at", "e.closed_at"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
 	return &data.IssueRatioSeries{Labels: ms, Opened: opened, Closed: closed}, nil
 }
 
-func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*data.UnansweredSeries, error) {
+func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, days int) (*data.UnansweredSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, unanswered int
 
 	if err := s.db.QueryRowContext(ctx, selectUnansweredRateSQL, org, repo, entity, since).Scan(&total, &unanswered); err != nil {
@@ -1301,12 +1301,12 @@ func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string
 	}, nil
 }
 
-func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, months int) (*data.ResponseSLOSeries, error) {
+func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, days int) (*data.ResponseSLOSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	var total, withinSLO int
 
 	if err := s.db.QueryRowContext(ctx, selectResponseSLOSQL, org, repo, entity, since).Scan(&total, &withinSLO); err != nil {
@@ -1326,12 +1326,12 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, m
 	}, nil
 }
 
-func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, months int) (*data.PortfolioSummary, error) {
+func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, days int) (*data.PortfolioSummary, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	thirtyDaysAgo := sinceDate(1)
 
 	var ps data.PortfolioSummary

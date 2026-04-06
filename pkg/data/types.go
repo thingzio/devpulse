@@ -10,7 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 
 const (
-	EventAgeMonthsDefault int = 6
+	EventAgeDaysDefault int = 180
 
 	EventTypePR           string = "pr"
 	EventTypePRReview     string = "pr_review"

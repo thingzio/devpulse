@@ -72,63 +72,63 @@ type InsightsMetrics struct {
 // GatherInsightsMetrics calls Store methods to collect all metrics for a repo.
 // Individual metric failures are logged as warnings; the function always returns
 // whatever metrics were successfully gathered.
-func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, months int) *InsightsMetrics {
+func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, days int) *InsightsMetrics {
 	o, r := &org, &repo
 	m := &InsightsMetrics{}
 	var err error
 
-	if m.Summary, err = store.GetInsightsSummary(ctx, o, r, nil, months); err != nil {
+	if m.Summary, err = store.GetInsightsSummary(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get summary", "error", err)
 	}
-	if m.Momentum, err = store.GetContributorMomentum(ctx, o, r, nil, months); err != nil {
+	if m.Momentum, err = store.GetContributorMomentum(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get momentum", "error", err)
 	}
-	if m.PRRatio, err = store.GetPRReviewRatio(ctx, o, r, nil, months); err != nil {
+	if m.PRRatio, err = store.GetPRReviewRatio(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get pr review ratio", "error", err)
 	}
-	if m.TimeToMerge, err = store.GetTimeToMerge(ctx, o, r, nil, months); err != nil {
+	if m.TimeToMerge, err = store.GetTimeToMerge(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get time to merge", "error", err)
 	}
-	if m.Retention, err = store.GetContributorRetention(ctx, o, r, nil, months); err != nil {
+	if m.Retention, err = store.GetContributorRetention(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get retention", "error", err)
 	}
-	if m.Funnel, err = store.GetContributorFunnel(ctx, o, r, nil, months); err != nil {
+	if m.Funnel, err = store.GetContributorFunnel(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get funnel", "error", err)
 	}
-	if m.ChangeFailure, err = store.GetChangeFailureRate(ctx, o, r, nil, months); err != nil {
+	if m.ChangeFailure, err = store.GetChangeFailureRate(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get change failure rate", "error", err)
 	}
-	if m.ReviewLatency, err = store.GetReviewLatency(ctx, o, r, nil, months); err != nil {
+	if m.ReviewLatency, err = store.GetReviewLatency(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get review latency", "error", err)
 	}
-	if m.PRSize, err = store.GetPRSizeDistribution(ctx, o, r, nil, months); err != nil {
+	if m.PRSize, err = store.GetPRSizeDistribution(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get pr size distribution", "error", err)
 	}
-	if m.ForksAndActivity, err = store.GetForksAndActivity(ctx, o, r, nil, months); err != nil {
+	if m.ForksAndActivity, err = store.GetForksAndActivity(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get forks and activity", "error", err)
 	}
-	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(ctx, o, r, nil, months); err != nil {
+	if m.IssueRatio, err = store.GetIssueOpenCloseRatio(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get issue ratio", "error", err)
 	}
-	if m.FirstResponse, err = store.GetTimeToFirstResponse(ctx, o, r, nil, months); err != nil {
+	if m.FirstResponse, err = store.GetTimeToFirstResponse(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get first response", "error", err)
 	}
-	if m.ReleaseCadence, err = store.GetReleaseCadence(ctx, o, r, nil, months); err != nil {
+	if m.ReleaseCadence, err = store.GetReleaseCadence(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get release cadence", "error", err)
 	}
-	if m.ReleaseDownloads, err = store.GetReleaseDownloads(ctx, o, r, months); err != nil {
+	if m.ReleaseDownloads, err = store.GetReleaseDownloads(ctx, o, r, days); err != nil {
 		slog.Warn("insights: failed to get release downloads", "error", err)
 	}
 	if m.RepoMeta, err = store.GetRepoMetas(ctx, o, r); err != nil {
 		slog.Warn("insights: failed to get repo metas", "error", err)
 	}
-	if m.AgingPRs, err = store.GetAgingPRs(ctx, o, r, nil, months); err != nil {
+	if m.AgingPRs, err = store.GetAgingPRs(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get aging PRs", "error", err)
 	}
-	if m.Unanswered, err = store.GetUnansweredRate(ctx, o, r, nil, months); err != nil {
+	if m.Unanswered, err = store.GetUnansweredRate(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get unanswered rate", "error", err)
 	}
-	if m.ResponseSLO, err = store.GetResponseSLO(ctx, o, r, nil, months); err != nil {
+	if m.ResponseSLO, err = store.GetResponseSLO(ctx, o, r, nil, days); err != nil {
 		slog.Warn("insights: failed to get response SLO", "error", err)
 	}
 

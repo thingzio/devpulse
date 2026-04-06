@@ -95,7 +95,7 @@ func queryParamInt(r *http.Request, key string, def int) int {
 		return def
 	}
 
-	if i < 1 || i > 120 {
+	if i < 14 || i > 3650 {
 		return def
 	}
 
@@ -126,17 +126,18 @@ func parseRepo(repo *string) (*string, *string, bool) {
 }
 
 type insightParams struct {
-	months int
-	org    *string
-	repo   *string
+	days int
+	org  *string
+	repo *string
 }
 
 func parseInsightParams(r *http.Request) insightParams {
-	months := queryParamInt(r, "m", data.EventAgeMonthsDefault)
+	days := queryParamInt(r, "d", data.EventAgeDaysDefault)
 	if tn := middleware.TenantFromContext(r.Context()); tn != nil {
 		if limits, ok := plan.Get(tn.Plan); ok && limits.MaxDataRangeMonths > 0 {
-			if months > limits.MaxDataRangeMonths {
-				months = limits.MaxDataRangeMonths
+			maxDays := limits.MaxDataRangeMonths * 30
+			if days > maxDays {
+				days = maxDays
 			}
 		}
 	}
@@ -146,7 +147,7 @@ func parseInsightParams(r *http.Request) insightParams {
 		org = *orgStr
 		repo = *repoStr
 	}
-	return insightParams{months: months, org: optional(org), repo: optional(repo)}
+	return insightParams{days: days, org: optional(org), repo: optional(repo)}
 }
 
 func mapCountedItemsToSeries(res []*data.CountedItem) *SeriesData[int] {
@@ -174,10 +175,10 @@ func mapCountedItemsToSeries(res []*data.CountedItem) *SeriesData[int] {
 	return d
 }
 
-type percentageProvider func(ctx context.Context, entity, org, repo *string, ex []string, months int) ([]*data.CountedItem, error)
+type percentageProvider func(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error)
 
 func percentageAPIHandler(w http.ResponseWriter, r *http.Request, fn percentageProvider) {
-	months := queryParamInt(r, "m", data.EventAgeMonthsDefault)
+	days := queryParamInt(r, "d", data.EventAgeDaysDefault)
 	org := r.URL.Query().Get("o")
 	repo := r.URL.Query().Get("r")
 	entity := r.URL.Query().Get("e")
@@ -186,14 +187,14 @@ func percentageAPIHandler(w http.ResponseWriter, r *http.Request, fn percentageP
 		exclude = strings.Split(x, arraySelector)
 	}
 
-	slog.Debug("event type query", "org", org, "repo", repo, "entity", entity, "months", months)
+	slog.Debug("event type query", "org", org, "repo", repo, "entity", entity, "days", days)
 
 	if orgStr, repoStr, ok := parseRepo(&repo); ok {
 		org = *orgStr
 		repo = *repoStr
 	}
 
-	res, err := fn(r.Context(), optional(entity), optional(org), optional(repo), exclude, months)
+	res, err := fn(r.Context(), optional(entity), optional(org), optional(repo), exclude, days)
 	if err != nil {
 		slog.Error("failed to get event type series", "error", err)
 		writeError(w, http.StatusInternalServerError, "error querying event type series")
@@ -292,7 +293,7 @@ func eventDataAPIHandler(store data.Store) http.HandlerFunc {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
 		entity := r.URL.Query().Get("e")
-		res, err := s.GetEventTypeSeries(r.Context(), p.org, p.repo, optional(entity), p.months)
+		res, err := s.GetEventTypeSeries(r.Context(), p.org, p.repo, optional(entity), p.days)
 		if err != nil {
 			slog.Error("failed to get event type series", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying event type series")
@@ -394,7 +395,7 @@ func insightWithEntityHandler(defaultStore data.Store, label string, fn func(con
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
 		entity := optional(r.URL.Query().Get("e"))
-		res, err := fn(r.Context(), s, p.org, p.repo, entity, p.months)
+		res, err := fn(r.Context(), s, p.org, p.repo, entity, p.days)
 		if err != nil {
 			slog.Error("failed to get "+label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
@@ -429,7 +430,7 @@ func insightHandler(defaultStore data.Store, label string, fn func(context.Conte
 
 		s := storeFromRequest(r, defaultStore)
 		p := parseInsightParams(r)
-		res, err := fn(r.Context(), s, p.org, p.repo, p.months)
+		res, err := fn(r.Context(), s, p.org, p.repo, p.days)
 		if err != nil {
 			slog.Error("failed to get "+label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
@@ -533,7 +534,7 @@ func insightsContributorProfileAPIHandler(store data.Store) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "username parameter (u) is required")
 			return
 		}
-		res, err := s.GetContributorProfile(r.Context(), username, p.org, p.repo, entity, p.months)
+		res, err := s.GetContributorProfile(r.Context(), username, p.org, p.repo, entity, p.days)
 		if err != nil {
 			slog.Error("failed to get contributor profile", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying contributor profile")
@@ -552,7 +553,7 @@ func developerSearchAPIHandler(store data.Store) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "query parameter (q) is required")
 			return
 		}
-		res, err := s.SearchDeveloperUsernames(r.Context(), q, p.org, p.repo, p.months, 10)
+		res, err := s.SearchDeveloperUsernames(r.Context(), q, p.org, p.repo, p.days, 10)
 		if err != nil {
 			slog.Error("failed to search developers", "error", err)
 			writeError(w, http.StatusInternalServerError, "error searching developers")
@@ -604,7 +605,7 @@ func insightsRepoOverviewAPIHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetRepoOverview(r.Context(), p.org, p.months)
+		res, err := s.GetRepoOverview(r.Context(), p.org, p.days)
 		if err != nil {
 			slog.Error("failed to get repo overview", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying repo overview")
@@ -689,7 +690,7 @@ func insightsPortfolioSummaryHandler(store data.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s := storeFromRequest(r, store)
 		p := parseInsightParams(r)
-		res, err := s.GetPortfolioSummary(r.Context(), p.org, p.repo, p.months)
+		res, err := s.GetPortfolioSummary(r.Context(), p.org, p.repo, p.days)
 		if err != nil {
 			slog.Error("failed to get portfolio summary", "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying portfolio summary")
@@ -707,15 +708,15 @@ func insightsHealthScorecardHandler(store data.Store) http.HandlerFunc {
 		ctx := r.Context()
 
 		// Gather sub-metrics (individual failures are non-fatal).
-		momentum, _ := s.GetContributorMomentum(ctx, p.org, p.repo, entity, p.months)
-		ttm, _ := s.GetTimeToMerge(ctx, p.org, p.repo, entity, p.months)
-		ttfr, _ := s.GetTimeToFirstResponse(ctx, p.org, p.repo, entity, p.months)
-		metricHistory, _ := s.GetRepoMetricHistory(ctx, p.org, p.repo, p.months)
-		aging, _ := s.GetAgingPRs(ctx, p.org, p.repo, entity, p.months)
-		unanswered, _ := s.GetUnansweredRate(ctx, p.org, p.repo, entity, p.months)
-		slo, _ := s.GetResponseSLO(ctx, p.org, p.repo, entity, p.months)
-		prRatio, _ := s.GetPRReviewRatio(ctx, p.org, p.repo, entity, p.months)
-		issueRatio, _ := s.GetIssueOpenCloseRatio(ctx, p.org, p.repo, entity, p.months)
+		momentum, _ := s.GetContributorMomentum(ctx, p.org, p.repo, entity, p.days)
+		ttm, _ := s.GetTimeToMerge(ctx, p.org, p.repo, entity, p.days)
+		ttfr, _ := s.GetTimeToFirstResponse(ctx, p.org, p.repo, entity, p.days)
+		metricHistory, _ := s.GetRepoMetricHistory(ctx, p.org, p.repo, p.days)
+		aging, _ := s.GetAgingPRs(ctx, p.org, p.repo, entity, p.days)
+		unanswered, _ := s.GetUnansweredRate(ctx, p.org, p.repo, entity, p.days)
+		slo, _ := s.GetResponseSLO(ctx, p.org, p.repo, entity, p.days)
+		prRatio, _ := s.GetPRReviewRatio(ctx, p.org, p.repo, entity, p.days)
+		issueRatio, _ := s.GetIssueOpenCloseRatio(ctx, p.org, p.repo, entity, p.days)
 
 		sc := buildScorecard(momentum, ttm, ttfr, metricHistory, aging, unanswered, slo, prRatio, issueRatio)
 		writeJSON(w, http.StatusOK, sc)

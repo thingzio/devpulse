@@ -50,14 +50,14 @@ func TestQueryParamInt(t *testing.T) {
 		def   int
 		want  int
 	}{
-		{name: "missing key uses default", query: "", key: "m", def: 6, want: 6},
-		{name: "valid value", query: "m=12", key: "m", def: 6, want: 12},
-		{name: "below range uses default", query: "m=0", key: "m", def: 6, want: 6},
-		{name: "above range uses default", query: "m=121", key: "m", def: 6, want: 6},
-		{name: "boundary low valid", query: "m=1", key: "m", def: 6, want: 1},
-		{name: "boundary high valid", query: "m=120", key: "m", def: 6, want: 120},
-		{name: "non-numeric uses default", query: "m=abc", key: "m", def: 6, want: 6},
-		{name: "empty value uses default", query: "m=", key: "m", def: 6, want: 6},
+		{name: "missing key uses default", query: "", key: "d", def: 180, want: 180},
+		{name: "valid value", query: "d=90", key: "d", def: 180, want: 90},
+		{name: "below range uses default", query: "d=0", key: "d", def: 180, want: 180},
+		{name: "above range uses default", query: "d=3651", key: "d", def: 180, want: 180},
+		{name: "boundary low valid", query: "d=14", key: "d", def: 180, want: 14},
+		{name: "boundary high valid", query: "d=3650", key: "d", def: 180, want: 3650},
+		{name: "non-numeric uses default", query: "d=abc", key: "d", def: 180, want: 180},
+		{name: "empty value uses default", query: "d=", key: "d", def: 180, want: 180},
 	}
 
 	for _, tc := range tests {
@@ -122,15 +122,15 @@ func TestParseInsightParams(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/data", nil)
 		p := parseInsightParams(r)
-		assert.Equal(t, data.EventAgeMonthsDefault, p.months)
+		assert.Equal(t, data.EventAgeDaysDefault, p.days)
 		assert.Nil(t, p.org)
 		assert.Nil(t, p.repo)
 	})
 
-	t.Run("explicit months", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/data?m=3", nil)
+	t.Run("explicit days", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/data?d=90", nil)
 		p := parseInsightParams(r)
-		assert.Equal(t, 3, p.months)
+		assert.Equal(t, 90, p.days)
 	})
 
 	t.Run("org/repo from r param", func(t *testing.T) {

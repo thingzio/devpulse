@@ -276,7 +276,7 @@ $(function () {
         $(".header-term").html("All imported events");
         history.pushState(null, "", window.location.pathname);
         updatePeriodOptions("", "", function () {
-            loadAllCharts($("#period_months").val(), "", "", "");
+            loadAllCharts($("#period_days").val(), "", "", "");
         });
     });
 
@@ -316,7 +316,7 @@ $(function () {
 
         history.replaceState(null, "");
         updatePeriodOptions("", "", function () {
-            var months = $("#period_months").val();
+            var months = $("#period_days").val();
             loadSummaryBanner(months, "", "", "");
             activateTab(activeTab);
         });
@@ -359,7 +359,7 @@ function initTabs() {
             rightChartExcludes = [];
             $(".header-term").html("All imported events");
             updatePeriodOptions("", "", function () {
-                loadAllCharts($("#period_months").val(), "", "", "");
+                loadAllCharts($("#period_days").val(), "", "", "");
             });
         }
     });
@@ -376,7 +376,7 @@ function activateTab(tab) {
     $(".tab-content").removeClass("active");
     $('.tab-content[data-tab="' + tab + '"]').addClass("active");
 
-    var months = $("#period_months").val();
+    var months = $("#period_days").val();
     var org = searchCriteria.org || "";
     var repo = searchCriteria.repo || "";
     var entity = searchCriteria.entity || "";
@@ -403,7 +403,7 @@ function loadSummaryBanner(months, org, repo, entity) {
 }
 
 function loadTabCharts(tab, months, org, repo, entity) {
-    var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
+    var q = 'd=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
             loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
@@ -509,7 +509,7 @@ function applySelection(scope, item, skipPushState) {
 
     resetCharts();
 
-    const months = $("#period_months").val();
+    const months = $("#period_days").val();
     let org = "", repo = "", entity = "";
     switch (scope) {
         case "org":
@@ -540,7 +540,7 @@ function applySelection(scope, item, skipPushState) {
 
     submitSearch();
     updatePeriodOptions(org, repo, function () {
-        var m = $("#period_months").val();
+        var m = $("#period_days").val();
         checkInsightsAvailable(org, repo);
         loadSummaryBanner(m, org, repo, entity);
         activateTab(activeTab);
@@ -611,7 +611,7 @@ function initUnifiedSearch() {
             var cleanURL = window.location.pathname + window.location.hash;
             history.pushState(null, "", cleanURL);
             updatePeriodOptions("", "", function () {
-                loadAllCharts($("#period_months").val(), "", "", "");
+                loadAllCharts($("#period_days").val(), "", "", "");
             });
             return false;
         }
@@ -791,11 +791,11 @@ function onLeftChartSelect(label) {
 
 function onRightChartSelect(label) {
     // Load contributor profile in the panel
-    var m = $("#period_months").val();
+    var m = $("#period_days").val();
     var o = searchCriteria.org || "";
     var r = searchCriteria.repo || "";
     var e = searchCriteria.entity || "";
-    var q = 'm=' + m + '&o=' + o + '&r=' + r + '&e=' + e;
+    var q = 'd=' + m + '&o=' + o + '&r=' + r + '&e=' + e;
     $("#contributor-search").val(label);
     loadContributorProfileChart('/data/insights/contributor-profile?u=' + encodeURIComponent(label) + '&' + q);
 }
@@ -1546,7 +1546,7 @@ function loadRepoMeta(url) {
         }
 
         // Sparkline for stars/forks trend.
-        var mhParams = 'm=' + ($("#period_months").val() || '6') + '&o=' + (new URLSearchParams(url.split('?')[1]).get('o') || '') + '&r=' + (new URLSearchParams(url.split('?')[1]).get('r') || '');
+        var mhParams = 'd=' + ($("#period_days").val() || '6') + '&o=' + (new URLSearchParams(url.split('?')[1]).get('o') || '') + '&r=' + (new URLSearchParams(url.split('?')[1]).get('r') || '');
         $.get('/data/insights/repo-metric-history?' + mhParams, function (hist) {
             if (!hist || hist.length === 0) return;
             var sLabels = [], sStars = [], sForks = [];
@@ -2082,8 +2082,8 @@ function initSearchFilters() {
 
 function initPeriodSelector() {
     $("#period-select").on("change", function () {
-        const months = $(this).val();
-        $("#period_months").val(months);
+        const days = $(this).val();
+        $("#period_days").val(days);
         resetCharts();
 
         let org = "", repo = "", entity = "";
@@ -2095,7 +2095,7 @@ function initPeriodSelector() {
                 case "entity": entity = searchItem.value; break;
             }
         }
-        loadAllCharts(months, org, repo, entity);
+        loadAllCharts(days, org, repo, entity);
     });
 }
 
@@ -2106,53 +2106,63 @@ function updatePeriodOptions(org, repo, cb) {
     if (repo) params.push("r=" + encodeURIComponent(repo));
     if (params.length) url += "?" + params.join("&");
 
-    const defaultMonths = parseInt($("#default_months").val(), 10) || 6;
+    const defaultDays = parseInt($("#default_days").val(), 10) || 180;
 
     $.get(url, function (data) {
         const sel = $("#period-select");
-        const currentVal = parseInt($("#period_months").val(), 10) || defaultMonths;
+        const currentVal = parseInt($("#period_days").val(), 10) || defaultDays;
         sel.empty();
 
-        let maxMonths = defaultMonths;
+        let maxDays = defaultDays;
         if (data.min_date) {
             const minDate = new Date(data.min_date);
             const now = new Date();
-            maxMonths = Math.max(1,
-                (now.getFullYear() - minDate.getFullYear()) * 12 +
-                (now.getMonth() - minDate.getMonth()) + 1
-            );
+            maxDays = Math.max(14, Math.round((now - minDate) / (1000 * 60 * 60 * 24)));
         }
 
         // Cap by plan data retention limit (0 = unlimited)
-        const planMax = parseInt($("#max_data_months").val(), 10) || 0;
-        if (planMax > 0 && maxMonths > planMax) {
-            maxMonths = planMax;
+        const planMax = parseInt($("#max_data_days").val(), 10) || 0;
+        if (planMax > 0 && maxDays > planMax) {
+            maxDays = planMax;
         }
 
-        const steps = [3, 6, 9, 12, 18, 24, 36, 48, 60];
-        const options = [];
-        for (let i = 0; i < steps.length; i++) {
-            if (steps[i] <= maxMonths) {
-                options.push(steps[i]);
+        var presets = [
+            {days: 14, label: "2 weeks"},
+            {days: 21, label: "3 weeks"},
+            {days: 28, label: "4 weeks"},
+            {days: 90, label: "3 months"},
+            {days: 180, label: "6 months"},
+            {days: 270, label: "9 months"},
+            {days: 365, label: "12 months"},
+            {days: 545, label: "18 months"},
+            {days: 730, label: "24 months"},
+            {days: 1095, label: "36 months"},
+        ];
+
+        var options = [];
+        for (var i = 0; i < presets.length; i++) {
+            if (presets[i].days <= maxDays) {
+                options.push(presets[i]);
             }
         }
-        if (options.length === 0 || options[options.length - 1] < maxMonths) {
-            options.push(maxMonths);
+        if (options.length === 0) {
+            options.push(presets[0]);
         }
 
-        $.each(options, function (i, m) {
-            sel.append(`<option value="${m}">${m} months</option>`);
+        $.each(options, function (i, opt) {
+            sel.append('<option value="' + opt.days + '">' + opt.label + '</option>');
         });
 
         // keep current selection if still valid, otherwise use default or max
-        if (options.indexOf(currentVal) >= 0) {
+        var validValues = options.map(function(o) { return o.days; });
+        if (validValues.indexOf(currentVal) >= 0) {
             sel.val(currentVal);
-        } else if (options.indexOf(defaultMonths) >= 0) {
-            sel.val(defaultMonths);
+        } else if (validValues.indexOf(defaultDays) >= 0) {
+            sel.val(defaultDays);
         } else {
-            sel.val(options[options.length - 1]);
+            sel.val(options[options.length - 1].days);
         }
-        $("#period_months").val(sel.val());
+        $("#period_days").val(sel.val());
 
         if (cb) cb();
     });
@@ -2798,8 +2808,8 @@ function exportSearchResults() {
 }
 
 function downloadCSV(selectedOnly) {
-    var months = $("#period_months").val();
-    var url = "/data/export/csv?m=" + months;
+    var days = $("#period_days").val();
+    var url = "/data/export/csv?d=" + days;
     if (selectedOnly) {
         var repo = searchCriteria.repo || "";
         if (repo) {
@@ -2814,8 +2824,8 @@ function generatePDF() {
     var repo = searchCriteria.repo || "";
     if (!repo) { return; }
 
-    var months = $("#period_months").val();
-    var q = 'm=' + months + '&o=' + org + '&r=' + repo + '&e=';
+    var months = $("#period_days").val();
+    var q = 'd=' + months + '&o=' + org + '&r=' + repo + '&e=';
     var btn = $("#pdf-download");
 
     if (!btn.find('.pdf-spinner').length) {

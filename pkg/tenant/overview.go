@@ -76,8 +76,8 @@ const tenantActiveRepoCountSQL = `
 	SELECT COUNT(*) FROM tenant_repo WHERE tenant_id = $1 AND active = TRUE`
 
 // GetOverview returns the full overview response with repo data and usage summary.
-func GetOverview(ctx context.Context, db *sql.DB, tenantID string, months int) (*OverviewResponse, error) {
-	since := time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
+func GetOverview(ctx context.Context, db *sql.DB, tenantID string, days int) (*OverviewResponse, error) {
+	since := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
 	weekStart := StartOfWeek().Format("2006-01-02")
 
 	// Get tenant limits

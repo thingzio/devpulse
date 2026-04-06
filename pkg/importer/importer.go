@@ -221,7 +221,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 	}
 
 	slog.Info("phase: events", "org", org, "repo", repo)
-	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 6); return err }); err != nil {
+	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 180); return err }); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}
@@ -331,7 +331,7 @@ func checkInsightStaleness(generatedAt string, savedEventCount, currentEventCoun
 }
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
-	insightMonths := 3 // 3 months of data covers the 9-week analysis window
+	insightDays := insightsPeriodWeeks * 7 // 63 days covers the 9-week analysis window
 
 	// Check staleness: age gate + event delta gate
 	generatedAt, err := store.GetRepoInsightsGeneratedAt(ctx, org, repo)
@@ -345,7 +345,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 
 	// Get current event count from summary (cheap DB query)
-	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightMonths)
+	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightDays)
 	if err != nil {
 		return fmt.Errorf("getting insights summary for staleness check: %w", err)
 	}
@@ -357,7 +357,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 	slog.Info("regenerating insights", "org", org, "repo", repo, "reason", reason)
 
-	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightMonths)
+	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightDays)
 
 	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodWeeks)
 	if err != nil {

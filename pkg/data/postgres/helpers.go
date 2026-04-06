@@ -184,8 +184,8 @@ var (
 	}
 )
 
-func sinceDate(months int) string {
-	return time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-02")
+func sinceDate(days int) string {
+	return time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
 }
 
 // Granularity controls how time-series data is bucketed.
@@ -195,13 +195,13 @@ const (
 	GranWeek  Granularity = "week"
 	GranMonth Granularity = "month"
 
-	// autoGranularityThreshold: time ranges up to this many months use weekly grouping.
-	autoGranularityThreshold = 6
+	// autoGranularityThreshold: time ranges up to this many days use weekly grouping.
+	autoGranularityThreshold = 180
 )
 
 // AutoGranularity selects weekly or monthly grouping based on the time window.
-func AutoGranularity(months int) Granularity {
-	if months <= autoGranularityThreshold {
+func AutoGranularity(days int) Granularity {
+	if days <= autoGranularityThreshold {
 		return GranWeek
 	}
 	return GranMonth

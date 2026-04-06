@@ -147,12 +147,12 @@ func (s *Store) GetMinEventDate(ctx context.Context, org, repo *string) (string,
 	return minDate, nil
 }
 
-func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *string, months int) (*data.EventTypeSeries, error) {
+func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *string, days int) (*data.EventTypeSeries, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectEventTypesSinceTpl, GroupExpr(gran, "dates.d::text"))
 
 	stmt, err := s.db.PrepareContext(ctx, query)
@@ -161,7 +161,7 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	}
 	defer stmt.Close()
 
-	since := sinceDate(months)
+	since := sinceDate(days)
 	to := time.Now().UTC().Format("2006-01-02")
 
 	rows, err := stmt.QueryContext(ctx, since, to,

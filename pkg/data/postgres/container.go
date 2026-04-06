@@ -204,14 +204,14 @@ func (s *Store) ImportAllContainerVersions(ctx context.Context, token string) er
 	return nil
 }
 
-func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, months int) (*data.ContainerActivitySeries, error) { //nolint:dupl,nolintlint
+func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, days int) (*data.ContainerActivitySeries, error) { //nolint:dupl,nolintlint
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	gran := AutoGranularity(months)
+	gran := AutoGranularity(days)
 	query := fmt.Sprintf(selectContainerActivityTpl, GroupExpr(gran, "cv.created_at"))
-	since := sinceDate(months)
+	since := sinceDate(days)
 
 	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
 	if err != nil {

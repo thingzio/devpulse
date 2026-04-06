@@ -11,23 +11,23 @@ import (
 
 func TestSinceDate(t *testing.T) {
 	tests := []struct {
-		months int
+		days int
 	}{
-		{1}, {3}, {6}, {12},
+		{30}, {90}, {180}, {365},
 	}
 	for _, tc := range tests {
-		got := sinceDate(tc.months)
+		got := sinceDate(tc.days)
 		_, err := time.Parse("2006-01-02", got)
-		require.NoError(t, err, "sinceDate(%d) returned non-date %q", tc.months, got)
+		require.NoError(t, err, "sinceDate(%d) returned non-date %q", tc.days, got)
 
-		expected := time.Now().UTC().AddDate(0, -tc.months, 0)
+		expected := time.Now().UTC().AddDate(0, 0, -tc.days)
 		// Allow ±1 day tolerance for clock skew at midnight.
 		parsed, _ := time.Parse("2006-01-02", got)
 		diff := expected.Sub(parsed)
 		if diff < 0 {
 			diff = -diff
 		}
-		assert.Less(t, diff.Hours(), 48.0, "sinceDate(%d) too far from expected", tc.months)
+		assert.Less(t, diff.Hours(), 48.0, "sinceDate(%d) too far from expected", tc.days)
 	}
 }
 
@@ -205,19 +205,19 @@ func TestBuildDailyTotalsExtra(t *testing.T) {
 
 func TestAutoGranularity(t *testing.T) {
 	tests := []struct {
-		months int
-		want   Granularity
+		days int
+		want Granularity
 	}{
-		{1, GranWeek},
-		{3, GranWeek},
-		{6, GranWeek},
-		{7, GranMonth},
-		{12, GranMonth},
-		{36, GranMonth},
+		{14, GranWeek},
+		{28, GranWeek},
+		{90, GranWeek},
+		{180, GranWeek},
+		{181, GranMonth},
+		{365, GranMonth},
 	}
 	for _, tc := range tests {
-		got := AutoGranularity(tc.months)
-		assert.Equal(t, tc.want, got, "months=%d", tc.months)
+		got := AutoGranularity(tc.days)
+		assert.Equal(t, tc.want, got, "days=%d", tc.days)
 	}
 }
 
