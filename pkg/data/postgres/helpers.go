@@ -23,6 +23,14 @@ const (
 	botExcludePrSQL = `AND pr.username NOT LIKE '%[bot]'
 		AND LOWER(pr.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
 
+	// botExcludeTpl is botExcludeSQL with % escaped for use in fmt.Sprintf templates.
+	botExcludeTpl = `AND e.username NOT LIKE '%%[bot]'
+		AND LOWER(e.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+
+	// botExcludePrTpl is botExcludePrSQL with % escaped for fmt.Sprintf templates.
+	botExcludePrTpl = `AND pr.username NOT LIKE '%%[bot]'
+		AND LOWER(pr.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+
 	// forkExcludeSQL excludes fork events from the join so only code/comment
 	// activity (PR, PR review, issue, issue comment) counts toward reputation.
 	forkExcludeSQL = `AND e.type != 'fork'`

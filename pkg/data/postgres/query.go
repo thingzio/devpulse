@@ -14,9 +14,9 @@ const (
 		  AND repo = COALESCE($2, repo)
 	`
 
-	// Postgres version: use generate_series instead of recursive CTE,
-	// SUBSTRING instead of substr, and numbered placeholders.
-	selectEventTypesSinceSQL = `SELECT
+	// selectEventTypesSinceTpl: Postgres version with generate_series.
+	// %s = GroupExpr(gran, "dates.d::text")
+	selectEventTypesSinceTpl = `SELECT
 			date,
 			SUM(prs) as prs,
 			SUM(pr_review) as pr_review,
@@ -25,7 +25,7 @@ const (
 			SUM(forks) as forks
 		FROM (
 			SELECT
-				SUBSTRING(dates.d::text, 1, 7) as date,
+				%s as date,
 				CASE WHEN e.type = $3 THEN 1 ELSE 0 END as prs,
 				CASE WHEN e.type = $4 THEN 1 ELSE 0 END as pr_review,
 				CASE WHEN e.type = $5 THEN 1 ELSE 0 END as issues,
@@ -37,7 +37,7 @@ const (
 			AND e.org = COALESCE($8, e.org)
 			AND e.repo = COALESCE($9, e.repo)
 			AND d.entity = COALESCE($10, d.entity)
-			` + botExcludeSQL + `
+			` + botExcludeTpl + `
 		) dt
 		GROUP BY date
 		ORDER BY 1
@@ -152,7 +152,10 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, selectEventTypesSinceSQL)
+	gran := AutoGranularity(months)
+	query := fmt.Sprintf(selectEventTypesSinceTpl, GroupExpr(gran, "dates.d::text"))
+
+	stmt, err := s.db.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare repo events statement: %w", err)
 	}
@@ -199,8 +202,7 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	// 3-month moving average trend line
-	const window = 3
+	window := TrendWindow(gran)
 	for i := range series.Total {
 		start := i - window + 1
 		if start < 0 {

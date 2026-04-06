@@ -29,16 +29,17 @@ const (
 		WHERE org = $1 AND repo = $2 AND package = $3
 	`
 
-	// selectContainerActivitySQL: $1=org, $2=repo, $3=since
-	selectContainerActivitySQL = `SELECT
-		SUBSTRING(cv.created_at, 1, 7) AS month,
+	// selectContainerActivityTpl: $1=org, $2=repo, $3=since
+	// %s = GroupExpr(gran, "cv.created_at")
+	selectContainerActivityTpl = `SELECT
+		%s AS period,
 		COUNT(*) AS versions
 	FROM container_version cv
 	WHERE cv.org = COALESCE($1, cv.org)
 	  AND cv.repo = COALESCE($2, cv.repo)
 	  AND cv.created_at >= $3
-	GROUP BY month
-	ORDER BY month
+	GROUP BY period
+	ORDER BY period
 	`
 )
 
@@ -208,9 +209,11 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, mon
 		return nil, data.ErrDBNotInitialized
 	}
 
+	gran := AutoGranularity(months)
+	query := fmt.Sprintf(selectContainerActivityTpl, GroupExpr(gran, "cv.created_at"))
 	since := sinceDate(months)
 
-	rows, err := s.db.QueryContext(ctx, selectContainerActivitySQL, org, repo, since)
+	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
 	if err != nil {
 		return nil, fmt.Errorf("querying container activity: %w", err)
 	}
@@ -222,12 +225,12 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, mon
 	}
 
 	for rows.Next() {
-		var month string
+		var label string
 		var count int
-		if err := rows.Scan(&month, &count); err != nil {
+		if err := rows.Scan(&label, &count); err != nil {
 			return nil, fmt.Errorf("scanning container activity row: %w", err)
 		}
-		sr.Labels = append(sr.Labels, month)
+		sr.Labels = append(sr.Labels, label)
 		sr.Versions = append(sr.Versions, count)
 	}
 
