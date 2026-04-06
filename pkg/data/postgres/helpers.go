@@ -185,7 +185,19 @@ var (
 )
 
 func sinceDate(days int) string {
-	return time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02")
+	now := time.Now().UTC()
+	since := now.AddDate(0, 0, -days)
+	// For weekly granularity windows, snap to the previous Monday so
+	// SQL date_trunc('week', ...) produces clean, full-week buckets.
+	if days <= autoGranularityThreshold {
+		wd := since.Weekday()
+		offset := int(wd) - 1 // Monday=0 ... Saturday=5
+		if wd == time.Sunday {
+			offset = 6
+		}
+		since = since.AddDate(0, 0, -offset)
+	}
+	return since.Format("2006-01-02")
 }
 
 // Granularity controls how time-series data is bucketed.

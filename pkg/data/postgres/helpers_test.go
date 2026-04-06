@@ -10,25 +10,37 @@ import (
 )
 
 func TestSinceDate(t *testing.T) {
-	tests := []struct {
-		days int
-	}{
-		{30}, {90}, {180}, {365},
-	}
-	for _, tc := range tests {
-		got := sinceDate(tc.days)
-		_, err := time.Parse("2006-01-02", got)
-		require.NoError(t, err, "sinceDate(%d) returned non-date %q", tc.days, got)
-
-		expected := time.Now().UTC().AddDate(0, 0, -tc.days)
-		// Allow ±1 day tolerance for clock skew at midnight.
-		parsed, _ := time.Parse("2006-01-02", got)
+	t.Run("monthly range returns expected date", func(t *testing.T) {
+		// 365 days > threshold → no Monday-snapping
+		got := sinceDate(365)
+		parsed, err := time.Parse("2006-01-02", got)
+		require.NoError(t, err)
+		expected := time.Now().UTC().AddDate(0, 0, -365)
 		diff := expected.Sub(parsed)
 		if diff < 0 {
 			diff = -diff
 		}
-		assert.Less(t, diff.Hours(), 48.0, "sinceDate(%d) too far from expected", tc.days)
-	}
+		assert.Less(t, diff.Hours(), 48.0)
+	})
+
+	t.Run("weekly range snaps to Monday", func(t *testing.T) {
+		// 14 days ≤ threshold → snaps to previous Monday
+		got := sinceDate(14)
+		parsed, err := time.Parse("2006-01-02", got)
+		require.NoError(t, err)
+		assert.Equal(t, time.Monday, parsed.Weekday(),
+			"sinceDate(14) should snap to Monday, got %s (%s)", got, parsed.Weekday())
+	})
+
+	t.Run("all weekly ranges snap to Monday", func(t *testing.T) {
+		for _, days := range []int{14, 21, 28, 90, 180} {
+			got := sinceDate(days)
+			parsed, err := time.Parse("2006-01-02", got)
+			require.NoError(t, err)
+			assert.Equal(t, time.Monday, parsed.Weekday(),
+				"sinceDate(%d) = %s should be Monday", days, got)
+		}
+	})
 }
 
 func TestCleanEntityName(t *testing.T) {
