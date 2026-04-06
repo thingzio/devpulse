@@ -1,3 +1,18 @@
+var shortMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function formatLabel(label) {
+    if (label && label.length === 10) {
+        var d = new Date(label + 'T00:00:00');
+        return shortMonths[d.getMonth()] + ' ' + d.getDate();
+    }
+    return label;
+}
+
+function formatLabels(labels) {
+    if (!labels) return labels;
+    return labels.map(formatLabel);
+}
+
 function formatImportDate(ts) {
     if (!ts) return '—';
     var d = new Date(ts);
@@ -874,10 +889,11 @@ function showErrorModal(message) {
 function loadTimeSeriesChart(url, fn) {
     $.get(url, function (data) {
         if (timeEventsChart) timeEventsChart.destroy();
+        var rawDates = data.dates;
         timeEventsChart = new Chart($("#time-series-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.dates,
+                labels: formatLabels(data.dates),
                 datasets: [{
                     label: 'PR',
                     data: data.pr,
@@ -972,7 +988,7 @@ function loadTimeSeriesChart(url, fn) {
                 },
                 onClick: (evt, item) => {
                     if (item.length) {
-                        const label = timeEventsChart.data.labels[item[0].index];
+                        const label = rawDates[item[0].index];
                         const val = timeEventsChart.data.datasets[item[0].datasetIndex].label;
                         if (fn) {
                             fn(label, val);
@@ -997,7 +1013,7 @@ function loadLeftChart(url, fn, cb) {
         leftChart = new Chart($("#left-chart")[0].getContext("2d"), {
             type: 'polarArea',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Entities',
                     data: data.data,
@@ -1049,7 +1065,7 @@ function loadRightChart(url, fn, cb) {
         rightChart = new Chart($("#right-chart")[0].getContext("2d"), {
             type: 'pie',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Repositories',
                     data: data.data,
@@ -1172,7 +1188,7 @@ function loadHealthActivitySparkline(url) {
         healthActivitySparkline = new Chart($("#health-activity-sparkline")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.dates,
+                labels: formatLabels(data.dates),
                 datasets: [{
                     label: 'Events',
                     data: data.counts,
@@ -1205,7 +1221,7 @@ function loadRetentionChart(url) {
         retentionChart = new Chart($("#retention-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'New',
                     data: data.new,
@@ -1239,7 +1255,7 @@ function loadPRRatioChart(url) {
         prRatioChart = new Chart($("#pr-ratio-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'PRs',
                     data: data.prs,
@@ -1290,7 +1306,7 @@ function loadTimeToCloseChart(closeURL, restoreURL) {
         timeToCloseChart = new Chart($("#time-to-close-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: close.labels,
+                labels: formatLabels(close.labels),
                 datasets: [{
                     label: 'All Issues',
                     data: close.avg_days,
@@ -1325,7 +1341,7 @@ function loadVelocityChart(url, canvasId, key) {
         const chart = new Chart($(`#${canvasId}`)[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Avg Days',
                     data: data.avg_days,
@@ -1372,7 +1388,7 @@ function loadForksAndActivityChart(url) {
         forksAndActivityChart = new Chart($("#forks-activity-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Forks',
                     data: data.forks,
@@ -1417,7 +1433,7 @@ function loadIssueRatioChart(url) {
         issueRatioChart = new Chart($("#issue-ratio-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Opened',
                     data: data.opened,
@@ -1452,7 +1468,7 @@ function loadTimeToFirstResponseChart(url) {
         timeToFirstResponseChart = new Chart($("#time-to-first-response-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Issues (avg hrs)',
                     data: data.issue_avg,
@@ -1813,7 +1829,7 @@ function loadReleaseCadenceChart(url) {
         releaseCadenceChart = new Chart($("#release-cadence-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Total',
                     data: data.total,
@@ -1862,7 +1878,7 @@ function loadReleaseDownloadsChart(url) {
         releaseDownloadsChart = new Chart($("#release-downloads-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Downloads',
                     data: data.downloads,
@@ -1940,7 +1956,7 @@ function loadContainerActivityChart(url) {
         containerActivityChart = new Chart($("#container-activity-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Versions Published',
                     data: data.versions,
@@ -1989,7 +2005,7 @@ function loadReputationChart(url) {
         reputationChart = new Chart($("#reputation-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Score',
                     data: data.data,
@@ -2198,7 +2214,7 @@ function loadReviewLatencyChart(url) {
         reviewLatencyChart = new Chart($("#review-latency-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Avg Hours',
                     data: data.avg_hours,
@@ -2241,7 +2257,7 @@ function loadChangeFailureRateChart(url) {
         changeFailureRateChart = new Chart($("#change-failure-rate-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Failure Rate %',
                     data: data.rate,
@@ -2276,7 +2292,7 @@ function loadPRSizeChart(url) {
         prSizeChart = new Chart($("#pr-size-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'S (<50)',
                     data: data.small,
@@ -2314,7 +2330,7 @@ function loadContributorFunnelChart(url) {
         contributorFunnelChart = new Chart($("#contributor-funnel-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'First Comment',
                     data: data.first_comment,
@@ -2498,7 +2514,7 @@ function loadContributorMomentumChart(url) {
         contributorMomentumChart = new Chart($("#contributor-momentum-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.labels,
+                labels: formatLabels(data.labels),
                 datasets: [{
                     label: 'Active (3mo rolling)',
                     data: data.active,
@@ -3072,7 +3088,7 @@ function generatePDF() {
         // PR Size (stacked bar)
         if (prSizeData && prSizeData.labels && prSizeData.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(prSizeData.labels, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(formatLabels(prSizeData.labels), [
                 { label: 'S (<50)', data: prSizeData.small, backgroundColor: colors[1] },
                 { label: 'M (50-250)', data: prSizeData.medium, backgroundColor: colors[0] },
                 { label: 'L (250-1K)', data: prSizeData.large, backgroundColor: colors[2] },
@@ -3085,7 +3101,7 @@ function generatePDF() {
         // Forks & Activity (dual axis line)
         if (forksActivity && forksActivity.labels && forksActivity.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(forksActivity.labels,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(formatLabels(forksActivity.labels),
                 [{ label: 'Forks', data: forksActivity.forks, backgroundColor: colors[0] + '40', borderColor: colors[0], borderWidth: 2 }],
                 [{ label: 'Events', data: forksActivity.events, borderColor: colors[3], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3096,7 +3112,7 @@ function generatePDF() {
         // Issue Ratio (stacked bar)
         if (issueRatio && issueRatio.labels && issueRatio.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(issueRatio.labels, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(formatLabels(issueRatio.labels), [
                 { label: 'Opened', data: issueRatio.opened, backgroundColor: colors[3] },
                 { label: 'Closed', data: issueRatio.closed, backgroundColor: colors[2] }
             ]));
@@ -3116,7 +3132,7 @@ function generatePDF() {
         // Time to First Response
         if (ttfr && ttfr.labels && ttfr.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttfr.labels, [
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(formatLabels(ttfr.labels), [
                 { label: 'Issues (avg hrs)', data: ttfr.issue_avg, backgroundColor: colors[3], borderWidth: 1 },
                 { label: 'PRs (avg hrs)', data: ttfr.pr_avg, backgroundColor: colors[2], borderWidth: 1 }
             ]));
@@ -3127,7 +3143,7 @@ function generatePDF() {
         // Time to Merge (bar + line dual axis)
         if (ttm && ttm.labels && ttm.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(ttm.labels,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(formatLabels(ttm.labels),
                 [{ label: 'Avg Days', data: ttm.avg_days, backgroundColor: colors[2], borderWidth: 1 }],
                 [{ label: 'Count', data: ttm.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3138,7 +3154,7 @@ function generatePDF() {
         // Change Failure Rate
         if (cfr && cfr.labels && cfr.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfLineChartConfig(cfr.labels, [{
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(formatLabels(cfr.labels), [{
                 label: 'Failure Rate %', data: cfr.rate,
                 borderColor: colors[3], backgroundColor: colors[3] + '33', fill: true, tension: 0.3, pointRadius: 2
             }]));
@@ -3149,7 +3165,7 @@ function generatePDF() {
         // Release Cadence
         if (relCadence && relCadence.labels && relCadence.labels.length > 0) {
             hasVelocity = true;
-            var rcCfg = pdfBarChartConfig(relCadence.labels, [
+            var rcCfg = pdfBarChartConfig(formatLabels(relCadence.labels), [
                 { label: 'Total', data: relCadence.total, backgroundColor: colors[4], borderWidth: 1 },
                 { label: 'Stable', data: relCadence.stable, backgroundColor: colors[1], borderWidth: 1 }
             ]);
@@ -3167,7 +3183,7 @@ function generatePDF() {
         // Release Downloads
         if (relDownloads && relDownloads.labels && relDownloads.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfLineChartConfig(relDownloads.labels, [{
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(formatLabels(relDownloads.labels), [{
                 label: 'Downloads', data: relDownloads.downloads,
                 borderColor: colors[0], backgroundColor: colors[0] + '20', fill: true, tension: 0.3, borderWidth: 2
             }]));
@@ -3187,7 +3203,7 @@ function generatePDF() {
         // PR Ratio (mixed bar + line with dual axis)
         if (prRatio && prRatio.labels && prRatio.labels.length > 0) {
             hasQuality = true;
-            img = pdfRenderChart(500, 300, pdfMixedBarLineConfig(prRatio.labels,
+            img = pdfRenderChart(500, 300, pdfMixedBarLineConfig(formatLabels(prRatio.labels),
                 [
                     { label: 'PRs', data: prRatio.prs, backgroundColor: colors[0], borderWidth: 1, yAxisID: 'y' },
                     { label: 'Reviews', data: prRatio.reviews, backgroundColor: colors[1], borderWidth: 1, yAxisID: 'y' }
@@ -3201,7 +3217,7 @@ function generatePDF() {
         // Review Latency (bar + line dual axis)
         if (reviewLatency && reviewLatency.labels && reviewLatency.labels.length > 0) {
             hasQuality = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(reviewLatency.labels,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(formatLabels(reviewLatency.labels),
                 [{ label: 'Avg Hours', data: reviewLatency.avg_hours, backgroundColor: colors[2], borderWidth: 1 }],
                 [{ label: 'Count', data: reviewLatency.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3216,7 +3232,7 @@ function generatePDF() {
             if (ttr && ttr.avg_days) {
                 ttcDS.push({ label: 'Bug (near release)', data: ttr.avg_days, backgroundColor: colors[3], borderWidth: 1 });
             }
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttc.labels, ttcDS));
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(formatLabels(ttc.labels), ttcDS));
             placeChartWithLabel(img, 'Time to Close', chartCol);
             chartCol = (chartCol + 1) % 2;
         }
@@ -3233,7 +3249,7 @@ function generatePDF() {
         // Retention (stacked bar)
         if (retention && retention.labels && retention.labels.length > 0) {
             hasCommunity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(retention.labels, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(formatLabels(retention.labels), [
                 { label: 'New', data: retention['new'], backgroundColor: colors[1], borderWidth: 1 },
                 { label: 'Returning', data: retention.returning, backgroundColor: colors[0], borderWidth: 1 }
             ]));
@@ -3245,7 +3261,7 @@ function generatePDF() {
         if (momentum && momentum.labels && momentum.labels.length > 0) {
             hasCommunity = true;
             var momDelta = momentum.delta || [];
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(momentum.labels,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(formatLabels(momentum.labels),
                 [{ label: 'Delta', data: momDelta, backgroundColor: momDelta.map(function(d) { return d >= 0 ? colors[1] + '88' : colors[3] + '88'; }), borderWidth: 0 }],
                 [{ label: 'Active (3mo rolling)', data: momentum.active, borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
             ));
@@ -3256,7 +3272,7 @@ function generatePDF() {
         // Contributor Funnel (grouped bar)
         if (funnel && funnel.labels && funnel.labels.length > 0) {
             hasCommunity = true;
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(funnel.labels, [
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(formatLabels(funnel.labels), [
                 { label: 'First Comment', data: funnel.first_comment, backgroundColor: colors[0] },
                 { label: 'First PR', data: funnel.first_pr, backgroundColor: colors[1] },
                 { label: 'First Merge', data: funnel.first_merge, backgroundColor: colors[4] }
