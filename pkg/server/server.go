@@ -297,6 +297,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			"build_date":    opts.Date,
 			"period_days":   180,
 			"username":      tn.Username,
+			"avatar_url":    tn.AvatarURL,
 			"plan":          tn.Plan,
 			"pdf_export":    limits.PDFExport,
 			"csv_export":    limits.CSVExport,

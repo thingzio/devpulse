@@ -58,14 +58,20 @@
             <span class="pdf-label">PDF</span>
         </button>
         {{ end }}
-        <button class="theme-toggle-btn" id="theme-toggle" aria-label="toggle theme">
-            <svg class="icon-moon" aria-hidden="true">
-                <use xlink:href="#moon"></use>
-            </svg>
-            <svg class="icon-sun" aria-hidden="true">
-                <use xlink:href="#sun"></use>
-            </svg>
-        </button>
+        <div class="user-menu-wrap">
+            <button class="user-avatar-btn" id="user-menu-toggle" aria-label="User menu">
+                <img src="{{ .avatar_url }}" alt="{{ .username }}" class="user-avatar" />
+            </button>
+            <div class="user-menu" id="user-menu" style="display:none;">
+                <div class="user-menu-header">{{ .username }}</div>
+                <div class="user-menu-plan">{{ .plan }} plan</div>
+                <div class="user-menu-divider"></div>
+                <button class="user-menu-item" id="theme-toggle">
+                    <span class="theme-label-light">Dark mode</span>
+                    <span class="theme-label-dark">Light mode</span>
+                </button>
+            </div>
+        </div>
     </section>
     <b class="header-term" style="display:none;">All imported events</b>
 

@@ -243,9 +243,22 @@ $(function () {
         $('.tbl-header').css({ 'padding-right': scrollWidth });
     });
 
-    // Theme toggle
+    // User menu toggle
+    $("#user-menu-toggle").click(function (e) {
+        e.stopPropagation();
+        $("#user-menu").toggle();
+    });
+
+    // Theme toggle inside user menu
     $("#theme-toggle").click(function () {
         toggleTheme();
+    });
+
+    // Close menu on outside click
+    $(document).click(function (e) {
+        if (!$(e.target).closest('.user-menu-wrap').length) {
+            $("#user-menu").hide();
+        }
     });
 
     // Modal close handlers
