@@ -764,8 +764,17 @@ function resetCharts() {
 }
 
 function onTimeSeriesChartSelect(label, val) {
-    searchCriteria.from = label + "-01";
-    searchCriteria.to = label + "-31";
+    if (label.length === 10) {
+        // Weekly: label is YYYY-MM-DD (Monday), search the full week
+        var end = new Date(label);
+        end.setDate(end.getDate() + 6);
+        searchCriteria.from = label;
+        searchCriteria.to = end.toISOString().substring(0, 10);
+    } else {
+        // Monthly: label is YYYY-MM
+        searchCriteria.from = label + "-01";
+        searchCriteria.to = label + "-31";
+    }
     if (val != "Total" && val != "Trend") {
         searchCriteria.type = val;
     }
@@ -1196,7 +1205,7 @@ function loadRetentionChart(url) {
         retentionChart = new Chart($("#retention-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'New',
                     data: data.new,
@@ -1230,7 +1239,7 @@ function loadPRRatioChart(url) {
         prRatioChart = new Chart($("#pr-ratio-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'PRs',
                     data: data.prs,
@@ -1281,7 +1290,7 @@ function loadTimeToCloseChart(closeURL, restoreURL) {
         timeToCloseChart = new Chart($("#time-to-close-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: close.months,
+                labels: close.labels,
                 datasets: [{
                     label: 'All Issues',
                     data: close.avg_days,
@@ -1316,7 +1325,7 @@ function loadVelocityChart(url, canvasId, key) {
         const chart = new Chart($(`#${canvasId}`)[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Avg Days',
                     data: data.avg_days,
@@ -1363,7 +1372,7 @@ function loadForksAndActivityChart(url) {
         forksAndActivityChart = new Chart($("#forks-activity-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Forks',
                     data: data.forks,
@@ -1408,7 +1417,7 @@ function loadIssueRatioChart(url) {
         issueRatioChart = new Chart($("#issue-ratio-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Opened',
                     data: data.opened,
@@ -1443,7 +1452,7 @@ function loadTimeToFirstResponseChart(url) {
         timeToFirstResponseChart = new Chart($("#time-to-first-response-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Issues (avg hrs)',
                     data: data.issue_avg,
@@ -1795,7 +1804,7 @@ function loadRepoOverview(url) {
 
 function loadReleaseCadenceChart(url) {
     $.get(url, function (data) {
-        if (!data.months || data.months.length === 0) {
+        if (!data.labels || data.labels.length === 0) {
             $("#release-cadence-chart").closest(".tbl").find(".insight-desc")
                 .text("No GitHub releases published for this scope.");
             return;
@@ -1804,7 +1813,7 @@ function loadReleaseCadenceChart(url) {
         releaseCadenceChart = new Chart($("#release-cadence-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Total',
                     data: data.total,
@@ -1844,7 +1853,7 @@ function loadReleaseCadenceChart(url) {
 
 function loadReleaseDownloadsChart(url) {
     $.get(url, function (data) {
-        if (!data.months || data.months.length === 0) {
+        if (!data.labels || data.labels.length === 0) {
             $("#release-downloads-chart").closest(".tbl").find(".insight-desc")
                 .text("No download data. Requires binary assets attached to GitHub releases.");
             return;
@@ -1853,7 +1862,7 @@ function loadReleaseDownloadsChart(url) {
         releaseDownloadsChart = new Chart($("#release-downloads-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Downloads',
                     data: data.downloads,
@@ -1922,7 +1931,7 @@ function loadReleaseDownloadsByTagChart(url) {
 
 function loadContainerActivityChart(url) {
     $.get(url, function (data) {
-        if (!data.months || data.months.length === 0) {
+        if (!data.labels || data.labels.length === 0) {
             $("#container-activity-chart").closest(".tbl").find(".insight-desc")
                 .text("No container images published via GitHub Packages (ghcr.io) for this scope.");
             return;
@@ -1931,7 +1940,7 @@ function loadContainerActivityChart(url) {
         containerActivityChart = new Chart($("#container-activity-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Versions Published',
                     data: data.versions,
@@ -2179,7 +2188,7 @@ function loadReviewLatencyChart(url) {
         reviewLatencyChart = new Chart($("#review-latency-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Avg Hours',
                     data: data.avg_hours,
@@ -2222,7 +2231,7 @@ function loadChangeFailureRateChart(url) {
         changeFailureRateChart = new Chart($("#change-failure-rate-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Failure Rate %',
                     data: data.rate,
@@ -2250,14 +2259,14 @@ function loadChangeFailureRateChart(url) {
 
 function loadPRSizeChart(url) {
     $.get(url, function (data) {
-        if (!data.months || data.months.length === 0) {
+        if (!data.labels || data.labels.length === 0) {
             return;
         }
         if (prSizeChart) prSizeChart.destroy();
         prSizeChart = new Chart($("#pr-size-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'S (<50)',
                     data: data.small,
@@ -2295,7 +2304,7 @@ function loadContributorFunnelChart(url) {
         contributorFunnelChart = new Chart($("#contributor-funnel-chart")[0].getContext("2d"), {
             type: 'bar',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'First Comment',
                     data: data.first_comment,
@@ -2479,7 +2488,7 @@ function loadContributorMomentumChart(url) {
         contributorMomentumChart = new Chart($("#contributor-momentum-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: data.months,
+                labels: data.labels,
                 datasets: [{
                     label: 'Active (3mo rolling)',
                     data: data.active,
@@ -2551,7 +2560,7 @@ function loadGeneratedInsights(url) {
             });
         }
 
-        metaContainer.text('Generated ' + item.generated_at + ' for ' + item.period_months + ' month period');
+        metaContainer.text('Generated ' + item.generated_at + ' for ' + item.period_weeks + ' week period');
     });
 }
 
@@ -3051,9 +3060,9 @@ function generatePDF() {
         }
 
         // PR Size (stacked bar)
-        if (prSizeData && prSizeData.months && prSizeData.months.length > 0) {
+        if (prSizeData && prSizeData.labels && prSizeData.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(prSizeData.months, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(prSizeData.labels, [
                 { label: 'S (<50)', data: prSizeData.small, backgroundColor: colors[1] },
                 { label: 'M (50-250)', data: prSizeData.medium, backgroundColor: colors[0] },
                 { label: 'L (250-1K)', data: prSizeData.large, backgroundColor: colors[2] },
@@ -3064,9 +3073,9 @@ function generatePDF() {
         }
 
         // Forks & Activity (dual axis line)
-        if (forksActivity && forksActivity.months && forksActivity.months.length > 0) {
+        if (forksActivity && forksActivity.labels && forksActivity.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(forksActivity.months,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(forksActivity.labels,
                 [{ label: 'Forks', data: forksActivity.forks, backgroundColor: colors[0] + '40', borderColor: colors[0], borderWidth: 2 }],
                 [{ label: 'Events', data: forksActivity.events, borderColor: colors[3], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3075,9 +3084,9 @@ function generatePDF() {
         }
 
         // Issue Ratio (stacked bar)
-        if (issueRatio && issueRatio.months && issueRatio.months.length > 0) {
+        if (issueRatio && issueRatio.labels && issueRatio.labels.length > 0) {
             hasActivity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(issueRatio.months, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(issueRatio.labels, [
                 { label: 'Opened', data: issueRatio.opened, backgroundColor: colors[3] },
                 { label: 'Closed', data: issueRatio.closed, backgroundColor: colors[2] }
             ]));
@@ -3095,9 +3104,9 @@ function generatePDF() {
         var hasVelocity = false;
 
         // Time to First Response
-        if (ttfr && ttfr.months && ttfr.months.length > 0) {
+        if (ttfr && ttfr.labels && ttfr.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttfr.months, [
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttfr.labels, [
                 { label: 'Issues (avg hrs)', data: ttfr.issue_avg, backgroundColor: colors[3], borderWidth: 1 },
                 { label: 'PRs (avg hrs)', data: ttfr.pr_avg, backgroundColor: colors[2], borderWidth: 1 }
             ]));
@@ -3106,9 +3115,9 @@ function generatePDF() {
         }
 
         // Time to Merge (bar + line dual axis)
-        if (ttm && ttm.months && ttm.months.length > 0) {
+        if (ttm && ttm.labels && ttm.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(ttm.months,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(ttm.labels,
                 [{ label: 'Avg Days', data: ttm.avg_days, backgroundColor: colors[2], borderWidth: 1 }],
                 [{ label: 'Count', data: ttm.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3117,9 +3126,9 @@ function generatePDF() {
         }
 
         // Change Failure Rate
-        if (cfr && cfr.months && cfr.months.length > 0) {
+        if (cfr && cfr.labels && cfr.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfLineChartConfig(cfr.months, [{
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(cfr.labels, [{
                 label: 'Failure Rate %', data: cfr.rate,
                 borderColor: colors[3], backgroundColor: colors[3] + '33', fill: true, tension: 0.3, pointRadius: 2
             }]));
@@ -3128,9 +3137,9 @@ function generatePDF() {
         }
 
         // Release Cadence
-        if (relCadence && relCadence.months && relCadence.months.length > 0) {
+        if (relCadence && relCadence.labels && relCadence.labels.length > 0) {
             hasVelocity = true;
-            var rcCfg = pdfBarChartConfig(relCadence.months, [
+            var rcCfg = pdfBarChartConfig(relCadence.labels, [
                 { label: 'Total', data: relCadence.total, backgroundColor: colors[4], borderWidth: 1 },
                 { label: 'Stable', data: relCadence.stable, backgroundColor: colors[1], borderWidth: 1 }
             ]);
@@ -3146,9 +3155,9 @@ function generatePDF() {
         }
 
         // Release Downloads
-        if (relDownloads && relDownloads.months && relDownloads.months.length > 0) {
+        if (relDownloads && relDownloads.labels && relDownloads.labels.length > 0) {
             hasVelocity = true;
-            img = pdfRenderChart(500, 300, pdfLineChartConfig(relDownloads.months, [{
+            img = pdfRenderChart(500, 300, pdfLineChartConfig(relDownloads.labels, [{
                 label: 'Downloads', data: relDownloads.downloads,
                 borderColor: colors[0], backgroundColor: colors[0] + '20', fill: true, tension: 0.3, borderWidth: 2
             }]));
@@ -3166,9 +3175,9 @@ function generatePDF() {
         var hasQuality = false;
 
         // PR Ratio (mixed bar + line with dual axis)
-        if (prRatio && prRatio.months && prRatio.months.length > 0) {
+        if (prRatio && prRatio.labels && prRatio.labels.length > 0) {
             hasQuality = true;
-            img = pdfRenderChart(500, 300, pdfMixedBarLineConfig(prRatio.months,
+            img = pdfRenderChart(500, 300, pdfMixedBarLineConfig(prRatio.labels,
                 [
                     { label: 'PRs', data: prRatio.prs, backgroundColor: colors[0], borderWidth: 1, yAxisID: 'y' },
                     { label: 'Reviews', data: prRatio.reviews, backgroundColor: colors[1], borderWidth: 1, yAxisID: 'y' }
@@ -3180,9 +3189,9 @@ function generatePDF() {
         }
 
         // Review Latency (bar + line dual axis)
-        if (reviewLatency && reviewLatency.months && reviewLatency.months.length > 0) {
+        if (reviewLatency && reviewLatency.labels && reviewLatency.labels.length > 0) {
             hasQuality = true;
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(reviewLatency.months,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(reviewLatency.labels,
                 [{ label: 'Avg Hours', data: reviewLatency.avg_hours, backgroundColor: colors[2], borderWidth: 1 }],
                 [{ label: 'Count', data: reviewLatency.count, borderColor: colors[5], borderWidth: 2, tension: 0.3 }]
             ));
@@ -3191,13 +3200,13 @@ function generatePDF() {
         }
 
         // Time to Close (bar chart with two series)
-        if (ttc && ttc.months && ttc.months.length > 0) {
+        if (ttc && ttc.labels && ttc.labels.length > 0) {
             hasQuality = true;
             var ttcDS = [{ label: 'All Issues', data: ttc.avg_days, backgroundColor: colors[2], borderWidth: 1 }];
             if (ttr && ttr.avg_days) {
                 ttcDS.push({ label: 'Bug (near release)', data: ttr.avg_days, backgroundColor: colors[3], borderWidth: 1 });
             }
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttc.months, ttcDS));
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(ttc.labels, ttcDS));
             placeChartWithLabel(img, 'Time to Close', chartCol);
             chartCol = (chartCol + 1) % 2;
         }
@@ -3212,9 +3221,9 @@ function generatePDF() {
         var hasCommunity = false;
 
         // Retention (stacked bar)
-        if (retention && retention.months && retention.months.length > 0) {
+        if (retention && retention.labels && retention.labels.length > 0) {
             hasCommunity = true;
-            img = pdfRenderChart(500, 300, pdfStackedBarConfig(retention.months, [
+            img = pdfRenderChart(500, 300, pdfStackedBarConfig(retention.labels, [
                 { label: 'New', data: retention['new'], backgroundColor: colors[1], borderWidth: 1 },
                 { label: 'Returning', data: retention.returning, backgroundColor: colors[0], borderWidth: 1 }
             ]));
@@ -3223,10 +3232,10 @@ function generatePDF() {
         }
 
         // Contributor Momentum (line + bar dual axis)
-        if (momentum && momentum.months && momentum.months.length > 0) {
+        if (momentum && momentum.labels && momentum.labels.length > 0) {
             hasCommunity = true;
             var momDelta = momentum.delta || [];
-            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(momentum.months,
+            img = pdfRenderChart(500, 300, pdfDualAxisLineBarConfig(momentum.labels,
                 [{ label: 'Delta', data: momDelta, backgroundColor: momDelta.map(function(d) { return d >= 0 ? colors[1] + '88' : colors[3] + '88'; }), borderWidth: 0 }],
                 [{ label: 'Active (3mo rolling)', data: momentum.active, borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }]
             ));
@@ -3235,9 +3244,9 @@ function generatePDF() {
         }
 
         // Contributor Funnel (grouped bar)
-        if (funnel && funnel.months && funnel.months.length > 0) {
+        if (funnel && funnel.labels && funnel.labels.length > 0) {
             hasCommunity = true;
-            img = pdfRenderChart(500, 300, pdfBarChartConfig(funnel.months, [
+            img = pdfRenderChart(500, 300, pdfBarChartConfig(funnel.labels, [
                 { label: 'First Comment', data: funnel.first_comment, backgroundColor: colors[0] },
                 { label: 'First PR', data: funnel.first_pr, backgroundColor: colors[1] },
                 { label: 'First Merge', data: funnel.first_merge, backgroundColor: colors[4] }
