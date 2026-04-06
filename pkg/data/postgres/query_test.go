@@ -111,7 +111,7 @@ func TestSearchEvents_Pagination(t *testing.T) {
 func TestGetEventTypeSeries_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetEventTypeSeries(ctx, nil, nil, nil, 6)
+	_, err := s.GetEventTypeSeries(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -121,7 +121,7 @@ func TestGetEventTypeSeries(t *testing.T) {
 	seedTestData(t, store)
 	org := "testorg"
 	repo := "testrepo"
-	series, err := store.GetEventTypeSeries(ctx, &org, &repo, nil, 24)
+	series, err := store.GetEventTypeSeries(ctx, &org, &repo, nil, 730)
 	require.NoError(t, err)
 	assert.NotNil(t, series)
 	assert.NotEmpty(t, series.Dates)

@@ -58,14 +58,14 @@ func TestGetAllOrgRepos_EmptyDB(t *testing.T) {
 func TestGetDeveloperPercentages_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetDeveloperPercentages(ctx, nil, nil, nil, nil, 6)
+	_, err := s.GetDeveloperPercentages(ctx, nil, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetEntityPercentages_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetEntityPercentages(ctx, nil, nil, nil, nil, 6)
+	_, err := s.GetEntityPercentages(ctx, nil, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -73,7 +73,7 @@ func TestGetDeveloperPercentages(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.GetDeveloperPercentages(ctx, nil, nil, nil, []string{}, 12)
+	results, err := store.GetDeveloperPercentages(ctx, nil, nil, nil, []string{}, 730)
 	require.NoError(t, err)
 	assert.NotEmpty(t, results)
 }
@@ -82,7 +82,7 @@ func TestGetEntityPercentages(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.GetEntityPercentages(ctx, nil, nil, nil, []string{}, 12)
+	results, err := store.GetEntityPercentages(ctx, nil, nil, nil, []string{}, 730)
 	require.NoError(t, err)
 	assert.NotEmpty(t, results)
 }
@@ -90,21 +90,21 @@ func TestGetEntityPercentages(t *testing.T) {
 func TestSearchDeveloperUsernames_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.SearchDeveloperUsernames(ctx, "dev", nil, nil, 6, 10)
+	_, err := s.SearchDeveloperUsernames(ctx, "dev", nil, nil, 180, 10)
 	assert.Error(t, err)
 }
 
 func TestSearchDeveloperUsernames_EmptyQuery(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	_, err := store.SearchDeveloperUsernames(ctx, "", nil, nil, 6, 10)
+	_, err := store.SearchDeveloperUsernames(ctx, "", nil, nil, 180, 10)
 	assert.Error(t, err)
 }
 
 func TestSearchDeveloperUsernames_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	results, err := store.SearchDeveloperUsernames(ctx, "dev", nil, nil, 6, 10)
+	results, err := store.SearchDeveloperUsernames(ctx, "dev", nil, nil, 180, 10)
 	require.NoError(t, err)
 	assert.Empty(t, results)
 }
@@ -113,7 +113,7 @@ func TestSearchDeveloperUsernames_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 	seedTestData(t, store)
-	results, err := store.SearchDeveloperUsernames(ctx, "dev", nil, nil, 12, 10)
+	results, err := store.SearchDeveloperUsernames(ctx, "dev", nil, nil, 730, 10)
 	require.NoError(t, err)
 	assert.NotEmpty(t, results)
 	for _, r := range results {

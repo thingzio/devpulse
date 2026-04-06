@@ -340,10 +340,10 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.NotEmpty(t, series.Labels)
-	assert.Equal(t, "2025-01", series.Labels[0])
-	assert.Equal(t, 2, series.Failures[0])
-	assert.Equal(t, 1, series.Deployments[0])
-	assert.InDelta(t, 200.0, series.Rate[0], 0.1) // 2 failures / 1 deployment * 100
+	idx := findPeriodIdx(t, series.Labels, "2025-01")
+	assert.Equal(t, 2, series.Failures[idx])
+	assert.Equal(t, 1, series.Deployments[idx])
+	assert.InDelta(t, 200.0, series.Rate[idx], 0.1) // 2 failures / 1 deployment * 100
 }
 
 func TestGetReviewLatency_NilDB(t *testing.T) {

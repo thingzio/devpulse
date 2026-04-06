@@ -14,14 +14,14 @@ import (
 func TestGetReputationDistribution_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReputationDistribution(ctx, nil, nil, nil, 6)
+	_, err := s.GetReputationDistribution(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetReputationDistribution_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 6)
+	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
 	assert.Empty(t, dist.Labels)
 	assert.Empty(t, dist.Data)
@@ -165,7 +165,7 @@ func TestGetReputationDistribution_WithData(t *testing.T) {
 		('org1', 'repo1', 'lowscore', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
-	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 24)
+	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 	require.Len(t, dist.Labels, 2)
 	// Ordered by reputation ASC (lowest first)

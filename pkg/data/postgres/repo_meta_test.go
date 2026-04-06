@@ -60,7 +60,7 @@ func TestGetRepoMetas_WithFilter(t *testing.T) {
 func TestGetRepoOverview_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	list, err := store.GetRepoOverview(ctx, nil, 6)
+	list, err := store.GetRepoOverview(ctx, nil, 180)
 	require.NoError(t, err)
 	assert.Empty(t, list)
 }
@@ -68,7 +68,7 @@ func TestGetRepoOverview_EmptyDB(t *testing.T) {
 func TestGetRepoOverview_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetRepoOverview(ctx, nil, 6)
+	_, err := s.GetRepoOverview(ctx, nil, 180)
 	assert.Error(t, err)
 }
 
@@ -89,7 +89,7 @@ func TestGetRepoOverview_WithData(t *testing.T) {
 		('org1', 'repo1', 'user2', 'issue', '2026-03-02', '', '', '')`)
 	require.NoError(t, err)
 
-	list, err := store.GetRepoOverview(ctx, nil, 6)
+	list, err := store.GetRepoOverview(ctx, nil, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "org1", list[0].Org)
@@ -113,7 +113,7 @@ func TestGetRepoOverview_WithOrgFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	list, err := store.GetRepoOverview(ctx, &org, 6)
+	list, err := store.GetRepoOverview(ctx, &org, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "org1", list[0].Org)

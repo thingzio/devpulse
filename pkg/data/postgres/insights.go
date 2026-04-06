@@ -301,7 +301,7 @@ const (
 		p.period,
 		COUNT(DISTINCT e.username) AS active
 	FROM periods p
-	JOIN event e ON %[1]s >= TO_CHAR((p.period::date - INTERVAL '%[2]s'), %[3]s)
+	JOIN event e ON %[1]s >= TO_CHAR(((CASE WHEN length(p.period) = 7 THEN p.period || '-01' ELSE p.period END)::date - INTERVAL '%[2]s'), %[3]s)
 		AND %[1]s <= p.period
 	JOIN developer d ON e.username = d.username
 	WHERE e.org = COALESCE($2, e.org)

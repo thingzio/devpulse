@@ -13,14 +13,14 @@ import (
 func TestGetRepoMetricHistory_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetRepoMetricHistory(ctx, nil, nil, 6)
+	_, err := s.GetRepoMetricHistory(ctx, nil, nil, 180)
 	assert.Error(t, err)
 }
 
 func TestGetRepoMetricHistory_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 180)
 	require.NoError(t, err)
 	assert.Empty(t, list)
 }
@@ -36,7 +36,7 @@ func TestGetRepoMetricHistory_WithData(t *testing.T) {
 		('org1', 'repo1', '2026-03-12', 110, 55)`)
 	require.NoError(t, err)
 
-	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 3)
 	assert.Equal(t, "2026-03-10", list[0].Date)
@@ -56,7 +56,7 @@ func TestGetRepoMetricHistory_WithFilter(t *testing.T) {
 
 	org := "org1"
 	repo := "repo1"
-	list, err := store.GetRepoMetricHistory(ctx, &org, &repo, 6)
+	list, err := store.GetRepoMetricHistory(ctx, &org, &repo, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "org1", list[0].Org)
@@ -75,7 +75,7 @@ func TestGetRepoMetricHistory_AggregateByDate(t *testing.T) {
 	require.NoError(t, err)
 
 	org := "org1"
-	list, err := store.GetRepoMetricHistory(ctx, &org, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, &org, nil, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, "2026-03-10", list[0].Date)
@@ -117,7 +117,7 @@ func TestUpsertMetricHistory(t *testing.T) {
 	err := store.upsertMetricHistory(ctx, "org1", "repo1", history)
 	require.NoError(t, err)
 
-	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 6)
+	list, err := store.GetRepoMetricHistory(ctx, nil, nil, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, 100, list[0].Stars)
@@ -127,7 +127,7 @@ func TestUpsertMetricHistory(t *testing.T) {
 	err = store.upsertMetricHistory(ctx, "org1", "repo1", history)
 	require.NoError(t, err)
 
-	list, err = store.GetRepoMetricHistory(ctx, nil, nil, 6)
+	list, err = store.GetRepoMetricHistory(ctx, nil, nil, 180)
 	require.NoError(t, err)
 	require.Len(t, list, 2)
 	assert.Equal(t, 101, list[0].Stars)
