@@ -1257,6 +1257,12 @@ a.link {
 .insights-summary .insight-val {
   font-size: 4rem;
 }
+#portfolio-summary-container .insight-val {
+  font-size: 2rem;
+}
+#portfolio-summary-container .insight-label {
+  font-size: 0.85rem;
+}
 .insights-summary .insight-desc {
   font-size: 0.95rem;
   max-width: 300px;
