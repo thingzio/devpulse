@@ -290,7 +290,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 }
 
 const (
-	insightsPeriodMonths       = 3
+	insightsPeriodWeeks        = 9
 	insightsMinAgeDays         = 7
 	insightsEventDeltaPct      = 0.10
 	deepReputationDefaultLimit = 100
@@ -331,6 +331,8 @@ func checkInsightStaleness(generatedAt string, savedEventCount, currentEventCoun
 }
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {
+	insightMonths := 3 // 3 months of data covers the 9-week analysis window
+
 	// Check staleness: age gate + event delta gate
 	generatedAt, err := store.GetRepoInsightsGeneratedAt(ctx, org, repo)
 	if err != nil {
@@ -343,7 +345,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 
 	// Get current event count from summary (cheap DB query)
-	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightsPeriodMonths)
+	summary, err := store.GetInsightsSummary(ctx, &org, &repo, nil, insightMonths)
 	if err != nil {
 		return fmt.Errorf("getting insights summary for staleness check: %w", err)
 	}
@@ -355,9 +357,9 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 	slog.Info("regenerating insights", "org", org, "repo", repo, "reason", reason)
 
-	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightsPeriodMonths)
+	metrics := data.GatherInsightsMetrics(ctx, store, org, repo, insightMonths)
 
-	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodMonths)
+	insights, model, err := data.GenerateInsights(ctx, cfg, metrics, insightsPeriodWeeks)
 	if err != nil {
 		return fmt.Errorf("generating insights: %w", err)
 	}
@@ -366,7 +368,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 		Org:          org,
 		Repo:         repo,
 		Insights:     insights,
-		PeriodWeeks: insightsPeriodMonths,
+		PeriodWeeks: insightsPeriodWeeks,
 		Model:        model,
 		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		EventCount:   summary.Events,

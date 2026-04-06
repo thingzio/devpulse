@@ -137,7 +137,7 @@ func GatherInsightsMetrics(ctx context.Context, store Store, org, repo string, m
 
 // buildInsightsPrompt assembles the JSON metrics and DORA benchmarks into a
 // prompt suitable for the Claude Messages API.
-func buildInsightsPrompt(metrics *InsightsMetrics, months int) string {
+func buildInsightsPrompt(metrics *InsightsMetrics, weeks int) string {
 	metricsJSON, err := json.Marshal(metrics)
 	if err != nil {
 		slog.Warn("insights: failed to marshal metrics", "error", err)
@@ -145,7 +145,7 @@ func buildInsightsPrompt(metrics *InsightsMetrics, months int) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "You are an expert open-source project analyst. Analyze the following %d months of GitHub repository metrics and provide actionable insights.\n\n", months)
+	fmt.Fprintf(&b, "You are an expert open-source project analyst. Analyze the following %d weeks of GitHub repository metrics and provide actionable insights.\n\n", weeks)
 	fmt.Fprintf(&b, "## Metrics (JSON)\n\n%s\n\n", string(metricsJSON))
 	b.WriteString("## DORA Benchmarks (for context)\n\n")
 	b.WriteString("- Elite: Deployment frequency multiple times per day, lead time < 1 hour, change failure rate < 5%%, time to restore < 1 hour\n")
@@ -188,7 +188,7 @@ type claudeContentBlock struct {
 
 // GenerateInsights calls the Claude Messages API to generate insights from
 // the provided metrics. Returns the parsed insights, the model used, and any error.
-func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetrics, months int) (*GeneratedInsights, string, error) {
+func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetrics, weeks int) (*GeneratedInsights, string, error) {
 	model := cfg.Model
 	if model == "" {
 		model = DefaultInsightsModel
@@ -198,7 +198,7 @@ func GenerateInsights(ctx context.Context, cfg *LLMConfig, metrics *InsightsMetr
 		baseURL = claudeAPIURL
 	}
 
-	prompt := buildInsightsPrompt(metrics, months)
+	prompt := buildInsightsPrompt(metrics, weeks)
 
 	reqBody := claudeRequest{
 		Model:     model,
