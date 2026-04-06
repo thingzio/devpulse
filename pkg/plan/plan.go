@@ -19,8 +19,8 @@ type Limits struct {
 
 var All = map[string]Limits{
 	Free:       {MaxRepos: 1, MaxEventsPerWeek: 500, MaxDataRangeMonths: 3, AILevel: 0, DeepReputation: false, PDFExport: false, CSVExport: false},
-	Starter:    {MaxRepos: 5, MaxEventsPerWeek: 2500, MaxDataRangeMonths: 12, AILevel: 1, DeepReputation: false, PDFExport: true, CSVExport: false},
-	Pro:        {MaxRepos: 25, MaxEventsPerWeek: 15000, MaxDataRangeMonths: 36, AILevel: 2, DeepReputation: true, PDFExport: true, CSVExport: true},
+	Starter:    {MaxRepos: 5, MaxEventsPerWeek: 2500, MaxDataRangeMonths: 6, AILevel: 1, DeepReputation: false, PDFExport: true, CSVExport: false},
+	Pro:        {MaxRepos: 25, MaxEventsPerWeek: 15000, MaxDataRangeMonths: 12, AILevel: 2, DeepReputation: true, PDFExport: true, CSVExport: true},
 	Enterprise: {MaxRepos: 0, MaxEventsPerWeek: 0, MaxDataRangeMonths: 0, AILevel: 2, DeepReputation: true, PDFExport: true, CSVExport: true}, // 0 = unlimited
 }
 
