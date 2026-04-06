@@ -1575,7 +1575,7 @@ function loadRepoMeta(url) {
             repoMetaSparkline = new Chart($("#repo-meta-sparkline")[0].getContext("2d"), {
                 type: 'line',
                 data: {
-                    labels: sLabels,
+                    labels: formatLabels(sLabels),
                     datasets: [
                         {
                             label: 'Stars',
@@ -1625,12 +1625,12 @@ function loadStarsTrendChart(url) {
             labels.push(d.date);
             stars.push(d.stars);
         });
-        $("#stars-trend-desc").text("Daily star count from " + labels[0] + " to " + labels[labels.length - 1] + ".");
+        $("#stars-trend-desc").text("Daily star count from " + formatLabel(labels[0]) + " to " + formatLabel(labels[labels.length - 1]) + ".");
         if (starsTrendChart) starsTrendChart.destroy();
         starsTrendChart = new Chart($("#stars-trend-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: labels,
+                labels: formatLabels(labels),
                 datasets: [{
                     label: 'Stars',
                     data: stars,
@@ -1665,12 +1665,12 @@ function loadForksTrendChart(url) {
             labels.push(d.date);
             forks.push(d.forks);
         });
-        $("#forks-trend-desc").text("Daily fork count from " + labels[0] + " to " + labels[labels.length - 1] + ".");
+        $("#forks-trend-desc").text("Daily fork count from " + formatLabel(labels[0]) + " to " + formatLabel(labels[labels.length - 1]) + ".");
         if (forksTrendChart) forksTrendChart.destroy();
         forksTrendChart = new Chart($("#forks-trend-chart")[0].getContext("2d"), {
             type: 'line',
             data: {
-                labels: labels,
+                labels: formatLabels(labels),
                 datasets: [{
                     label: 'Forks',
                     data: forks,
@@ -3040,7 +3040,7 @@ function generatePDF() {
         // Health charts: Stars Trend, Forks Trend
         chartCol = 0;
         if (metricHistory && metricHistory.length > 0) {
-            var mhLabels = metricHistory.map(function(d) { return d.date; });
+            var mhLabels = formatLabels(metricHistory.map(function(d) { return d.date; }));
             img = pdfRenderChart(500, 300, pdfLineChartConfig(mhLabels, [{
                 label: 'Stars', data: metricHistory.map(function(d) { return d.stars; }),
                 borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 1
