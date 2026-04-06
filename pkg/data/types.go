@@ -497,11 +497,11 @@ type GeneratedInsights struct {
 }
 
 type RepoInsights struct {
-	Org          string             `json:"org" yaml:"org"`
-	Repo         string             `json:"repo" yaml:"repo"`
-	Insights     *GeneratedInsights `json:"insights" yaml:"insights"`
-	PeriodWeeks  int                `json:"period_weeks" yaml:"periodWeeks"`
-	Model        string             `json:"model" yaml:"model"`
-	GeneratedAt  string             `json:"generated_at" yaml:"generatedAt"`
-	EventCount   int                `json:"event_count" yaml:"eventCount"`
+	Org         string             `json:"org" yaml:"org"`
+	Repo        string             `json:"repo" yaml:"repo"`
+	Insights    *GeneratedInsights `json:"insights" yaml:"insights"`
+	PeriodWeeks int                `json:"period_weeks" yaml:"periodWeeks"`
+	Model       string             `json:"model" yaml:"model"`
+	GeneratedAt string             `json:"generated_at" yaml:"generatedAt"`
+	EventCount  int                `json:"event_count" yaml:"eventCount"`
 }

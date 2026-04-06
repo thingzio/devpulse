@@ -270,3 +270,52 @@ func TestSinceDateWeeks(t *testing.T) {
 	expected := time.Now().UTC().AddDate(0, 0, -63).Format("2006-01-02")
 	assert.Equal(t, expected, result)
 }
+
+func TestGeneratePeriods_Weekly(t *testing.T) {
+	periods := generatePeriods(28) // 4 weeks
+	// Should produce 4-5 entries (4 full weeks + possible current partial)
+	assert.GreaterOrEqual(t, len(periods), 4)
+	assert.LessOrEqual(t, len(periods), 6)
+	for _, p := range periods {
+		assert.Len(t, p, 10, "weekly period should be YYYY-MM-DD: %s", p)
+		parsed, err := time.Parse("2006-01-02", p)
+		require.NoError(t, err)
+		assert.Equal(t, time.Monday, parsed.Weekday(), "period %s should be Monday", p)
+	}
+}
+
+func TestGeneratePeriods_Monthly(t *testing.T) {
+	periods := generatePeriods(365) // 12 months
+	assert.GreaterOrEqual(t, len(periods), 12)
+	assert.LessOrEqual(t, len(periods), 14)
+	for _, p := range periods {
+		assert.Len(t, p, 7, "monthly period should be YYYY-MM: %s", p)
+	}
+}
+
+func TestGapFiller(t *testing.T) {
+	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+
+	intData := gf.fillInt([]int{10, 30})
+	found := 0
+	for _, v := range intData {
+		if v > 0 {
+			found++
+		}
+	}
+	assert.Equal(t, 2, found, "should have exactly 2 non-zero values")
+	assert.Equal(t, len(gf.periods), len(intData), "output length should match periods")
+
+	floatData := gf.fillFloat64([]float64{1.5, 3.5})
+	assert.Equal(t, len(gf.periods), len(floatData))
+}
+
+func TestGapFillSlice(t *testing.T) {
+	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+
+	intResult := gapFillSlice(gf, []int{5, 15})
+	assert.Equal(t, len(gf.periods), len(intResult))
+
+	floatResult := gapFillSlice(gf, []float64{2.5, 7.5})
+	assert.Equal(t, len(gf.periods), len(floatResult))
+}

@@ -365,13 +365,13 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	}
 
 	ri := &data.RepoInsights{
-		Org:          org,
-		Repo:         repo,
-		Insights:     insights,
+		Org:         org,
+		Repo:        repo,
+		Insights:    insights,
 		PeriodWeeks: insightsPeriodWeeks,
-		Model:        model,
-		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
-		EventCount:   summary.Events,
+		Model:       model,
+		GeneratedAt: time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		EventCount:  summary.Events,
 	}
 
 	if err := store.SaveRepoInsights(ctx, org, repo, ri); err != nil {

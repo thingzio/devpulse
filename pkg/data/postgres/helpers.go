@@ -257,6 +257,76 @@ func sinceDateWeeks(weeks int) string {
 	return time.Now().UTC().AddDate(0, 0, -weeks*7).Format("2006-01-02")
 }
 
+// gapFiller pads time-series results so every expected period is present.
+type gapFiller struct {
+	periods []string
+	index   map[string]int
+}
+
+// newGapFiller builds a filler from the query's days parameter and the
+// labels actually returned by the database.
+func newGapFiller(days int, labels []string) *gapFiller {
+	periods := generatePeriods(days)
+	idx := make(map[string]int, len(labels))
+	for i, l := range labels {
+		idx[l] = i
+	}
+	return &gapFiller{periods: periods, index: idx}
+}
+
+func (g *gapFiller) fillInt(orig []int) []int {
+	out := make([]int, len(g.periods))
+	for i, p := range g.periods {
+		if idx, ok := g.index[p]; ok && idx < len(orig) {
+			out[i] = orig[idx]
+		}
+	}
+	return out
+}
+
+func (g *gapFiller) fillFloat64(orig []float64) []float64 {
+	out := make([]float64, len(g.periods))
+	for i, p := range g.periods {
+		if idx, ok := g.index[p]; ok && idx < len(orig) {
+			out[i] = orig[idx]
+		}
+	}
+	return out
+}
+
+func gapFillSlice[T int | float64](gf *gapFiller, orig []T) []T {
+	out := make([]T, len(gf.periods))
+	for i, p := range gf.periods {
+		if idx, ok := gf.index[p]; ok && idx < len(orig) {
+			out[i] = orig[idx]
+		}
+	}
+	return out
+}
+
+// generatePeriods returns every period label from sinceDate(days) to today.
+func generatePeriods(days int) []string {
+	gran := AutoGranularity(days)
+	since := sinceDate(days)
+	start, _ := time.Parse("2006-01-02", since)
+	now := time.Now().UTC()
+
+	var periods []string
+	if gran == GranWeek {
+		for d := start; !d.After(now); d = d.AddDate(0, 0, 7) {
+			periods = append(periods, d.Format("2006-01-02"))
+		}
+	} else {
+		d := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, time.UTC)
+		nowMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		for !d.After(nowMonth) {
+			periods = append(periods, d.Format("2006-01"))
+			d = d.AddDate(0, 1, 0)
+		}
+	}
+	return periods
+}
+
 func rollbackTransaction(tx *sql.Tx) {
 	if err := tx.Rollback(); err != nil {
 		slog.Error("error rolling back transaction", "error", err)

@@ -291,17 +291,17 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 		t := pageTemplates["home.html"]
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := t.ExecuteTemplate(w, "home", map[string]any{
-			"base_path":       "",
-			"version":         opts.Version,
-			"commit":          opts.Commit,
-			"build_date":      opts.Date,
-			"period_days":     180,
-			"username":        tn.Username,
-			"plan":            tn.Plan,
-			"pdf_export":      limits.PDFExport,
-			"csv_export":      limits.CSVExport,
-			"max_data_days":   limits.MaxDataRangeMonths * 30,
-			"ai_level":        limits.AILevel,
+			"base_path":     "",
+			"version":       opts.Version,
+			"commit":        opts.Commit,
+			"build_date":    opts.Date,
+			"period_days":   180,
+			"username":      tn.Username,
+			"plan":          tn.Plan,
+			"pdf_export":    limits.PDFExport,
+			"csv_export":    limits.CSVExport,
+			"max_data_days": limits.MaxDataRangeMonths * 30,
+			"ai_level":      limits.AILevel,
 		}); err != nil {
 			slog.Error("rendering dashboard", "error", err)
 		}

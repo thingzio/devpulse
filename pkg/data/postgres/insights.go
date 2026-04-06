@@ -776,7 +776,8 @@ func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl strin
 		return nil, nil, nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	return ms, a, b, nil
+	gf := newGapFiller(days, ms)
+	return gf.periods, gapFillSlice(gf, a), gapFillSlice(gf, b), nil
 }
 
 func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, days int) (*data.RetentionSeries, error) {
@@ -832,6 +833,12 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.PRs = gf.fillInt(sr.PRs)
+	sr.Reviews = gf.fillInt(sr.Reviews)
+	sr.Ratio = gf.fillFloat64(sr.Ratio)
 
 	return sr, nil
 }
@@ -922,6 +929,12 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 		sr.Rate = append(sr.Rate, rate)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Failures = gf.fillInt(sr.Failures)
+	sr.Deployments = gf.fillInt(sr.Deployments)
+	sr.Rate = gf.fillFloat64(sr.Rate)
+
 	return sr, nil
 }
 
@@ -962,6 +975,11 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Count = gf.fillInt(sr.Count)
+	sr.AvgHours = gf.fillFloat64(sr.AvgHours)
+
 	return sr, nil
 }
 
@@ -1001,6 +1019,11 @@ func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Count = gf.fillInt(sr.Count)
+	sr.AvgDays = gf.fillFloat64(sr.AvgDays)
 
 	return sr, nil
 }
@@ -1057,6 +1080,13 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Small = gf.fillInt(sr.Small)
+	sr.Medium = gf.fillInt(sr.Medium)
+	sr.Large = gf.fillInt(sr.Large)
+	sr.XLarge = gf.fillInt(sr.XLarge)
+
 	return sr, nil
 }
 
@@ -1095,6 +1125,11 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Forks = gf.fillInt(sr.Forks)
+	sr.Events = gf.fillInt(sr.Events)
 
 	return sr, nil
 }
@@ -1143,6 +1178,12 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.FirstComment = gf.fillInt(sr.FirstComment)
+	sr.FirstPR = gf.fillInt(sr.FirstPR)
+	sr.FirstMerge = gf.fillInt(sr.FirstMerge)
+
 	return sr, nil
 }
 
@@ -1181,11 +1222,15 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Active = gf.fillInt(sr.Active)
+	sr.Delta = make([]int, len(sr.Active))
 	for i := range sr.Active {
 		if i == 0 {
-			sr.Delta = append(sr.Delta, 0)
+			sr.Delta[i] = 0
 		} else {
-			sr.Delta = append(sr.Delta, sr.Active[i]-sr.Active[i-1])
+			sr.Delta[i] = sr.Active[i] - sr.Active[i-1]
 		}
 	}
 

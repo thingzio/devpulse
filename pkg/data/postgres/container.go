@@ -238,6 +238,10 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, day
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Versions = gf.fillInt(sr.Versions)
+
 	return sr, nil
 }
 

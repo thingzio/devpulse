@@ -280,6 +280,11 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 
 	if len(sr.Labels) > 0 {
 		sr.Deployments = append(sr.Deployments, sr.Total...)
+		gf := newGapFiller(days, sr.Labels)
+		sr.Labels = gf.periods
+		sr.Total = gf.fillInt(sr.Total)
+		sr.Stable = gf.fillInt(sr.Stable)
+		sr.Deployments = gf.fillInt(sr.Deployments)
 		return sr, nil
 	}
 
@@ -303,6 +308,12 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 	if err := fallbackRows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Total = gf.fillInt(sr.Total)
+	sr.Stable = gf.fillInt(sr.Stable)
+	sr.Deployments = gf.fillInt(sr.Deployments)
 
 	return sr, nil
 }
@@ -340,6 +351,10 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, days
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
+
+	gf := newGapFiller(days, sr.Labels)
+	sr.Labels = gf.periods
+	sr.Downloads = gf.fillInt(sr.Downloads)
 
 	return sr, nil
 }
