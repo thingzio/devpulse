@@ -122,11 +122,11 @@ var (
 		"NVIDIA CORPORATION": "NVIDIA",
 
 		// ---- Oracle ----
-		"OCI":                          "ORACLE",
-		"ORACLE AMERICA":               "ORACLE",
-		"ORACLE CLOUD INFRASTRUCTURE":  "ORACLE",
-		"ORACLE OCI":                   "ORACLE",
-		"WERCKER":                      "ORACLE",
+		"OCI":                         "ORACLE",
+		"ORACLE AMERICA":              "ORACLE",
+		"ORACLE CLOUD INFRASTRUCTURE": "ORACLE",
+		"ORACLE OCI":                  "ORACLE",
+		"WERCKER":                     "ORACLE",
 
 		// ---- Red Hat ----
 		"COREOS":         "RED HAT",
