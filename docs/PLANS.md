@@ -1,6 +1,10 @@
 # Plan Feature Gating — Phase 2
 
 > **Phase 1 (shipped):** Repos, data retention, exports (PDF/CSV), AI insights, deep reputation. See `pkg/plan/plan.go` for current limits.
+>
+> **Retention limits:** Free=3 months, Starter=6 months, Pro=12 months, Enterprise=unlimited.
+>
+> **Chart granularity:** Charts auto-select weekly granularity for time ranges ≤6 months and monthly for longer ranges.
 
 This document covers remaining plan features not yet implemented.
 

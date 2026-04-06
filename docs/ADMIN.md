@@ -63,8 +63,8 @@ Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 | Plan | Repos | Events/Week | Data Retention | AI Level | Deep Rep | Exports |
 |------|-------|-------------|----------------|----------|----------|---------|
 | free | 1 | 500 | 3 months | none | no | none |
-| starter | 5 | 2,500 | 12 months | basic | no | PDF |
-| pro | 25 | 15,000 | 36 months | full | yes | PDF+CSV |
+| starter | 5 | 2,500 | 6 months | basic | no | PDF |
+| pro | 25 | 15,000 | 12 months | full | yes | PDF+CSV |
 | enterprise | unlimited | unlimited | unlimited | full | yes | PDF+CSV |
 
 ## Monitoring
