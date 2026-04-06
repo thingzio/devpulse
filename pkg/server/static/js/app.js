@@ -2139,17 +2139,10 @@ function initPeriodSelector() {
         const days = $(this).val();
         $("#period_days").val(days);
         resetCharts();
-
-        let org = "", repo = "", entity = "";
-        if (searchItem) {
-            const scope = ($("#search-bar").val().match(/^(org|repo|entity):/i) || [])[1] || "org";
-            switch (scope.toLowerCase()) {
-                case "org": org = searchItem.value; break;
-                case "repo": repo = searchItem.value; break;
-                case "entity": entity = searchItem.value; break;
-            }
-        }
-        loadAllCharts(days, org, repo, entity);
+        loadAllCharts(days,
+            searchCriteria.org || "",
+            searchCriteria.repo || "",
+            searchCriteria.entity || "");
     });
 }
 
