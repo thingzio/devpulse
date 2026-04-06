@@ -19,10 +19,6 @@ const (
 	botExcludeDSQL = `AND d.username NOT LIKE '%[bot]'
 		AND LOWER(d.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
 
-	// botExcludePrSQL filters out bot accounts using the "pr" table alias.
-	botExcludePrSQL = `AND pr.username NOT LIKE '%[bot]'
-		AND LOWER(pr.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
-
 	// botExcludeTpl is botExcludeSQL with % escaped for use in fmt.Sprintf templates.
 	botExcludeTpl = `AND e.username NOT LIKE '%%[bot]'
 		AND LOWER(e.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
