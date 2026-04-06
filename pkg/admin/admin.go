@@ -23,48 +23,6 @@ const (
 	writeTimeout      = 90 * time.Second
 	shutdownTimeout   = 5 * time.Second
 	maxRequestBodyLen = 1 << 20
-
-	selectTenantByUsernameSQL = `SELECT id FROM tenant WHERE username = $1`
-
-	clearUpgradeRequestSQL = `
-		UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW()
-		WHERE id = $1`
-
-	listTenantsSQL = `
-		SELECT t.username, t.plan, t.max_repos, t.max_events_per_week,
-		       t.created_at, MAX(s.created_at) AS last_sign_in
-		FROM tenant t
-		LEFT JOIN session s ON s.tenant_id = t.id
-		GROUP BY t.id
-		ORDER BY t.created_at`
-
-	getTenantDetailSQL = `
-		SELECT t.id, t.username, t.email, t.plan,
-		       t.max_repos, t.max_events_per_week,
-		       t.created_at, MAX(s.created_at) AS last_sign_in
-		FROM tenant t
-		LEFT JOIN session s ON s.tenant_id = t.id
-		WHERE t.username = $1
-		GROUP BY t.id`
-
-	insertMinimalTenantSQL = `
-		INSERT INTO tenant (github_id, username)
-		VALUES ($1, $2)
-		ON CONFLICT (github_id) DO UPDATE SET updated_at = NOW()
-		RETURNING id`
-
-	getTenantReposSQL = `
-		SELECT tr.org, tr.repo,
-		       COUNT(e.type),
-		       COUNT(CASE WHEN e.date >= $3 THEN 1 END),
-		       COALESCE(rm.last_import_at, '')
-		FROM tenant_repo tr
-		LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
-		LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo
-		       AND e.date >= $2
-		WHERE tr.tenant_id = $1 AND tr.active = TRUE
-		GROUP BY tr.org, tr.repo, rm.last_import_at
-		ORDER BY tr.org, tr.repo`
 )
 
 // Run starts the admin HTTP server and blocks until ctx is canceled.
@@ -130,40 +88,28 @@ func Run(ctx context.Context) error {
 
 func handleListTenants(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.QueryContext(r.Context(), listTenantsSQL)
+		tenants, err := tenant.ListTenantSummaries(r.Context(), db)
 		if err != nil {
 			slog.Error("listing tenants", "error", err)
 			http.Error(w, "error listing tenants", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
-		var tenants []tenantSummary
-		for rows.Next() {
-			var t tenantSummary
-			var createdAt time.Time
-			var lastSignIn sql.NullTime
-			if err := rows.Scan(
-				&t.Username, &t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
-				&createdAt, &lastSignIn,
-			); err != nil {
-				slog.Error("scanning tenant", "error", err)
-				http.Error(w, "error scanning tenant", http.StatusInternalServerError)
-				return
+		out := make([]tenantSummary, len(tenants))
+		for i, t := range tenants {
+			out[i] = tenantSummary{
+				Username:         t.Username,
+				Plan:             t.Plan,
+				MaxRepos:         t.MaxRepos,
+				MaxEventsPerWeek: t.MaxEventsPerWeek,
+				CreatedAt:        t.CreatedAt.Format("2006-01-02"),
 			}
-			t.CreatedAt = createdAt.Format("2006-01-02")
-			if lastSignIn.Valid {
-				t.LastSignIn = lastSignIn.Time.Format("2006-01-02")
+			if t.LastSignIn != nil {
+				out[i].LastSignIn = t.LastSignIn.Format("2006-01-02")
 			}
-			tenants = append(tenants, t)
-		}
-		if err := rows.Err(); err != nil {
-			slog.Error("iterating tenants", "error", err)
-			http.Error(w, "error iterating tenants", http.StatusInternalServerError)
-			return
 		}
 
-		writeJSON(w, tenants)
+		writeJSON(w, out)
 	}
 }
 
@@ -175,60 +121,48 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var td tenantDetail
-		var tenantID string
-		var createdAt time.Time
-		var lastSignIn sql.NullTime
-		var email sql.NullString
-		err := db.QueryRowContext(r.Context(), getTenantDetailSQL, username).Scan(
-			&tenantID, &td.Username, &email, &td.Plan,
-			&td.MaxRepos, &td.MaxEventsPerWeek,
-			&createdAt, &lastSignIn,
-		)
+		td, err := tenant.GetTenantDetailByUsername(r.Context(), db, username)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("tenant not found: %s", username), http.StatusNotFound)
 			return
 		}
-		td.CreatedAt = createdAt.Format("2006-01-02")
-		if lastSignIn.Valid {
-			td.LastSignIn = lastSignIn.Time.Format("2006-01-02")
+
+		out := tenantDetail{
+			Username:         td.Username,
+			Email:            td.Email,
+			Plan:             td.Plan,
+			MaxRepos:         td.MaxRepos,
+			MaxEventsPerWeek: td.MaxEventsPerWeek,
+			CreatedAt:        td.CreatedAt.Format("2006-01-02"),
 		}
-		if email.Valid {
-			td.Email = email.String
+		if td.LastSignIn != nil {
+			out.LastSignIn = td.LastSignIn.Format("2006-01-02")
 		}
 
 		since := time.Now().UTC().AddDate(0, -6, 0).Format("2006-01-02")
 		weekStart := tenant.StartOfWeek().Format("2006-01-02")
 
-		rows, err := db.QueryContext(r.Context(), getTenantReposSQL, tenantID, since, weekStart)
+		repos, err := tenant.GetTenantRepoDetails(r.Context(), db, td.ID, since, weekStart)
 		if err != nil {
 			slog.Error("querying tenant repos", "error", err)
 			http.Error(w, "error querying repos", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
-		for rows.Next() {
-			var rd repoDetail
-			var org, repo string
-			if err := rows.Scan(&org, &repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport); err != nil {
-				slog.Error("scanning repo", "error", err)
-				http.Error(w, "error scanning repo", http.StatusInternalServerError)
-				return
+		for _, rd := range repos {
+			d := repoDetail{
+				Name:         rd.Org + "/" + rd.Repo,
+				Events:       rd.Events,
+				WeeklyEvents: rd.WeeklyEvents,
+				LastImport:   rd.LastImport,
 			}
-			rd.Name = org + "/" + repo
-			if td.MaxEventsPerWeek > 0 {
-				rd.WeeklyPct = float64(rd.WeeklyEvents) / float64(td.MaxEventsPerWeek) * 100
+			if out.MaxEventsPerWeek > 0 {
+				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100
 			}
-			td.Repos = append(td.Repos, rd)
-		}
-		if err := rows.Err(); err != nil {
-			slog.Error("iterating repos", "error", err)
-			http.Error(w, "error iterating repos", http.StatusInternalServerError)
-			return
+			out.Repos = append(out.Repos, d)
 		}
 
-		writeJSON(w, td)
+		writeJSON(w, out)
 	}
 }
 
@@ -254,10 +188,7 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var tenantID string
-		err := db.QueryRowContext(
-			r.Context(), selectTenantByUsernameSQL, req.Username,
-		).Scan(&tenantID)
+		tenantID, err := tenant.GetTenantIDByUsername(r.Context(), db, req.Username)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("tenant not found: %s", req.Username), http.StatusNotFound)
 			return
@@ -271,7 +202,7 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.ExecContext(r.Context(), clearUpgradeRequestSQL, tenantID); err != nil {
+		if err := tenant.ClearUpgradeRequest(r.Context(), db, tenantID); err != nil {
 			slog.Warn("clearing upgrade request", "error", err)
 		}
 
@@ -320,8 +251,7 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var tenantID string
-		err = db.QueryRowContext(r.Context(), insertMinimalTenantSQL, ghID, req.Username).Scan(&tenantID)
+		tenantID, err := tenant.InsertMinimalTenant(r.Context(), db, ghID, req.Username)
 		if err != nil {
 			slog.Error("inserting tenant", "error", err)
 			http.Error(w, "error creating tenant", http.StatusInternalServerError)
