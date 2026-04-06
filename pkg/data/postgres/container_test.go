@@ -20,7 +20,7 @@ func TestGetContainerActivity_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetContainerActivity(ctx, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 	assert.Empty(t, series.Versions)
 }
 
@@ -37,10 +37,10 @@ func TestGetContainerActivity_WithData(t *testing.T) {
 
 	series, err := store.GetContainerActivity(ctx, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 2)
-	assert.Equal(t, "2025-01", series.Months[0])
+	require.Len(t, series.Labels, 2)
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 2, series.Versions[0])
-	assert.Equal(t, "2025-02", series.Months[1])
+	assert.Equal(t, "2025-02", series.Labels[1])
 	assert.Equal(t, 1, series.Versions[1])
 }
 
@@ -57,6 +57,6 @@ func TestGetContainerActivity_FilterByOrg(t *testing.T) {
 	org := "org1"
 	series, err := store.GetContainerActivity(ctx, &org, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 1, series.Versions[0])
 }

@@ -217,7 +217,7 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, mon
 	defer rows.Close()
 
 	sr := &data.ContainerActivitySeries{
-		Months:   make([]string, 0),
+		Labels:   make([]string, 0),
 		Versions: make([]int, 0),
 	}
 
@@ -227,7 +227,7 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, mon
 		if err := rows.Scan(&month, &count); err != nil {
 			return nil, fmt.Errorf("scanning container activity row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Versions = append(sr.Versions, count)
 	}
 

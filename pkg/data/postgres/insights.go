@@ -721,7 +721,7 @@ func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string,
 	return series, nil
 }
 
-func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
+func getDualSeries[T int | float64](ctx context.Context, db DBTX, query string, org, repo, entity *string, months int) ([]string, []T, []T, error) {
 	if db == nil {
 		return nil, nil, nil, data.ErrDBNotInitialized
 	}
@@ -756,11 +756,11 @@ func getMonthDualSeries[T int | float64](ctx context.Context, db DBTX, query str
 }
 
 func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, months int) (*data.RetentionSeries, error) {
-	ms, newC, retC, err := getMonthDualSeries[int](ctx, s.db, selectRetentionSQL, org, repo, entity, months)
+	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}
-	return &data.RetentionSeries{Months: ms, New: newC, Returning: retC}, nil
+	return &data.RetentionSeries{Labels: ms, New: newC, Returning: retC}, nil
 }
 
 func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string, months int) (*data.PRReviewRatioSeries, error) {
@@ -780,7 +780,7 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	defer rows.Close()
 
 	sr := &data.PRReviewRatioSeries{
-		Months:  make([]string, 0),
+		Labels:  make([]string, 0),
 		PRs:     make([]int, 0),
 		Reviews: make([]int, 0),
 		Ratio:   make([]float64, 0),
@@ -792,7 +792,7 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 		if err := rows.Scan(&month, &prs, &reviews); err != nil {
 			return nil, fmt.Errorf("failed to scan PR review ratio row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.PRs = append(sr.PRs, prs)
 		sr.Reviews = append(sr.Reviews, reviews)
 
@@ -874,7 +874,7 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	sort.Strings(sortedMonths)
 
 	sr := &data.ChangeFailureRateSeries{
-		Months:      make([]string, 0, len(sortedMonths)),
+		Labels:      make([]string, 0, len(sortedMonths)),
 		Failures:    make([]int, 0, len(sortedMonths)),
 		Deployments: make([]int, 0, len(sortedMonths)),
 		Rate:        make([]float64, 0, len(sortedMonths)),
@@ -887,7 +887,7 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 		if d > 0 {
 			rate = float64(f) / float64(d) * 100
 		}
-		sr.Months = append(sr.Months, m)
+		sr.Labels = append(sr.Labels, m)
 		sr.Failures = append(sr.Failures, f)
 		sr.Deployments = append(sr.Deployments, d)
 		sr.Rate = append(sr.Rate, rate)
@@ -910,7 +910,7 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 	defer rows.Close()
 
 	sr := &data.ReviewLatencySeries{
-		Months:   make([]string, 0),
+		Labels:   make([]string, 0),
 		Count:    make([]int, 0),
 		AvgHours: make([]float64, 0),
 	}
@@ -922,7 +922,7 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 		if err := rows.Scan(&month, &cnt, &avgHours); err != nil {
 			return nil, fmt.Errorf("failed to scan review latency row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Count = append(sr.Count, cnt)
 		sr.AvgHours = append(sr.AvgHours, avgHours)
 	}
@@ -948,7 +948,7 @@ func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, 
 	defer rows.Close()
 
 	sr := &data.VelocitySeries{
-		Months:  make([]string, 0),
+		Labels:  make([]string, 0),
 		Count:   make([]int, 0),
 		AvgDays: make([]float64, 0),
 	}
@@ -960,7 +960,7 @@ func (s *Store) getVelocitySeries(ctx context.Context, query string, org, repo, 
 		if err := rows.Scan(&month, &cnt, &avgDays); err != nil {
 			return nil, fmt.Errorf("failed to scan velocity row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Count = append(sr.Count, cnt)
 		sr.AvgDays = append(sr.AvgDays, avgDays)
 	}
@@ -998,7 +998,7 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	defer rows.Close()
 
 	sr := &data.PRSizeSeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Small:  make([]int, 0),
 		Medium: make([]int, 0),
 		Large:  make([]int, 0),
@@ -1011,7 +1011,7 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 		if err := rows.Scan(&month, &small, &medium, &large, &xlarge); err != nil {
 			return nil, fmt.Errorf("failed to scan PR size row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Small = append(sr.Small, small)
 		sr.Medium = append(sr.Medium, medium)
 		sr.Large = append(sr.Large, large)
@@ -1039,7 +1039,7 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	defer rows.Close()
 
 	sr := &data.ForksAndActivitySeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Forks:  make([]int, 0),
 		Events: make([]int, 0),
 	}
@@ -1050,7 +1050,7 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 		if err := rows.Scan(&month, &forks, &events); err != nil {
 			return nil, fmt.Errorf("failed to scan forks and activity row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Forks = append(sr.Forks, forks)
 		sr.Events = append(sr.Events, events)
 	}
@@ -1076,7 +1076,7 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 	defer rows.Close()
 
 	sr := &data.ContributorFunnelSeries{
-		Months:       make([]string, 0),
+		Labels:       make([]string, 0),
 		FirstComment: make([]int, 0),
 		FirstPR:      make([]int, 0),
 		FirstMerge:   make([]int, 0),
@@ -1088,7 +1088,7 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 		if err := rows.Scan(&month, &fc, &fp, &fm); err != nil {
 			return nil, fmt.Errorf("failed to scan contributor funnel row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.FirstComment = append(sr.FirstComment, fc)
 		sr.FirstPR = append(sr.FirstPR, fp)
 		sr.FirstMerge = append(sr.FirstMerge, fm)
@@ -1115,7 +1115,7 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 	defer rows.Close()
 
 	sr := &data.MomentumSeries{
-		Months: make([]string, 0),
+		Labels: make([]string, 0),
 		Active: make([]int, 0),
 		Delta:  make([]int, 0),
 	}
@@ -1126,7 +1126,7 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 		if err := rows.Scan(&month, &active); err != nil {
 			return nil, fmt.Errorf("failed to scan contributor momentum row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Active = append(sr.Active, active)
 	}
 
@@ -1190,11 +1190,11 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 }
 
 func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, months int) (*data.FirstResponseSeries, error) {
-	ms, issueAvg, prAvg, err := getMonthDualSeries[float64](ctx, s.db, selectTimeToFirstResponseSQL, org, repo, entity, months)
+	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}
-	return &data.FirstResponseSeries{Months: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
+	return &data.FirstResponseSeries{Labels: ms, IssueAvg: issueAvg, PRAvg: prAvg}, nil
 }
 
 func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, months int) (*data.AgingPRsSeries, error) {
@@ -1223,11 +1223,11 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, mont
 }
 
 func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, months int) (*data.IssueRatioSeries, error) {
-	ms, opened, closed, err := getMonthDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
+	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioSQL, org, repo, entity, months)
 	if err != nil {
 		return nil, err
 	}
-	return &data.IssueRatioSeries{Months: ms, Opened: opened, Closed: closed}, nil
+	return &data.IssueRatioSeries{Labels: ms, Opened: opened, Closed: closed}, nil
 }
 
 func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string, months int) (*data.UnansweredSeries, error) {

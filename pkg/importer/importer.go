@@ -366,7 +366,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 		Org:          org,
 		Repo:         repo,
 		Insights:     insights,
-		PeriodMonths: insightsPeriodMonths,
+		PeriodWeeks: insightsPeriodMonths,
 		Model:        model,
 		GeneratedAt:  time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		EventCount:   summary.Events,

@@ -252,7 +252,7 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 	defer rows.Close()
 
 	sr := &data.ReleaseCadenceSeries{
-		Months:      make([]string, 0),
+		Labels:      make([]string, 0),
 		Total:       make([]int, 0),
 		Stable:      make([]int, 0),
 		Deployments: make([]int, 0),
@@ -264,7 +264,7 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		if scanErr := rows.Scan(&month, &total, &stable); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan release cadence row: %w", scanErr)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Total = append(sr.Total, total)
 		sr.Stable = append(sr.Stable, stable)
 	}
@@ -273,7 +273,7 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	if len(sr.Months) > 0 {
+	if len(sr.Labels) > 0 {
 		sr.Deployments = append(sr.Deployments, sr.Total...)
 		return sr, nil
 	}
@@ -290,7 +290,7 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		if scanErr := fallbackRows.Scan(&month, &cnt); scanErr != nil {
 			return nil, fmt.Errorf("failed to scan merged PR deployment row: %w", scanErr)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Deployments = append(sr.Deployments, cnt)
 	}
 
@@ -315,7 +315,7 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, mont
 	defer rows.Close()
 
 	sr := &data.ReleaseDownloadsSeries{
-		Months:    make([]string, 0),
+		Labels:    make([]string, 0),
 		Downloads: make([]int, 0),
 	}
 
@@ -325,7 +325,7 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, mont
 		if err := rows.Scan(&month, &downloads); err != nil {
 			return nil, fmt.Errorf("failed to scan release downloads row: %w", err)
 		}
-		sr.Months = append(sr.Months, month)
+		sr.Labels = append(sr.Labels, month)
 		sr.Downloads = append(sr.Downloads, downloads)
 	}
 

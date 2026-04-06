@@ -46,8 +46,8 @@ func (s *Store) SaveRepoInsights(ctx context.Context, org, repo string, ri *data
 	j := string(b)
 
 	_, err = s.db.ExecContext(ctx, upsertRepoInsightsSQL,
-		org, repo, j, ri.PeriodMonths, ri.Model, ri.GeneratedAt, ri.EventCount,
-		j, ri.PeriodMonths, ri.Model, ri.GeneratedAt, ri.EventCount,
+		org, repo, j, ri.PeriodWeeks, ri.Model, ri.GeneratedAt, ri.EventCount,
+		j, ri.PeriodWeeks, ri.Model, ri.GeneratedAt, ri.EventCount,
 	)
 	if err != nil {
 		return fmt.Errorf("upserting repo insights %s/%s: %w", org, repo, err)
@@ -71,7 +71,7 @@ func (s *Store) GetRepoInsights(ctx context.Context, org, repo *string) ([]*data
 	for rows.Next() {
 		ri := &data.RepoInsights{}
 		var j string
-		if err := rows.Scan(&ri.Org, &ri.Repo, &j, &ri.PeriodMonths, &ri.Model, &ri.GeneratedAt, &ri.EventCount); err != nil {
+		if err := rows.Scan(&ri.Org, &ri.Repo, &j, &ri.PeriodWeeks, &ri.Model, &ri.GeneratedAt, &ri.EventCount); err != nil {
 			return nil, fmt.Errorf("scanning repo insights row: %w", err)
 		}
 		ri.Insights = &data.GeneratedInsights{}

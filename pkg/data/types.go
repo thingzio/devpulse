@@ -205,19 +205,19 @@ type DailyActivitySeries struct {
 }
 
 type VelocitySeries struct {
-	Months  []string  `json:"months" yaml:"months"`
+	Labels  []string  `json:"labels" yaml:"labels"`
 	Count   []int     `json:"count" yaml:"count"`
 	AvgDays []float64 `json:"avg_days" yaml:"avgDays"`
 }
 
 type IssueRatioSeries struct {
-	Months []string `json:"months" yaml:"months"`
+	Labels []string `json:"labels" yaml:"labels"`
 	Opened []int    `json:"opened" yaml:"opened"`
 	Closed []int    `json:"closed" yaml:"closed"`
 }
 
 type FirstResponseSeries struct {
-	Months   []string  `json:"months" yaml:"months"`
+	Labels   []string  `json:"labels" yaml:"labels"`
 	IssueAvg []float64 `json:"issue_avg" yaml:"issueAvg"`
 	PRAvg    []float64 `json:"pr_avg" yaml:"prAvg"`
 }
@@ -289,33 +289,33 @@ type Signal struct {
 }
 
 type RetentionSeries struct {
-	Months    []string `json:"months" yaml:"months"`
+	Labels    []string `json:"labels" yaml:"labels"`
 	New       []int    `json:"new" yaml:"new"`
 	Returning []int    `json:"returning" yaml:"returning"`
 }
 
 type PRReviewRatioSeries struct {
-	Months  []string  `json:"months" yaml:"months"`
+	Labels  []string  `json:"labels" yaml:"labels"`
 	PRs     []int     `json:"prs" yaml:"prs"`
 	Reviews []int     `json:"reviews" yaml:"reviews"`
 	Ratio   []float64 `json:"ratio" yaml:"ratio"`
 }
 
 type ChangeFailureRateSeries struct {
-	Months      []string  `json:"months" yaml:"months"`
+	Labels      []string  `json:"labels" yaml:"labels"`
 	Failures    []int     `json:"failures" yaml:"failures"`
 	Deployments []int     `json:"deployments" yaml:"deployments"`
 	Rate        []float64 `json:"rate" yaml:"rate"`
 }
 
 type ReviewLatencySeries struct {
-	Months   []string  `json:"months" yaml:"months"`
+	Labels   []string  `json:"labels" yaml:"labels"`
 	Count    []int     `json:"count" yaml:"count"`
 	AvgHours []float64 `json:"avg_hours" yaml:"avgHours"`
 }
 
 type PRSizeSeries struct {
-	Months []string `json:"months" yaml:"months"`
+	Labels []string `json:"labels" yaml:"labels"`
 	Small  []int    `json:"small" yaml:"small"`
 	Medium []int    `json:"medium" yaml:"medium"`
 	Large  []int    `json:"large" yaml:"large"`
@@ -323,19 +323,19 @@ type PRSizeSeries struct {
 }
 
 type MomentumSeries struct {
-	Months []string `json:"months" yaml:"months"`
+	Labels []string `json:"labels" yaml:"labels"`
 	Active []int    `json:"active" yaml:"active"`
 	Delta  []int    `json:"delta" yaml:"delta"`
 }
 
 type ForksAndActivitySeries struct {
-	Months []string `json:"months" yaml:"months"`
+	Labels []string `json:"labels" yaml:"labels"`
 	Forks  []int    `json:"forks" yaml:"forks"`
 	Events []int    `json:"events" yaml:"events"`
 }
 
 type ContributorFunnelSeries struct {
-	Months       []string `json:"months" yaml:"months"`
+	Labels       []string `json:"labels" yaml:"labels"`
 	FirstComment []int    `json:"first_comment" yaml:"firstComment"`
 	FirstPR      []int    `json:"first_pr" yaml:"firstPR"`
 	FirstMerge   []int    `json:"first_merge" yaml:"firstMerge"`
@@ -353,14 +353,14 @@ type ContributorProfileSeries struct {
 // ---------------------------------------------------------------------------
 
 type ReleaseCadenceSeries struct {
-	Months      []string `json:"months" yaml:"months"`
+	Labels      []string `json:"labels" yaml:"labels"`
 	Total       []int    `json:"total" yaml:"total"`
 	Stable      []int    `json:"stable" yaml:"stable"`
 	Deployments []int    `json:"deployments" yaml:"deployments"`
 }
 
 type ReleaseDownloadsSeries struct {
-	Months    []string `json:"months" yaml:"months"`
+	Labels    []string `json:"labels" yaml:"labels"`
 	Downloads []int    `json:"downloads" yaml:"downloads"`
 }
 
@@ -375,7 +375,7 @@ type ReleaseDownloadsByTagSeries struct {
 
 // ContainerActivitySeries is the chart data for container version publishes per month.
 type ContainerActivitySeries struct {
-	Months   []string `json:"months" yaml:"months"`
+	Labels   []string `json:"labels" yaml:"labels"`
 	Versions []int    `json:"versions" yaml:"versions"`
 }
 
@@ -500,7 +500,7 @@ type RepoInsights struct {
 	Org          string             `json:"org" yaml:"org"`
 	Repo         string             `json:"repo" yaml:"repo"`
 	Insights     *GeneratedInsights `json:"insights" yaml:"insights"`
-	PeriodMonths int                `json:"period_months" yaml:"periodMonths"`
+	PeriodWeeks  int                `json:"period_weeks" yaml:"periodWeeks"`
 	Model        string             `json:"model" yaml:"model"`
 	GeneratedAt  string             `json:"generated_at" yaml:"generatedAt"`
 	EventCount   int                `json:"event_count" yaml:"eventCount"`

@@ -86,7 +86,7 @@ func TestGetContributorRetention_EmptyDB(t *testing.T) {
 
 	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetContributorRetention_NilDB(t *testing.T) {
@@ -112,15 +112,15 @@ func TestGetContributorRetention_WithData(t *testing.T) {
 
 	series, err := store.GetContributorRetention(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 2)
+	require.Len(t, series.Labels, 2)
 
 	// January: alice is new
-	assert.Equal(t, "2025-01", series.Months[0])
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 1, series.New[0])
 	assert.Equal(t, 0, series.Returning[0])
 
 	// February: bob is new, alice is returning
-	assert.Equal(t, "2025-02", series.Months[1])
+	assert.Equal(t, "2025-02", series.Labels[1])
 	assert.Equal(t, 1, series.New[1])
 	assert.Equal(t, 1, series.Returning[1])
 }
@@ -131,7 +131,7 @@ func TestGetPRReviewRatio_EmptyDB(t *testing.T) {
 
 	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetPRReviewRatio_NilDB(t *testing.T) {
@@ -158,7 +158,7 @@ func TestGetPRReviewRatio_WithData(t *testing.T) {
 
 	series, err := store.GetPRReviewRatio(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 2, series.PRs[0])
 	assert.Equal(t, 3, series.Reviews[0])
 	assert.InDelta(t, 1.5, series.Ratio[0], 0.01)
@@ -169,7 +169,7 @@ func TestGetTimeToMerge_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetTimeToMerge_NilDB(t *testing.T) {
@@ -194,7 +194,7 @@ func TestGetTimeToMerge_WithData(t *testing.T) {
 
 	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 2, series.Count[0])
 	assert.InDelta(t, 3.5, series.AvgDays[0], 0.01) // (5+2)/2
 }
@@ -204,7 +204,7 @@ func TestGetTimeToClose_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetTimeToClose_NilDB(t *testing.T) {
@@ -229,7 +229,7 @@ func TestGetTimeToClose_WithData(t *testing.T) {
 
 	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
+	require.Len(t, series.Labels, 1)
 	assert.Equal(t, 2, series.Count[0])
 	assert.InDelta(t, 5.5, series.AvgDays[0], 0.01) // (5+6)/2
 }
@@ -246,7 +246,7 @@ func TestGetTimeToRestoreBugs_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
@@ -278,8 +278,8 @@ func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
 
 	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1) // Only January has a qualifying bug
-	assert.Equal(t, "2025-01", series.Months[0])
+	require.Len(t, series.Labels, 1) // Only January has a qualifying bug
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 1, series.Count[0])
 	assert.InDelta(t, 1.0, series.AvgDays[0], 0.01) // 1 day
 }
@@ -296,7 +296,7 @@ func TestGetChangeFailureRate_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetChangeFailureRate_WithData(t *testing.T) {
@@ -323,8 +323,8 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 
 	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.NotEmpty(t, series.Months)
-	assert.Equal(t, "2025-01", series.Months[0])
+	require.NotEmpty(t, series.Labels)
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 2, series.Failures[0])
 	assert.Equal(t, 1, series.Deployments[0])
 	assert.InDelta(t, 200.0, series.Rate[0], 0.1) // 2 failures / 1 deployment * 100
@@ -342,7 +342,7 @@ func TestGetReviewLatency_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetReviewLatency_WithData(t *testing.T) {
@@ -369,11 +369,11 @@ func TestGetReviewLatency_WithData(t *testing.T) {
 
 	series, err := store.GetReviewLatency(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.NotEmpty(t, series.Months)
+	require.NotEmpty(t, series.Labels)
 
 	// Find January in results
 	found := false
-	for i, m := range series.Months {
+	for i, m := range series.Labels {
 		if m == "2025-01" {
 			found = true
 			assert.Equal(t, 1, series.Count[i])
@@ -396,7 +396,7 @@ func TestGetPRSizeDistribution_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetPRSizeDistribution_WithData(t *testing.T) {
@@ -428,8 +428,8 @@ func TestGetPRSizeDistribution_WithData(t *testing.T) {
 
 	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 1)
-	assert.Equal(t, "2025-01", series.Months[0])
+	require.Len(t, series.Labels, 1)
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 1, series.Small[0])
 	assert.Equal(t, 1, series.Medium[0])
 	assert.Equal(t, 1, series.Large[0])
@@ -448,7 +448,7 @@ func TestGetContributorMomentum_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetContributorMomentum_WithData(t *testing.T) {
@@ -471,15 +471,15 @@ func TestGetContributorMomentum_WithData(t *testing.T) {
 
 	series, err := store.GetContributorMomentum(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.Len(t, series.Months, 2)
+	require.Len(t, series.Labels, 2)
 
 	// Jan: 2 active (alice + bob)
-	assert.Equal(t, "2025-01", series.Months[0])
+	assert.Equal(t, "2025-01", series.Labels[0])
 	assert.Equal(t, 2, series.Active[0])
 	assert.Equal(t, 0, series.Delta[0]) // first month, delta=0
 
 	// Feb: still 2 active (rolling 3-month window includes Jan, so bob is still counted)
-	assert.Equal(t, "2025-02", series.Months[1])
+	assert.Equal(t, "2025-02", series.Labels[1])
 	assert.Equal(t, 2, series.Active[1])
 	assert.Equal(t, 0, series.Delta[1])
 }
@@ -496,7 +496,7 @@ func TestGetContributorFunnel_EmptyDB(t *testing.T) {
 	store := setupTestDB(t)
 	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 6)
 	require.NoError(t, err)
-	assert.Empty(t, series.Months)
+	assert.Empty(t, series.Labels)
 }
 
 func TestGetContributorFunnel_WithData(t *testing.T) {
@@ -520,11 +520,11 @@ func TestGetContributorFunnel_WithData(t *testing.T) {
 
 	series, err := store.GetContributorFunnel(ctx, nil, nil, nil, 24)
 	require.NoError(t, err)
-	require.NotEmpty(t, series.Months)
+	require.NotEmpty(t, series.Labels)
 
 	// Find January
 	found := false
-	for i, m := range series.Months {
+	for i, m := range series.Labels {
 		if m == "2025-01" {
 			found = true
 			assert.Equal(t, 2, series.FirstComment[i]) // Alice + Bob
