@@ -1259,6 +1259,8 @@ a.link {
 }
 #portfolio-summary-container {
   padding: 0.5rem 1rem;
+  height: auto;
+  min-height: 0;
 }
 #portfolio-summary-container .insight-card {
   gap: 2px;
