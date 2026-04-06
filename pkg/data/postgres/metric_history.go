@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v83/github"
@@ -251,6 +253,10 @@ func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, his
 		return fmt.Errorf("failed to prepare metric history statement: %w", err)
 	}
 	defer stmt.Close()
+
+	slices.SortFunc(history, func(a, b *data.RepoMetricHistory) int {
+		return strings.Compare(a.Date, b.Date)
+	})
 
 	for _, h := range history {
 		if _, err := stmt.ExecContext(ctx, owner, repo, h.Date, h.Stars, h.Forks, h.Stars, h.Forks); err != nil {

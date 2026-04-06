@@ -223,6 +223,8 @@ Migration: `pg_dump`/`pg_restore` (minutes of downtime) or Database Migration Se
 
 The import job uses a PostgreSQL SKIP LOCKED claim queue. Each Cloud Run task claims individual repos from the queue — multiple tasks safely share work without overlap. Current setting: `parallelism=3`.
 
+All upsert batches are sorted by primary key before execution to ensure consistent lock acquisition order across parallel tasks, preventing deadlocks. This applies to: developers (by `username`), events (by `org, repo, username, type, date`), releases (by `tag`), release assets (by `name`), and metric history (by `date`).
+
 | Tenants | ~Repos | `import_parallelism` | Est. Duration | Strategy |
 |---------|--------|---------------------|--------------|----------|
 | 1-10 | 5-100 | 3 (current) | < 15 min | Current settings |
@@ -350,11 +352,13 @@ All infrastructure is defined in `infra/saas/`:
 
 ## Cost Optimization
 
+- **Serve service scale-to-zero** — `min_instance_count=0` eliminates always-on compute cost (~$10/mo savings); cold starts ~2s, within 1s p99 alert threshold
 - **Response caching** — two-layer cache (5 min server + 30 min browser) eliminates ~95% of DB queries on the dashboard
 - **AI gating by plan** — Free tenants generate zero Anthropic API cost
 - **Insight caching** — 7-day age gate + 10% event delta gate reduces LLM calls by ~85%
 - **Covering indexes** — heaviest self-join queries use index-only scans, 2-5x faster on cache miss
-- **Import job exits after completion** — no idle compute
+- **PK-sorted upserts** — all import batches sorted by primary key before execution, preventing deadlocks and reducing transaction retries
+- **Import job exits after completion** — no idle compute; ~85% of hourly runs are no-ops (queue empty), exiting in <200ms
 - **Admin service scale-to-zero** — no cost when not in use
 - **Shared data model** — repos imported by one tenant are visible to others (no duplicate imports)
 - **Incremental imports** — pagination state ensures only new data is fetched

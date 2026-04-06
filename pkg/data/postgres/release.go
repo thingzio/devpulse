@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/google/go-github/v83/github"
 	"github.com/thingzio/devpulse/pkg/data"
@@ -178,6 +180,10 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 	txAssetStmt := tx.Stmt(assetStmt)
 	defer txAssetStmt.Close()
 
+	slices.SortFunc(releases, func(a, b *github.RepositoryRelease) int {
+		return strings.Compare(a.GetTagName(), b.GetTagName())
+	})
+
 	seenOld := false
 	for _, r := range releases {
 		tag := r.GetTagName()
@@ -204,6 +210,9 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 			return false, fmt.Errorf("error inserting release %s: %w", tag, execErr)
 		}
 
+		slices.SortFunc(r.Assets, func(a, b *github.ReleaseAsset) int {
+			return strings.Compare(a.GetName(), b.GetName())
+		})
 		for _, a := range r.Assets {
 			aName := a.GetName()
 			if aName == "" {

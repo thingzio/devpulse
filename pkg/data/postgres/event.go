@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +19,22 @@ import (
 	"github.com/thingzio/devpulse/pkg/net"
 	"golang.org/x/sync/errgroup"
 )
+
+func compareEventsByPK(a, b *data.Event) int {
+	if c := strings.Compare(a.Org, b.Org); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Repo, b.Repo); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Username, b.Username); c != 0 {
+		return c
+	}
+	if c := strings.Compare(a.Type, b.Type); c != 0 {
+		return c
+	}
+	return strings.Compare(a.Date, b.Date)
+}
 
 const (
 	pageSizeDefault = 100
@@ -327,10 +344,15 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 
-	devs := make([]*data.Developer, 0)
+	devs := make([]*data.Developer, 0, len(users))
 	for _, v := range users {
 		devs = append(devs, ghutil.MapUserToDeveloper(v))
 	}
+	slices.SortFunc(devs, func(a, b *data.Developer) int {
+		return strings.Compare(a.Username, b.Username)
+	})
+
+	slices.SortFunc(events, compareEventsByPK)
 
 	slog.Debug("flushing events and developers to db", "events", len(events), "developers", len(devs))
 

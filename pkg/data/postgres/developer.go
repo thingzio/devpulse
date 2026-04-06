@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/google/go-github/v83/github"
 	"github.com/thingzio/devpulse/pkg/data"
@@ -128,6 +130,10 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 	if len(devs) == 0 {
 		return nil
 	}
+
+	slices.SortFunc(devs, func(a, b *data.Developer) int {
+		return strings.Compare(a.Username, b.Username)
+	})
 
 	userStmt, err := s.db.PrepareContext(ctx, insertDeveloperSQL)
 	if err != nil {
