@@ -45,12 +45,12 @@ Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
-| Serve | Cloud Run service | 1-10 instances (always-on) | Public |
+| Serve | Cloud Run service | 0-10 instances (scale-to-zero) | Public |
 | Import | Cloud Run job | Hourly, parallelism=3, IMPORT_MODE=import (SKIP LOCKED queue) | Internal |
 | Deep Rep | Cloud Run job | Hourly at :30, single-task, round-robin token rotation | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
-The serve service runs with `min_instance_count=1` to avoid cold-start latency on the dashboard. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
+The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize cost. Cold starts for the Go binary are ~2s, within the 1s p99 latency alert threshold. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
 
 ## Response Caching
 
@@ -90,7 +90,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Service | Details | Estimate |
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
-| Cloud Run Service (serve) | always-on (min=1), 1 vCPU/512MB | $15/mo |
+| Cloud Run Service (serve) | scale-to-zero (min=0), 1 vCPU/512MB | $5/mo |
 | Cloud Run Job (import) | hourly, ~3 tasks, ~5 min/run | $2/mo |
 | Cloud Run Job (deeprep) | hourly, 1 task, ~10-30 min/run | $1.50/mo |
 | Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
@@ -100,7 +100,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
 | Cloud Monitoring | log-based metrics, 9 alert policies, email | free tier |
-| **Total** | | **~$47/mo** |
+| **Total** | | **~$37/mo** |
 
 ## Cost by Tenant Scale
 
@@ -181,7 +181,7 @@ Total repos: ~3,600. Paid repos with AI: ~3,000.
 
 | Tenants | DB Tier | Repos (est) | Anthropic | Total |
 |---------|---------|-------------|-----------|-------|
-| 5 (current) | db-g1-small | ~15 | $0.30 | ~$47 |
+| 5 (current) | db-g1-small | ~15 | $0.30 | ~$37 |
 | 25 | db-g1-small | ~93 | $1.50 | ~$53 |
 | 100 | db-g1-small | ~360 | $6 | ~$68 |
 | 300 | db-custom-1-3840 | ~1,080 | $18 | ~$134 |
