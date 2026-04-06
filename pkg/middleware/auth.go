@@ -63,6 +63,11 @@ func RequireAuth(db *sql.DB, loginURL string) func(http.Handler) http.Handler {
 	}
 }
 
+// WithTenantContext injects a tenant into the context. Intended for tests.
+func WithTenantContext(ctx context.Context, tn *tenant.Tenant) context.Context {
+	return context.WithValue(ctx, tenantContextKey, tn)
+}
+
 // TenantFromContext extracts the tenant from the request context.
 func TenantFromContext(ctx context.Context) *tenant.Tenant {
 	if t, ok := ctx.Value(tenantContextKey).(*tenant.Tenant); ok {

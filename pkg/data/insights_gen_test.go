@@ -118,6 +118,39 @@ func TestGenerateInsights_APIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "401")
 }
 
+func TestNewLLMConfigFromEnv_NoKey(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_MODEL", "")
+	t.Setenv("ANTHROPIC_BASE_URL", "")
+
+	cfg := NewLLMConfigFromEnv()
+	assert.Nil(t, cfg)
+}
+
+func TestNewLLMConfigFromEnv_KeyOnly(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "sk-test-123")
+	t.Setenv("ANTHROPIC_MODEL", "")
+	t.Setenv("ANTHROPIC_BASE_URL", "")
+
+	cfg := NewLLMConfigFromEnv()
+	require.NotNil(t, cfg)
+	assert.Equal(t, "sk-test-123", cfg.Token)
+	assert.Empty(t, cfg.Model)
+	assert.Empty(t, cfg.BaseURL)
+}
+
+func TestNewLLMConfigFromEnv_AllSet(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "sk-test-456")
+	t.Setenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+	t.Setenv("ANTHROPIC_BASE_URL", "https://custom.api.example.com")
+
+	cfg := NewLLMConfigFromEnv()
+	require.NotNil(t, cfg)
+	assert.Equal(t, "sk-test-456", cfg.Token)
+	assert.Equal(t, "claude-haiku-4-5-20251001", cfg.Model)
+	assert.Equal(t, "https://custom.api.example.com", cfg.BaseURL)
+}
+
 func TestGenerateInsights_DefaultModel(t *testing.T) {
 	body := claudeResponse{
 		Content: []claudeContentBlock{
