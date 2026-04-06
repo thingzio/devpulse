@@ -3,7 +3,6 @@ package server
 import (
 	"archive/zip"
 	"context"
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"log/slog"
@@ -16,7 +15,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
-func csvExportHandler(defaultStore data.Store, db *sql.DB) http.HandlerFunc {
+func csvExportHandler(defaultStore data.Store, listRepos func(ctx context.Context, tenantID string) ([]tenant.TenantRepo, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
@@ -34,7 +33,7 @@ func csvExportHandler(defaultStore data.Store, db *sql.DB) http.HandlerFunc {
 		p := parseInsightParams(r)
 		ctx := r.Context()
 
-		repos, err := tenant.ListTenantRepos(ctx, db, tn.ID)
+		repos, err := listRepos(ctx, tn.ID)
 		if err != nil {
 			slog.Error("listing repos for export", "error", err)
 			writeError(w, http.StatusInternalServerError, "error listing repos")

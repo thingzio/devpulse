@@ -232,7 +232,9 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /data/insights/portfolio-summary", scopedWrap(insightsPortfolioSummaryHandler(store)))
 	mux.Handle("GET /data/insights/signals", scopedWrap(insightsSignalsHandler(store)))
 	mux.Handle("GET /data/insights/generated", scopedWrap(insightsGeneratedAPIHandler(store)))
-	mux.Handle("GET /data/export/csv", scopedWrap(csvExportHandler(store, db)))
+	mux.Handle("GET /data/export/csv", scopedWrap(csvExportHandler(store, func(ctx context.Context, tenantID string) ([]tenant.TenantRepo, error) {
+		return tenant.ListTenantRepos(ctx, db, tenantID)
+	})))
 
 	return mux
 }
