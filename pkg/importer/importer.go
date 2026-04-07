@@ -261,7 +261,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		var res *data.DeepReputationResult
 		if err := retryRL(func() error {
 			var drErr error
-			res, drErr = store.ImportDeepReputation(ctx, tokenFn, deepReputationDefaultLimit, 0, &org, &repo)
+			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, deepReputationDefaultLimit, 0, &org, &repo)
 			return drErr
 		}); err != nil {
 			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
@@ -296,7 +296,7 @@ const (
 	insightsPeriodWeeks        = 9
 	insightsMinAgeDays         = 7
 	insightsEventDeltaPct      = 0.10
-	deepReputationDefaultLimit = 100
+	deepReputationDefaultLimit = 1000
 )
 
 // checkInsightStaleness determines whether insights should be regenerated

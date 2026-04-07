@@ -322,21 +322,21 @@ func TestGetLowestReputationUsernames_SkipsBots(t *testing.T) {
 func TestImportDeepReputation_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.ImportDeepReputation(ctx, func() string { return "token" }, 5, 0, nil, nil)
+	_, err := s.ImportDeepReputation(ctx, func() string { return "token" }, nil, 5, 0, nil, nil)
 	assert.Error(t, err)
 }
 
 func TestImportDeepReputation_EmptyToken(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	_, err := store.ImportDeepReputation(ctx, nil, 5, 0, nil, nil)
+	_, err := store.ImportDeepReputation(ctx, nil, nil, 5, 0, nil, nil)
 	assert.Error(t, err)
 }
 
 func TestImportDeepReputation_ZeroLimit(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, 0, 0, nil, nil)
+	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, nil, 0, 0, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 0, res.Scored)
 }
@@ -344,7 +344,7 @@ func TestImportDeepReputation_ZeroLimit(t *testing.T) {
 func TestImportDeepReputation_NoCandidates(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, 5, 0, nil, nil)
+	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, nil, 5, 0, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 0, res.Scored)
 }

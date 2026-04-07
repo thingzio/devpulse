@@ -237,7 +237,7 @@ func (m *mockStore) GetRepoMetricHistory(ctx context.Context, org, repo *string,
 func (m *mockStore) ImportReputation(_ context.Context, _, _ *string) (*data.ReputationResult, error) {
 	return nil, nil
 }
-func (m *mockStore) ImportDeepReputation(_ context.Context, _ data.TokenFunc, _, _ int, _, _ *string) (*data.DeepReputationResult, error) {
+func (m *mockStore) ImportDeepReputation(_ context.Context, _ data.TokenFunc, _ data.ExhaustFunc, _, _ int, _, _ *string) (*data.DeepReputationResult, error) {
 	return nil, nil
 }
 func (m *mockStore) GetOrComputeDeepReputation(_ context.Context, _, _ string) (*data.UserReputation, error) {

@@ -766,6 +766,8 @@ fieldset {
 
 /* MOBILE */
 @media screen and (max-width: 899px) {
+  .hide-mobile { display: none; }
+
   .page-content {
     min-height: 0;
     padding: 10px;

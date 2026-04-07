@@ -50,10 +50,10 @@ func RunDeepReputation(ctx context.Context) error {
 	slog.Info("token pool ready", "tokens", pool.Size())
 
 	// Score all stale users globally (nil org/repo = all users via COALESCE).
-	res, err := store.ImportDeepReputation(ctx, pool.Token, deepReputationDefaultLimit, 0, nil, nil)
-	if err != nil && ghutil.WaitForRateReset(ctx, err) {
-		res, err = store.ImportDeepReputation(ctx, pool.Token, deepReputationDefaultLimit, 0, nil, nil)
-	}
+	// Token rotation happens inside the loop: when a token hits its rate limit,
+	// it's marked exhausted and the next token is used. The loop stops when all
+	// tokens are exhausted or the limit is reached.
+	res, err := store.ImportDeepReputation(ctx, pool.Token, pool.Exhaust, deepReputationDefaultLimit, 0, nil, nil)
 	if err != nil {
 		return fmt.Errorf("deep reputation scoring: %w", err)
 	}
@@ -61,7 +61,8 @@ func RunDeepReputation(ctx context.Context) error {
 	slog.Info("deep reputation worker complete",
 		"scored", res.Scored,
 		"errors", res.Errors,
-		"tokens", pool.Size(),
+		"tokens_total", pool.Size(),
+		"tokens_active", pool.ActiveCount(),
 		"token_usage", pool.UsageCounts(),
 		"duration", time.Since(start).String())
 

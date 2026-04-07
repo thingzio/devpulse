@@ -94,3 +94,57 @@ func TestTokenPoolConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestTokenPoolExhaustSingle(t *testing.T) {
+	pool := NewTokenPool("tok1", "tok2", "tok3")
+	pool.Exhaust("tok2")
+	assert.Equal(t, 2, pool.ActiveCount())
+	assert.Equal(t, 3, pool.Size()) // total unchanged
+
+	// tok2 should be skipped in rotation
+	seen := make(map[string]int)
+	for range 10 {
+		tok := pool.Token()
+		require.NotEmpty(t, tok)
+		seen[tok]++
+	}
+	assert.Zero(t, seen["tok2"], "exhausted token should never be returned")
+	assert.Greater(t, seen["tok1"], 0)
+	assert.Greater(t, seen["tok3"], 0)
+}
+
+func TestTokenPoolExhaustAll(t *testing.T) {
+	pool := NewTokenPool("tok1", "tok2")
+	pool.Exhaust("tok1")
+	pool.Exhaust("tok2")
+	assert.Equal(t, 0, pool.ActiveCount())
+	assert.Equal(t, "", pool.Token())
+}
+
+func TestTokenPoolExhaustUnknownToken(t *testing.T) {
+	pool := NewTokenPool("tok1")
+	pool.Exhaust("unknown") // should not panic
+	assert.Equal(t, 1, pool.ActiveCount())
+	assert.Equal(t, "tok1", pool.Token())
+}
+
+func TestTokenPoolActiveCount(t *testing.T) {
+	pool := NewTokenPool("a", "b", "c", "d")
+	assert.Equal(t, 4, pool.ActiveCount())
+	pool.Exhaust("b")
+	assert.Equal(t, 3, pool.ActiveCount())
+	pool.Exhaust("d")
+	assert.Equal(t, 2, pool.ActiveCount())
+}
+
+func TestTokenPoolExhaustMidRotation(t *testing.T) {
+	pool := NewTokenPool("a", "b", "c")
+
+	// Consume "a", then exhaust "b"
+	assert.Equal(t, "a", pool.Token())
+	pool.Exhaust("b")
+
+	// Next should skip "b" and return "c"
+	assert.Equal(t, "c", pool.Token())
+	assert.Equal(t, "a", pool.Token())
+}

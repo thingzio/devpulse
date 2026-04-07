@@ -3,6 +3,7 @@ package ghutil
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -96,6 +97,35 @@ func TestWaitForRateReset(t *testing.T) {
 			},
 		}
 		assert.False(t, WaitForRateReset(ctx, err))
+	})
+}
+
+func TestIsRateLimited(t *testing.T) {
+	t.Run("nil error", func(t *testing.T) {
+		assert.False(t, IsRateLimited(nil))
+	})
+
+	t.Run("generic error", func(t *testing.T) {
+		assert.False(t, IsRateLimited(errors.New("generic")))
+	})
+
+	t.Run("ErrRateLimited sentinel", func(t *testing.T) {
+		assert.True(t, IsRateLimited(ErrRateLimited))
+	})
+
+	t.Run("wrapped ErrRateLimited", func(t *testing.T) {
+		err := fmt.Errorf("computing deep reputation: %w", ErrRateLimited)
+		assert.True(t, IsRateLimited(err))
+	})
+
+	t.Run("github.RateLimitError", func(t *testing.T) {
+		err := &github.RateLimitError{}
+		assert.True(t, IsRateLimited(err))
+	})
+
+	t.Run("github.AbuseRateLimitError", func(t *testing.T) {
+		err := &github.AbuseRateLimitError{}
+		assert.True(t, IsRateLimited(err))
 	})
 }
 

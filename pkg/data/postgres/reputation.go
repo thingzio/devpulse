@@ -200,7 +200,7 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 	return res, nil
 }
 
-func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc, limit, staleHours int, org, repo *string) (*data.DeepReputationResult, error) {
+func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc, limit, staleHours int, org, repo *string) (*data.DeepReputationResult, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
@@ -215,6 +215,11 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 
 	if staleHours <= 0 {
 		staleHours = reputationStaleHours
+	}
+
+	// Default to no-op if caller doesn't support exhaustion.
+	if exhaustFn == nil {
+		exhaustFn = func(string) {}
 	}
 
 	threshold := time.Now().UTC().Add(-time.Duration(staleHours) * time.Hour).Format("2006-01-02T15:04:05Z")
@@ -233,10 +238,25 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 
 	res := &data.DeepReputationResult{}
 
-	for i, username := range usernames {
+	i := 0
+	for i < len(usernames) {
+		username := usernames[i]
+		token := tokenFn()
+		if token == "" {
+			slog.Warn("all tokens exhausted, stopping deep reputation")
+			break
+		}
+
 		slog.Info("reputation", "user", username, "progress", fmt.Sprintf("%d/%d", i+1, len(usernames)))
 
-		if _, deepErr := s.ComputeDeepReputation(ctx, tokenFn(), username); deepErr != nil {
+		if _, deepErr := s.ComputeDeepReputation(ctx, token, username); deepErr != nil {
+			// Rate limited — exhaust this token and retry same user with next token.
+			if ghutil.IsRateLimited(deepErr) {
+				exhaustFn(token)
+				slog.Warn("token rate limited, exhausting and retrying", "username", username)
+				continue // retry same i with next token
+			}
+
 			// If user is deleted/renamed (404), mark as deep-scored so they
 			// drop out of the candidate pool and stop burning API calls.
 			var ghErr *github.ErrorResponse
@@ -250,10 +270,12 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 				slog.Error("deep reputation failed", "username", username, "error", deepErr)
 			}
 			res.Errors++
+			i++
 			continue
 		}
 
 		res.Scored++
+		i++
 	}
 
 	slog.Info("deep reputation done", "scored", res.Scored, "errors", res.Errors)

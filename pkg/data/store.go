@@ -10,6 +10,10 @@ import (
 // calls in a loop so they can rotate tokens from a pool on each iteration.
 type TokenFunc func() string
 
+// ExhaustFunc marks a token as exhausted (e.g. after hitting a rate limit)
+// so the token pool skips it in future rotations.
+type ExhaustFunc func(token string)
+
 // StateStore manages import state tracking.
 type StateStore interface {
 	GetState(ctx context.Context, query, org, repo string, min time.Time) (*State, error)
@@ -135,7 +139,7 @@ type MetricHistoryStore interface {
 // ReputationStore manages reputation scoring.
 type ReputationStore interface {
 	ImportReputation(ctx context.Context, org, repo *string) (*ReputationResult, error)
-	ImportDeepReputation(ctx context.Context, tokenFn TokenFunc, limit, staleHours int, org, repo *string) (*DeepReputationResult, error)
+	ImportDeepReputation(ctx context.Context, tokenFn TokenFunc, exhaustFn ExhaustFunc, limit, staleHours int, org, repo *string) (*DeepReputationResult, error)
 	GetOrComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
 	ComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
 	GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*ReputationDistribution, error)

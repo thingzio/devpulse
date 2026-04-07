@@ -13,6 +13,28 @@ import (
 
 const RateLimitThreshold = 10
 
+// ErrRateLimited is returned when a GitHub API token has hit its rate limit.
+// Callers with a token pool should exhaust this token and try another.
+var ErrRateLimited = errors.New("github token rate limited")
+
+// IsRateLimited reports whether err (or any error in its chain) indicates a
+// GitHub rate limit has been reached. Matches ErrRateLimited, github.RateLimitError,
+// and github.AbuseRateLimitError.
+func IsRateLimited(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrRateLimited) {
+		return true
+	}
+	var rlErr *github.RateLimitError
+	if errors.As(err, &rlErr) {
+		return true
+	}
+	var abuseErr *github.AbuseRateLimitError
+	return errors.As(err, &abuseErr)
+}
+
 func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 	if resp == nil {
 		return nil
