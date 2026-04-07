@@ -53,7 +53,13 @@ func RunDeepReputation(ctx context.Context) error {
 	// Token rotation happens inside the loop: when a token hits its rate limit,
 	// it's marked exhausted and the next token is used. The loop stops when all
 	// tokens are exhausted or the limit is reached.
-	res, err := store.ImportDeepReputation(ctx, pool.Token, pool.Exhaust, deepReputationDefaultLimit, 0, nil, nil)
+	exhaustFn := func(token string) {
+		pool.Exhaust(token)
+		slog.Warn("token exhausted",
+			"active_tokens", pool.ActiveCount(),
+			"total_tokens", pool.Size())
+	}
+	res, err := store.ImportDeepReputation(ctx, pool.Token, exhaustFn, deepReputationDefaultLimit, 0, nil, nil)
 	if err != nil {
 		return fmt.Errorf("deep reputation scoring: %w", err)
 	}
