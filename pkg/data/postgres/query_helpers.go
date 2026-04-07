@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -328,7 +329,7 @@ func generatePeriods(days int) []string {
 }
 
 func rollbackTransaction(tx *sql.Tx) {
-	if err := tx.Rollback(); err != nil {
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
 		slog.Error("error rolling back transaction", "error", err)
 	}
 }
