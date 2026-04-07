@@ -963,7 +963,7 @@ fieldset {
 }
 
 .tbl-home {
-  height: 263px;
+  min-height: 263px;
 }
 
 .tbl-content {
