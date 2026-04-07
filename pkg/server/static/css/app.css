@@ -1737,11 +1737,13 @@ a.link {
 /* Health Scorecard */
 .scorecard-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     padding: 1rem;
 }
 .scorecard-category {
     flex: 1;
+    min-width: 200px;
     text-align: center;
     padding: 1rem;
 }
