@@ -3,6 +3,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -75,7 +76,12 @@ func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 
 			if !rl.allow(ip) {
 				slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path)
-				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+				w.Header().Set("Retry-After", "60")
+				if strings.HasPrefix(r.URL.Path, "/api/") {
+					writeError(w, http.StatusTooManyRequests, "please wait a moment and try again")
+				} else {
+					http.Redirect(w, r, "/?err=rate_limit", http.StatusSeeOther)
+				}
 				return
 			}
 

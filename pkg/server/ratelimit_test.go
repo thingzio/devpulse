@@ -56,11 +56,35 @@ func TestRateLimitMiddleware(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, "request %d should succeed", i+1)
 	}
 
+	// Non-API path returns redirect.
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.RemoteAddr = "10.0.0.1:1234"
 	handler.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	assert.Equal(t, http.StatusSeeOther, w.Code)
+}
+
+func TestRateLimitMiddleware_APIPath(t *testing.T) {
+	rl := newRateLimiter(1, time.Minute)
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := rateLimitMiddleware(rl)(inner)
+
+	w1 := httptest.NewRecorder()
+	r1 := httptest.NewRequest(http.MethodGet, "/api/data", nil)
+	r1.RemoteAddr = "10.0.0.2:1234"
+	handler.ServeHTTP(w1, r1)
+	assert.Equal(t, http.StatusOK, w1.Code)
+
+	// API path returns 429 JSON.
+	w2 := httptest.NewRecorder()
+	r2 := httptest.NewRequest(http.MethodGet, "/api/data", nil)
+	r2.RemoteAddr = "10.0.0.2:1234"
+	handler.ServeHTTP(w2, r2)
+	assert.Equal(t, http.StatusTooManyRequests, w2.Code)
+	assert.Contains(t, w2.Body.String(), "please wait")
 }
 
 func TestRateLimitMiddleware_XForwardedFor(t *testing.T) {
@@ -73,14 +97,14 @@ func TestRateLimitMiddleware_XForwardedFor(t *testing.T) {
 
 	// First request with X-Forwarded-For header.
 	w1 := httptest.NewRecorder()
-	r1 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r1 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	r1.Header.Set("X-Forwarded-For", "203.0.113.1")
 	handler.ServeHTTP(w1, r1)
 	assert.Equal(t, http.StatusOK, w1.Code)
 
 	// Second request from same forwarded IP should be denied.
 	w2 := httptest.NewRecorder()
-	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	r2.Header.Set("X-Forwarded-For", "203.0.113.1")
 	handler.ServeHTTP(w2, r2)
 	assert.Equal(t, http.StatusTooManyRequests, w2.Code)
