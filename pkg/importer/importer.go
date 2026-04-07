@@ -205,17 +205,7 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 
 	var errs int
 
-	// retryRL retries fn once after waiting for a GitHub rate limit reset.
-	retryRL := func(fn func() error) error {
-		err := fn()
-		if err != nil && ghutil.WaitForRateReset(ctx, err) {
-			return fmt.Errorf("retryRL: %w", fn())
-		}
-		if err != nil {
-			return fmt.Errorf("retryRL: %w", err)
-		}
-		return nil
-	}
+	retryRL := newRetryRL(ctx)
 
 	slog.Info("phase: metadata", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportRepoMeta(ctx, token, org, repo) }); err != nil {
@@ -290,6 +280,24 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
 	}
 	return nil
+}
+
+// newRetryRL returns a function that calls fn and, if it fails with a GitHub
+// rate limit error, waits for the reset and retries once.
+func newRetryRL(ctx context.Context) func(func() error) error {
+	return func(fn func() error) error {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		if ghutil.WaitForRateReset(ctx, err) {
+			if retryErr := fn(); retryErr != nil {
+				return fmt.Errorf("retryRL (after wait): %w", retryErr)
+			}
+			return nil
+		}
+		return fmt.Errorf("retryRL: %w", err)
+	}
 }
 
 const (
