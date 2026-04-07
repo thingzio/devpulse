@@ -343,9 +343,9 @@ fieldset {
 
 .period-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  white-space: nowrap;
 }
 
 .pdf-btn {
@@ -1214,6 +1214,7 @@ a.link {
 /* INSIGHT CARDS */
 .insights-summary {
   display: flex;
+  flex-wrap: wrap;
   align-items: start;
   justify-content: space-evenly;
   gap: 20px;
@@ -1697,6 +1698,7 @@ a.link {
   .landing { padding: 30px 15px; }
   .landing-hero h1 { font-size: 1.8em; }
   .landing-features { grid-template-columns: 1fr; }
+  .insights-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .landing-feature img[src] {
