@@ -788,6 +788,14 @@ fieldset {
     gap: 8px;
   }
 
+  .search-and-user .pdf-btn { display: none; }
+
+  .search-and-user form {
+    order: -1;
+    flex: 0 0 100%;
+    min-width: 0;
+  }
+
   .search-and-user [type="search"] {
     font-size: 1rem;
     height: 35px;
@@ -796,11 +804,6 @@ fieldset {
   .search-and-user form svg {
     width: 18px;
     height: 18px;
-  }
-
-  .search-and-user form {
-    flex: 1;
-    min-width: 0;
   }
 
   .logo-img {
