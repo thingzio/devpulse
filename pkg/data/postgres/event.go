@@ -319,6 +319,9 @@ func (e *eventImporter) loadState(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting last page: %s/%s - %s: %w", e.owner, e.repo, t, err)
 		}
+		// Always start from page 1. Results are sorted newest-first (created desc),
+		// so resuming from a saved page skips new events created since the last run.
+		state.Page = 1
 		e.state[t] = state
 	}
 
