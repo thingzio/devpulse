@@ -1,6 +1,6 @@
 resource "google_cloud_scheduler_job" "import" {
   name     = "${var.prefix}-import-hourly"
-  schedule = "0 * * * *"
+  schedule = "0 */2 * * *"
   project  = var.project_id
   region   = var.region
 
@@ -18,7 +18,7 @@ resource "google_cloud_scheduler_job" "import" {
 
 resource "google_cloud_scheduler_job" "deeprep" {
   name     = "${var.prefix}-deeprep-hourly"
-  schedule = "30 * * * *"
+  schedule = "0 1-23/2 * * *"
   project  = var.project_id
   region   = var.region
 

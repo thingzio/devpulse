@@ -344,7 +344,7 @@ All infrastructure is defined in `infra/saas/`:
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
 | `cloudrun.tf` | Cloud Run service (serve) + job (import) + job (deeprep) + service (admin, IAM-gated) |
-| `scheduler.tf` | Hourly import trigger |
+| `scheduler.tf` | Alternating 2h schedules: import on even hours, deeprep on odd hours |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
 | `registry.tf` | Artifact Registry standard repo (direct push from CI) |
