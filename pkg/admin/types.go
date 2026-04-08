@@ -60,6 +60,16 @@ type inviteRequest struct {
 	Plan     string `json:"plan"`
 }
 
+type tokenStatus struct {
+	Login          string `json:"login"`
+	InstallationID int64  `json:"installation_id"`
+	Limit          int    `json:"limit"`
+	Used           int    `json:"used"`
+	Remaining      int    `json:"remaining"`
+	ResetAt        string `json:"reset_at,omitempty"`
+	Error          string `json:"error,omitempty"`
+}
+
 type inviteResponse struct {
 	Username         string `json:"username"`
 	GitHubID         int64  `json:"github_id"`

@@ -51,6 +51,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("POST /invite", handleInvite(db))
 	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
 	mux.HandleFunc("GET /metrics/review", handleMetricsReview(mcfg))
+	mux.HandleFunc("GET /tokens", handleTokenStatus(db))
 
 	address := "0.0.0.0:" + port
 	srv := &http.Server{
@@ -343,6 +344,95 @@ func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
 	}
 
 	return ghUser.ID, nil
+}
+
+func handleTokenStatus(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ghAppConfig, err := tenant.LoadGitHubAppConfig()
+		if err != nil {
+			http.Error(w, "github app config not available", http.StatusInternalServerError)
+			return
+		}
+
+		tenants, err := tenant.GetActiveTenants(r.Context(), db)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("getting tenants: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		client := &http.Client{Timeout: 10 * time.Second}
+		seen := make(map[int64]bool)
+		var results []tokenStatus
+
+		for _, tn := range tenants {
+			installs, instErr := tenant.GetActiveInstallations(r.Context(), db, tn.ID)
+			if instErr != nil || len(installs) == 0 {
+				continue
+			}
+			for _, inst := range installs {
+				if seen[inst.ID] {
+					continue
+				}
+				seen[inst.ID] = true
+
+				tok, mintErr := tenant.MintInstallationToken(r.Context(), ghAppConfig, inst.ID)
+				if mintErr != nil {
+					results = append(results, tokenStatus{
+						Login:          inst.Login,
+						InstallationID: inst.ID,
+						Error:          mintErr.Error(),
+					})
+					continue
+				}
+
+				ts := checkGitHubRateLimit(client, tok.Token)
+				ts.Login = inst.Login
+				ts.InstallationID = inst.ID
+				results = append(results, ts)
+			}
+		}
+
+		writeJSON(w, results)
+	}
+}
+
+func checkGitHubRateLimit(client *http.Client, token string) tokenStatus {
+	req, err := http.NewRequest("GET", "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		return tokenStatus{Error: fmt.Sprintf("creating request: %v", err)}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return tokenStatus{Error: fmt.Sprintf("calling rate_limit: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	var rl struct {
+		Resources struct {
+			Core struct {
+				Limit     int   `json:"limit"`
+				Remaining int   `json:"remaining"`
+				Reset     int64 `json:"reset"`
+			} `json:"core"`
+		} `json:"resources"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rl); err != nil {
+		return tokenStatus{Error: fmt.Sprintf("decoding rate_limit: %v", err)}
+	}
+
+	core := rl.Resources.Core
+	used := core.Limit - core.Remaining
+	resetAt := time.Unix(core.Reset, 0).UTC().Format(time.RFC3339)
+
+	return tokenStatus{
+		Limit:     core.Limit,
+		Used:      used,
+		Remaining: core.Remaining,
+		ResetAt:   resetAt,
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
