@@ -40,6 +40,8 @@ type repoDetail struct {
 	LastImport    string  `json:"last_import"`
 	PRTotal       int     `json:"pr_total"`
 	PRMissingSize int     `json:"pr_missing_size"`
+	Contributors  int     `json:"contributors"`
+	Scored        int     `json:"scored"`
 }
 
 type resetErrorsRequest struct {

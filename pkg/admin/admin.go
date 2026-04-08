@@ -158,6 +158,8 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 				LastImport:    rd.LastImport,
 				PRTotal:       rd.PRTotal,
 				PRMissingSize: rd.PRMissingSize,
+				Contributors:  rd.Contributors,
+				Scored:        rd.Scored,
 			}
 			if out.MaxEventsPerWeek > 0 {
 				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100

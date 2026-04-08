@@ -1844,8 +1844,8 @@ function loadRepoOverview(url) {
             if (wcolor) $weeklyCell.css('color', wcolor);
             $row.append($weeklyCell);
 
-            $row.append($('<td class="num hide-mobile"></td>').text(r.contributors.toLocaleString()));
-            $row.append($('<td class="num hide-mobile"></td>').text(r.scored + '/' + r.contributors));
+            var scoredPct = r.contributors > 0 ? Math.round(r.scored / r.contributors * 100) : 0;
+            $row.append($('<td class="num hide-mobile"></td>').text(r.contributors.toLocaleString() + ' (' + scoredPct + '%)'));
             var $removeBtn = $('<button style="color:var(--gray);font-size:0.85em;padding:2px 8px;border:1px solid var(--border-color);border-radius:var(--border-radius);cursor:pointer">Remove</button>');
             $removeBtn.on('click', function() { removeTrackedRepo(r.org, r.repo); });
             $row.append($('<td></td>').append($removeBtn));

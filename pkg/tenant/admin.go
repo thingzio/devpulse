@@ -38,6 +38,8 @@ type RepoDetail struct {
 	LastImport    string
 	PRTotal       int
 	PRMissingSize int
+	Contributors  int
+	Scored        int
 }
 
 const (
@@ -77,11 +79,14 @@ const (
 		       COALESCE(rm.last_import_at, ''),
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0 THEN 1 END),
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0
-		                   AND (e.additions IS NULL OR e.changed_files IS NULL) THEN 1 END)
+		                   AND (e.additions IS NULL OR e.changed_files IS NULL) THEN 1 END),
+		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END)
 		FROM tenant_repo tr
 		LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 		LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo
 		       AND e.date >= $2
+		LEFT JOIN developer d ON e.username = d.username
 		WHERE tr.tenant_id = $1 AND tr.active = TRUE
 		GROUP BY tr.org, tr.repo, rm.last_import_at
 		ORDER BY tr.org, tr.repo`
@@ -175,7 +180,7 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 	var repos []RepoDetail
 	for rows.Next() {
 		var rd RepoDetail
-		if err := rows.Scan(&rd.Org, &rd.Repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport, &rd.PRTotal, &rd.PRMissingSize); err != nil {
+		if err := rows.Scan(&rd.Org, &rd.Repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport, &rd.PRTotal, &rd.PRMissingSize, &rd.Contributors, &rd.Scored); err != nil {
 			return nil, fmt.Errorf("scanning repo detail: %w", err)
 		}
 		repos = append(repos, rd)
