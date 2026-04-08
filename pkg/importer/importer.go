@@ -70,15 +70,18 @@ func runImport(ctx context.Context, mode string) error {
 
 	llmCfg := data.NewLLMConfigFromEnv()
 
-	if err := tenant.PrepareImportQueue(ctx, db); err != nil {
-		return fmt.Errorf("preparing import queue: %w", err)
+	if prepErr := tenant.PrepareImportQueue(ctx, db); prepErr != nil {
+		return fmt.Errorf("preparing import queue: %w", prepErr)
 	}
 
 	slog.Info("import worker starting", "execution", executionID, "mode", mode)
 
-	// Cache tokens per tenant to avoid re-minting for each repo of the same tenant.
-	// Installation tokens are valid for 1 hour — safe to reuse within a single run.
-	tokenCache := make(map[string]string)
+	pool, err := collectTokenPool(ctx, db, ghAppConfig)
+	if err != nil {
+		slog.Warn("token pool unavailable, falling back to unauthenticated", "error", err)
+	} else {
+		slog.Info("token pool ready", "tokens", pool.Size())
+	}
 
 	var totalRepos, totalErrors int
 	for {
@@ -101,7 +104,7 @@ func runImport(ctx context.Context, mode string) error {
 			"tenant_id", claim.TenantID,
 			"execution", executionID)
 
-		if importErr := importClaim(ctx, db, store, claim, tokenCache, ghAppConfig, llmCfg, mode); importErr != nil {
+		if importErr := importClaim(ctx, db, store, claim, pool, llmCfg, mode); importErr != nil {
 			totalErrors++
 			slog.Error("repo import failed",
 				"org", claim.Org,
@@ -125,22 +128,7 @@ func runImport(ctx context.Context, mode string) error {
 		}
 	}
 
-	// Enrich developer profiles from GitHub once per execution, after all repo
-	// imports. Uses any available token from the cache.
-	for _, anyToken := range tokenCache {
-		slog.Info("phase: developer enrichment")
-		if enrichErr := store.EnrichDeveloperEntities(ctx, anyToken); enrichErr != nil {
-			slog.Warn("enriching developer entities", "error", enrichErr)
-		}
-		break
-	}
-
-	// Normalize entity names for all developers (fixes casing, suffixes,
-	// and applies canonical name substitutions).
-	slog.Info("phase: entity normalization")
-	if cleanErr := store.CleanEntities(ctx); cleanErr != nil {
-		slog.Warn("cleaning entity names", "error", cleanErr)
-	}
+	postImport(ctx, store, pool)
 
 	slog.Info("import worker complete",
 		"repos", totalRepos,
@@ -154,9 +142,26 @@ func runImport(ctx context.Context, mode string) error {
 	return nil
 }
 
+// postImport runs developer enrichment and entity normalization after all repo imports.
+func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
+	if pool != nil {
+		if anyToken := pool.Token(); anyToken != "" {
+			slog.Info("phase: developer enrichment")
+			if enrichErr := store.EnrichDeveloperEntities(ctx, anyToken); enrichErr != nil {
+				slog.Warn("enriching developer entities", "error", enrichErr)
+			}
+		}
+	}
+
+	slog.Info("phase: entity normalization")
+	if cleanErr := store.CleanEntities(ctx); cleanErr != nil {
+		slog.Warn("cleaning entity names", "error", cleanErr)
+	}
+}
+
 func importClaim(ctx context.Context, db *sql.DB, store data.Store,
-	claim *tenant.ClaimedRepo, tokenCache map[string]string,
-	ghAppConfig *tenant.GitHubAppConfig, llmCfg *data.LLMConfig, mode string) error {
+	claim *tenant.ClaimedRepo, pool *ghutil.TokenPool,
+	llmCfg *data.LLMConfig, mode string) error {
 	tn, err := tenant.GetTenantByID(ctx, db, claim.TenantID)
 	if err != nil {
 		return fmt.Errorf("getting tenant: %w", err)
@@ -188,12 +193,9 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 		return nil
 	}
 
-	token, ok := tokenCache[claim.TenantID]
-	if !ok {
-		token = resolveToken(ctx, db, claim.TenantID, ghAppConfig)
-		if token != "" {
-			tokenCache[claim.TenantID] = token
-		}
+	var token string
+	if pool != nil {
+		token = pool.Token()
 	}
 
 	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg, tn.Plan, mode)
@@ -392,57 +394,4 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 	slog.Info("insights generated", "org", org, "repo", repo, "model", model,
 		"event_count", summary.Events, "prev_count", savedCount)
 	return nil
-}
-
-// resolveToken returns a GitHub token for API access.
-// Priority: 1) GITHUB_TOKEN env var, 2) GitHub App installation token, 3) empty (unauthenticated, public repos only).
-func resolveToken(ctx context.Context, db *sql.DB, tenantID string, ghAppConfig *tenant.GitHubAppConfig) string {
-	// 1. Explicit token (dev/testing)
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		slog.Debug("using GITHUB_TOKEN env var")
-		return token
-	}
-
-	// 2. GitHub App installation token
-	if ghAppConfig != nil {
-		if token, err := mintInstallationToken(ctx, db, tenantID, ghAppConfig); err == nil {
-			return token
-		} else {
-			slog.Debug("github app token minting failed, falling back to unauthenticated",
-				"tenant_id", tenantID, "error", err)
-		}
-	}
-
-	// 3. Unauthenticated (60 req/hr, public repos only)
-	slog.Warn("no GitHub token available, using unauthenticated API (rate limited to 60 req/hr)",
-		"tenant_id", tenantID)
-	return ""
-}
-
-// mintInstallationToken mints an installation token for the tenant's first active installation.
-func mintInstallationToken(ctx context.Context, db *sql.DB, tenantID string, cfg *tenant.GitHubAppConfig) (string, error) {
-	installs, err := tenant.GetActiveInstallations(ctx, db, tenantID)
-	if err != nil {
-		return "", fmt.Errorf("getting installations: %w", err)
-	}
-
-	if len(installs) == 0 {
-		return "", fmt.Errorf("no active installations for tenant %s", tenantID)
-	}
-
-	// Use the first active installation
-	install := installs[0]
-	token, err := tenant.MintInstallationToken(ctx, cfg, install.ID)
-	if err != nil {
-		return "", fmt.Errorf("minting token for installation %d: %w", install.ID, err)
-	}
-
-	slog.Info("minted installation token",
-		"tenant_id", tenantID,
-		"installation_id", install.ID,
-		"login", install.Login,
-		"expires_at", token.ExpiresAt,
-	)
-
-	return token.Token, nil
 }
