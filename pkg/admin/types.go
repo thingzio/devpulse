@@ -40,6 +40,17 @@ type repoDetail struct {
 	LastImport   string  `json:"last_import"`
 }
 
+type resetErrorsRequest struct {
+	Org  string `json:"org"`
+	Repo string `json:"repo"`
+}
+
+type resetErrorsResponse struct {
+	Org   string `json:"org"`
+	Repo  string `json:"repo"`
+	Reset int64  `json:"reset"`
+}
+
 type inviteRequest struct {
 	Username string `json:"username"`
 	Plan     string `json:"plan"`

@@ -49,6 +49,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("GET /tenant", handleGetTenant(db))
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
 	mux.HandleFunc("POST /invite", handleInvite(db))
+	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
 	mux.HandleFunc("GET /metrics/review", handleMetricsReview(mcfg))
 
 	address := "0.0.0.0:" + port
@@ -276,6 +277,37 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 			Plan:             req.Plan,
 			MaxRepos:         limits.MaxRepos,
 			MaxEventsPerWeek: limits.MaxEventsPerWeek,
+		})
+	}
+}
+
+func handleResetErrors(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyLen)
+		var req resetErrorsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.Org == "" || req.Repo == "" {
+			http.Error(w, "org and repo are required", http.StatusBadRequest)
+			return
+		}
+
+		count, err := tenant.ResetImportErrorsByRepo(r.Context(), db, req.Org, req.Repo)
+		if err != nil {
+			slog.Error("resetting import errors", "org", req.Org, "repo", req.Repo, "error", err)
+			http.Error(w, "error resetting import errors", http.StatusInternalServerError)
+			return
+		}
+
+		slog.Info("import errors reset", "org", req.Org, "repo", req.Repo, "rows", count)
+
+		writeJSON(w, resetErrorsResponse{
+			Org:   req.Org,
+			Repo:  req.Repo,
+			Reset: count,
 		})
 	}
 }

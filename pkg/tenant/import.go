@@ -60,6 +60,11 @@ const resetImportErrorsSQL = `
 	SET import_errors = 0, import_last_error = NULL
 	WHERE id = $1`
 
+const resetImportErrorsByRepoSQL = `
+	UPDATE tenant_repo
+	SET import_errors = 0, import_last_error = NULL
+	WHERE org = $1 AND repo = $2 AND import_errors > 0`
+
 // importResetMinutes returns the IMPORT_RESET_MINUTES env var or 30 as default.
 func importResetMinutes() int {
 	if v := os.Getenv("IMPORT_RESET_MINUTES"); v != "" {
@@ -130,6 +135,15 @@ func ResetImportErrors(ctx context.Context, db *sql.DB, id string) error {
 		return fmt.Errorf("resetting import errors: %w", err)
 	}
 	return nil
+}
+
+// ResetImportErrorsByRepo clears the error counter for a specific org/repo across all tenants.
+func ResetImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo string) (int64, error) {
+	res, err := db.ExecContext(ctx, resetImportErrorsByRepoSQL, org, repo)
+	if err != nil {
+		return 0, fmt.Errorf("resetting import errors for %s/%s: %w", org, repo, err)
+	}
+	return res.RowsAffected()
 }
 
 // ActiveTenant represents a tenant with at least one active repo.
