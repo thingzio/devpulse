@@ -152,10 +152,12 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 
 		for _, rd := range repos {
 			d := repoDetail{
-				Name:         rd.Org + "/" + rd.Repo,
-				Events:       rd.Events,
-				WeeklyEvents: rd.WeeklyEvents,
-				LastImport:   rd.LastImport,
+				Name:          rd.Org + "/" + rd.Repo,
+				Events:        rd.Events,
+				WeeklyEvents:  rd.WeeklyEvents,
+				LastImport:    rd.LastImport,
+				PRTotal:       rd.PRTotal,
+				PRMissingSize: rd.PRMissingSize,
 			}
 			if out.MaxEventsPerWeek > 0 {
 				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100

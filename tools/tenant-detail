@@ -55,11 +55,14 @@ echo "REPOS"
 echo "${BODY}" | jq -r '
     if (.repos | length) == 0 then "  (none)"
     else
-        ["  NAME", "EVENTS", "WEEKLY-%", "LAST-IMPORT"],
+        .max_events_per_week as $max |
+        ["  NAME", "EVENTS", "WEEKLY", "WEEKLY-%", "BACKFILL", "LAST-IMPORT"],
         (.repos[] | [
             "  \(.name)",
             (.events | tostring),
-            (if .weekly_pct == 0 then "0.0%" else "\(.weekly_pct | . * 10 | round / 10)%" end),
+            (.weekly_events | tostring),
+            (if $max == 0 then "-" elif .weekly_pct == 0 then "0.0%" else "\(.weekly_pct | . * 10 | round / 10)%" end),
+            (if .pr_total == 0 then "-" elif .pr_missing_size == 0 then "done" else "\(.pr_total - .pr_missing_size)/\(.pr_total)" end),
             (if .last_import == "" then "never" else .last_import end)
         ]) | @tsv
     end' | column -t

@@ -33,11 +33,13 @@ type tenantDetail struct {
 }
 
 type repoDetail struct {
-	Name         string  `json:"name"`
-	Events       int     `json:"events"`
-	WeeklyEvents int     `json:"weekly_events"`
-	WeeklyPct    float64 `json:"weekly_pct"`
-	LastImport   string  `json:"last_import"`
+	Name          string  `json:"name"`
+	Events        int     `json:"events"`
+	WeeklyEvents  int     `json:"weekly_events"`
+	WeeklyPct     float64 `json:"weekly_pct"`
+	LastImport    string  `json:"last_import"`
+	PRTotal       int     `json:"pr_total"`
+	PRMissingSize int     `json:"pr_missing_size"`
 }
 
 type resetErrorsRequest struct {
