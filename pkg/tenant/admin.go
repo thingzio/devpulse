@@ -31,13 +31,13 @@ type TenantDetail struct {
 
 // RepoDetail holds per-repo statistics for admin inspection.
 type RepoDetail struct {
-	Org            string
-	Repo           string
-	Events         int
-	WeeklyEvents   int
-	LastImport     string
-	PRTotal        int
-	PRMissingSize  int
+	Org           string
+	Repo          string
+	Events        int
+	WeeklyEvents  int
+	LastImport    string
+	PRTotal       int
+	PRMissingSize int
 }
 
 const (
