@@ -166,14 +166,8 @@ type metricQuery struct {
 	params string
 }
 
-func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, days int) string {
-	now := time.Now().UTC()
-	start := now.Add(-time.Duration(days) * 24 * time.Hour)
-
-	hourlyAlign := "aggregation.alignmentPeriod=3600s"
-	dailyAlign := fmt.Sprintf("aggregation.alignmentPeriod=%ds", days*86400)
-
-	queries := []metricQuery{
+func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQuery {
+	return []metricQuery{
 		{
 			label:  "Service: Request Count (req/s by response class)",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.service),
@@ -223,6 +217,16 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			label:  "Import: Repo Errors (by org/repo)",
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-errors"`,
 			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.org&aggregation.groupByFields=metric.labels.repo",
+		},
+		{
+			label:  "Import: Backfill Rate Limited (by repo)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-backfill-rate-limited"`,
+			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.repo",
+		},
+		{
+			label:  "Import: PR Backfill Completed (updated count)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-backfill-completed"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
 			label:  "Deep Reputation: Job Execution Results",
@@ -298,12 +302,20 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MEAN",
 		},
 	}
+}
+
+func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, days int) string {
+	now := time.Now().UTC()
+	start := now.Add(-time.Duration(days) * 24 * time.Hour)
+
+	hourlyAlign := "aggregation.alignmentPeriod=3600s"
+	dailyAlign := fmt.Sprintf("aggregation.alignmentPeriod=%ds", days*86400)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "DevPulse Metrics — Last %d day(s), Project: %s, %s\n\n",
 		days, cfg.projectID, now.Format("2006-01-02 15:04 UTC"))
 
-	for _, q := range queries {
+	for _, q := range metricQueries(cfg, hourlyAlign, dailyAlign) {
 		raw, err := queryTimeSeries(ctx, cfg.projectID, token, q.filter, q.params, start, now)
 		if err != nil {
 			fmt.Fprintf(&b, "--- %s ---\n  (error: %s)\n\n", q.label, err)

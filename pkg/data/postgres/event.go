@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -41,12 +42,14 @@ const (
 	importBatchSize = 500
 	nilNumber       = 0
 
-	sortField        string = "created"
-	sortCommentField string = "updated"
-	sortForkField    string = "newest"
-	sortDirection    string = "desc"
+	sortField              string = "created"
+	sortCommentField       string = "updated"
+	sortForkField          string = "newest"
+	sortDirection          string = "desc"
+	backfillMaxDaysDefault        = 90
+	backfillMaxDaysEnvKey         = "BACKFILL_MAX_DAYS"
 
-	// selectPRsMissingSizeSQL: $1=org, $2=repo
+	// selectPRsMissingSizeSQL: $1=org, $2=repo, $3=min_created_at
 	selectPRsMissingSizeSQL = `SELECT org, repo, number
 		FROM event
 		WHERE type = 'pr'
@@ -55,6 +58,8 @@ const (
 		  AND number IS NOT NULL
 		  AND number > 0
 		  AND (additions IS NULL OR changed_files IS NULL)
+		  AND created_at >= $3
+		ORDER BY created_at DESC
 		LIMIT 500
 	`
 
@@ -211,7 +216,11 @@ func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, day
 	}
 
 	if err := imp.backfillPRSize(ctx); err != nil {
-		slog.Warn("error backfilling PR size data", "repo", owner+"/"+repo, "error", err)
+		if ghutil.IsRateLimited(err) {
+			slog.Warn("backfill rate limited", "repo", owner+"/"+repo, "error", err)
+		} else {
+			slog.Warn("error backfilling PR size data", "repo", owner+"/"+repo, "error", err)
+		}
 	}
 
 	total := 0
@@ -592,7 +601,14 @@ type prRef struct {
 func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 	db := e.store.db
 
-	rows, err := db.QueryContext(ctx, selectPRsMissingSizeSQL, e.owner, e.repo)
+	days := backfillMaxDaysDefault
+	if v := os.Getenv(backfillMaxDaysEnvKey); v != "" {
+		if d, err := strconv.Atoi(v); err == nil && d > 0 {
+			days = d
+		}
+	}
+	minCreatedAt := time.Now().AddDate(0, 0, -days).UTC().Format(time.RFC3339)
+	rows, err := db.QueryContext(ctx, selectPRsMissingSizeSQL, e.owner, e.repo, minCreatedAt)
 	if err != nil {
 		return fmt.Errorf("error querying PRs missing size: %w", err)
 	}
@@ -641,6 +657,9 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prRef) (bool, error) {
 	pr, resp, err := e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
 	if err != nil {
+		if ghutil.IsRateLimited(err) {
+			return false, fmt.Errorf("rate limit hit during PR backfill: %w", err)
+		}
 		if wait := ghutil.AbuseRetryAfter(err); wait > 0 {
 			slog.Warn("secondary rate limit hit, waiting", "number", p.number, "wait", wait.String())
 			select {

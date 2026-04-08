@@ -99,7 +99,7 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 9 alert policies, email | free tier |
+| Cloud Monitoring | log-based metrics, 11 alert policies, email | free tier |
 | **Total** | | **~$37/mo** |
 
 ## Cost by Tenant Scale
@@ -256,7 +256,7 @@ Each repo runs 7 import phases:
 |-------|------------:|-------------:|-------|
 | Metadata | 2 | 2 | `Repositories.Get` + `GetCommunityHealthMetrics` |
 | Events (5 concurrent) | 10-30 | 50-200+ | PRs, reviews, issues, comments, forks (100/page) |
-| PR size backfill | 0-20 | 50-200 | `PullRequests.Get` per new PR |
+| PR size backfill | 0-20 | 50-200 | `PullRequests.Get` per new PR (capped to last 90 days, configurable via `BACKFILL_MAX_DAYS`; exits early on rate limit) |
 | Releases | 1-3 | 1-5 | `ListReleases` paginated |
 | Metric history | 3-10 | 5-15 | Stars + forks pagination |
 | Containers | 0-5 | 2-10 | Packages + versions |

@@ -175,6 +175,7 @@ Tenant isolation layers:
 - `ANTHROPIC_API_KEY` — optional, enables LLM insights generation
 - `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`
 - `IMPORT_MODE` — `all` (default), `import` (skip deep rep), `reputation` (deep rep only)
+- `BACKFILL_MAX_DAYS` — max age in days for PR size backfill (default: 90)
 
 ## CI/CD
 

@@ -175,6 +175,47 @@ resource "google_logging_metric" "import_repo_errors" {
   }
 }
 
+resource "google_logging_metric" "backfill_rate_limited" {
+  name    = "${var.prefix}-backfill-rate-limited"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"backfill rate limited\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "repo"
+      value_type  = "STRING"
+      description = "Repository (org/repo)"
+    }
+  }
+
+  label_extractors = {
+    "repo" = "EXTRACT(jsonPayload.repo)"
+  }
+}
+
+resource "google_logging_metric" "backfill_completed" {
+  name    = "${var.prefix}-backfill-completed"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"PR sizes backfilled\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
+    unit        = "1"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.updated)"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [1, 10, 50, 100, 200, 500]
+    }
+  }
+}
+
 resource "google_logging_metric" "deeprep_duration" {
   name    = "${var.prefix}-deeprep-duration"
   project = var.project_id
