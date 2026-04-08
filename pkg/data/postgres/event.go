@@ -283,6 +283,10 @@ type eventExtra struct {
 }
 
 func (e *eventImporter) add(ctx context.Context, eType, url string, usr *github.User, updated *time.Time, mentions []string, labels []string, extra *eventExtra) error {
+	if usr == nil || usr.GetLogin() == "" {
+		return nil
+	}
+
 	item := &data.Event{
 		Org:      e.owner,
 		Repo:     e.repo,

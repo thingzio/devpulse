@@ -36,7 +36,7 @@ const (
 			ROUND(100.0 * events / (SUM(events) OVER ())) AS percent
 		FROM (
 			SELECT
-				d.username,
+				COALESCE(NULLIF(d.username, ''), 'unknown') AS username,
 				COUNT(*) as events
 			FROM developer d
 			JOIN event e ON d.username = e.username

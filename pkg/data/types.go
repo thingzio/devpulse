@@ -69,7 +69,7 @@ type EntityResult struct {
 // ---------------------------------------------------------------------------
 
 type CountedItem struct {
-	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
+	Name  string `json:"name" yaml:"name"`
 	Count int    `json:"count,omitempty" yaml:"count,omitempty"`
 }
 
