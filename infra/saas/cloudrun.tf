@@ -372,11 +372,26 @@ resource "google_cloud_run_v2_service" "admin" {
         value = "claude-sonnet-4-6"
       }
 
+      env {
+        name  = "GITHUB_APP_ID"
+        value = var.github_app_id
+      }
+
+      env {
+        name  = "GITHUB_APP_KEY_PATH"
+        value = "/secrets/github-app-key/key.pem"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
           memory = "512Mi"
         }
+      }
+
+      volume_mounts {
+        name       = "github-app-key"
+        mount_path = "/secrets/github-app-key"
       }
 
       volume_mounts {
@@ -391,6 +406,17 @@ resource "google_cloud_run_v2_service" "admin" {
         initial_delay_seconds = 2
         period_seconds        = 3
         failure_threshold     = 5
+      }
+    }
+
+    volumes {
+      name = "github-app-key"
+      secret {
+        secret = google_secret_manager_secret.github_app_key.secret_id
+        items {
+          version = "latest"
+          path    = "key.pem"
+        }
       }
     }
 
