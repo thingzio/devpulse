@@ -108,7 +108,7 @@ func TestShardRepos(t *testing.T) {
 		repos := makeRepos("org1/alpha", "org2/bravo", "org3/charlie", "org4/delta", "org5/echo")
 
 		var all []RepoWork
-		for idx := 0; idx < 3; idx++ {
+		for idx := range 3 {
 			shard := ShardRepos(repos, 3, idx)
 			all = append(all, shard...)
 		}
@@ -122,7 +122,7 @@ func TestShardRepos(t *testing.T) {
 
 		var all []RepoWork
 		nonEmpty := 0
-		for idx := 0; idx < 5; idx++ {
+		for idx := range 5 {
 			shard := ShardRepos(repos, 5, idx)
 			if len(shard) > 0 {
 				nonEmpty++
@@ -159,7 +159,7 @@ func TestShardRepos(t *testing.T) {
 		repos := makeRepos("z/m", "a/n", "m/a", "m/z", "a/a")
 
 		first := ShardRepos(repos, 3, 1)
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			got := ShardRepos(repos, 3, 1)
 			require.Equal(t, first, got, "call %d produced different result", i)
 		}
@@ -212,12 +212,11 @@ func TestShardReposExhaustive(t *testing.T) {
 
 	// For every taskCount from 1 to N+2, verify complete coverage.
 	for tc := 1; tc <= len(repos)+2; tc++ {
-		tc := tc
 		t.Run(fmt.Sprintf("taskCount=%d", tc), func(t *testing.T) {
 			t.Parallel()
 
 			var all []RepoWork
-			for idx := 0; idx < tc; idx++ {
+			for idx := range tc {
 				shard := ShardRepos(repos, tc, idx)
 				all = append(all, shard...)
 			}
