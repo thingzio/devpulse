@@ -349,13 +349,24 @@ func oauthStartHandler(cfg *oauth.Config) http.HandlerFunc {
 }
 
 func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
+	clearAndRedirect := func(w http.ResponseWriter, r *http.Request, msg string) {
+		// Clear all auth cookies so the user can retry cleanly.
+		http.SetCookie(w, &http.Cookie{
+			Name: "oauth_state", Value: "", MaxAge: -1, Path: "/",
+			HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+		})
+		middleware.ClearSessionCookie(w)
+		http.Redirect(w, r, "/?err="+url.QueryEscape(msg), http.StatusSeeOther)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		stateCookie, err := r.Cookie("oauth_state")
 		if err != nil || subtle.ConstantTimeCompare(
 			[]byte(stateCookie.Value),
 			[]byte(r.URL.Query().Get("state")),
 		) != 1 {
-			http.Error(w, "invalid state", http.StatusBadRequest)
+			slog.Warn("oauth state mismatch", "has_cookie", err == nil)
+			clearAndRedirect(w, r, "auth_expired")
 			return
 		}
 
@@ -373,21 +384,21 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 		token, err := oauth.ExchangeCode(r.Context(), cfg, code)
 		if err != nil {
 			slog.Error("oauth exchange failed", "error", err)
-			http.Error(w, "authentication failed", http.StatusBadRequest)
+			clearAndRedirect(w, r, "auth_failed")
 			return
 		}
 
 		user, err := oauth.FetchUser(r.Context(), cfg, token)
 		if err != nil {
 			slog.Error("fetching github user", "error", err)
-			http.Error(w, "authentication failed", http.StatusInternalServerError)
+			clearAndRedirect(w, r, "auth_failed")
 			return
 		}
 
 		tn, err := tenant.UpsertTenant(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL)
 		if err != nil {
 			slog.Error("upserting tenant", "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			clearAndRedirect(w, r, "auth_failed")
 			return
 		}
 
@@ -396,7 +407,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 		sessionToken, err := tenant.CreateSession(r.Context(), db, tn.ID, sessionTTL)
 		if err != nil {
 			slog.Error("creating session", "error", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			clearAndRedirect(w, r, "auth_failed")
 			return
 		}
 
