@@ -20,7 +20,6 @@ DEPLOYER_SA=$(terraform -chdir="$TF_DIR" output -raw deployer_sa)
 SERVICE_NAME="devpulse-saas-serve"
 JOB_NAME="devpulse-saas-import"
 ADMIN_SERVICE_NAME="devpulse-saas-admin"
-DEEPREP_JOB_NAME="devpulse-saas-deeprep"
 REGION="us-west1"
 PROJECT_ID=$(terraform -chdir="$TF_DIR" output -raw project_id)
 AR_REPO=$(terraform -chdir="$TF_DIR" output -raw ar_repo)
@@ -35,7 +34,6 @@ gh variable set DEPLOYER_SA   --repo "$REPO" --env "$ENV_NAME" --body "$DEPLOYER
 gh variable set SERVICE_NAME       --repo "$REPO" --env "$ENV_NAME" --body "$SERVICE_NAME"
 gh variable set JOB_NAME            --repo "$REPO" --env "$ENV_NAME" --body "$JOB_NAME"
 gh variable set ADMIN_SERVICE_NAME --repo "$REPO" --env "$ENV_NAME" --body "$ADMIN_SERVICE_NAME"
-gh variable set DEEPREP_JOB_NAME   --repo "$REPO" --env "$ENV_NAME" --body "$DEEPREP_JOB_NAME"
 gh variable set REGION        --repo "$REPO" --env "$ENV_NAME" --body "$REGION"
 gh variable set PROJECT_ID    --repo "$REPO" --env "$ENV_NAME" --body "$PROJECT_ID"
 gh variable set AR_REPO       --repo "$REPO" --env "$ENV_NAME" --body "$AR_REPO"
@@ -47,7 +45,6 @@ echo "  DEPLOYER_SA  = ${DEPLOYER_SA}"
 echo "  SERVICE_NAME       = ${SERVICE_NAME}"
 echo "  JOB_NAME           = ${JOB_NAME}"
 echo "  ADMIN_SERVICE_NAME = ${ADMIN_SERVICE_NAME}"
-echo "  DEEPREP_JOB_NAME   = ${DEEPREP_JOB_NAME}"
 echo "  REGION       = ${REGION}"
 echo "  PROJECT_ID   = ${PROJECT_ID}"
 echo "  AR_REPO      = ${AR_REPO}"

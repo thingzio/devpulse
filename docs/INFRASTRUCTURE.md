@@ -13,13 +13,10 @@ Internet
    |     +-- Webhook endpoint (GitHub App)
    |     +-- Data API (30+ chart endpoints)
    |
-   +-- Cloud Run job (import mode, hourly, IMPORT_MODE=import)
+   +-- Cloud Run job (import, hourly)
    |     +-- Per-tenant repo import via GitHub API
+   |     +-- Deep reputation scoring (round-robin token pool)
    |     +-- LLM insights generation (Claude Haiku 4.5)
-   |
-   +-- Cloud Run job (deep rep mode, hourly at :30)
-   |     +-- Sequential deep reputation scoring
-   |     +-- Round-robin token rotation
    |
    +-- Cloud Run service (admin, IAM-gated)
    |     +-- Tenant plan management (upgrade/downgrade)
@@ -41,13 +38,12 @@ Cloud DNS       -> devpulse.thingz.io
 
 ## Compute
 
-Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run jobs: import + deeprep), `devpulse-admin` (Cloud Run service, IAM-protected).
+Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run job), `devpulse-admin` (Cloud Run service, IAM-protected).
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
 | Serve | Cloud Run service | 0-10 instances (scale-to-zero) | Public |
-| Import | Cloud Run job | Hourly, parallelism=3, IMPORT_MODE=import (SKIP LOCKED queue) | Internal |
-| Deep Rep | Cloud Run job | Hourly at :30, single-task, round-robin token rotation | Internal |
+| Import | Cloud Run job | Hourly, parallelism=3 (SKIP LOCKED queue), full pipeline | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
 The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize cost. Cold starts for the Go binary are ~2s, within the 1s p99 latency alert threshold. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
@@ -91,11 +87,10 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
 | Cloud Run Service (serve) | scale-to-zero (min=0), 1 vCPU/512MB | $5/mo |
-| Cloud Run Job (import) | hourly, ~3 tasks, ~5 min/run | $2/mo |
-| Cloud Run Job (deeprep) | hourly, 1 task, ~10-30 min/run | $1.50/mo |
+| Cloud Run Job (import) | hourly, ~3 tasks, ~10 min/run | $3.50/mo |
 | Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
 | Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
-| Cloud Scheduler | 2 hourly jobs | free (3 free) |
+| Cloud Scheduler | 1 hourly job | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
@@ -115,8 +110,7 @@ Total repos: ~93. Paid repos with AI: ~78.
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, ~15GB storage | $29/mo |
 | Cloud Run (serve) | always-on, light load | $15/mo |
-| Cloud Run (import) | hourly, ~10 min/run | $4/mo |
-| Cloud Run (deeprep) | hourly, ~30 min/run | $2/mo |
+| Cloud Run (import) | hourly, ~15 min/run | $6/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~78 repos x $0.02/mo (cached) | $1.50/mo |
 | Fixed (scheduler, DNS, secrets, AR, monitoring) | | $1/mo |
@@ -131,8 +125,7 @@ Total repos: ~360. Paid repos with AI: ~300.
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, ~25GB storage | $31/mo |
 | Cloud Run (serve) | always-on, moderate load | $18/mo |
-| Cloud Run (import) | hourly, ~20 min/run | $8/mo |
-| Cloud Run (deeprep) | hourly, ~45 min/run | $3/mo |
+| Cloud Run (import) | hourly, ~30 min/run | $11/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~300 repos x $0.02/mo (cached) | $6/mo |
 | Fixed | | $1/mo |
@@ -149,8 +142,7 @@ Total repos: ~1,080. Paid repos with AI: ~900.
 |---------|---------|----------|
 | Cloud SQL | db-custom-1-3840, 1 vCPU, 3.75GB, ~50GB storage | $59/mo |
 | Cloud Run (serve) | always-on, higher concurrency | $25/mo |
-| Cloud Run (import) | parallelism=5, ~30 min/run | $15/mo |
-| Cloud Run (deeprep) | hourly, ~60 min/run | $5/mo |
+| Cloud Run (import) | parallelism=5, ~45 min/run | $20/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | PgBouncer sidecar | connection pooling | $10/mo |
 | Anthropic API | ~900 repos x $0.02/mo (cached) | $18/mo |
@@ -169,8 +161,7 @@ Total repos: ~3,600. Paid repos with AI: ~3,000.
 | AlloyDB primary | 2 vCPU, ~100GB storage | $185/mo |
 | AlloyDB read pool (optional) | 2 vCPU | $150/mo |
 | Cloud Run (serve) | always-on, 2-5 instances avg | $50/mo |
-| Cloud Run (import) | parallelism=10+, Cloud Tasks | $25/mo |
-| Cloud Run (deeprep) | hourly, ~90 min/run, multi-token | $8/mo |
+| Cloud Run (import) | parallelism=10+, Cloud Tasks | $33/mo |
 | Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Cloud Tasks | parallel import dispatch | $10/mo |
 | Anthropic API | ~3,000 repos x $0.02/mo (cached) | $60/mo |
@@ -343,8 +334,8 @@ All infrastructure is defined in `infra/saas/`:
 | `database.tf` | Cloud SQL instance, database, IAM users |
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
-| `cloudrun.tf` | Cloud Run service (serve) + job (import) + job (deeprep) + service (admin, IAM-gated) |
-| `scheduler.tf` | Alternating 2h schedules: import on even hours, deeprep on odd hours |
+| `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
+| `scheduler.tf` | Hourly import job trigger |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
 | `registry.tf` | Artifact Registry standard repo (direct push from CI) |

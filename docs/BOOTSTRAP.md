@@ -122,7 +122,7 @@ terraform init
 terraform apply
 ```
 
-This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + jobs (import + deeprep), Cloud Scheduler (2 hourly triggers), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + job (import), Cloud Scheduler (hourly trigger), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
 
 > **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
 
@@ -141,7 +141,7 @@ cd ../..  # back to repo root
 ```
 
 This creates 9 variables in the GitHub `saas` environment:
-`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `DEEPREP_JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
+`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
 
 ## 9. Delegate DNS
 
@@ -190,7 +190,7 @@ open https://$DOMAIN
 
 # Trigger manual import (after signing in, installing app, and adding repos)
 gcloud run jobs execute devpulse-saas-import --region=$REGION --project=$PROJECT_ID
-# Note: the deep reputation job (devpulse-saas-deeprep) runs automatically at :30 via Cloud Scheduler
+# The import job runs hourly via Cloud Scheduler (includes all phases)
 
 # Check logs
 gcloud logging read 'resource.type="cloud_run_revision"' \
@@ -216,7 +216,7 @@ gcloud run jobs update devpulse-saas-import --region=$REGION \
 
 After verifying everything works:
 ```shell
-# Edit infra/saas/cloudrun.tf — set deletion_protection = true on all three resources (serve, import, deeprep)
+# Edit infra/saas/cloudrun.tf — set deletion_protection = true on all resources (serve, import, admin)
 cd infra/saas && terraform apply
 ```
 

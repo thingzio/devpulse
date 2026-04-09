@@ -115,7 +115,7 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | Memory Utilization | Sustained > 80% = upgrade DB tier |
 | Connections | Approaching max = add PgBouncer sidecar |
 
-### Alert Policies (8)
+### Alert Policies (7)
 
 | Alert | Condition | Action |
 |-------|-----------|--------|
@@ -126,7 +126,6 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | DB connections | Connection count approaching max | Increase pool size or add PgBouncer |
 | Import failure | Any failed import job execution | Check import logs |
 | Import repo errors | Repo import errors > 5/hour | Check import logs for persistent repo failures |
-| Deeprep failure | Any failed deep reputation job execution | Check deeprep logs |
 
 ### Querying Logs
 

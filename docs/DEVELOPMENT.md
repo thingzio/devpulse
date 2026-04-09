@@ -89,15 +89,7 @@ make down           # stop Postgres (data preserved)
 
 `make server` runs `devpulse-site` (HTTP server on :8080). `make import` runs `devpulse-import` (batch worker, exits when done). `devpulse-admin` is an IAM-protected admin service for tenant management — see [ADMIN.md](ADMIN.md).
 
-The import binary supports `IMPORT_MODE` to select which phases run:
-
-```bash
-make import                          # default (all phases including deep reputation)
-IMPORT_MODE=import make import       # fast phases only, skip deep reputation
-IMPORT_MODE=reputation make import   # deep reputation scoring only (round-robin token pool)
-```
-
-In production, two Cloud Run jobs run the same binary: import at :00 (`IMPORT_MODE=import`), deep reputation at :30 (`IMPORT_MODE=reputation`). See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+The import binary runs the full pipeline: events, deep reputation, and LLM insights in a single pass. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 

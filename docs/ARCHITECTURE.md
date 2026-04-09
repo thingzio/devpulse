@@ -7,7 +7,6 @@ Multi-tenant SaaS for GitHub project health analytics. Three binaries: `devpulse
 ```
 GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
 Cloud Scheduler :00 ──→ devpulse (import) ──→ per-tenant install tokens ──→ PostgreSQL
-Cloud Scheduler :30 ──→ devpulse (deeprep) ──→ round-robin token pool ──→ PostgreSQL
 Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
 Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo
 Admin  ──→ devpulse (admin) ──→ IAM auth ──→ tenant plan management ──→ PostgreSQL
@@ -54,7 +53,7 @@ devpulse/
 
 ## Binaries
 
-Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports (supports `IMPORT_MODE` for import vs deep reputation), `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
+Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs the full import pipeline (events, reputation, insights), `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
 
 ## Data Layer
 
@@ -90,8 +89,8 @@ Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP
 ### Migrations
 
 Two migration sets, both using `applyMigrations()` in `pkg/data/postgres/migrate.go`:
-- `sql/migrations/001_initial.sql` — base tables (schema_version, advisory lock 1)
-- `sql/migrations_saas/001_initial.sql` — tenant tables + RLS policies (saas_schema_version, advisory lock 2)
+- `sql/migrations/001_initial.sql` — base tables (schema_version)
+- `sql/migrations_saas/001_initial.sql` — tenant tables + RLS policies (saas_schema_version)
 
 ## Tenant Isolation
 
@@ -103,23 +102,15 @@ PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
 
 ## Import Pipeline
 
-The `devpulse-import` binary supports an `IMPORT_MODE` env var (`all`, `import`, or `reputation`) to select which phases run. Two Cloud Run jobs use the same binary with different modes: the import job runs at :00 with `IMPORT_MODE=import` (3 parallel tasks via SKIP LOCKED claim queue), and the deeprep job runs at :30 with `IMPORT_MODE=reputation` (single task, sequential scoring).
-
-### Import Job (`IMPORT_MODE=import`)
-
-Each claimed repo runs 7 phases (skips deep reputation):
+The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (hourly, 3 parallel tasks via SKIP LOCKED claim queue). Each claimed repo runs all phases sequentially:
 
 1. **Metadata** — repo stars, forks, language, license, community profile
 2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)
 3. **Releases** — tags, dates, asset downloads
 4. **Metric history** — daily star/fork counts
 5. **Container versions** — image version tracking
-6. **Reputation** — shallow scores from local data
+6. **Reputation** — deep reputation scoring with round-robin token pool
 7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
-
-### Deep Reputation Job (`IMPORT_MODE=reputation`)
-
-Runs deep reputation scoring only, with round-robin token rotation across all installations. This is a separate Cloud Run job (`devpulse-saas-deeprep`) using the same `devpulse-import` binary.
 
 Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 
