@@ -403,6 +403,12 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 	defer rollbackTransaction(tx)
 
+	// Sort developers by username to ensure consistent lock ordering
+	// across concurrent import transactions, preventing deadlocks.
+	slices.SortFunc(devs, func(a, b *data.Developer) int {
+		return strings.Compare(a.Username, b.Username)
+	})
+
 	txDevStmt := tx.Stmt(devStmt)
 	defer txDevStmt.Close()
 	for i, u := range devs {
