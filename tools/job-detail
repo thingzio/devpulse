@@ -1,0 +1,143 @@
+#!/bin/bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools gcloud jq
+
+PROJECT="devpulseio"
+REGION="us-west1"
+
+usage() {
+    echo "Usage: $0 <execution-name>"
+    echo "  e.g. $0 devpulse-saas-import-bpr72"
+    exit 1
+}
+
+[[ $# -ne 1 ]] && usage
+
+EXECUTION="$1"
+JOB_NAME="${EXECUTION%-*}"
+
+msg "Job: ${JOB_NAME} | Execution: ${EXECUTION}"
+
+# --- Execution status ---
+msg "Fetching execution status..."
+STATUS_RAW="$(gcloud run jobs executions describe "${EXECUTION}" \
+    --project="${PROJECT}" --region="${REGION}" \
+    --format=json 2>&1 | grep -v WARNING)" \
+    || err "Failed to describe execution '${EXECUTION}'"
+
+STATE="$(echo "${STATUS_RAW}" | jq -r '
+    if .status.completionTime then "Completed"
+    elif (.status.failedCount // 0) > 0 then "Failed"
+    else "Running"
+    end')"
+START="$(echo "${STATUS_RAW}" | jq -r '.status.startTime // "unknown"')"
+COMPLETION="$(echo "${STATUS_RAW}" | jq -r '.status.completionTime // empty')"
+
+echo ""
+echo "STATUS"
+echo "  State:      ${STATE}"
+echo "  Started:    ${START}"
+[[ -n "${COMPLETION}" ]] && echo "  Completed:  ${COMPLETION}"
+echo "${STATUS_RAW}" | jq -r '"  Tasks:      running=\(.status.runningCount // 0) succeeded=\(.status.succeededCount // 0) failed=\(.status.failedCount // 0)"'
+echo "${STATUS_RAW}" | jq -r '(.status.conditions[0].message // empty) as $m | if $m then "  Message:    \($m)" else empty end'
+
+# --- Build time-bounded log filter ---
+TIME_FILTER=""
+[[ "${START}" != "unknown" ]] && TIME_FILTER=" AND timestamp>=\"${START}\""
+[[ -n "${COMPLETION}" ]] && TIME_FILTER="${TIME_FILTER} AND timestamp<=\"${COMPLETION}\""
+
+BASE_FILTER="resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${JOB_NAME}\" AND labels.\"run.googleapis.com/execution_name\"=\"${EXECUTION}\"${TIME_FILTER}"
+
+# --- Single log query: fetch all interesting messages as JSON ---
+MSG_FILTER='jsonPayload.msg=("import worker starting" OR "token pool ready" OR "import worker complete" OR "claimed repo" OR "repo import complete" OR "PR backfill complete" OR "backfilling PR sizes" OR "backfill rate limited" OR "deep reputation worker complete" OR "deep reputation scoring")'
+
+echo ""
+msg "Fetching logs..."
+LOGS_JSON="$(gcloud logging read \
+    "${BASE_FILTER} AND (${MSG_FILTER} OR severity>=ERROR OR jsonPayload.level=\"ERROR\" OR jsonPayload.level=\"WARN\")" \
+    --project="${PROJECT}" --limit=150 \
+    --format=json \
+    --order=asc 2>&1 | grep -v WARNING)" || true
+
+if [[ -z "${LOGS_JSON}" || "${LOGS_JSON}" == "[]" ]]; then
+    echo ""
+    echo "  (no log entries found for this execution)"
+    echo ""
+    exit 0
+fi
+
+# --- Group by task index and print per-task summaries ---
+echo "${LOGS_JSON}" | jq -r '
+
+# Known structured messages (everything else is an error/warning)
+def is_known:
+    .jsonPayload.msg as $m |
+    ($m == "import worker starting" or $m == "token pool ready" or
+     $m == "import worker complete" or $m == "claimed repo" or
+     $m == "repo import complete" or $m == "PR backfill complete" or
+     $m == "backfilling PR sizes" or $m == "backfill rate limited" or
+     $m == "deep reputation scoring" or $m == "deep reputation worker complete");
+
+# Extract task index from labels
+def task_idx:
+    (.labels["run.googleapis.com/task_index"] // "?");
+
+# Format a log entry as a detail line
+def fmt_line:
+    .jsonPayload as $p | .timestamp[0:19] as $ts |
+    if $p.msg == "import worker starting" then
+        "    \($ts)  starting  mode=\($p.mode // "all")"
+    elif $p.msg == "token pool ready" then
+        "    \($ts)  token pool ready  tokens=\($p.tokens // 0)"
+    elif $p.msg == "claimed repo" then
+        "    \($ts)  claimed  \($p.org // "")/\($p.repo // "")"
+    elif $p.msg == "repo import complete" then
+        "    \($ts)  imported  \($p.repo // "?")  errs=\($p.errors // 0) dur=\($p.duration // "?")"
+    elif $p.msg == "backfilling PR sizes" then
+        "    \($ts)  backfill  \($p.repo // "?")  candidates=\($p.total // 0)"
+    elif $p.msg == "PR backfill complete" then
+        "    \($ts)  backfilled  \($p.repo // "?")  updated=\($p.updated // 0)/\($p.total // 0)"
+    elif $p.msg == "backfill rate limited" then
+        "    \($ts)  RATELIMIT  \($p.repo // "?")  \($p.error // "")"
+    elif $p.msg == "deep reputation scoring" then
+        "    \($ts)  deep rep scoring  candidates=\($p.candidates // 0)"
+    elif $p.msg == "deep reputation worker complete" then
+        "    \($ts)  deep rep complete  duration=\($p.duration // "?")"
+    elif $p.msg == "import worker complete" then
+        "    \($ts)  complete  repos=\($p.repos // 0) errors=\($p.errors // 0) duration=\($p.duration // "?")"
+    else
+        "    \($ts)  \($p.level // .severity // "?")  \($p.msg // "")  \($p.repo // "")  \($p.error // "")"
+    end;
+
+# Group all entries by task index
+group_by(task_idx) | sort_by(.[0] | task_idx) |
+.[] |
+    (.[0] | task_idx) as $idx |
+    "\nTASK \($idx)",
+    (.[] | fmt_line)
+'
+
+# --- Latest activity (only if still running) ---
+if [[ "${STATE}" != "Completed" ]]; then
+    echo ""
+    msg "Fetching latest activity..."
+    LATEST="$(gcloud logging read \
+        "${BASE_FILTER}" \
+        --project="${PROJECT}" --limit=5 \
+        --format=json \
+        --order=desc 2>&1 | grep -v WARNING)" || true
+
+    echo ""
+    echo "LATEST ACTIVITY"
+    if [[ -z "${LATEST}" || "${LATEST}" == "[]" ]]; then
+        echo "  (no log entries yet)"
+    else
+        echo "${LATEST}" | jq -r '.[] | .timestamp[0:19] as $ts | .jsonPayload as $p |
+            "  \($ts)  \($p.msg // "")  \($p.repo // "")"'
+    fi
+fi
+echo ""
