@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -162,6 +163,39 @@ func TestUpdateDeveloperNames_NilDB(t *testing.T) {
 	s := &Store{db: nil}
 	err := s.UpdateDeveloperNames(ctx, map[string]string{"u": "n"})
 	assert.Error(t, err)
+}
+
+func TestSaveDevelopers_Concurrent(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	// Two batches with overlapping developers — must not deadlock.
+	batch1 := []*data.Developer{
+		{Username: "alice", FullName: "Alice A", Email: "a@x.com"},
+		{Username: "bob", FullName: "Bob B", Email: "b@x.com"},
+		{Username: "shared", FullName: "Shared V1", Email: "s@x.com"},
+	}
+	batch2 := []*data.Developer{
+		{Username: "shared", FullName: "Shared V2", Email: "s@y.com"},
+		{Username: "carol", FullName: "Carol C", Email: "c@x.com"},
+	}
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	wg.Add(2)
+	go func() { defer wg.Done(); errs[0] = store.SaveDevelopers(ctx, batch1) }()
+	go func() { defer wg.Done(); errs[1] = store.SaveDevelopers(ctx, batch2) }()
+	wg.Wait()
+
+	require.NoError(t, errs[0], "batch1")
+	require.NoError(t, errs[1], "batch2")
+
+	// All 4 unique developers exist.
+	for _, name := range []string{"alice", "bob", "carol", "shared"} {
+		dev, err := store.GetDeveloper(ctx, name)
+		require.NoError(t, err)
+		require.NotNil(t, dev, "developer %s should exist", name)
+	}
 }
 
 func TestSearchDevelopers_MultipleMatches(t *testing.T) {

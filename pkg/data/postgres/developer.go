@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/google/go-github/v83/github"
@@ -79,9 +78,6 @@ const (
 
 	updateDeveloperNamesSQL = `UPDATE developer SET full_name = $1 WHERE username = $2`
 
-	// saveDevelopersLockID serializes concurrent developer upserts across
-	// goroutine workers to prevent deadlocks on overlapping usernames.
-	saveDevelopersLockID = 4
 )
 
 func (s *Store) GetDeveloperUsernames(ctx context.Context) ([]string, error) {
@@ -135,52 +131,32 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 		return nil
 	}
 
-	slices.SortFunc(devs, func(a, b *data.Developer) int {
-		return strings.Compare(a.Username, b.Username)
-	})
+	// Build multi-row INSERT ... ON CONFLICT DO UPDATE.
+	// Single statement = single implicit transaction = no deadlock possible.
+	var b strings.Builder
+	b.WriteString(`INSERT INTO developer (username, full_name, email, avatar, url, entity) VALUES `)
 
-	userStmt, err := s.db.PrepareContext(ctx, insertDeveloperSQL)
-	if err != nil {
-		return fmt.Errorf("failed to prepare developer insert statement: %w", err)
-	}
-	defer userStmt.Close()
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer rollbackTransaction(tx)
-
-	// Serialize concurrent developer upserts to prevent deadlocks when
-	// multiple workers import repos with overlapping contributors.
-	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", saveDevelopersLockID); err != nil {
-		return fmt.Errorf("acquiring developer save lock: %w", err)
-	}
-
-	txStmt := tx.Stmt(userStmt)
-	for i, u := range devs {
-		if _, err = txStmt.ExecContext(ctx, u.Username,
-			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
-			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
-			slog.Error("failed to insert developer",
-				"index", i,
-				"error", err,
-				"user", u.Username,
-				"name", u.FullName,
-				"email", u.Email,
-				"avatar", u.AvatarURL,
-				"profile", u.ProfileURL,
-				"entity", u.Entity,
-			)
-			rollbackTransaction(tx)
-			return fmt.Errorf("error inserting developer[%d]: %s: %w", i, u.Username, err)
+	args := make([]any, 0, len(devs)*6)
+	for i, d := range devs {
+		if i > 0 {
+			b.WriteString(", ")
 		}
+		base := i * 6
+		fmt.Fprintf(&b, "($%d, $%d, $%d, $%d, $%d, NULLIF($%d, ''))",
+			base+1, base+2, base+3, base+4, base+5, base+6)
+		args = append(args, d.Username, d.FullName, d.Email, d.AvatarURL, d.ProfileURL, d.Entity)
 	}
 
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
+	b.WriteString(` ON CONFLICT(username) DO UPDATE SET
+		full_name = EXCLUDED.full_name,
+		email = EXCLUDED.email,
+		avatar = EXCLUDED.avatar,
+		url = EXCLUDED.url,
+		entity = CASE WHEN EXCLUDED.entity IS NULL THEN developer.entity ELSE EXCLUDED.entity END`)
 
+	if _, err := s.db.ExecContext(ctx, b.String(), args...); err != nil {
+		return fmt.Errorf("batch saving %d developers: %w", len(devs), err)
+	}
 	return nil
 }
 
