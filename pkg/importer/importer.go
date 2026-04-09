@@ -91,6 +91,7 @@ func runImport(ctx context.Context) error {
 	}
 	work := make(chan RepoWork)
 	var wg sync.WaitGroup
+	shardSize := len(myRepos)
 	var totalRepos, totalErrors atomic.Int32
 
 	for range numWorkers {
@@ -101,7 +102,6 @@ func runImport(ctx context.Context) error {
 				if taskCtx.Err() != nil {
 					return
 				}
-				totalRepos.Add(1)
 				if importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg); importErr != nil {
 					totalErrors.Add(1)
 					slog.Error("repo import failed",
@@ -111,16 +111,21 @@ func runImport(ctx context.Context) error {
 					if incErr := tenant.IncrementImportErrorsByRepo(taskCtx, db, rw.Org, rw.Repo, importErr.Error()); incErr != nil {
 						slog.Warn("incrementing import errors", "error", incErr)
 					}
-					continue
-				}
-				if err := tenant.MarkImportDoneByRepo(taskCtx, db, rw.Org, rw.Repo); err != nil {
-					slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
-				}
-				for _, tr := range rw.Tenants {
-					if err := tenant.ResetImportErrors(taskCtx, db, tr.TenantRepoID); err != nil {
-						slog.Warn("resetting import errors", "error", err)
+				} else {
+					if err := tenant.MarkImportDoneByRepo(taskCtx, db, rw.Org, rw.Repo); err != nil {
+						slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
+					}
+					for _, tr := range rw.Tenants {
+						if err := tenant.ResetImportErrors(taskCtx, db, tr.TenantRepoID); err != nil {
+							slog.Warn("resetting import errors", "error", err)
+						}
 					}
 				}
+				done := int(totalRepos.Add(1))
+				slog.Info("shard progress",
+					"completed", done,
+					"total", shardSize,
+					"errors", int(totalErrors.Load()))
 			}
 		}()
 	}

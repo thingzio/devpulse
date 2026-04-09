@@ -53,7 +53,7 @@ TIME_FILTER=""
 BASE_FILTER="resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${JOB_NAME}\" AND labels.\"run.googleapis.com/execution_name\"=\"${EXECUTION}\"${TIME_FILTER}"
 
 # --- Single log query: fetch all interesting messages as JSON ---
-MSG_FILTER='jsonPayload.msg=("starting devpulse-import" OR "import worker starting" OR "shard assigned" OR "token pool ready" OR "import worker complete" OR "importing repo" OR "claimed repo" OR "repo import complete" OR "PR backfill complete" OR "backfilling PR sizes" OR "backfill rate limited" OR "deep reputation worker complete" OR "deep reputation scoring")'
+MSG_FILTER='jsonPayload.msg=("starting devpulse-import" OR "import worker starting" OR "shard assigned" OR "shard progress" OR "token pool ready" OR "import worker complete" OR "importing repo" OR "claimed repo" OR "repo import complete" OR "PR backfill complete" OR "backfilling PR sizes" OR "backfill rate limited" OR "deep reputation worker complete" OR "deep reputation scoring")'
 
 echo ""
 msg "Fetching logs..."
@@ -77,7 +77,7 @@ echo "${LOGS_JSON}" | jq -r '
 def is_known:
     .jsonPayload.msg as $m |
     ($m == "starting devpulse-import" or $m == "import worker starting" or
-     $m == "shard assigned" or $m == "token pool ready" or
+     $m == "shard assigned" or $m == "shard progress" or $m == "token pool ready" or
      $m == "import worker complete" or $m == "importing repo" or
      $m == "claimed repo" or $m == "repo import complete" or
      $m == "PR backfill complete" or $m == "backfilling PR sizes" or
@@ -97,6 +97,8 @@ def fmt_line:
         "    \($ts)  worker starting  mode=\($p.mode // "all") task=\($p.task_index // "?")/\($p.task_count // "?") workers=\($p.workers // "?")"
     elif $p.msg == "shard assigned" then
         "    \($ts)  shard assigned  total=\($p.total_repos // 0) shard=\($p.shard_size // 0)"
+    elif $p.msg == "shard progress" then
+        "    \($ts)  progress  \($p.completed // 0)/\($p.total // 0) done  errors=\($p.errors // 0)"
     elif $p.msg == "token pool ready" then
         "    \($ts)  token pool ready  tokens=\($p.tokens // 0)"
     elif $p.msg == "importing repo" then
