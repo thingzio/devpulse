@@ -1,7 +1,7 @@
 var shortMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function formatLabel(label) {
-    if (label && label.length === 10) {
+    if (label && label.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(label)) {
         var d = new Date(label + 'T00:00:00');
         return shortMonths[d.getMonth()] + ' ' + d.getDate();
     }
