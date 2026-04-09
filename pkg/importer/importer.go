@@ -187,21 +187,27 @@ func importClaim(ctx context.Context, db *sql.DB, store data.Store,
 		return nil
 	}
 
-	var token string
-	if pool != nil {
-		token = pool.Token()
-	}
-
-	return importRepo(ctx, store, token, claim.Org, claim.Repo, llmCfg, tn.Plan, mode)
+	return importRepo(ctx, store, pool, claim.Org, claim.Repo, llmCfg, tn.Plan, mode)
 }
 
-func importRepo(ctx context.Context, store data.Store, token, org, repo string, llmCfg *data.LLMConfig, planName, mode string) error {
+func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName, mode string) error {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
+
+	// tokenForPhase returns the current pool token, rotating on rate limit.
+	// Each phase gets a potentially fresh token if the previous one was exhausted.
+	tokenForPhase := func() string {
+		if pool == nil {
+			return ""
+		}
+		return pool.Token()
+	}
 
 	var errs int
 
 	retryRL := newRetryRL(ctx)
+
+	token := tokenForPhase()
 
 	slog.Info("phase: metadata", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportRepoMeta(ctx, token, org, repo) }); err != nil {
@@ -209,24 +215,28 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		errs++
 	}
 
+	token = tokenForPhase()
 	slog.Info("phase: events", "org", org, "repo", repo)
 	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 180); return err }); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	token = tokenForPhase()
 	slog.Info("phase: releases", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportReleases(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing releases", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	token = tokenForPhase()
 	slog.Info("phase: metrics", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportRepoMetricHistory(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing metric history", "org", org, "repo", repo, "error", err)
 		errs++
 	}
 
+	token = tokenForPhase()
 	slog.Info("phase: containers", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportContainerVersions(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing container versions", "org", org, "repo", repo, "error", err)
@@ -239,11 +249,12 @@ func importRepo(ctx context.Context, store data.Store, token, org, repo string, 
 		errs++
 	}
 
+	token = tokenForPhase()
 	limits, _ := plan.Get(planName)
 
 	if token != "" && limits.DeepReputation && mode != ModeImport {
 		slog.Info("phase: deep reputation", "org", org, "repo", repo)
-		tokenFn := func() string { return token }
+		tokenFn := func() string { return pool.Token() }
 		var res *data.DeepReputationResult
 		if err := retryRL(func() error {
 			var drErr error
