@@ -53,7 +53,7 @@ TIME_FILTER=""
 BASE_FILTER="resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"${JOB_NAME}\" AND labels.\"run.googleapis.com/execution_name\"=\"${EXECUTION}\"${TIME_FILTER}"
 
 # --- Single log query: fetch all interesting messages as JSON ---
-MSG_FILTER='jsonPayload.msg=("import worker starting" OR "token pool ready" OR "import worker complete" OR "claimed repo" OR "repo import complete" OR "PR backfill complete" OR "backfilling PR sizes" OR "backfill rate limited" OR "deep reputation worker complete" OR "deep reputation scoring")'
+MSG_FILTER='jsonPayload.msg=("starting devpulse-import" OR "import worker starting" OR "shard assigned" OR "token pool ready" OR "import worker complete" OR "importing repo" OR "claimed repo" OR "repo import complete" OR "PR backfill complete" OR "backfilling PR sizes" OR "backfill rate limited" OR "deep reputation worker complete" OR "deep reputation scoring")'
 
 echo ""
 msg "Fetching logs..."
@@ -76,11 +76,13 @@ echo "${LOGS_JSON}" | jq -r '
 # Known structured messages (everything else is an error/warning)
 def is_known:
     .jsonPayload.msg as $m |
-    ($m == "import worker starting" or $m == "token pool ready" or
-     $m == "import worker complete" or $m == "claimed repo" or
-     $m == "repo import complete" or $m == "PR backfill complete" or
-     $m == "backfilling PR sizes" or $m == "backfill rate limited" or
-     $m == "deep reputation scoring" or $m == "deep reputation worker complete");
+    ($m == "starting devpulse-import" or $m == "import worker starting" or
+     $m == "shard assigned" or $m == "token pool ready" or
+     $m == "import worker complete" or $m == "importing repo" or
+     $m == "claimed repo" or $m == "repo import complete" or
+     $m == "PR backfill complete" or $m == "backfilling PR sizes" or
+     $m == "backfill rate limited" or $m == "deep reputation scoring" or
+     $m == "deep reputation worker complete");
 
 # Extract task index from labels
 def task_idx:
@@ -89,10 +91,16 @@ def task_idx:
 # Format a log entry as a detail line
 def fmt_line:
     .jsonPayload as $p | .timestamp[0:19] as $ts |
-    if $p.msg == "import worker starting" then
-        "    \($ts)  starting  mode=\($p.mode // "all")"
+    if $p.msg == "starting devpulse-import" then
+        "    \($ts)  starting  v\($p.version // "?") (\($p.commit // "?"))"
+    elif $p.msg == "import worker starting" then
+        "    \($ts)  worker starting  mode=\($p.mode // "all") task=\($p.task_index // "?")/\($p.task_count // "?") workers=\($p.workers // "?")"
+    elif $p.msg == "shard assigned" then
+        "    \($ts)  shard assigned  total=\($p.total_repos // 0) shard=\($p.shard_size // 0)"
     elif $p.msg == "token pool ready" then
         "    \($ts)  token pool ready  tokens=\($p.tokens // 0)"
+    elif $p.msg == "importing repo" then
+        "    \($ts)  importing  \($p.org // "")/\($p.repo // "")  plan=\($p.plan // "?") tenants=\($p.tenants // 1)"
     elif $p.msg == "claimed repo" then
         "    \($ts)  claimed  \($p.org // "")/\($p.repo // "")"
     elif $p.msg == "repo import complete" then
