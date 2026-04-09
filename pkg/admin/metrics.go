@@ -9,10 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/config"
 )
 
 const (
@@ -46,19 +47,12 @@ type metricsConfig struct {
 }
 
 func newMetricsConfig() *metricsConfig {
-	project := os.Getenv("GCP_PROJECT_ID")
-	if project == "" {
-		project = "devpulseio"
-	}
+	project := config.GCPProjectID()
 	prefix := "devpulse-saas"
-	model := os.Getenv("ANTHROPIC_MODEL")
-	if model == "" {
-		model = defaultInsightsModel
-	}
 	return &metricsConfig{
 		projectID:    project,
-		anthropicKey: os.Getenv("ANTHROPIC_API_KEY"),
-		model:        model,
+		anthropicKey: config.AnthropicAPIKey(),
+		model:        config.AnthropicModel(defaultInsightsModel),
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
 		deeprep:      prefix + "-deeprep",

@@ -135,7 +135,7 @@ func TestNewLLMConfigFromEnv_KeyOnly(t *testing.T) {
 	cfg := NewLLMConfigFromEnv()
 	require.NotNil(t, cfg)
 	assert.Equal(t, "sk-test-123", cfg.Token)
-	assert.Empty(t, cfg.Model)
+	assert.Equal(t, DefaultInsightsModel, cfg.Model)
 	assert.Empty(t, cfg.BaseURL)
 }
 

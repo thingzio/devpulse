@@ -9,9 +9,10 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/config"
 )
 
 const (
@@ -36,14 +37,14 @@ type LLMConfig struct {
 // NewLLMConfigFromEnv creates an LLMConfig from environment variables.
 // Returns nil if ANTHROPIC_API_KEY is not set.
 func NewLLMConfigFromEnv() *LLMConfig {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	apiKey := config.AnthropicAPIKey()
 	if apiKey == "" {
 		return nil
 	}
 	return &LLMConfig{
 		Token:   apiKey,
-		BaseURL: os.Getenv("ANTHROPIC_BASE_URL"),
-		Model:   os.Getenv("ANTHROPIC_MODEL"),
+		BaseURL: config.AnthropicBaseURL(),
+		Model:   config.AnthropicModel(DefaultInsightsModel),
 	}
 }
 

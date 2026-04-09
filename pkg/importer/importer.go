@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
@@ -25,10 +25,7 @@ const (
 // Run reads IMPORT_MODE env var and dispatches to the appropriate workflow.
 // Supported modes: "all" (default), "import" (skip deep reputation), "reputation" (deep reputation only).
 func Run(ctx context.Context) error {
-	mode := os.Getenv("IMPORT_MODE")
-	if mode == "" {
-		mode = ModeAll
-	}
+	mode := config.ImportMode()
 
 	slog.Info("import mode selected", "mode", mode)
 
@@ -58,10 +55,7 @@ func runImport(ctx context.Context, mode string) error {
 	db := store.DB()
 	start := time.Now()
 
-	executionID := os.Getenv("CLOUD_RUN_EXECUTION")
-	if executionID == "" {
-		executionID = fmt.Sprintf("local-%d", time.Now().Unix())
-	}
+	executionID := config.CloudRunExecution()
 
 	ghAppConfig, ghAppErr := tenant.LoadGitHubAppConfig()
 	if ghAppErr != nil {

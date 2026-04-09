@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
+
+	"github.com/thingzio/devpulse/pkg/config"
 )
 
 // ClaimedRepo is a repo claimed from the import queue.
@@ -67,12 +67,7 @@ const resetImportErrorsByRepoSQL = `
 
 // importResetMinutes returns the IMPORT_RESET_MINUTES env var or 30 as default.
 func importResetMinutes() int {
-	if v := os.Getenv("IMPORT_RESET_MINUTES"); v != "" {
-		if m, err := strconv.Atoi(v); err == nil && m > 0 {
-			return m
-		}
-	}
-	return 30
+	return config.ImportResetMinutes()
 }
 
 // PrepareImportQueue resets stale claims (job died mid-run) and clears completed

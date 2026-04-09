@@ -6,11 +6,11 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"
 
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
@@ -81,12 +81,8 @@ func AdminPoolConfig() PoolConfig {
 
 // applyEnvOverrides lets DB_MAX_OPEN_CONNS and DB_MAX_IDLE_CONNS override code defaults.
 func (c *PoolConfig) applyEnvOverrides() {
-	if v, err := strconv.Atoi(os.Getenv("DB_MAX_OPEN_CONNS")); err == nil && v > 0 {
-		c.MaxOpenConns = v
-	}
-	if v, err := strconv.Atoi(os.Getenv("DB_MAX_IDLE_CONNS")); err == nil && v > 0 {
-		c.MaxIdleConns = v
-	}
+	c.MaxOpenConns = config.DBMaxOpenConns(c.MaxOpenConns)
+	c.MaxIdleConns = config.DBMaxIdleConns(c.MaxIdleConns)
 }
 
 // New creates a new PostgreSQL Store, running migrations automatically.

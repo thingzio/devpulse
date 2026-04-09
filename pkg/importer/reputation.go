@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/tenant"
@@ -35,10 +36,7 @@ func RunDeepReputation(ctx context.Context) error {
 		slog.Warn("github app config not available", "error", ghAppErr)
 	}
 
-	executionID := os.Getenv("CLOUD_RUN_EXECUTION")
-	if executionID == "" {
-		executionID = fmt.Sprintf("local-%d", time.Now().Unix())
-	}
+	executionID := config.CloudRunExecution()
 
 	slog.Info("deep reputation worker starting", "execution", executionID)
 
