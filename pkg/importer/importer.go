@@ -109,9 +109,9 @@ func runImport(ctx context.Context, mode string) error {
 	var wg sync.WaitGroup
 	var totalRepos, totalErrors atomic.Int32
 
-	for i := range numWorkers {
+	for range numWorkers {
 		wg.Add(1)
-		go func(workerID int) {
+		go func() {
 			defer wg.Done()
 			for rw := range work {
 				if taskCtx.Err() != nil {
@@ -138,7 +138,7 @@ func runImport(ctx context.Context, mode string) error {
 					}
 				}
 			}
-		}(i)
+		}()
 	}
 
 	for _, rw := range myRepos {
@@ -185,7 +185,6 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 // importRepoWork imports shared repo data and handles per-tenant event limits.
 func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig, mode string) error {
-
 	bestPlan := bestPlanForRepo(rw.Tenants)
 
 	if limited, err := allTenantsAtLimit(ctx, db, rw.Tenants); err != nil {
