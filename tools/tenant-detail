@@ -61,7 +61,7 @@ echo "${BODY}" | jq -r '
             (.events | tostring),
             (.weekly_events | tostring),
             (.contributors | tostring),
-            (if .contributors == 0 then "-" else "\(.deep_scored)(\(.deep_scored * 100 / .contributors | round)%)" end),
+            (if .contributors == 0 then "-" elif .deep_scored == .contributors then "done" else "\(.deep_scored)(\(.deep_scored * 100 / .contributors | round)%)" end),
             (if .pr_total == 0 then "-" elif .pr_missing_size == 0 then "done" else "\(.pr_total)(\((.pr_total - .pr_missing_size) * 100 / .pr_total | round)%)" end),
             (if .last_import == "" then "never" else .last_import end)
         ]) | @tsv
