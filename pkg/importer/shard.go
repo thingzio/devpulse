@@ -3,6 +3,8 @@ package importer
 import (
 	"sort"
 	"strings"
+
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 // RepoWork represents a unique repo to import, with all tenants that track it.
@@ -19,18 +21,9 @@ type TenantRef struct {
 	Plan         string
 }
 
-// TenantRepoRow is a raw row from the work list query.
-type TenantRepoRow struct {
-	TenantRepoID string
-	TenantID     string
-	Org          string
-	Repo         string
-	Plan         string
-}
-
 // BuildWorkList deduplicates tenant_repo rows by (org, repo), grouping
 // tenant refs under each unique repo. Preserves exact org/repo casing.
-func BuildWorkList(rows []TenantRepoRow) []RepoWork {
+func BuildWorkList(rows []tenant.ImportWorkRow) []RepoWork {
 	if len(rows) == 0 {
 		return nil
 	}

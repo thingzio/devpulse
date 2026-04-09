@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func TestBuildWorkList(t *testing.T) {
@@ -21,7 +22,7 @@ func TestBuildWorkList(t *testing.T) {
 
 	t.Run("single tenant single repo", func(t *testing.T) {
 		t.Parallel()
-		rows := []TenantRepoRow{
+		rows := []tenant.ImportWorkRow{
 			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
 		}
 		got := BuildWorkList(rows)
@@ -34,7 +35,7 @@ func TestBuildWorkList(t *testing.T) {
 
 	t.Run("two tenants same repo deduplicates", func(t *testing.T) {
 		t.Parallel()
-		rows := []TenantRepoRow{
+		rows := []tenant.ImportWorkRow{
 			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
 			{TenantRepoID: "tr2", TenantID: "t2", Org: "NVIDIA", Repo: "aicr", Plan: "free"},
 		}
@@ -45,7 +46,7 @@ func TestBuildWorkList(t *testing.T) {
 
 	t.Run("different repos stay separate", func(t *testing.T) {
 		t.Parallel()
-		rows := []TenantRepoRow{
+		rows := []tenant.ImportWorkRow{
 			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
 			{TenantRepoID: "tr2", TenantID: "t1", Org: "NVIDIA", Repo: "cccl", Plan: "pro"},
 		}
@@ -56,7 +57,7 @@ func TestBuildWorkList(t *testing.T) {
 	t.Run("case-sensitive org/repo matching", func(t *testing.T) {
 		t.Parallel()
 		// NVIDIA/aicr and nvidia/aicr are different repos on GitHub.
-		rows := []TenantRepoRow{
+		rows := []tenant.ImportWorkRow{
 			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
 			{TenantRepoID: "tr2", TenantID: "t2", Org: "nvidia", Repo: "aicr", Plan: "free"},
 		}

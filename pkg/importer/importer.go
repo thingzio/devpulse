@@ -3,9 +3,10 @@ package importer
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/config"
@@ -39,8 +40,6 @@ func Run(ctx context.Context) error {
 	}
 }
 
-// runImport iterates active repos via a SKIP LOCKED claim queue and imports each one.
-// Multiple concurrent executions safely share work without overlap.
 func runImport(ctx context.Context, mode string) error {
 	store, err := postgres.NewFromEnv(postgres.ImportPoolConfig())
 	if err != nil {
@@ -53,86 +52,116 @@ func runImport(ctx context.Context, mode string) error {
 	}()
 
 	db := store.DB()
-	start := time.Now()
 
+	// Per-task timeout.
+	timeoutMin := config.ImportTaskTimeout()
+	taskCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMin)*time.Minute)
+	defer cancel()
+
+	taskIndex := config.CloudRunTaskIndex()
+	taskCount := config.CloudRunTaskCount()
+	numWorkers := config.ImportWorkers()
 	executionID := config.CloudRunExecution()
+
+	slog.Info("import worker starting",
+		"execution", executionID,
+		"mode", mode,
+		"task_index", taskIndex,
+		"task_count", taskCount,
+		"workers", numWorkers)
 
 	ghAppConfig, ghAppErr := tenant.LoadGitHubAppConfig()
 	if ghAppErr != nil {
 		slog.Warn("github app config not available, installation tokens disabled", "error", ghAppErr)
 	}
 
-	llmCfg := data.NewLLMConfigFromEnv()
-
-	if prepErr := tenant.PrepareImportQueue(ctx, db); prepErr != nil {
-		return fmt.Errorf("preparing import queue: %w", prepErr)
-	}
-
-	slog.Info("import worker starting", "execution", executionID, "mode", mode)
-
-	pool, err := collectTokenPool(ctx, db, ghAppConfig)
+	pool, err := collectTokenPool(taskCtx, db, ghAppConfig)
 	if err != nil {
 		slog.Warn("token pool unavailable, falling back to unauthenticated", "error", err)
 	} else {
 		slog.Info("token pool ready", "tokens", pool.Size())
 	}
 
-	var totalRepos, totalErrors int
-	for {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("import canceled: %w", err)
-		}
+	llmCfg := data.NewLLMConfigFromEnv()
 
-		claim, err := tenant.ClaimNextRepo(ctx, db, executionID)
-		if errors.Is(err, tenant.ErrNoWork) {
+	// Fetch all active repos and build deduplicated work list.
+	rows, err := tenant.ListImportWork(taskCtx, db)
+	if err != nil {
+		return fmt.Errorf("listing import work: %w", err)
+	}
+
+	workList := BuildWorkList(rows)
+	myRepos := ShardRepos(workList, taskCount, taskIndex)
+
+	slog.Info("shard assigned",
+		"total_repos", len(workList),
+		"shard_size", len(myRepos),
+		"task_index", taskIndex)
+
+	if len(myRepos) == 0 {
+		slog.Info("no repos in shard, exiting")
+		return nil
+	}
+
+	// Fan out to workers.
+	start := time.Now()
+	work := make(chan RepoWork)
+	var wg sync.WaitGroup
+	var totalRepos, totalErrors atomic.Int32
+
+	for i := range numWorkers {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for rw := range work {
+				if taskCtx.Err() != nil {
+					return
+				}
+				totalRepos.Add(1)
+				if importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg, mode); importErr != nil {
+					totalErrors.Add(1)
+					slog.Error("repo import failed",
+						"org", rw.Org,
+						"repo", rw.Repo,
+						"error", importErr)
+					if incErr := tenant.IncrementImportErrorsByRepo(taskCtx, db, rw.Org, rw.Repo, importErr.Error()); incErr != nil {
+						slog.Warn("incrementing import errors", "error", incErr)
+					}
+					continue
+				}
+				if err := tenant.MarkImportDoneByRepo(taskCtx, db, rw.Org, rw.Repo); err != nil {
+					slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
+				}
+				for _, tr := range rw.Tenants {
+					if err := tenant.ResetImportErrors(taskCtx, db, tr.TenantRepoID); err != nil {
+						slog.Warn("resetting import errors", "error", err)
+					}
+				}
+			}
+		}(i)
+	}
+
+	for _, rw := range myRepos {
+		if taskCtx.Err() != nil {
 			break
 		}
-		if err != nil {
-			return fmt.Errorf("claiming next repo: %w", err)
-		}
-
-		totalRepos++
-		slog.Info("claimed repo",
-			"org", claim.Org,
-			"repo", claim.Repo,
-			"tenant_id", claim.TenantID,
-			"execution", executionID)
-
-		if importErr := importClaim(ctx, db, store, claim, pool, llmCfg, mode); importErr != nil {
-			totalErrors++
-			slog.Error("repo import failed",
-				"org", claim.Org,
-				"repo", claim.Repo,
-				"error", importErr)
-			if incErr := tenant.IncrementImportErrors(ctx, db, claim.ID, importErr.Error()); incErr != nil {
-				slog.Warn("incrementing import errors", "error", incErr)
-			}
-			continue
-		}
-
-		if err := tenant.ResetImportErrors(ctx, db, claim.ID); err != nil {
-			slog.Warn("resetting import errors", "error", err)
-		}
-
-		if err := tenant.MarkRepoDone(ctx, db, claim.ID); err != nil {
-			slog.Warn("marking repo done",
-				"org", claim.Org,
-				"repo", claim.Repo,
-				"error", err)
-		}
+		work <- rw
 	}
+	close(work)
+	wg.Wait()
 
-	postImport(ctx, store, pool)
+	postImport(taskCtx, store, pool)
 
+	repos := int(totalRepos.Load())
+	errs := int(totalErrors.Load())
 	slog.Info("import worker complete",
-		"repos", totalRepos,
-		"errors", totalErrors,
+		"repos", repos,
+		"errors", errs,
 		"duration", time.Since(start).String())
 
-	if totalErrors > 0 && totalErrors == totalRepos {
-		return fmt.Errorf("all %d repo imports failed", totalErrors)
+	if errs > 0 && errs == repos {
+		return fmt.Errorf("all %d repo imports failed", errs)
 	}
-
 	return nil
 }
 
@@ -153,41 +182,70 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 	}
 }
 
-func importClaim(ctx context.Context, db *sql.DB, store data.Store,
-	claim *tenant.ClaimedRepo, pool *ghutil.TokenPool,
-	llmCfg *data.LLMConfig, mode string) error {
-	tn, err := tenant.GetTenantByID(ctx, db, claim.TenantID)
-	if err != nil {
-		return fmt.Errorf("getting tenant: %w", err)
-	}
+// importRepoWork imports shared repo data and handles per-tenant event limits.
+func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
+	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig, mode string) error {
 
-	weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, claim.TenantID)
-	if err != nil {
-		return fmt.Errorf("getting weekly events: %w", err)
-	}
+	bestPlan := bestPlanForRepo(rw.Tenants)
 
-	weeklyPct := float64(0)
-	if tn.MaxEventsPerWeek > 0 {
-		weeklyPct = float64(weeklyEvents) / float64(tn.MaxEventsPerWeek) * 100
-	}
-
-	slog.Info("tenant usage",
-		"tenant_id", claim.TenantID,
-		"weekly_events", weeklyEvents,
-		"max_events_per_week", tn.MaxEventsPerWeek,
-		"weekly_pct", weeklyPct)
-
-	if tn.MaxEventsPerWeek > 0 && weeklyEvents >= tn.MaxEventsPerWeek {
-		slog.Warn("weekly event limit reached, skipping import",
-			"tenant_id", claim.TenantID,
-			"org", claim.Org,
-			"repo", claim.Repo,
-			"weekly_events", weeklyEvents,
-			"max_events_per_week", tn.MaxEventsPerWeek)
+	if limited, err := allTenantsAtLimit(ctx, db, rw.Tenants); err != nil {
+		slog.Warn("checking event limits", "org", rw.Org, "repo", rw.Repo, "error", err)
+	} else if limited {
+		slog.Warn("all tenants at weekly event limit, skipping",
+			"org", rw.Org, "repo", rw.Repo)
 		return nil
 	}
 
-	return importRepo(ctx, store, pool, claim.Org, claim.Repo, llmCfg, tn.Plan, mode)
+	slog.Info("importing repo",
+		"org", rw.Org,
+		"repo", rw.Repo,
+		"plan", bestPlan,
+		"tenants", len(rw.Tenants))
+
+	return importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan, mode)
+}
+
+// bestPlanForRepo returns the highest-tier plan among all tenants tracking a repo.
+// Uses MaxRepos as proxy for tier (0=unlimited=enterprise, highest tier).
+func bestPlanForRepo(tenants []TenantRef) string {
+	best := ""
+	bestLevel := -1
+	for _, t := range tenants {
+		limits, _ := plan.Get(t.Plan)
+		if limits.MaxRepos == 0 {
+			return t.Plan // unlimited = enterprise
+		}
+		if limits.MaxRepos > bestLevel {
+			bestLevel = limits.MaxRepos
+			best = t.Plan
+		}
+	}
+	if best == "" && len(tenants) > 0 {
+		best = tenants[0].Plan
+	}
+	return best
+}
+
+// allTenantsAtLimit returns true if every tenant tracking this repo has hit
+// their weekly event limit. Returns false if at least one has room or is unlimited.
+func allTenantsAtLimit(ctx context.Context, db *sql.DB, tenants []TenantRef) (bool, error) {
+	for _, t := range tenants {
+		tn, err := tenant.GetTenantByID(ctx, db, t.TenantID)
+		if err != nil {
+			return false, fmt.Errorf("getting tenant %s: %w", t.TenantID, err)
+		}
+		if tn.MaxEventsPerWeek == 0 {
+			return false, nil // unlimited
+		}
+		weeklyEvents, err := tenant.GetWeeklyEventCount(ctx, db, t.TenantID)
+		if err != nil {
+			return false, fmt.Errorf("getting weekly events for %s: %w", t.TenantID, err)
+		}
+		if weeklyEvents < tn.MaxEventsPerWeek {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName, mode string) error {
