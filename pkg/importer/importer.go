@@ -17,30 +17,12 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
-const (
-	ModeAll        = "all"
-	ModeImport     = "import"
-	ModeReputation = "reputation"
-)
-
-// Run reads IMPORT_MODE env var and dispatches to the appropriate workflow.
-// Supported modes: "all" (default), "import" (skip deep reputation), "reputation" (deep reputation only).
+// Run executes the import pipeline: fetch events, score reputation, generate insights.
 func Run(ctx context.Context) error {
-	mode := config.ImportMode()
-
-	slog.Info("import mode selected", "mode", mode)
-
-	switch mode {
-	case ModeReputation:
-		return RunDeepReputation(ctx)
-	case ModeImport, ModeAll:
-		return runImport(ctx, mode)
-	default:
-		return fmt.Errorf("unknown IMPORT_MODE: %q", mode)
-	}
+	return runImport(ctx)
 }
 
-func runImport(ctx context.Context, mode string) error {
+func runImport(ctx context.Context) error {
 	store, err := postgres.NewFromEnv(postgres.ImportPoolConfig())
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
@@ -65,7 +47,6 @@ func runImport(ctx context.Context, mode string) error {
 
 	slog.Info("import worker starting",
 		"execution", executionID,
-		"mode", mode,
 		"task_index", taskIndex,
 		"task_count", taskCount,
 		"workers", numWorkers)
@@ -121,7 +102,7 @@ func runImport(ctx context.Context, mode string) error {
 					return
 				}
 				totalRepos.Add(1)
-				if importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg, mode); importErr != nil {
+				if importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg); importErr != nil {
 					totalErrors.Add(1)
 					slog.Error("repo import failed",
 						"org", rw.Org,
@@ -187,7 +168,7 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 
 // importRepoWork imports shared repo data and handles per-tenant event limits.
 func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
-	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig, mode string) error {
+	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig) error {
 	bestPlan := bestPlanForRepo(rw.Tenants)
 
 	if limited, err := allTenantsAtLimit(ctx, db, rw.Tenants); err != nil {
@@ -204,7 +185,7 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 		"plan", bestPlan,
 		"tenants", len(rw.Tenants))
 
-	return importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan, mode)
+	return importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
 }
 
 // bestPlanForRepo returns the highest-tier plan among all tenants tracking a repo.
@@ -250,7 +231,7 @@ func allTenantsAtLimit(ctx context.Context, db *sql.DB, tenants []TenantRef) (bo
 	return true, nil
 }
 
-func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName, mode string) error {
+func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) error {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
 
@@ -312,7 +293,7 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	token = tokenForPhase()
 	limits, _ := plan.Get(planName)
 
-	if token != "" && limits.DeepReputation && mode != ModeImport {
+	if token != "" && limits.DeepReputation {
 		slog.Info("phase: deep reputation", "org", org, "repo", repo)
 		tokenFn := func() string { return pool.Token() }
 		var res *data.DeepReputationResult

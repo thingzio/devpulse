@@ -66,10 +66,6 @@ func DBMaxIdleConns(poolDefault int) int { return GetEnvAsInt("DB_MAX_IDLE_CONNS
 // Import
 // ---------------------------------------------------------------------------
 
-// ImportMode returns the import mode (all, import, reputation).
-// Override: IMPORT_MODE (default "all").
-func ImportMode() string { return GetEnv("IMPORT_MODE", "all") }
-
 // ImportWorkers returns the number of concurrent goroutine workers per task.
 // Override: IMPORT_WORKERS (default 2).
 func ImportWorkers() int { return GetEnvAsInt("IMPORT_WORKERS", 2) }
