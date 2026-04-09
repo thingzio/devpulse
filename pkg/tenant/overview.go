@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 // RepoOverview holds repo metadata and activity stats for the dashboard table.
@@ -51,8 +53,8 @@ const tenantRepoOverviewSQL = `
 		COALESCE(rm.open_issues, 0),
 		COUNT(e.type),
 		COUNT(CASE WHEN e.date >= $3 THEN 1 END),
-		COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' THEN e.username END),
-		COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END),
+		COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
+		COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` AND d.reputation IS NOT NULL THEN e.username END),
 		COALESCE(rm.language, ''),
 		COALESCE(rm.license, ''),
 		COALESCE(rm.last_import_at, ''),

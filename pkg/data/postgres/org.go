@@ -45,7 +45,7 @@ const (
 			AND e.org = COALESCE($3, e.org)
 			AND e.repo = COALESCE($4, e.repo)
 			%s
-			AND d.username NOT LIKE '%%[bot]'
+			` + botExcludeTpl + `
 			` + forkExcludeSQL + `
 			GROUP BY d.username
 		) dt
@@ -68,7 +68,7 @@ const (
 		WHERE d.username ILIKE $1
 		  AND e.org = COALESCE($2, e.org)
 		  AND e.repo = COALESCE($3, e.repo)
-		  AND d.username NOT LIKE '%[bot]'
+		  ` + botExcludeDSQL + `
 		  AND e.date >= $4
 		  ` + forkExcludeSQL + `
 		ORDER BY d.username

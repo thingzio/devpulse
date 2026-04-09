@@ -51,8 +51,8 @@ const (
 	selectRepoOverviewSQL = `SELECT
 			rm.org, rm.repo, rm.stars, rm.forks, rm.open_issues,
 			COUNT(e.type),
-			COUNT(DISTINCT CASE WHEN e.type != 'fork' AND d.username NOT LIKE '%[bot]' THEN e.username END),
-			COUNT(DISTINCT CASE WHEN e.type != 'fork' AND d.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END),
+			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
+			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` AND d.reputation IS NOT NULL THEN e.username END),
 			rm.language, rm.license, rm.archived,
 			rm.last_import_at
 		FROM repo_meta rm

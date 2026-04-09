@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 // TenantSummary is a lightweight tenant record for admin listing.
@@ -85,10 +87,12 @@ const (
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0
 		                   AND e.created_at::date >= $4
 		                   AND (e.additions IS NULL OR e.changed_files IS NULL) THEN 1 END),
-		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation_deep = 1 THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]'
+		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
+		                   AND d.reputation IS NOT NULL THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
+		                   AND d.reputation_deep = 1 THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
 		                   AND (d.reputation IS NULL OR d.reputation_deep IS NULL OR d.reputation_deep = 0) THEN e.username END)
 		FROM tenant_repo tr
 		LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo

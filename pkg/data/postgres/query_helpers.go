@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"regexp"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/data"
 )
 
 const (
@@ -14,19 +16,19 @@ const (
 
 	// botExcludeSQL filters out bot accounts using the "e" table alias.
 	botExcludeSQL = `AND e.username NOT LIKE '%[bot]'
-		AND LOWER(e.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+		AND LOWER(e.username) NOT IN (` + data.BotNames + `)`
 
 	// botExcludeDSQL filters out bot accounts using the "d" table alias.
 	botExcludeDSQL = `AND d.username NOT LIKE '%[bot]'
-		AND LOWER(d.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+		AND LOWER(d.username) NOT IN (` + data.BotNames + `)`
 
 	// botExcludeTpl is botExcludeSQL with % escaped for use in fmt.Sprintf templates.
 	botExcludeTpl = `AND e.username NOT LIKE '%%[bot]'
-		AND LOWER(e.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+		AND LOWER(e.username) NOT IN (` + data.BotNames + `)`
 
 	// botExcludePrTpl is botExcludePrSQL with % escaped for fmt.Sprintf templates.
 	botExcludePrTpl = `AND pr.username NOT LIKE '%%[bot]'
-		AND LOWER(pr.username) NOT IN ('copilot','github-copilot','claude','anthropic-claude')`
+		AND LOWER(pr.username) NOT IN (` + data.BotNames + `)`
 
 	// forkExcludeSQL excludes fork events from the join so only code/comment
 	// activity (PR, PR review, issue, issue comment) counts toward reputation.
