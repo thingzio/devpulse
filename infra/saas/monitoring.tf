@@ -216,78 +216,6 @@ resource "google_logging_metric" "backfill_completed" {
   }
 }
 
-resource "google_logging_metric" "deeprep_duration" {
-  name    = "${var.prefix}-deeprep-duration"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"deep reputation worker complete\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "DISTRIBUTION"
-    unit        = "s"
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.duration)"
-
-  bucket_options {
-    explicit_buckets {
-      bounds = [60, 300, 600, 1800, 3600, 7200]
-    }
-  }
-}
-
-resource "google_logging_metric" "deeprep_scored" {
-  name    = "${var.prefix}-deeprep-scored"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"deep reputation worker complete\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "DISTRIBUTION"
-    unit        = "1"
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.scored)"
-
-  bucket_options {
-    explicit_buckets {
-      bounds = [10, 25, 50, 100, 200, 500]
-    }
-  }
-}
-
-resource "google_logging_metric" "deeprep_rate_limit_pauses" {
-  name    = "${var.prefix}-deeprep-rate-limit-pauses"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"rate limit approaching, pausing until reset\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "INT64"
-  }
-}
-
-resource "google_logging_metric" "deeprep_errors" {
-  name    = "${var.prefix}-deeprep-errors"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-deeprep\" jsonPayload.msg=\"deep reputation failed\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "INT64"
-
-    labels {
-      key         = "username"
-      value_type  = "STRING"
-      description = "GitHub username"
-    }
-  }
-
-  label_extractors = {
-    "username" = "EXTRACT(jsonPayload.username)"
-  }
-}
-
 resource "google_logging_metric" "webhook_installs" {
   name    = "${var.prefix}-webhook-installs"
   project = var.project_id
@@ -507,24 +435,3 @@ resource "google_monitoring_alert_policy" "db_vacuum_lag" {
   }
 }
 
-resource "google_monitoring_alert_policy" "deeprep_failure" {
-  display_name          = "${var.prefix}-deeprep-failure"
-  project               = var.project_id
-  combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.email.name]
-
-  conditions {
-    display_name = "Deep reputation job failure"
-    condition_threshold {
-      filter          = "resource.type = \"cloud_run_job\" AND resource.labels.job_name = \"${google_cloud_run_v2_job.deeprep.name}\" AND metric.type = \"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result = \"failed\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 0
-      duration        = "0s"
-
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_SUM"
-      }
-    }
-  }
-}

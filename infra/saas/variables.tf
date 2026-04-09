@@ -75,9 +75,3 @@ variable "import_task_timeout" {
   type        = number
   default     = 55
 }
-
-variable "deeprep_timeout" {
-  description = "Timeout in seconds for the deep reputation job"
-  type        = number
-  default     = 7200
-}
