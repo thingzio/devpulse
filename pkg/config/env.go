@@ -70,10 +70,6 @@ func DBMaxIdleConns(poolDefault int) int { return GetEnvAsInt("DB_MAX_IDLE_CONNS
 // Override: IMPORT_MODE (default "all").
 func ImportMode() string { return GetEnv("IMPORT_MODE", "all") }
 
-// ImportResetMinutes returns the stale-import reset window in minutes.
-// Override: IMPORT_RESET_MINUTES (default 30).
-func ImportResetMinutes() int { return GetEnvAsInt("IMPORT_RESET_MINUTES", 30) }
-
 // ImportWorkers returns the number of concurrent goroutine workers per task.
 // Override: IMPORT_WORKERS (default 2).
 func ImportWorkers() int { return GetEnvAsInt("IMPORT_WORKERS", 2) }

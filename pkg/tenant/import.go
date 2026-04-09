@@ -3,52 +3,8 @@ package tenant
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-
-	"github.com/thingzio/devpulse/pkg/config"
 )
-
-// ClaimedRepo is a repo claimed from the import queue.
-type ClaimedRepo struct {
-	ID       string
-	TenantID string
-	Org      string
-	Repo     string
-}
-
-// ErrNoWork is returned by ClaimNextRepo when the import queue is empty.
-var ErrNoWork = errors.New("no work available")
-
-const resetStaleClaimsSQL = `
-	UPDATE tenant_repo
-	SET import_claimed_at = NULL, import_claimed_by = NULL
-	WHERE import_claimed_at IS NOT NULL
-	  AND import_done_at IS NULL
-	  AND import_claimed_at < NOW() - INTERVAL '2 hours'`
-
-const resetDoneSQLTmpl = `
-	UPDATE tenant_repo
-	SET import_claimed_at = NULL, import_claimed_by = NULL, import_done_at = NULL
-	WHERE import_done_at IS NOT NULL
-	  AND import_done_at < NOW() - INTERVAL '%d minutes'`
-
-const claimNextRepoSQL = `
-	UPDATE tenant_repo
-	SET import_claimed_at = NOW(), import_claimed_by = $1
-	WHERE id = (
-		SELECT id FROM tenant_repo
-		WHERE active = TRUE AND import_claimed_at IS NULL AND import_errors < 5
-		ORDER BY org, repo
-		LIMIT 1
-		FOR UPDATE SKIP LOCKED
-	)
-	RETURNING id, tenant_id, org, repo`
-
-const markRepoDoneSQL = `
-	UPDATE tenant_repo
-	SET import_done_at = NOW()
-	WHERE id = $1`
 
 const incrementImportErrorsSQL = `
 	UPDATE tenant_repo
@@ -64,57 +20,6 @@ const resetImportErrorsByRepoSQL = `
 	UPDATE tenant_repo
 	SET import_errors = 0, import_last_error = NULL
 	WHERE org = $1 AND repo = $2 AND import_errors > 0`
-
-// importResetMinutes returns the IMPORT_RESET_MINUTES env var or 30 as default.
-func importResetMinutes() int {
-	return config.ImportResetMinutes()
-}
-
-// PrepareImportQueue resets stale claims (job died mid-run) and clears completed
-// work from the prior cycle so all active repos are available for claiming.
-// Only resets repos completed more than IMPORT_RESET_MINUTES ago (default 30).
-// Safe to call concurrently — both UPDATEs are idempotent.
-func PrepareImportQueue(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("beginning import queue tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
-
-	if _, err := tx.ExecContext(ctx, resetStaleClaimsSQL); err != nil {
-		return fmt.Errorf("resetting stale claims: %w", err)
-	}
-
-	resetDoneSQL := fmt.Sprintf(resetDoneSQLTmpl, importResetMinutes())
-	if _, err := tx.ExecContext(ctx, resetDoneSQL); err != nil {
-		return fmt.Errorf("resetting completed repos: %w", err)
-	}
-	return tx.Commit()
-}
-
-// ClaimNextRepo atomically claims one unclaimed active repo for import.
-// Returns ErrNoWork when the queue is empty.
-func ClaimNextRepo(ctx context.Context, db *sql.DB, executionID string) (*ClaimedRepo, error) {
-	var r ClaimedRepo
-	err := db.QueryRowContext(ctx, claimNextRepoSQL, executionID).
-		Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNoWork
-	}
-	if err != nil {
-		return nil, fmt.Errorf("claiming repo: %w", err)
-	}
-	return &r, nil
-}
-
-// MarkRepoDone marks a claimed repo as successfully imported.
-func MarkRepoDone(ctx context.Context, db *sql.DB, id string) error {
-	_, err := db.ExecContext(ctx, markRepoDoneSQL, id)
-	if err != nil {
-		return fmt.Errorf("marking repo done: %w", err)
-	}
-	return nil
-}
 
 // IncrementImportErrors increments the consecutive error counter and stores the last error.
 func IncrementImportErrors(ctx context.Context, db *sql.DB, id, errMsg string) error {

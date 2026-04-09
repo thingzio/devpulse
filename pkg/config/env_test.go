@@ -170,18 +170,6 @@ func TestBackfillMaxDays(t *testing.T) {
 	})
 }
 
-func TestImportResetMinutes(t *testing.T) {
-	t.Run("returns default", func(t *testing.T) {
-		t.Setenv("IMPORT_RESET_MINUTES", "")
-		assert.Equal(t, 30, ImportResetMinutes())
-	})
-
-	t.Run("returns override", func(t *testing.T) {
-		t.Setenv("IMPORT_RESET_MINUTES", "60")
-		assert.Equal(t, 60, ImportResetMinutes())
-	})
-}
-
 func TestAnthropicModel(t *testing.T) {
 	t.Run("returns default when not set", func(t *testing.T) {
 		assert.Equal(t, "claude-haiku-4-5-20251001", AnthropicModel("claude-haiku-4-5-20251001"))
