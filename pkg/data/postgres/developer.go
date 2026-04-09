@@ -78,6 +78,10 @@ const (
 	`
 
 	updateDeveloperNamesSQL = `UPDATE developer SET full_name = $1 WHERE username = $2`
+
+	// saveDevelopersLockID serializes concurrent developer upserts across
+	// goroutine workers to prevent deadlocks on overlapping usernames.
+	saveDevelopersLockID = 4
 )
 
 func (s *Store) GetDeveloperUsernames(ctx context.Context) ([]string, error) {
@@ -146,6 +150,12 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer rollbackTransaction(tx)
+
+	// Serialize concurrent developer upserts to prevent deadlocks when
+	// multiple workers import repos with overlapping contributors.
+	if _, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", saveDevelopersLockID); err != nil {
+		return fmt.Errorf("acquiring developer save lock: %w", err)
+	}
 
 	txStmt := tx.Stmt(userStmt)
 	for i, u := range devs {

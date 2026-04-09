@@ -176,17 +176,13 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 	}
 	defer rollbackTransaction(tx)
 
-	// Try to acquire an advisory lock scoped to this transaction.
-	// If another import task is already cleaning entities, skip this run.
-	var locked bool
-	if err = tx.QueryRowContext(ctx,
-		"SELECT pg_try_advisory_xact_lock($1)", cleanEntitiesLockID,
-	).Scan(&locked); err != nil {
+	// Acquire a blocking advisory lock scoped to this transaction.
+	// Concurrent tasks wait instead of running simultaneously, preventing deadlocks
+	// from non-deterministic UPDATE ordering across transactions.
+	if _, err = tx.ExecContext(ctx,
+		"SELECT pg_advisory_xact_lock($1)", cleanEntitiesLockID,
+	); err != nil {
 		return fmt.Errorf("failed to acquire advisory lock: %w", err)
-	}
-	if !locked {
-		slog.Debug("entity cleanup already running, skipping")
-		return nil
 	}
 
 	rows, err := tx.QueryContext(ctx, selectEntityNamesSQL)
