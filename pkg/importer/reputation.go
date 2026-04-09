@@ -7,71 +7,10 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
-	"time"
 
-	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
-	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
-
-// RunDeepReputation scores all stale contributors globally using round-robin
-// token rotation across all active installations. Single task, no parallelism.
-func RunDeepReputation(ctx context.Context) error {
-	store, err := postgres.NewFromEnv(postgres.ImportPoolConfig())
-	if err != nil {
-		return fmt.Errorf("opening store: %w", err)
-	}
-	defer func() {
-		if closeErr := store.Close(); closeErr != nil {
-			slog.Error("closing store", "error", closeErr)
-		}
-	}()
-
-	db := store.DB()
-	start := time.Now()
-
-	ghAppConfig, ghAppErr := tenant.LoadGitHubAppConfig()
-	if ghAppErr != nil {
-		slog.Warn("github app config not available", "error", ghAppErr)
-	}
-
-	executionID := config.CloudRunExecution()
-
-	slog.Info("deep reputation worker starting", "execution", executionID)
-
-	pool, err := collectTokenPool(ctx, db, ghAppConfig)
-	if err != nil {
-		return fmt.Errorf("collecting token pool: %w", err)
-	}
-
-	slog.Info("token pool ready", "tokens", pool.Size())
-
-	// Score all stale users globally (nil org/repo = all users via COALESCE).
-	// Token rotation happens inside the loop: when a token hits its rate limit,
-	// it's marked exhausted and the next token is used. The loop stops when all
-	// tokens are exhausted or the limit is reached.
-	exhaustFn := func(token string) {
-		pool.Exhaust(token)
-		slog.Warn("token exhausted",
-			"active_tokens", pool.ActiveCount(),
-			"total_tokens", pool.Size())
-	}
-	res, err := store.ImportDeepReputation(ctx, pool.Token, exhaustFn, deepReputationDefaultLimit, 0, nil, nil)
-	if err != nil {
-		return fmt.Errorf("deep reputation scoring: %w", err)
-	}
-
-	slog.Info("deep reputation worker complete",
-		"scored", res.Scored,
-		"errors", res.Errors,
-		"tokens_total", pool.Size(),
-		"tokens_active", pool.ActiveCount(),
-		"token_usage", pool.UsageCounts(),
-		"duration", time.Since(start).String())
-
-	return nil
-}
 
 // collectTokenPool mints installation tokens from all active tenants and
 // returns a round-robin TokenPool. Falls back to GITHUB_TOKEN env var.
