@@ -78,6 +78,86 @@ func TestGetEnvBool(t *testing.T) {
 	})
 }
 
+func TestGetEnvAsIntNonNeg(t *testing.T) {
+	t.Run("returns default when not set", func(t *testing.T) {
+		assert.Equal(t, 42, GetEnvAsIntNonNeg("UNSET_VAR_XYZ", 42))
+	})
+
+	t.Run("accepts zero", func(t *testing.T) {
+		t.Setenv("TEST_NONNEG", "0")
+		assert.Equal(t, 0, GetEnvAsIntNonNeg("TEST_NONNEG", 99))
+	})
+
+	t.Run("returns default for negative", func(t *testing.T) {
+		t.Setenv("TEST_NONNEG", "-1")
+		assert.Equal(t, 99, GetEnvAsIntNonNeg("TEST_NONNEG", 99))
+	})
+
+	t.Run("returns default for non-numeric", func(t *testing.T) {
+		t.Setenv("TEST_NONNEG", "abc")
+		assert.Equal(t, 99, GetEnvAsIntNonNeg("TEST_NONNEG", 99))
+	})
+
+	t.Run("accepts positive", func(t *testing.T) {
+		t.Setenv("TEST_NONNEG", "5")
+		assert.Equal(t, 5, GetEnvAsIntNonNeg("TEST_NONNEG", 99))
+	})
+}
+
+func TestImportWorkers(t *testing.T) {
+	t.Run("returns default", func(t *testing.T) {
+		assert.Equal(t, 2, ImportWorkers())
+	})
+
+	t.Run("returns override", func(t *testing.T) {
+		t.Setenv("IMPORT_WORKERS", "5")
+		assert.Equal(t, 5, ImportWorkers())
+	})
+
+	t.Run("non-positive falls back to default", func(t *testing.T) {
+		t.Setenv("IMPORT_WORKERS", "0")
+		assert.Equal(t, 2, ImportWorkers())
+	})
+}
+
+func TestImportTaskTimeout(t *testing.T) {
+	t.Run("returns default", func(t *testing.T) {
+		assert.Equal(t, 55, ImportTaskTimeout())
+	})
+
+	t.Run("returns override", func(t *testing.T) {
+		t.Setenv("IMPORT_TASK_TIMEOUT", "30")
+		assert.Equal(t, 30, ImportTaskTimeout())
+	})
+}
+
+func TestCloudRunTaskIndex(t *testing.T) {
+	t.Run("returns default", func(t *testing.T) {
+		assert.Equal(t, 0, CloudRunTaskIndex())
+	})
+
+	t.Run("returns override", func(t *testing.T) {
+		t.Setenv("CLOUD_RUN_TASK_INDEX", "2")
+		assert.Equal(t, 2, CloudRunTaskIndex())
+	})
+
+	t.Run("zero is valid", func(t *testing.T) {
+		t.Setenv("CLOUD_RUN_TASK_INDEX", "0")
+		assert.Equal(t, 0, CloudRunTaskIndex())
+	})
+}
+
+func TestCloudRunTaskCount(t *testing.T) {
+	t.Run("returns default", func(t *testing.T) {
+		assert.Equal(t, 1, CloudRunTaskCount())
+	})
+
+	t.Run("returns override", func(t *testing.T) {
+		t.Setenv("CLOUD_RUN_TASK_COUNT", "3")
+		assert.Equal(t, 3, CloudRunTaskCount())
+	})
+}
+
 func TestBackfillMaxDays(t *testing.T) {
 	t.Run("returns default", func(t *testing.T) {
 		t.Setenv("BACKFILL_MAX_DAYS", "")

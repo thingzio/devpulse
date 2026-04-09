@@ -27,6 +27,15 @@ func GetEnvAsInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
+// GetEnvAsIntNonNeg retrieves the value of the environment variable and
+// converts it to a non-negative integer. Returns defaultValue if unset or negative.
+func GetEnvAsIntNonNeg(key string, defaultValue int) int {
+	if v, err := strconv.Atoi(os.Getenv(key)); err == nil && v >= 0 {
+		return v
+	}
+	return defaultValue
+}
+
 // GetEnvBool returns true if the environment variable is set to "true" or "1".
 func GetEnvBool(key string) bool {
 	v := strings.ToLower(os.Getenv(key))
@@ -64,6 +73,22 @@ func ImportMode() string { return GetEnv("IMPORT_MODE", "all") }
 // ImportResetMinutes returns the stale-import reset window in minutes.
 // Override: IMPORT_RESET_MINUTES (default 30).
 func ImportResetMinutes() int { return GetEnvAsInt("IMPORT_RESET_MINUTES", 30) }
+
+// ImportWorkers returns the number of concurrent goroutine workers per task.
+// Override: IMPORT_WORKERS (default 2).
+func ImportWorkers() int { return GetEnvAsInt("IMPORT_WORKERS", 2) }
+
+// ImportTaskTimeout returns the per-task timeout in minutes.
+// Override: IMPORT_TASK_TIMEOUT (default 55).
+func ImportTaskTimeout() int { return GetEnvAsInt("IMPORT_TASK_TIMEOUT", 55) }
+
+// CloudRunTaskIndex returns the 0-based task index within the job execution.
+// Override: CLOUD_RUN_TASK_INDEX (default 0 for local/single-task runs).
+func CloudRunTaskIndex() int { return GetEnvAsIntNonNeg("CLOUD_RUN_TASK_INDEX", 0) }
+
+// CloudRunTaskCount returns the total number of tasks in the job execution.
+// Override: CLOUD_RUN_TASK_COUNT (default 1 for local/single-task runs).
+func CloudRunTaskCount() int { return GetEnvAsInt("CLOUD_RUN_TASK_COUNT", 1) }
 
 // CloudRunExecution returns the Cloud Run execution ID, or a local fallback.
 // Override: CLOUD_RUN_EXECUTION.
