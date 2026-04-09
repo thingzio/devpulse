@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -203,12 +204,19 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 	}
 	defer rollbackTransaction(tx)
 
+	// Sort keys for consistent lock ordering across concurrent tasks.
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
 	txStmt := tx.Stmt(updateStmt)
 	defer txStmt.Close()
-	for old, new := range m {
-		if _, err = txStmt.ExecContext(ctx, new, old); err != nil {
+	for _, old := range keys {
+		if _, err = txStmt.ExecContext(ctx, m[old], old); err != nil {
 			rollbackTransaction(tx)
-			return fmt.Errorf("error updating entity %s to %s: %w", old, new, err)
+			return fmt.Errorf("error updating entity %s to %s: %w", old, m[old], err)
 		}
 	}
 
