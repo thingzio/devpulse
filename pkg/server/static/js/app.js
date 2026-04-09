@@ -2146,6 +2146,12 @@ function initPeriodSelector() {
     });
 }
 
+function formatPeriodLabel(days) {
+    var d = parseInt(days, 10);
+    if (d <= 28) return d / 7 + ' weeks';
+    return Math.round(d / 30) + ' months';
+}
+
 function updatePeriodOptions(org, repo, cb) {
     let url = "/data/min-date";
     const params = [];
@@ -2547,7 +2553,7 @@ function loadContributorMomentumChart(url) {
             data: {
                 labels: formatLabels(data.labels),
                 datasets: [{
-                    label: 'Active (3mo rolling)',
+                    label: 'Active (rolling)',
                     data: data.active,
                     borderColor: colors[0],
                     backgroundColor: colors[0] + '33',
@@ -2871,8 +2877,8 @@ function generatePDF() {
     var repo = searchCriteria.repo || "";
     if (!repo) { return; }
 
-    var months = $("#period_days").val();
-    var q = 'd=' + months + '&o=' + org + '&r=' + repo + '&e=';
+    var days = $("#period_days").val();
+    var q = 'd=' + days + '&o=' + org + '&r=' + repo + '&e=';
     var btn = $("#pdf-download");
 
     if (!btn.find('.pdf-spinner').length) {
@@ -2989,7 +2995,7 @@ function generatePDF() {
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text('Period: ' + months + ' months  |  Generated: ' + new Date().toLocaleDateString(), MARGIN, y);
+    doc.text('Period: ' + formatPeriodLabel(days) + '  |  Generated: ' + new Date().toLocaleDateString(), MARGIN, y);
     y += 20;
     doc.setDrawColor(180, 180, 180);
     doc.line(MARGIN, y, PDF_W - MARGIN, y);
