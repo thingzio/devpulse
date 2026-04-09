@@ -230,7 +230,7 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 	}
 
 	if len(usernames) == 0 {
-		slog.Debug("deep reputation: no candidates")
+		slog.Info("deep reputation: no candidates")
 		return &data.DeepReputationResult{}, nil
 	}
 
@@ -662,12 +662,24 @@ func (s *Store) updateReputation(ctx context.Context, username string, reputatio
 		signalsJSON = &str
 	}
 
-	_, err := s.db.ExecContext(ctx, updateReputationSQL, reputation, updatedAt, deepVal, signalsJSON, username)
+	// Use a short lock timeout to avoid deadlocks with concurrent event
+	// import transactions that hold exclusive locks on developer rows via
+	// INSERT...ON CONFLICT. If the row is locked, skip rather than wait.
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("begin tx for reputation update %s: %w", username, err)
+	}
+	defer rollbackTransaction(tx)
+
+	if _, err := tx.ExecContext(ctx, "SET LOCAL lock_timeout = '2s'"); err != nil {
+		return fmt.Errorf("setting lock_timeout for %s: %w", username, err)
+	}
+
+	if _, err := tx.ExecContext(ctx, updateReputationSQL, reputation, updatedAt, deepVal, signalsJSON, username); err != nil {
 		return fmt.Errorf("failed to update reputation for %s: %w", username, err)
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (s *Store) getDistinctOrgs(ctx context.Context) ([]string, error) {

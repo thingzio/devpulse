@@ -124,7 +124,10 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		td, err := tenant.GetTenantDetailByUsername(r.Context(), db, username)
+		qctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		td, err := tenant.GetTenantDetailByUsername(qctx, db, username)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("tenant not found: %s", username), http.StatusNotFound)
 			return
@@ -146,7 +149,7 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 		weekStart := tenant.StartOfWeek().Format("2006-01-02")
 		backfillSince := time.Now().UTC().AddDate(0, 0, -config.BackfillMaxDays()).Format("2006-01-02")
 
-		repos, err := tenant.GetTenantRepoDetails(r.Context(), db, td.ID, since, weekStart, backfillSince)
+		repos, err := tenant.GetTenantRepoDetails(qctx, db, td.ID, since, weekStart, backfillSince)
 		if err != nil {
 			slog.Error("querying tenant repos", "error", err)
 			http.Error(w, "error querying repos", http.StatusInternalServerError)

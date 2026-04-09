@@ -644,9 +644,7 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 		}
 	}
 
-	if updated > 0 {
-		slog.Info("PR sizes backfilled", "repo", e.owner+"/"+e.repo, "updated", updated, "total", len(prs))
-	}
+	slog.Info("PR backfill complete", "repo", e.owner+"/"+e.repo, "updated", updated, "total", len(prs))
 	return nil
 }
 
