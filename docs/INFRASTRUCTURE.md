@@ -43,7 +43,7 @@ Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
 | Serve | Cloud Run service | 0-10 instances (scale-to-zero) | Public |
-| Import | Cloud Run job | Hourly, parallelism=3 (SKIP LOCKED queue), full pipeline | Internal |
+| Import | Cloud Run job | Every 2 hours, parallelism=3 (deterministic sharding), full pipeline | Internal |
 | Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
 The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize cost. Cold starts for the Go binary are ~2s, within the 1s p99 latency alert threshold. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
@@ -212,7 +212,7 @@ Migration: `pg_dump`/`pg_restore` (minutes of downtime) or Database Migration Se
 
 ## Import Worker Scaling
 
-The import job uses a PostgreSQL SKIP LOCKED claim queue. Each Cloud Run task claims individual repos from the queue — multiple tasks safely share work without overlap. Current setting: `parallelism=3`.
+The import job uses deterministic task-index sharding. Each Cloud Run task fetches the full sorted repo list, takes every Nth item based on its task index, and processes its shard using goroutine workers. No DB coordination needed — sharding is computed in-process. Current setting: `parallelism=3`, `workers=2`.
 
 All upsert batches are sorted by primary key before execution to ensure consistent lock acquisition order across parallel tasks, preventing deadlocks. This applies to: developers (by `username`), events (by `org, repo, username, type, date`), releases (by `tag`), release assets (by `name`), and metric history (by `date`).
 
@@ -275,7 +275,7 @@ Secondary (abuse) limits return HTTP 403 with `Retry-After`. The importer detect
 ### What scales linearly
 
 - **GitHub API budget** — each tenant's installation token has its own 5,000/hr
-- **Queue work distribution** — SKIP LOCKED ensures no repo is claimed twice
+- **Work distribution** — deterministic task-index sharding ensures no repo is processed twice
 
 ### What doesn't scale automatically
 
@@ -319,7 +319,7 @@ Performance indexes beyond primary keys, defined in migration files:
 | `idx_tenant_member_github` | `(github_id)` | OAuth login lookup |
 | `idx_github_app_installation_tenant` | `(tenant_id)` | Installation token minting |
 | `idx_tenant_repo_rls` | `(tenant_id, org, repo) WHERE active` | RLS policy performance |
-| `idx_tenant_repo_import_queue` | `(active, import_claimed_at, import_done_at) WHERE active` | SKIP LOCKED claim queue |
+| `idx_tenant_repo_import_queue` | `(active, import_claimed_at, import_done_at) WHERE active` | Legacy claim queue (columns unused, index retained for rollback) |
 
 ## Terraform
 

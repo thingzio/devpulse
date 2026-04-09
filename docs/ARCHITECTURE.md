@@ -32,7 +32,7 @@ devpulse/
 │   ├── server/             HTTP server, handlers, templates, static assets
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
 │   │   └── templates/      HTML templates: layout, header, footer, home, landing, dashboard, help, tos
-│   ├── importer/           Import worker (SKIP LOCKED claim queue)
+│   ├── importer/           Import worker (sharded task-index + goroutine workers)
 │   ├── config/             Environment configuration
 │   ├── data/               Store interface, shared types, helpers
 │   │   ├── postgres/       PostgreSQL Store implementation + migrations
@@ -102,7 +102,7 @@ PostgreSQL Row-Level Security (RLS) policies filter data per tenant:
 
 ## Import Pipeline
 
-The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (hourly, 3 parallel tasks via SKIP LOCKED claim queue). Each claimed repo runs all phases sequentially:
+The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (every 2 hours, 3 parallel tasks via deterministic sharding). Each task gets a disjoint slice of repos and runs them through all phases using goroutine workers:
 
 1. **Metadata** — repo stars, forks, language, license, community profile
 2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)

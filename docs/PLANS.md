@@ -71,11 +71,11 @@ Currently repo-add requires a public repo (HEAD request to GitHub API). Private 
 
 **Effort:** Medium
 
-The importer uses a `SKIP LOCKED` claim queue. `PrepareImportQueue` resets completed repos for re-claiming. Currently all tenants are processed every hourly run.
+The importer uses deterministic task-index sharding. Each Cloud Run task gets a disjoint slice of repos. Repos shared by multiple tenants are imported once and marked done for all.
 
 **Changes:**
 - `pkg/plan/plan.go` — add `ImportIntervalHours int` and `OnDemandImport bool`
-- `PrepareImportQueue` — only reset repos whose last import + interval has elapsed
+- Sharding already ensures each repo is processed at most once per cycle
 - Two Cloud Run jobs: daily-schedule + hourly-schedule, same binary
 - Free repos only claimable when 24h have passed; Starter+ repos claimable every hour
 
@@ -89,5 +89,5 @@ The importer uses a `SKIP LOCKED` claim queue. `PrepareImportQueue` resets compl
 |---------|-----------|--------|
 | API Access | Auth middleware + GitHub PAT resolution | Medium |
 | Private Repos | Repo-add validation + GitHub App permissions | Low-Medium |
-| Import Frequency | `PrepareImportQueue` time check + 2 scheduled jobs | Medium |
+| Import Frequency | Single scheduled job every 2 hours with sharded tasks | Medium |
 | On-demand Import | Repo-level claim trigger + Cloud Run Jobs API | Medium |
