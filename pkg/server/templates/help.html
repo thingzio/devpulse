@@ -37,15 +37,89 @@
     </div>
 
     <div class="landing-feature help-section" style="margin-bottom:20px">
-      <h3>Dashboard Tabs</h3>
+      <h3>Portfolio View</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Shows when no repo is selected &mdash; your bird's-eye view across all tracked projects.</p>
       <ul>
-        <li><strong>Health</strong> &mdash; overall project health indicators including bus factor score, repository metadata (stars, forks, open issues), stars and forks trends over time, and community profile completeness (README, contributing guide, license, code of conduct).</li>
-        <li><strong>Activity</strong> &mdash; event volume trends over time, PR size distribution (small, medium, large, extra-large), forks-vs-activity correlation, and issue-to-PR ratio showing how much work is issue-driven.</li>
-        <li><strong>Velocity</strong> &mdash; lead time to merge (how quickly PRs get merged), change failure rate (percentage of changes that cause issues), release cadence (time between releases), and download trends for published releases.</li>
-        <li><strong>Quality</strong> &mdash; PR review ratio (percentage of PRs that receive reviews), review latency (time from PR open to first review), time to close issues and PRs, and contributor reputation scores based on review activity.</li>
-        <li><strong>Community</strong> &mdash; contributor retention rates (returning vs. one-time contributors), momentum trends (growing or shrinking contributor base), first-time contributor funnel (how many newcomers return), and entity/company affiliations of contributors.</li>
-        <li><strong>Events</strong> &mdash; searchable, sortable log of all imported GitHub events. Filter by event type (push, PR, issue, review, release), date range, username, or entity/company affiliation.</li>
-        <li><strong>Insights</strong> &mdash; AI-generated observations and recommended action items per repository. Insights are regenerated after each import and highlight trends, risks, and opportunities. Available when your account has the AI insights feature enabled.</li>
+        <li><strong>Portfolio Summary</strong> &mdash; KPI cards for orgs, repos, events, contributors, stars, forks, issues, PRs, avg merge time, and last import. Quick pulse check across your entire portfolio.</li>
+        <li><strong>Repository Overview</strong> &mdash; table of all repos with stars, forks, events, weekly activity, and contributor scoring status. Your triage surface for spotting repos that need attention.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Health Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Is this project alive and well?</p>
+      <ul>
+        <li><strong>Project Health</strong> &mdash; Bus Factor (devs behind 50%+ of work), Pony Factor (orgs behind 50%+ of work), and Overall Health grade. High bus factor = key-person risk. Low pony factor = single-company dependency.</li>
+        <li><strong>Health Activity</strong> &mdash; daily contributor activity. Shows whether the project has steady engagement or sporadic bursts &mdash; sustained activity signals a healthy community.</li>
+        <li><strong>Repository Status</strong> &mdash; stars, forks, open issues snapshot from GitHub. Lagging indicator but useful for tracking external interest.</li>
+        <li><strong>Stars Trend</strong> &mdash; daily star count over time. Spikes often correlate with blog posts, HN/Reddit mentions, or conference talks.</li>
+        <li><strong>Forks Trend</strong> &mdash; daily fork count. Rising forks without rising PRs may mean people are forking but not contributing back.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Activity Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">What's actually happening in the repo?</p>
+      <ul>
+        <li><strong>Monthly Activity</strong> &mdash; PRs, issues, reviews, comments, and forks with trend line. The single best chart for answering "is this project growing or declining?"</li>
+        <li><strong>PR Size Distribution</strong> &mdash; Small/Medium/Large/XL breakdown by lines changed. Large PRs are harder to review and more likely to introduce bugs &mdash; healthy projects skew small.</li>
+        <li><strong>Forks &amp; Activity</strong> &mdash; fork count overlaid with total events. When forks rise alongside activity, interest is converting to engagement. Forks without activity = window shoppers.</li>
+        <li><strong>Issue Open/Close Ratio</strong> &mdash; opened vs closed over time. A growing gap means backlog is building &mdash; maintainers may be overwhelmed.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Velocity Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">How fast does work move through the pipeline?</p>
+      <ul>
+        <li><strong>Time to First Response</strong> &mdash; hours until a PR gets its first review or an issue gets its first comment. The #1 signal for contributor experience &mdash; slow responses drive contributors away.</li>
+        <li><strong>Lead Time (PR to Merge)</strong> &mdash; days from PR creation to merge. Tracks how efficiently the team processes contributions. Long lead times frustrate external contributors.</li>
+        <li><strong>Change Failure Rate</strong> &mdash; percentage of releases followed by bug reports or reverts. Measures release quality &mdash; are you shipping fast but breaking things?</li>
+        <li><strong>Release Cadence</strong> &mdash; releases over time, stable vs pre-release. Regular cadence signals a mature, predictable project.</li>
+        <li><strong>Release Downloads</strong> &mdash; binary asset download counts. Direct measure of adoption for projects that ship binaries.</li>
+        <li><strong>Downloads by Release</strong> &mdash; per-tag download counts. Shows which versions gained traction and whether adoption is growing.</li>
+        <li><strong>Container Releases</strong> &mdash; container image versions via ghcr.io. Tracks CI/CD health for containerized projects.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Quality Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Is the code getting proper attention?</p>
+      <ul>
+        <li><strong>PR Review Ratio</strong> &mdash; reviews per PR. Higher = stronger review culture. Projects with low review ratios tend to accumulate technical debt faster.</li>
+        <li><strong>Review Latency</strong> &mdash; hours from PR creation to first review. Focused specifically on code review bottlenecks.</li>
+        <li><strong>Time to Close (Issues)</strong> &mdash; average days to close all issues vs bug issues near releases. Shows whether the team can keep up with incoming work.</li>
+        <li><strong>Lowest Reputation Contributors</strong> &mdash; flags contributors with limited track record. Useful for identifying PRs that may need extra review scrutiny.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Community Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Who's contributing and are they sticking around?</p>
+      <ul>
+        <li><strong>Contributor Retention</strong> &mdash; new vs returning contributors. A healthy project converts newcomers into repeat contributors. High churn = revolving door problem.</li>
+        <li><strong>Contributor Momentum</strong> &mdash; rolling active count with period-over-period delta. The clearest signal of community growth or decline.</li>
+        <li><strong>First-Time Contributors</strong> &mdash; tracks the newcomer funnel: first comment, first PR, first merge. Bottlenecks here mean your onboarding or review process needs work.</li>
+        <li><strong>Top Entities</strong> &mdash; which companies are contributing. Critical for understanding organizational dependency and sponsorship diversity.</li>
+        <li><strong>Top Collaborators</strong> &mdash; individual contributor rankings by event count. Helps identify your most active community members and potential maintainers.</li>
+        <li><strong>Contributor Profile</strong> &mdash; per-person metrics vs repo average. Useful for understanding individual contribution patterns.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Events Tab</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Raw data exploration.</p>
+      <ul>
+        <li><strong>Event Search</strong> &mdash; filter and browse individual PRs, issues, reviews, and comments. Drill down when you need specifics behind the charts.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Insights Tab (AI-powered)</h3>
+      <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Machine-generated analysis of your repo's health. Available when your plan includes AI insights.</p>
+      <ul>
+        <li><strong>Key Observations</strong> &mdash; AI summary of trends, risks, and notable patterns across your metrics. Saves time vs manually interpreting every chart.</li>
+        <li><strong>Action Items</strong> &mdash; prioritized recommendations based on the data. Turns insights into next steps.</li>
       </ul>
     </div>
 
