@@ -383,6 +383,16 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 		code := r.URL.Query().Get("code")
 		token, err := oauth.ExchangeCode(r.Context(), cfg, code)
 		if err != nil {
+			// Code exchange can fail if the code was already consumed (e.g.,
+			// browser prefetch, double-click, or redirect replay). If the user
+			// already has a valid session from the first successful callback,
+			// send them to the dashboard instead of showing an error.
+			if sessionCookie, cookieErr := r.Cookie(middleware.SessionCookieName()); cookieErr == nil {
+				if _, valErr := tenant.ValidateSession(r.Context(), db, sessionCookie.Value); valErr == nil {
+					http.Redirect(w, r, "/dashboard", http.StatusFound)
+					return
+				}
+			}
 			slog.Error("oauth exchange failed", "error", err)
 			clearAndRedirect(w, r, "auth_failed")
 			return
