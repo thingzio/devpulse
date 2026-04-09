@@ -4,20 +4,18 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${DIR}/common"
 
-has_tools gcloud terraform curl
+has_tools gcloud terraform curl jq
 
 usage() {
     echo "Usage: $0 <org> <repo>"
+    echo "       $0 --all <username>"
     echo ""
-    echo "Resets the import error counter for the specified repo,"
-    echo "allowing paused imports to resume on the next scheduled run."
+    echo "Resets the import error counter for the specified repo (or all repos"
+    echo "for a tenant), allowing paused imports to resume on the next scheduled run."
     exit 1
 }
 
-[[ $# -ne 2 ]] && usage
-
-ORG="$1"
-REPO="$2"
+[[ $# -lt 1 ]] && usage
 
 msg "Fetching admin service URL..."
 ADMIN_URL="$(cd "${REPO_ROOT}/infra/saas" && terraform output -raw admin_url 2>/dev/null)" \
@@ -27,18 +25,56 @@ msg "Getting identity token..."
 TOKEN="$(gcloud auth print-identity-token 2>/dev/null)" \
     || err "Failed to get identity token. Run 'gcloud auth login' first."
 
-msg "Resetting import errors for ${ORG}/${REPO}..."
-RESPONSE="$(curl -s -w "\n%{http_code}" \
-    -H "Authorization: Bearer ${TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "{\"org\":\"${ORG}\",\"repo\":\"${REPO}\"}" \
-    "${ADMIN_URL}/reset-errors")"
+reset_repo() {
+    local org="$1" repo="$2"
+    RESPONSE="$(curl -s -w "\n%{http_code}" \
+        -H "Authorization: Bearer ${TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "{\"org\":\"${org}\",\"repo\":\"${repo}\"}" \
+        "${ADMIN_URL}/reset-errors")"
 
-HTTP_CODE="$(echo "${RESPONSE}" | tail -1)"
-BODY="$(echo "${RESPONSE}" | head -1)"
+    HTTP_CODE="$(echo "${RESPONSE}" | tail -1)"
+    BODY="$(echo "${RESPONSE}" | head -1)"
 
-if [[ "${HTTP_CODE}" == "200" ]]; then
-    msg "Success: ${BODY}"
+    if [[ "${HTTP_CODE}" == "200" ]]; then
+        msg "Reset ${org}/${repo}: ${BODY}"
+    else
+        echo "[WARN] Failed ${org}/${repo} (HTTP ${HTTP_CODE}): ${BODY}" >&2
+    fi
+}
+
+if [[ "$1" == "--all" ]]; then
+    [[ $# -ne 2 ]] && usage
+    USERNAME="$2"
+
+    msg "Fetching repos for ${USERNAME}..."
+    RESPONSE="$(curl -s -w "\n%{http_code}" \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${ADMIN_URL}/tenant?username=${USERNAME}")"
+
+    HTTP_CODE="$(echo "${RESPONSE}" | tail -1)"
+    BODY="$(echo "${RESPONSE}" | sed '$d')"
+
+    if [[ "${HTTP_CODE}" != "200" ]]; then
+        err "Failed to get tenant (HTTP ${HTTP_CODE}): ${BODY}"
+    fi
+
+    REPOS="$(echo "${BODY}" | jq -r '.repos[].name')"
+    if [[ -z "${REPOS}" ]]; then
+        msg "No repos found for ${USERNAME}"
+        exit 0
+    fi
+
+    COUNT=0
+    while IFS= read -r name; do
+        org="${name%%/*}"
+        repo="${name##*/}"
+        reset_repo "${org}" "${repo}"
+        COUNT=$((COUNT + 1))
+    done <<< "${REPOS}"
+
+    msg "Reset ${COUNT} repos for ${USERNAME}"
 else
-    err "Failed (HTTP ${HTTP_CODE}): ${BODY}"
+    [[ $# -ne 2 ]] && usage
+    reset_repo "$1" "$2"
 fi
