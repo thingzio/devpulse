@@ -33,3 +33,26 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", "token "+t.token)
 	return t.base.RoundTrip(req)
 }
+
+const (
+	// GitHubTimeout is the default timeout for GitHub API calls.
+	GitHubTimeout = 10 * time.Second
+
+	// GitHubAccept is the standard Accept header for GitHub API v3.
+	GitHubAccept = "application/vnd.github+json"
+
+	// QuotaCheckTimeout is a short timeout for lightweight API quota checks.
+	QuotaCheckTimeout = 5 * time.Second
+)
+
+// GitHubClient is a shared HTTP client for GitHub API calls.
+var GitHubClient = &http.Client{Timeout: GitHubTimeout}
+
+// QuotaCheckClient is a shared HTTP client for lightweight rate-limit checks.
+var QuotaCheckClient = &http.Client{Timeout: QuotaCheckTimeout}
+
+// SetGitHubHeaders sets the standard Authorization and Accept headers for GitHub API requests.
+func SetGitHubHeaders(req *http.Request, token string) {
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", GitHubAccept)
+}

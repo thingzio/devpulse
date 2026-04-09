@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"log/slog"
 
 	"github.com/google/go-github/v83/github"
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/net"
@@ -42,13 +42,10 @@ const (
 	importBatchSize = 500
 	nilNumber       = 0
 
-	sortField              string = "created"
-	sortCommentField       string = "updated"
-	sortForkField          string = "newest"
-	sortDirection          string = "desc"
-	backfillMaxDaysDefault        = 90
-	backfillMaxDaysEnvKey         = "BACKFILL_MAX_DAYS"
-
+	sortField        string = "created"
+	sortCommentField string = "updated"
+	sortForkField    string = "newest"
+	sortDirection    string = "desc"
 	// selectPRsMissingSizeSQL: $1=org, $2=repo, $3=min_created_at
 	selectPRsMissingSizeSQL = `SELECT org, repo, number
 		FROM event
@@ -605,12 +602,7 @@ type prRef struct {
 func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 	db := e.store.db
 
-	days := backfillMaxDaysDefault
-	if v := os.Getenv(backfillMaxDaysEnvKey); v != "" {
-		if d, err := strconv.Atoi(v); err == nil && d > 0 {
-			days = d
-		}
-	}
+	days := config.BackfillMaxDays()
 	minCreatedAt := time.Now().AddDate(0, 0, -days).UTC().Format(time.RFC3339)
 	rows, err := db.QueryContext(ctx, selectPRsMissingSizeSQL, e.owner, e.repo, minCreatedAt)
 	if err != nil {

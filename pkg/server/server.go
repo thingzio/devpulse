@@ -110,7 +110,10 @@ func Run(ctx context.Context, opts Options) error {
 
 	apiCache.startEviction(ctx)
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts)
+	oauthRL := newRateLimiter(10, time.Minute)
+	repoSearchRL := newRateLimiter(30, time.Minute)
+
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
@@ -144,18 +147,22 @@ func Run(ctx context.Context, opts Options) error {
 	if err := s.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("shutdown failed", "error", err)
 	}
+
+	oauthRL.stop()
+	repoSearchRL.stop()
+
 	return nil
 }
 
-func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options) *http.ServeMux {
+func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
-	// Rate limiters for abuse-sensitive endpoints.
-	oauthRL := rateLimitMiddleware(newRateLimiter(10, time.Minute))
-	repoSearchRL := rateLimitMiddleware(newRateLimiter(30, time.Minute))
+	// Rate limit middleware for abuse-sensitive endpoints.
+	oauthRL := rateLimitMiddleware(oauthRLimiter)
+	repoSearchRL := rateLimitMiddleware(repoSearchRLimiter)
 
 	// Public routes (no auth)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
@@ -631,6 +638,10 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 
 		query := strings.TrimSpace(r.URL.Query().Get("q"))
 		if len(query) < 2 {
+			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
+			return
+		}
+		if len(query) > 128 {
 			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})
 			return
 		}

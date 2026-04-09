@@ -173,14 +173,14 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	defer rows.Close()
 
 	series := &data.EventTypeSeries{
-		Dates:         make([]string, 0),
-		PRs:           make([]int, 0),
-		PRReviews:     make([]int, 0),
-		Issues:        make([]int, 0),
-		IssueComments: make([]int, 0),
-		Forks:         make([]int, 0),
-		Total:         make([]int, 0),
-		Trend:         make([]float32, 0),
+		Dates:         make([]string, 0, 52),
+		PRs:           make([]int, 0, 52),
+		PRReviews:     make([]int, 0, 52),
+		Issues:        make([]int, 0, 52),
+		IssueComments: make([]int, 0, 52),
+		Forks:         make([]int, 0, 52),
+		Total:         make([]int, 0, 52),
+		Trend:         make([]float32, 0, 52),
 	}
 
 	for rows.Next() {

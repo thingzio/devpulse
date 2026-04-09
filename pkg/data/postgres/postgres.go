@@ -44,13 +44,18 @@ type PoolConfig struct {
 	ConnMaxIdleTime time.Duration
 }
 
+const (
+	defaultConnMaxLifetime = 5 * time.Minute
+	defaultConnMaxIdleTime = 1 * time.Minute
+)
+
 // DefaultPoolConfig returns pool settings suitable for the site service.
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
 		MaxOpenConns:    17,
 		MaxIdleConns:    5,
-		ConnMaxLifetime: 5 * time.Minute,
-		ConnMaxIdleTime: 1 * time.Minute,
+		ConnMaxLifetime: defaultConnMaxLifetime,
+		ConnMaxIdleTime: defaultConnMaxIdleTime,
 	}
 }
 
@@ -59,8 +64,8 @@ func ImportPoolConfig() PoolConfig {
 	return PoolConfig{
 		MaxOpenConns:    5,
 		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-		ConnMaxIdleTime: 1 * time.Minute,
+		ConnMaxLifetime: defaultConnMaxLifetime,
+		ConnMaxIdleTime: defaultConnMaxIdleTime,
 	}
 }
 
@@ -69,8 +74,8 @@ func AdminPoolConfig() PoolConfig {
 	return PoolConfig{
 		MaxOpenConns:    3,
 		MaxIdleConns:    1,
-		ConnMaxLifetime: 5 * time.Minute,
-		ConnMaxIdleTime: 1 * time.Minute,
+		ConnMaxLifetime: defaultConnMaxLifetime,
+		ConnMaxIdleTime: defaultConnMaxIdleTime,
 	}
 }
 

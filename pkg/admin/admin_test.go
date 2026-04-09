@@ -20,7 +20,7 @@ func TestWriteJSON(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	writeJSON(w, payload{Name: "test", Count: 42})
+	writeJSON(w, http.StatusOK, payload{Name: "test", Count: 42})
 
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
@@ -34,7 +34,7 @@ func TestWriteJSON_Slice(t *testing.T) {
 	t.Parallel()
 
 	w := httptest.NewRecorder()
-	writeJSON(w, []string{"a", "b"})
+	writeJSON(w, http.StatusOK, []string{"a", "b"})
 
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 

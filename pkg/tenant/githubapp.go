@@ -14,11 +14,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const defaultGitHubBaseURL = "https://api.github.com"
-
-var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // GitHubAppConfig holds the GitHub App credentials for minting installation tokens.
 type GitHubAppConfig struct {
@@ -69,10 +68,9 @@ func MintInstallationToken(ctx context.Context, cfg *GitHubAppConfig, installati
 	if err != nil {
 		return nil, fmt.Errorf("creating installation token request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+appJWT)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	net.SetGitHubHeaders(req, appJWT)
 
-	resp, err := httpClient.Do(req)
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("requesting installation token: %w", err)
 	}

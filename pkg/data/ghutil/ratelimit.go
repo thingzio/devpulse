@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v83/github"
+	"github.com/thingzio/devpulse/pkg/net"
 )
 
 const minTokenQuota = 100
@@ -20,6 +21,8 @@ const minTokenQuota = 100
 func MinTokenQuota() int { return minTokenQuota }
 
 const RateLimitThreshold = 10
+
+const maxWait = 15 * time.Minute
 
 // ErrRateLimited is returned when a GitHub API token has hit its rate limit.
 // Callers with a token pool should exhaust this token and try another.
@@ -53,7 +56,6 @@ func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 	}
 
 	resetAt := resp.Rate.Reset.Time
-	maxWait := 15 * time.Minute
 	wait := time.Until(resetAt)
 	if wait <= 0 {
 		return nil
@@ -88,16 +90,14 @@ func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 
 // CheckTokenQuota calls the GitHub rate_limit API (free, no quota cost) and
 // returns the remaining quota. Returns -1 on error (treat as usable).
-func CheckTokenQuota(token string) int {
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", "https://api.github.com/rate_limit", nil)
+func CheckTokenQuota(ctx context.Context, token string) int {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/rate_limit", nil)
 	if err != nil {
 		return -1
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	net.SetGitHubHeaders(req, token)
 
-	resp, err := client.Do(req)
+	resp, err := net.QuotaCheckClient.Do(req)
 	if err != nil {
 		return -1
 	}
@@ -117,8 +117,8 @@ func CheckTokenQuota(token string) int {
 }
 
 // HasSufficientQuota returns true if the token has enough remaining API calls.
-func HasSufficientQuota(token string) bool {
-	remaining := CheckTokenQuota(token)
+func HasSufficientQuota(ctx context.Context, token string) bool {
+	remaining := CheckTokenQuota(ctx, token)
 	return remaining < 0 || remaining >= minTokenQuota
 }
 
@@ -144,8 +144,6 @@ func WaitForRateReset(ctx context.Context, err error) bool {
 	if err == nil {
 		return false
 	}
-
-	const maxWait = 15 * time.Minute
 
 	// Secondary (abuse) rate limit.
 	if wait := AbuseRetryAfter(err); wait > 0 {

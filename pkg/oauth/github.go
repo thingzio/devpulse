@@ -10,10 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
-)
 
-var httpClient = &http.Client{Timeout: 10 * time.Second}
+	"github.com/thingzio/devpulse/pkg/net"
+)
 
 const (
 	defaultAuthURL   = "https://github.com/login/oauth/authorize"
@@ -78,7 +77,7 @@ func ExchangeCode(ctx context.Context, cfg *Config, code string) (string, error)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("exchanging code: %w", err)
 	}
@@ -115,7 +114,7 @@ func FetchUser(ctx context.Context, cfg *Config, token string) (*GitHubUser, err
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
@@ -151,14 +150,15 @@ func fetchPrimaryEmail(ctx context.Context, emailsURL, token string) string {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		if resp != nil {
-			resp.Body.Close()
-		}
+	resp, err := net.GitHubClient.Do(req)
+	if err != nil {
 		return ""
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
 
 	var emails []struct {
 		Email    string `json:"email"`

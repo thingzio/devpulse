@@ -33,15 +33,17 @@ type tenantDetail struct {
 }
 
 type repoDetail struct {
-	Name          string  `json:"name"`
-	Events        int     `json:"events"`
-	WeeklyEvents  int     `json:"weekly_events"`
-	WeeklyPct     float64 `json:"weekly_pct"`
-	LastImport    string  `json:"last_import"`
-	PRTotal       int     `json:"pr_total"`
-	PRMissingSize int     `json:"pr_missing_size"`
-	Contributors  int     `json:"contributors"`
-	Scored        int     `json:"scored"`
+	Name           string  `json:"name"`
+	Events         int     `json:"events"`
+	WeeklyEvents   int     `json:"weekly_events"`
+	WeeklyPct      float64 `json:"weekly_pct"`
+	LastImport     string  `json:"last_import"`
+	PRTotal        int     `json:"pr_total"`
+	PRMissingSize  int     `json:"pr_missing_size"`
+	Contributors   int     `json:"contributors"`
+	Scored         int     `json:"scored"`
+	DeepScored     int     `json:"deep_scored"`
+	NeverDeepScore int     `json:"never_deep_score"`
 }
 
 type resetErrorsRequest struct {

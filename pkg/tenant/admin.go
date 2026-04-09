@@ -31,15 +31,17 @@ type TenantDetail struct {
 
 // RepoDetail holds per-repo statistics for admin inspection.
 type RepoDetail struct {
-	Org           string
-	Repo          string
-	Events        int
-	WeeklyEvents  int
-	LastImport    string
-	PRTotal       int
-	PRMissingSize int
-	Contributors  int
-	Scored        int
+	Org            string
+	Repo           string
+	Events         int
+	WeeklyEvents   int
+	LastImport     string
+	PRTotal        int
+	PRMissingSize  int
+	Contributors   int
+	Scored         int
+	DeepScored     int
+	NeverDeepScore int
 }
 
 const (
@@ -72,16 +74,22 @@ const (
 		WHERE t.username = $1
 		GROUP BY t.id`
 
+	// getTenantRepoDetailsSQL: $1=tenantID, $2=eventsSince, $3=weekStart, $4=backfillSince
 	getTenantRepoDetailsSQL = `
 		SELECT tr.org, tr.repo,
 		       COUNT(e.type),
 		       COUNT(CASE WHEN e.date >= $3 THEN 1 END),
 		       COALESCE(rm.last_import_at, ''),
-		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0 THEN 1 END),
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0
+		                   AND e.created_at::date >= $4 THEN 1 END),
+		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0
+		                   AND e.created_at::date >= $4
 		                   AND (e.additions IS NULL OR e.changed_files IS NULL) THEN 1 END),
 		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END)
+		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation IS NOT NULL THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]' AND d.reputation_deep = 1 THEN e.username END),
+		       COUNT(DISTINCT CASE WHEN e.username NOT LIKE '%[bot]'
+		                   AND (d.reputation IS NULL OR d.reputation_deep IS NULL OR d.reputation_deep = 0) THEN e.username END)
 		FROM tenant_repo tr
 		LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 		LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo
@@ -170,8 +178,9 @@ func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string)
 }
 
 // GetTenantRepoDetails returns per-repo statistics for a tenant.
-func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, weekStart string) ([]RepoDetail, error) {
-	rows, err := db.QueryContext(ctx, getTenantRepoDetailsSQL, tenantID, since, weekStart)
+// backfillSince scopes PR backfill counts to match the worker's BACKFILL_MAX_DAYS window.
+func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, weekStart, backfillSince string) ([]RepoDetail, error) {
+	rows, err := db.QueryContext(ctx, getTenantRepoDetailsSQL, tenantID, since, weekStart, backfillSince)
 	if err != nil {
 		return nil, fmt.Errorf("querying tenant repo details: %w", err)
 	}
@@ -180,7 +189,11 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 	var repos []RepoDetail
 	for rows.Next() {
 		var rd RepoDetail
-		if err := rows.Scan(&rd.Org, &rd.Repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport, &rd.PRTotal, &rd.PRMissingSize, &rd.Contributors, &rd.Scored); err != nil {
+		if err := rows.Scan(
+			&rd.Org, &rd.Repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport,
+			&rd.PRTotal, &rd.PRMissingSize,
+			&rd.Contributors, &rd.Scored, &rd.DeepScored, &rd.NeverDeepScore,
+		); err != nil {
 			return nil, fmt.Errorf("scanning repo detail: %w", err)
 		}
 		repos = append(repos, rd)

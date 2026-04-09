@@ -13,6 +13,7 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/net"
 	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
@@ -111,7 +112,7 @@ func handleListTenants(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		writeJSON(w, out)
+		writeJSON(w, http.StatusOK, out)
 	}
 }
 
@@ -141,10 +142,11 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 			out.LastSignIn = td.LastSignIn.Format("2006-01-02")
 		}
 
-		since := time.Now().UTC().AddDate(0, -6, 0).Format("2006-01-02")
+		since := time.Now().UTC().AddDate(0, 0, -180).Format("2006-01-02")
 		weekStart := tenant.StartOfWeek().Format("2006-01-02")
+		backfillSince := time.Now().UTC().AddDate(0, 0, -config.BackfillMaxDays()).Format("2006-01-02")
 
-		repos, err := tenant.GetTenantRepoDetails(r.Context(), db, td.ID, since, weekStart)
+		repos, err := tenant.GetTenantRepoDetails(r.Context(), db, td.ID, since, weekStart, backfillSince)
 		if err != nil {
 			slog.Error("querying tenant repos", "error", err)
 			http.Error(w, "error querying repos", http.StatusInternalServerError)
@@ -153,14 +155,16 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 
 		for _, rd := range repos {
 			d := repoDetail{
-				Name:          rd.Org + "/" + rd.Repo,
-				Events:        rd.Events,
-				WeeklyEvents:  rd.WeeklyEvents,
-				LastImport:    rd.LastImport,
-				PRTotal:       rd.PRTotal,
-				PRMissingSize: rd.PRMissingSize,
-				Contributors:  rd.Contributors,
-				Scored:        rd.Scored,
+				Name:           rd.Org + "/" + rd.Repo,
+				Events:         rd.Events,
+				WeeklyEvents:   rd.WeeklyEvents,
+				LastImport:     rd.LastImport,
+				PRTotal:        rd.PRTotal,
+				PRMissingSize:  rd.PRMissingSize,
+				Contributors:   rd.Contributors,
+				Scored:         rd.Scored,
+				DeepScored:     rd.DeepScored,
+				NeverDeepScore: rd.NeverDeepScore,
 			}
 			if out.MaxEventsPerWeek > 0 {
 				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100
@@ -168,7 +172,7 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 			out.Repos = append(out.Repos, d)
 		}
 
-		writeJSON(w, out)
+		writeJSON(w, http.StatusOK, out)
 	}
 }
 
@@ -219,7 +223,7 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 			"max_events_per_week", limits.MaxEventsPerWeek,
 		)
 
-		writeJSON(w, upgradeResponse{
+		writeJSON(w, http.StatusOK, upgradeResponse{
 			Username:         req.Username,
 			Plan:             req.Plan,
 			MaxRepos:         limits.MaxRepos,
@@ -276,7 +280,7 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 			"plan", req.Plan,
 		)
 
-		writeJSON(w, inviteResponse{
+		writeJSON(w, http.StatusOK, inviteResponse{
 			Username:         req.Username,
 			GitHubID:         ghID,
 			Plan:             req.Plan,
@@ -309,7 +313,7 @@ func handleResetErrors(db *sql.DB) http.HandlerFunc {
 
 		slog.Info("import errors reset", "org", req.Org, "repo", req.Repo, "rows", count)
 
-		writeJSON(w, resetErrorsResponse{
+		writeJSON(w, http.StatusOK, resetErrorsResponse{
 			Org:   req.Org,
 			Repo:  req.Repo,
 			Reset: count,
@@ -323,10 +327,9 @@ func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("building request: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Accept", net.GitHubAccept)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("calling GitHub API: %w", err)
 	}
@@ -360,7 +363,6 @@ func handleTokenStatus(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		client := &http.Client{Timeout: 10 * time.Second}
 		seen := make(map[int64]bool)
 		var results []tokenStatus
 
@@ -385,26 +387,25 @@ func handleTokenStatus(db *sql.DB) http.HandlerFunc {
 					continue
 				}
 
-				ts := checkGitHubRateLimit(client, tok.Token)
+				ts := checkGitHubRateLimit(r.Context(), tok.Token)
 				ts.Login = inst.Login
 				ts.InstallationID = inst.ID
 				results = append(results, ts)
 			}
 		}
 
-		writeJSON(w, results)
+		writeJSON(w, http.StatusOK, results)
 	}
 }
 
-func checkGitHubRateLimit(client *http.Client, token string) tokenStatus {
-	req, err := http.NewRequest("GET", "https://api.github.com/rate_limit", nil)
+func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/rate_limit", nil)
 	if err != nil {
 		return tokenStatus{Error: fmt.Sprintf("creating request: %v", err)}
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
+	net.SetGitHubHeaders(req, token)
 
-	resp, err := client.Do(req)
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return tokenStatus{Error: fmt.Sprintf("calling rate_limit: %v", err)}
 	}
@@ -435,9 +436,14 @@ func checkGitHubRateLimit(client *http.Client, token string) tokenStatus {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("encoding JSON response", "error", err)
+func writeJSON(w http.ResponseWriter, status int, v any) { //nolint:unparam // status kept for consistency with server.writeJSON
+	b, err := json.Marshal(v)
+	if err != nil {
+		slog.Error("failed to marshal JSON", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(b)
 }
