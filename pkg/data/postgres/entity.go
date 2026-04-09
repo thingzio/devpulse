@@ -161,10 +161,6 @@ func (s *Store) QueryEntities(ctx context.Context, val string, limit int) ([]*da
 	return list, nil
 }
 
-// cleanEntitiesLockID is the advisory lock ID for entity cleanup.
-// Lock IDs 1 and 2 are used by migrations (postgres.go, saas.go).
-const cleanEntitiesLockID = 3
-
 func (s *Store) CleanEntities(ctx context.Context) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
@@ -175,15 +171,6 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer rollbackTransaction(tx)
-
-	// Acquire a blocking advisory lock scoped to this transaction.
-	// Concurrent tasks wait instead of running simultaneously, preventing deadlocks
-	// from non-deterministic UPDATE ordering across transactions.
-	if _, err = tx.ExecContext(ctx,
-		"SELECT pg_advisory_xact_lock($1)", cleanEntitiesLockID,
-	); err != nil {
-		return fmt.Errorf("failed to acquire advisory lock: %w", err)
-	}
 
 	rows, err := tx.QueryContext(ctx, selectEntityNamesSQL)
 	if err != nil {

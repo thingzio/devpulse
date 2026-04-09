@@ -153,7 +153,7 @@ func runImport(ctx context.Context, mode string) error {
 	close(work)
 	wg.Wait()
 
-	postImport(taskCtx, store, pool)
+	postImport(taskCtx, db, store, pool)
 
 	repos := int(totalRepos.Load())
 	errs := int(totalErrors.Load())
@@ -168,8 +168,24 @@ func runImport(ctx context.Context, mode string) error {
 	return nil
 }
 
+// postImportLockID serializes postImport across concurrent tasks to prevent
+// deadlocks from enrichment and entity cleanup updating the same developer rows.
+const postImportLockID = 5
+
 // postImport runs developer enrichment and entity normalization after all repo imports.
-func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
+// Uses a session-level advisory lock so concurrent tasks serialize instead of deadlocking.
+func postImport(ctx context.Context, db *sql.DB, store data.Store, pool *ghutil.TokenPool) {
+	// Acquire session-level advisory lock — blocks until available.
+	if _, err := db.ExecContext(ctx, "SELECT pg_advisory_lock($1)", postImportLockID); err != nil {
+		slog.Warn("acquiring post-import lock", "error", err)
+		return
+	}
+	defer func() {
+		if _, err := db.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", postImportLockID); err != nil {
+			slog.Warn("releasing post-import lock", "error", err)
+		}
+	}()
+
 	if pool != nil {
 		if anyToken := pool.Token(); anyToken != "" {
 			slog.Info("phase: developer enrichment")
