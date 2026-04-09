@@ -220,6 +220,73 @@ func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string) ([
 	return result, nil
 }
 
+const listImportWorkSQL = `
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan
+	FROM tenant_repo tr
+	JOIN tenant t ON t.id = tr.tenant_id
+	WHERE tr.active = TRUE
+	  AND tr.import_errors < 5
+	  AND t.tos_accepted_at IS NOT NULL
+	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
+
+const markImportDoneByRepoSQL = `
+	UPDATE tenant_repo
+	SET import_done_at = NOW()
+	WHERE org = $1 AND repo = $2 AND active = TRUE`
+
+const incrementImportErrorsByRepoSQL = `
+	UPDATE tenant_repo
+	SET import_errors = import_errors + 1, import_last_error = $3
+	WHERE org = $1 AND repo = $2 AND active = TRUE`
+
+// ImportWorkRow is a raw row from the import work list query.
+type ImportWorkRow struct {
+	TenantRepoID string
+	TenantID     string
+	Org          string
+	Repo         string
+	Plan         string
+}
+
+// ListImportWork returns all active tenant_repo rows eligible for import,
+// joined with tenant plan. Sorted deterministically for sharding.
+func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkSQL)
+	if err != nil {
+		return nil, fmt.Errorf("listing import work: %w", err)
+	}
+	defer rows.Close()
+
+	var result []ImportWorkRow
+	for rows.Next() {
+		var r ImportWorkRow
+		if err := rows.Scan(&r.TenantRepoID, &r.TenantID, &r.Org, &r.Repo, &r.Plan); err != nil {
+			return nil, fmt.Errorf("scanning import work row: %w", err)
+		}
+		result = append(result, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating import work: %w", err)
+	}
+	return result, nil
+}
+
+// MarkImportDoneByRepo marks all active tenant_repo rows for a given org/repo as imported.
+func MarkImportDoneByRepo(ctx context.Context, db *sql.DB, org, repo string) error {
+	if _, err := db.ExecContext(ctx, markImportDoneByRepoSQL, org, repo); err != nil {
+		return fmt.Errorf("marking import done for %s/%s: %w", org, repo, err)
+	}
+	return nil
+}
+
+// IncrementImportErrorsByRepo increments error counter for all active tenant_repo rows of a given org/repo.
+func IncrementImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo, errMsg string) error {
+	if _, err := db.ExecContext(ctx, incrementImportErrorsByRepoSQL, org, repo, errMsg); err != nil {
+		return fmt.Errorf("incrementing import errors for %s/%s: %w", org, repo, err)
+	}
+	return nil
+}
+
 // GetActiveReposForInstall returns active repos for a tenant's installation.
 func GetActiveReposForInstall(ctx context.Context, db *sql.DB, tenantID string, installationID int64) ([]ActiveRepo, error) {
 	rows, err := db.QueryContext(ctx, getActiveReposForInstallSQL, tenantID, installationID)
