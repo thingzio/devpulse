@@ -77,7 +77,6 @@ const (
 	`
 
 	updateDeveloperNamesSQL = `UPDATE developer SET full_name = $1 WHERE username = $2`
-
 )
 
 func (s *Store) GetDeveloperUsernames(ctx context.Context) ([]string, error) {

@@ -112,7 +112,7 @@ func TestBuildAndShardIntegration(t *testing.T) {
 	}
 
 	// Shard across 2 tasks — all repos covered, no overlap.
-	var all []RepoWork
+	all := make([]RepoWork, 0, len(workList))
 	for idx := range 2 {
 		all = append(all, ShardRepos(workList, 2, idx)...)
 	}
@@ -124,4 +124,3 @@ func TestBuildAndShardIntegration(t *testing.T) {
 		seen[key] = true
 	}
 }
-
