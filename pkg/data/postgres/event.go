@@ -683,10 +683,6 @@ func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prR
 	changedFiles := pr.GetChangedFiles()
 	commits := pr.GetCommits()
 
-	if additions == 0 && deletions == 0 && changedFiles == 0 && commits == 0 {
-		return false, nil
-	}
-
 	if _, err := db.ExecContext(ctx, updatePRSizeSQL,
 		intPtr(additions), intPtr(deletions), intPtr(changedFiles), intPtr(commits),
 		p.org, p.repo, p.number); err != nil {
