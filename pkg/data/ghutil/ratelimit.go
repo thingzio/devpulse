@@ -2,14 +2,22 @@ package ghutil
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net/http"
 	"time"
 
 	"github.com/google/go-github/v83/github"
 )
+
+const minTokenQuota = 100
+
+// MinTokenQuota returns the minimum remaining API calls required for a token
+// to be included in the pool.
+func MinTokenQuota() int { return minTokenQuota }
 
 const RateLimitThreshold = 10
 
@@ -76,6 +84,42 @@ func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 	case <-time.After(total):
 		return nil
 	}
+}
+
+// CheckTokenQuota calls the GitHub rate_limit API (free, no quota cost) and
+// returns the remaining quota. Returns -1 on error (treat as usable).
+func CheckTokenQuota(token string) int {
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		return -1
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return -1
+	}
+	defer resp.Body.Close()
+
+	var rl struct {
+		Resources struct {
+			Core struct {
+				Remaining int `json:"remaining"`
+			} `json:"core"`
+		} `json:"resources"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rl); err != nil {
+		return -1
+	}
+	return rl.Resources.Core.Remaining
+}
+
+// HasSufficientQuota returns true if the token has enough remaining API calls.
+func HasSufficientQuota(token string) bool {
+	remaining := CheckTokenQuota(token)
+	return remaining < 0 || remaining >= minTokenQuota
 }
 
 // AbuseRetryAfter returns the retry-after duration if the error is a secondary

@@ -115,10 +115,19 @@ func collectTokenPool(ctx context.Context, db *sql.DB, ghAppConfig *tenant.GitHu
 					"error", err)
 				continue
 			}
+			remaining := ghutil.CheckTokenQuota(tok.Token)
+			if remaining >= 0 && remaining < ghutil.MinTokenQuota() {
+				slog.Info("skipping token with insufficient quota",
+					"installation_id", inst.ID,
+					"login", inst.Login,
+					"remaining", remaining)
+				continue
+			}
 			slog.Info("minted installation token",
 				"tenant_id", tn.ID,
 				"installation_id", inst.ID,
 				"login", inst.Login,
+				"remaining", remaining,
 				"expires_at", tok.ExpiresAt)
 			tokens = append(tokens, tok.Token)
 		}
