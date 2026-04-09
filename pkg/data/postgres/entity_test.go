@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"regexp"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +140,32 @@ func TestQueryEntities_NoMatch(t *testing.T) {
 	results, err := store.QueryEntities(ctx, "NONEXISTENT", 10)
 	require.NoError(t, err)
 	assert.Empty(t, results)
+}
+
+func TestCleanEntities_Concurrent(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	devs := []*data.Developer{
+		{Username: "u1", FullName: "U1", Entity: "  NVIDIA  "},
+		{Username: "u2", FullName: "U2", Entity: "Google, Inc."},
+	}
+	require.NoError(t, store.SaveDevelopers(ctx, devs))
+
+	var wg sync.WaitGroup
+	errs := make([]error, 3)
+	for i := range 3 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			errs[idx] = store.CleanEntities(ctx)
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		assert.NoError(t, err, "goroutine %d", i)
+	}
 }
 
 func TestCleanEntity(t *testing.T) {

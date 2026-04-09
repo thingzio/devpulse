@@ -166,41 +166,32 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 		return data.ErrDBNotInitialized
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer rollbackTransaction(tx)
-
-	rows, err := tx.QueryContext(ctx, selectEntityNamesSQL)
+	rows, err := s.db.QueryContext(ctx, selectEntityNamesSQL)
 	if err != nil {
 		return fmt.Errorf("failed to query entity names: %w", err)
 	}
 	defer rows.Close()
 
-	m := make(map[string]string)
+	type entityUpdate struct{ old, cleaned string }
+	var updates []entityUpdate
 	for rows.Next() {
 		var name string
 		if err = rows.Scan(&name); err != nil {
 			return fmt.Errorf("failed to scan row: %w", err)
 		}
-		m[name] = cleanEntityName(name)
+		if cleaned := cleanEntityName(name); cleaned != name {
+			updates = append(updates, entityUpdate{name, cleaned})
+		}
 	}
-
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	for old, cleaned := range m {
-		if _, err = tx.ExecContext(ctx, updateEntityNamesSQL, cleaned, old); err != nil {
-			return fmt.Errorf("error updating entity %s to %s: %w", old, cleaned, err)
+	for _, u := range updates {
+		if _, err = s.db.ExecContext(ctx, updateEntityNamesSQL, u.cleaned, u.old); err != nil {
+			slog.Warn("error updating entity name", "old", u.old, "new", u.cleaned, "error", err)
 		}
 	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return nil
 }
 
