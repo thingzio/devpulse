@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -162,24 +161,41 @@ func (s *Store) QueryEntities(ctx context.Context, val string, limit int) ([]*da
 	return list, nil
 }
 
+// cleanEntitiesLockID is the advisory lock ID for entity cleanup.
+// Lock IDs 1 and 2 are used by migrations (postgres.go, saas.go).
+const cleanEntitiesLockID = 3
+
 func (s *Store) CleanEntities(ctx context.Context) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, selectEntityNamesSQL)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed to prepare developer query statement: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer stmt.Close()
+	defer rollbackTransaction(tx)
 
-	m := make(map[string]string)
-	rows, err := stmt.QueryContext(ctx)
+	// Try to acquire an advisory lock scoped to this transaction.
+	// If another import task is already cleaning entities, skip this run.
+	var locked bool
+	if err = tx.QueryRowContext(ctx,
+		"SELECT pg_try_advisory_xact_lock($1)", cleanEntitiesLockID,
+	).Scan(&locked); err != nil {
+		return fmt.Errorf("failed to acquire advisory lock: %w", err)
+	}
+	if !locked {
+		slog.Debug("entity cleanup already running, skipping")
+		return nil
+	}
+
+	rows, err := tx.QueryContext(ctx, selectEntityNamesSQL)
 	if err != nil {
-		return fmt.Errorf("failed to execute select statement: %w", err)
+		return fmt.Errorf("failed to query entity names: %w", err)
 	}
 	defer rows.Close()
 
+	m := make(map[string]string)
 	for rows.Next() {
 		var name string
 		if err = rows.Scan(&name); err != nil {
@@ -192,31 +208,9 @@ func (s *Store) CleanEntities(ctx context.Context) error {
 		return fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	updateStmt, err := s.db.PrepareContext(ctx, updateEntityNamesSQL)
-	if err != nil {
-		return fmt.Errorf("failed to prepare entity update statement: %w", err)
-	}
-	defer updateStmt.Close()
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer rollbackTransaction(tx)
-
-	// Sort keys for consistent lock ordering across concurrent tasks.
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-
-	txStmt := tx.Stmt(updateStmt)
-	defer txStmt.Close()
-	for _, old := range keys {
-		if _, err = txStmt.ExecContext(ctx, m[old], old); err != nil {
-			rollbackTransaction(tx)
-			return fmt.Errorf("error updating entity %s to %s: %w", old, m[old], err)
+	for old, cleaned := range m {
+		if _, err = tx.ExecContext(ctx, updateEntityNamesSQL, cleaned, old); err != nil {
+			return fmt.Errorf("error updating entity %s to %s: %w", old, cleaned, err)
 		}
 	}
 
