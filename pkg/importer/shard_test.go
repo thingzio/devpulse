@@ -10,6 +10,61 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuildWorkList(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty input", func(t *testing.T) {
+		t.Parallel()
+		got := BuildWorkList(nil)
+		assert.Empty(t, got)
+	})
+
+	t.Run("single tenant single repo", func(t *testing.T) {
+		t.Parallel()
+		rows := []TenantRepoRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
+		}
+		got := BuildWorkList(rows)
+		require.Len(t, got, 1)
+		assert.Equal(t, "NVIDIA", got[0].Org)
+		assert.Equal(t, "aicr", got[0].Repo)
+		require.Len(t, got[0].Tenants, 1)
+		assert.Equal(t, "t1", got[0].Tenants[0].TenantID)
+	})
+
+	t.Run("two tenants same repo deduplicates", func(t *testing.T) {
+		t.Parallel()
+		rows := []TenantRepoRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
+			{TenantRepoID: "tr2", TenantID: "t2", Org: "NVIDIA", Repo: "aicr", Plan: "free"},
+		}
+		got := BuildWorkList(rows)
+		require.Len(t, got, 1)
+		assert.Len(t, got[0].Tenants, 2)
+	})
+
+	t.Run("different repos stay separate", func(t *testing.T) {
+		t.Parallel()
+		rows := []TenantRepoRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
+			{TenantRepoID: "tr2", TenantID: "t1", Org: "NVIDIA", Repo: "cccl", Plan: "pro"},
+		}
+		got := BuildWorkList(rows)
+		assert.Len(t, got, 2)
+	})
+
+	t.Run("case-sensitive org/repo matching", func(t *testing.T) {
+		t.Parallel()
+		// NVIDIA/aicr and nvidia/aicr are different repos on GitHub.
+		rows := []TenantRepoRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
+			{TenantRepoID: "tr2", TenantID: "t2", Org: "nvidia", Repo: "aicr", Plan: "free"},
+		}
+		got := BuildWorkList(rows)
+		assert.Len(t, got, 2, "different orgs should not deduplicate")
+	})
+}
+
 func TestShardRepos(t *testing.T) {
 	t.Parallel()
 

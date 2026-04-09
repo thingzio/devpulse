@@ -19,6 +19,49 @@ type TenantRef struct {
 	Plan         string
 }
 
+// TenantRepoRow is a raw row from the work list query.
+type TenantRepoRow struct {
+	TenantRepoID string
+	TenantID     string
+	Org          string
+	Repo         string
+	Plan         string
+}
+
+// BuildWorkList deduplicates tenant_repo rows by (org, repo), grouping
+// tenant refs under each unique repo. Preserves exact org/repo casing.
+func BuildWorkList(rows []TenantRepoRow) []RepoWork {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	idx := map[string]int{} // "org/repo" → index in result
+	var result []RepoWork
+
+	for _, r := range rows {
+		key := r.Org + "/" + r.Repo
+		if i, ok := idx[key]; ok {
+			result[i].Tenants = append(result[i].Tenants, TenantRef{
+				TenantRepoID: r.TenantRepoID,
+				TenantID:     r.TenantID,
+				Plan:         r.Plan,
+			})
+			continue
+		}
+		idx[key] = len(result)
+		result = append(result, RepoWork{
+			Org:  r.Org,
+			Repo: r.Repo,
+			Tenants: []TenantRef{{
+				TenantRepoID: r.TenantRepoID,
+				TenantID:     r.TenantID,
+				Plan:         r.Plan,
+			}},
+		})
+	}
+	return result
+}
+
 // ShardRepos deterministically assigns repos to a task shard.
 // Sorts by lowercase(repo), then lowercase(org) as tiebreaker, then
 // assigns every taskCount-th item to the given taskIndex.
