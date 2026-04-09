@@ -670,15 +670,15 @@ func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prR
 			pr, resp, err = e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
 			if err != nil {
 				slog.Warn("error fetching PR details after retry", "number", p.number, "error", err)
-				return false, nil
+				return e.markPRSizeZero(ctx, db, p)
 			}
 		} else {
 			slog.Warn("error fetching PR details", "number", p.number, "error", err)
-			return false, nil
+			return e.markPRSizeZero(ctx, db, p)
 		}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return false, nil
+		return e.markPRSizeZero(ctx, db, p)
 	}
 	if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
 		return false, fmt.Errorf("rate limit during PR size backfill for #%d: %w", p.number, err)
@@ -696,6 +696,18 @@ func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prR
 		return false, nil
 	}
 	return true, nil
+}
+
+// markPRSizeZero writes zeros for unfetchable PRs (deleted, transferred, etc.)
+// so they exit the "missing size" pool and don't block backfill progress.
+func (e *eventImporter) markPRSizeZero(ctx context.Context, db DBTX, p prRef) (bool, error) {
+	zero := intPtr(0)
+	if _, err := db.ExecContext(ctx, updatePRSizeSQL, zero, zero, zero, zero,
+		p.org, p.repo, p.number); err != nil {
+		slog.Warn("error marking PR size as zero", "number", p.number, "error", err)
+		return false, nil
+	}
+	return false, nil
 }
 
 func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error {
