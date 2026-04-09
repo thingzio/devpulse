@@ -98,13 +98,16 @@ func runImport(ctx context.Context, mode string) error {
 		"shard_size", len(myRepos),
 		"task_index", taskIndex)
 
-	if len(myRepos) == 0 {
-		slog.Info("no repos in shard, exiting")
-		return nil
-	}
-
 	// Fan out to workers.
 	start := time.Now()
+
+	if len(myRepos) == 0 {
+		slog.Info("import worker complete",
+			"repos", 0,
+			"errors", 0,
+			"duration", time.Since(start).String())
+		return nil
+	}
 	work := make(chan RepoWork)
 	var wg sync.WaitGroup
 	var totalRepos, totalErrors atomic.Int32
