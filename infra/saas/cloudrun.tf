@@ -189,6 +189,16 @@ resource "google_cloud_run_v2_job" "import" {
           value = "import"
         }
 
+        env {
+          name  = "IMPORT_WORKERS"
+          value = tostring(var.import_workers)
+        }
+
+        env {
+          name  = "IMPORT_TASK_TIMEOUT"
+          value = tostring(var.import_task_timeout)
+        }
+
         resources {
           limits = {
             cpu    = "1000m"

@@ -64,6 +64,18 @@ variable "import_parallelism" {
   default     = 3
 }
 
+variable "import_workers" {
+  description = "Number of concurrent goroutine workers per import task"
+  type        = number
+  default     = 2
+}
+
+variable "import_task_timeout" {
+  description = "Per-task timeout in minutes for import jobs"
+  type        = number
+  default     = 55
+}
+
 variable "deeprep_timeout" {
   description = "Timeout in seconds for the deep reputation job"
   type        = number
