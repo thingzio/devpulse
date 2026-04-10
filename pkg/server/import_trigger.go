@@ -43,7 +43,6 @@ func (t *importTrigger) TriggerRepoImport(ctx context.Context, org, repo string)
 					Env: []*runpb.EnvVar{
 						{Name: "IMPORT_ORG", Values: &runpb.EnvVar_Value{Value: org}},
 						{Name: "IMPORT_REPO", Values: &runpb.EnvVar_Value{Value: repo}},
-						{Name: "CLOUD_RUN_TASK_COUNT", Values: &runpb.EnvVar_Value{Value: "1"}},
 					},
 				},
 			},
