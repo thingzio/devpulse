@@ -264,7 +264,7 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	token := tokenForPhase()
 
 	slog.Info("phase: metadata", "org", org, "repo", repo)
-	if err := retryRL(func() error { return store.ImportRepoMeta(ctx, token, org, repo) }); err != nil {
+	if err := retryRL(func() error { _, err := store.ImportRepoMeta(ctx, token, org, repo); return err }); err != nil {
 		slog.Error("importing repo meta", "org", org, "repo", repo, "error", err)
 		errs++
 	}

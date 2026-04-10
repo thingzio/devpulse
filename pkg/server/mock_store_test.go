@@ -214,8 +214,10 @@ func (m *mockStore) GetContainerActivity(_ context.Context, _, _ *string, _ int)
 }
 
 // --- RepoMetaStore ---
-func (m *mockStore) ImportRepoMeta(_ context.Context, _, _, _ string) error { return nil }
-func (m *mockStore) ImportAllRepoMeta(_ context.Context, _ string) error    { return nil }
+func (m *mockStore) ImportRepoMeta(_ context.Context, _, _, _ string) (time.Time, error) {
+	return time.Time{}, nil
+}
+func (m *mockStore) ImportAllRepoMeta(_ context.Context, _ string) error { return nil }
 func (m *mockStore) GetRepoMetas(_ context.Context, _, _ *string) ([]*data.RepoMeta, error) {
 	return nil, nil
 }
