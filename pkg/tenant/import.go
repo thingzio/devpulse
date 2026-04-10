@@ -163,20 +163,7 @@ func ListImportWorkForRepo(ctx context.Context, db *sql.DB, org, repo string) ([
 	if err != nil {
 		return nil, fmt.Errorf("listing import work for %s/%s: %w", org, repo, err)
 	}
-	defer rows.Close()
-
-	var result []ImportWorkRow
-	for rows.Next() {
-		var r ImportWorkRow
-		if err := rows.Scan(&r.TenantRepoID, &r.TenantID, &r.Org, &r.Repo, &r.Plan, &r.EventCount); err != nil {
-			return nil, fmt.Errorf("scanning import work row: %w", err)
-		}
-		result = append(result, r)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating import work for %s/%s: %w", org, repo, err)
-	}
-	return result, nil
+	return scanImportWorkRows(rows)
 }
 
 const markImportDoneByRepoSQL = `
@@ -206,6 +193,11 @@ func ListImportWork(ctx context.Context, db *sql.DB, adoptTimeoutMin int) ([]Imp
 	if err != nil {
 		return nil, fmt.Errorf("listing import work: %w", err)
 	}
+	return scanImportWorkRows(rows)
+}
+
+// scanImportWorkRows scans sql.Rows into ImportWorkRow slices.
+func scanImportWorkRows(rows *sql.Rows) ([]ImportWorkRow, error) {
 	defer rows.Close()
 
 	var result []ImportWorkRow
@@ -217,7 +209,7 @@ func ListImportWork(ctx context.Context, db *sql.DB, adoptTimeoutMin int) ([]Imp
 		result = append(result, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating import work: %w", err)
+		return nil, fmt.Errorf("iterating import work rows: %w", err)
 	}
 	return result, nil
 }
