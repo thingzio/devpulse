@@ -29,11 +29,11 @@ func TestGetMaxEventTime_WithEvents(t *testing.T) {
 	// Insert test events with known created_at timestamps.
 	// PK is (org, repo, username, type, date) — vary date for uniqueness.
 	for _, ts := range []string{"2025-01-15", "2025-03-20", "2025-02-10"} {
-		_, err := store.db.ExecContext(ctx,
+		_, insertErr := store.db.ExecContext(ctx,
 			`INSERT INTO event (org, repo, username, type, date, url, mentions, labels, created_at)
 			 VALUES ($1, $2, 'user1', 'pr', $3, '', '', '', $3)`,
 			"testorg", "testrepo", ts)
-		require.NoError(t, err)
+		require.NoError(t, insertErr)
 	}
 
 	got, err := store.GetMaxEventTime(ctx, "testorg", "testrepo")
