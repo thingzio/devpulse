@@ -4,6 +4,7 @@ Pending work items, future improvements, and technical debt.
 
 ## Import Pipeline
 
+- [ ] **Skip event pagination for unchanged repos** — Check `pushed_at` from metadata phase against last import. If unchanged, skip the entire event import phase. Currently every run re-paginates all historical events (e.g., 10k events = 20 pages × 2s = 40s+ per repo) even when nothing changed. Would turn inactive repos from minutes to seconds.
 - [ ] **Legacy claim queue columns** — Drop `import_claimed_at`, `import_claimed_by`, `import_done_at` columns and `idx_tenant_repo_import_queue` index from `tenant_repo` table. Retained for rollback safety after sharded import refactor (v0.35.0).
 - [ ] **Duplicate `importing repo` log lines** — Each repo logs twice: once from `importRepoWork` (with plan/tenants) and once from `importRepo` (without). Consolidate to single log line.
 
