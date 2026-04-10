@@ -149,7 +149,7 @@ resource "google_logging_metric" "backfill_rate_limited" {
 resource "google_logging_metric" "backfill_completed" {
   name    = "${var.prefix}-backfill-completed"
   project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"PR sizes backfilled\""
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"PR backfill complete\""
 
   metric_descriptor {
     metric_kind = "DELTA"
