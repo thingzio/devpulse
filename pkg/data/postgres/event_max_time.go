@@ -29,7 +29,11 @@ func (s *Store) GetMaxEventTime(ctx context.Context, org, repo string) (time.Tim
 		return time.Time{}, nil
 	}
 
-	t, err := time.Parse("2006-01-02", raw.String)
+	// created_at may be "YYYY-MM-DD" or full RFC3339 "YYYY-MM-DDTHH:MM:SSZ".
+	t, err := time.Parse("2006-01-02T15:04:05Z", raw.String)
+	if err != nil {
+		t, err = time.Parse("2006-01-02", raw.String)
+	}
 	if err != nil {
 		return time.Time{}, fmt.Errorf("parsing max event time %q for %s/%s: %w", raw.String, org, repo, err)
 	}

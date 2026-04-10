@@ -28,7 +28,8 @@ func TestGetMaxEventTime_WithEvents(t *testing.T) {
 
 	// Insert test events with known created_at timestamps.
 	// PK is (org, repo, username, type, date) — vary date for uniqueness.
-	for _, ts := range []string{"2025-01-15", "2025-03-20", "2025-02-10"} {
+	// Mix date-only and full RFC3339 formats to match real data.
+	for _, ts := range []string{"2025-01-15", "2025-03-20T21:14:12Z", "2025-02-10"} {
 		_, insertErr := store.db.ExecContext(ctx,
 			`INSERT INTO event (org, repo, username, type, date, url, mentions, labels, created_at)
 			 VALUES ($1, $2, 'user1', 'pr', $3, '', '', '', $3)`,
