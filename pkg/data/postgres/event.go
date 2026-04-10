@@ -281,6 +281,24 @@ func (e *eventImporter) rotateToken(ctx context.Context) bool {
 	return true
 }
 
+// retryOnRateLimit executes fn. If it returns a rate-limit error, rotates
+// the token and retries once. Returns the original error if rotation fails
+// or the retry also fails.
+func (e *eventImporter) retryOnRateLimit(ctx context.Context, fn func() error) error {
+	err := fn()
+	if err == nil {
+		return nil
+	}
+	if !ghutil.IsRateLimited(err) {
+		return err
+	}
+	slog.Debug("rate limited, rotating token", "org", e.owner, "repo", e.repo)
+	if !e.rotateToken(ctx) {
+		return fmt.Errorf("all tokens exhausted: %w", err)
+	}
+	return fn()
+}
+
 func (e *eventImporter) qualifyTypeKey(t string) string {
 	return e.owner + "/" + e.repo + "/" + t
 }
@@ -568,16 +586,21 @@ func (e *eventImporter) importPREvents(ctx context.Context) error {
 	}
 
 	for {
-		items, resp, err := e.client.PullRequests.List(ctx, e.owner, e.repo, opt)
-		if err != nil {
-			return fmt.Errorf("error listing prs: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			net.PrintHTTPResponse(resp.Response)
-			return fmt.Errorf("error listing prs, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during PR import: %w", err)
+		var items []*github.PullRequest
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			items, resp, apiErr = e.client.PullRequests.List(ctx, e.owner, e.repo, opt)
+			if apiErr != nil {
+				return fmt.Errorf("error listing prs: %w", apiErr)
+			}
+			if resp.StatusCode != http.StatusOK {
+				net.PrintHTTPResponse(resp.Response)
+				return fmt.Errorf("error listing prs, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 		slog.Debug("pr events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -682,8 +705,16 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 }
 
 func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prRef) (bool, error) {
-	pr, resp, err := e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
-	if err != nil {
+	var pr *github.PullRequest
+	var resp *github.Response
+	if err := e.retryOnRateLimit(ctx, func() error {
+		var apiErr error
+		pr, resp, apiErr = e.client.PullRequests.Get(ctx, e.owner, e.repo, p.number)
+		if apiErr != nil {
+			return apiErr
+		}
+		return ghutil.CheckRateLimit(ctx, resp)
+	}); err != nil {
 		if ghutil.IsRateLimited(err) {
 			return false, fmt.Errorf("rate limit hit during PR backfill: %w", err)
 		}
@@ -706,9 +737,6 @@ func (e *eventImporter) fetchAndUpdatePRSize(ctx context.Context, db DBTX, p prR
 	}
 	if resp.StatusCode != http.StatusOK {
 		return e.markPRSizeZero(ctx, db, p)
-	}
-	if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-		return false, fmt.Errorf("rate limit during PR size backfill for #%d: %w", p.number, err)
 	}
 
 	additions := pr.GetAdditions()
@@ -745,12 +773,17 @@ func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error
 	opts := &github.ListOptions{PerPage: pageSizeDefault}
 
 	for {
-		reviews, resp, err := e.client.PullRequests.ListReviews(ctx, e.owner, e.repo, prNumber, opts)
-		if err != nil {
-			return fmt.Errorf("error listing reviews for PR #%d: %w", prNumber, err)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during PR review import for PR #%d: %w", prNumber, err)
+		var reviews []*github.PullRequestReview
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			reviews, resp, apiErr = e.client.PullRequests.ListReviews(ctx, e.owner, e.repo, prNumber, opts)
+			if apiErr != nil {
+				return fmt.Errorf("error listing reviews for PR #%d: %w", prNumber, apiErr)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 
 		for i := range reviews {
@@ -792,16 +825,21 @@ func (e *eventImporter) importIssueEvents(ctx context.Context) error {
 	}
 
 	for {
-		items, resp, err := e.client.Issues.ListByRepo(ctx, e.owner, e.repo, opt)
-		if err != nil {
-			return fmt.Errorf("error listing issues: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			net.PrintHTTPResponse(resp.Response)
-			return fmt.Errorf("error listing issues, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during issue import: %w", err)
+		var items []*github.Issue
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			items, resp, apiErr = e.client.Issues.ListByRepo(ctx, e.owner, e.repo, opt)
+			if apiErr != nil {
+				return fmt.Errorf("error listing issues: %w", apiErr)
+			}
+			if resp.StatusCode != http.StatusOK {
+				net.PrintHTTPResponse(resp.Response)
+				return fmt.Errorf("error listing issues, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 		slog.Debug("issue events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -860,16 +898,21 @@ func (e *eventImporter) importIssueCommentEvents(ctx context.Context) error {
 	}
 
 	for {
-		items, resp, err := e.client.Issues.ListComments(ctx, e.owner, e.repo, nilNumber, opt)
-		if err != nil {
-			return fmt.Errorf("error listing issue comments: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			net.PrintHTTPResponse(resp.Response)
-			return fmt.Errorf("error listing issue comments, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during issue comment import: %w", err)
+		var items []*github.IssueComment
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			items, resp, apiErr = e.client.Issues.ListComments(ctx, e.owner, e.repo, nilNumber, opt)
+			if apiErr != nil {
+				return fmt.Errorf("error listing issue comments: %w", apiErr)
+			}
+			if resp.StatusCode != http.StatusOK {
+				net.PrintHTTPResponse(resp.Response)
+				return fmt.Errorf("error listing issue comments, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 		slog.Debug("issue comment events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -918,16 +961,21 @@ func (e *eventImporter) importPRReviewEvents(ctx context.Context) error {
 	}
 
 	for {
-		items, resp, err := e.client.PullRequests.ListComments(ctx, e.owner, e.repo, nilNumber, opt)
-		if err != nil {
-			return fmt.Errorf("error listing pr comments: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			net.PrintHTTPResponse(resp.Response)
-			return fmt.Errorf("error listing pr comments, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during PR review import: %w", err)
+		var items []*github.PullRequestComment
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			items, resp, apiErr = e.client.PullRequests.ListComments(ctx, e.owner, e.repo, nilNumber, opt)
+			if apiErr != nil {
+				return fmt.Errorf("error listing pr comments: %w", apiErr)
+			}
+			if resp.StatusCode != http.StatusOK {
+				net.PrintHTTPResponse(resp.Response)
+				return fmt.Errorf("error listing pr comments, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 		slog.Debug("pr review events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -973,16 +1021,21 @@ func (e *eventImporter) importForkEvents(ctx context.Context) error {
 	}
 
 	for {
-		items, resp, err := e.client.Repositories.ListForks(ctx, e.owner, e.repo, opt)
-		if err != nil {
-			return fmt.Errorf("error listing forks: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			net.PrintHTTPResponse(resp.Response)
-			return fmt.Errorf("error listing forks, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
-		}
-		if err := ghutil.CheckRateLimit(ctx, resp); err != nil {
-			return fmt.Errorf("rate limit during fork import: %w", err)
+		var items []*github.Repository
+		var resp *github.Response
+		if err := e.retryOnRateLimit(ctx, func() error {
+			var apiErr error
+			items, resp, apiErr = e.client.Repositories.ListForks(ctx, e.owner, e.repo, opt)
+			if apiErr != nil {
+				return fmt.Errorf("error listing forks: %w", apiErr)
+			}
+			if resp.StatusCode != http.StatusOK {
+				net.PrintHTTPResponse(resp.Response)
+				return fmt.Errorf("error listing forks, rate: %s, status: %d", ghutil.RateInfo(&resp.Rate), resp.StatusCode)
+			}
+			return ghutil.CheckRateLimit(ctx, resp)
+		}); err != nil {
+			return err
 		}
 		slog.Debug("fork events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
