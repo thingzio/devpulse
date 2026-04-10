@@ -108,12 +108,22 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
 
+	trigger, err := newImportTrigger(ctx, config.ImportJobName())
+	if err != nil {
+		slog.Warn("import trigger unavailable", "error", err)
+	}
+	defer func() {
+		if closeErr := trigger.Close(); closeErr != nil {
+			slog.Error("closing import trigger", "error", closeErr)
+		}
+	}()
+
 	apiCache.startEviction(ctx)
 
 	oauthRL := newRateLimiter(20, time.Minute)
 	repoSearchRL := newRateLimiter(30, time.Minute)
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL)
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, trigger)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
@@ -154,7 +164,7 @@ func Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter) *http.ServeMux {
+func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter, trigger *importTrigger) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -193,7 +203,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	// Tenant management API
 	mux.Handle("GET /api/repos", wrap(listReposHandler(db)))
 	mux.Handle("GET /api/repos/overview", wrap(repoOverviewHandler(db)))
-	mux.Handle("POST /api/repos", wrap(addRepoHandler(db)))
+	mux.Handle("POST /api/repos", wrap(addRepoHandler(db, trigger)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
 	mux.Handle("GET /api/repos/available", repoSearchRL(wrap(availableReposHandler(db))))
@@ -511,7 +521,7 @@ func listInstallationsHandler(db *sql.DB) http.HandlerFunc {
 	})
 }
 
-func addRepoHandler(db *sql.DB) http.HandlerFunc {
+func addRepoHandler(db *sql.DB, trigger *importTrigger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
@@ -568,6 +578,14 @@ func addRepoHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "error adding repository", http.StatusInternalServerError)
 			return
 		}
+
+		go func() { //nolint:gosec // fire-and-forget: goroutine intentionally outlives the HTTP request
+			triggerCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if triggerErr := trigger.TriggerRepoImport(triggerCtx, org, repo); triggerErr != nil {
+				slog.Error("triggering on-demand import", "org", org, "repo", repo, "error", triggerErr)
+			}
+		}()
 
 		w.WriteHeader(http.StatusCreated)
 	}
