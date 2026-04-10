@@ -23,7 +23,7 @@ func TestBuildWorkList(t *testing.T) {
 	t.Run("single tenant single repo", func(t *testing.T) {
 		t.Parallel()
 		rows := []tenant.ImportWorkRow{
-			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro", EventCount: 0},
 		}
 		got := BuildWorkList(rows)
 		require.Len(t, got, 1)
@@ -36,8 +36,8 @@ func TestBuildWorkList(t *testing.T) {
 	t.Run("two tenants same repo deduplicates", func(t *testing.T) {
 		t.Parallel()
 		rows := []tenant.ImportWorkRow{
-			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
-			{TenantRepoID: "tr2", TenantID: "t2", Org: "NVIDIA", Repo: "aicr", Plan: "free"},
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro", EventCount: 0},
+			{TenantRepoID: "tr2", TenantID: "t2", Org: "NVIDIA", Repo: "aicr", Plan: "free", EventCount: 0},
 		}
 		got := BuildWorkList(rows)
 		require.Len(t, got, 1)
@@ -47,8 +47,8 @@ func TestBuildWorkList(t *testing.T) {
 	t.Run("different repos stay separate", func(t *testing.T) {
 		t.Parallel()
 		rows := []tenant.ImportWorkRow{
-			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
-			{TenantRepoID: "tr2", TenantID: "t1", Org: "NVIDIA", Repo: "cccl", Plan: "pro"},
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro", EventCount: 0},
+			{TenantRepoID: "tr2", TenantID: "t1", Org: "NVIDIA", Repo: "cccl", Plan: "pro", EventCount: 0},
 		}
 		got := BuildWorkList(rows)
 		assert.Len(t, got, 2)
@@ -58,11 +58,32 @@ func TestBuildWorkList(t *testing.T) {
 		t.Parallel()
 		// NVIDIA/aicr and nvidia/aicr are different repos on GitHub.
 		rows := []tenant.ImportWorkRow{
-			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro"},
-			{TenantRepoID: "tr2", TenantID: "t2", Org: "nvidia", Repo: "aicr", Plan: "free"},
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "aicr", Plan: "pro", EventCount: 0},
+			{TenantRepoID: "tr2", TenantID: "t2", Org: "nvidia", Repo: "aicr", Plan: "free", EventCount: 0},
 		}
 		got := BuildWorkList(rows)
 		assert.Len(t, got, 2, "different orgs should not deduplicate")
+	})
+
+	t.Run("weight propagated from event count", func(t *testing.T) {
+		t.Parallel()
+		rows := []tenant.ImportWorkRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "NVIDIA", Repo: "dynamo", Plan: "pro", EventCount: 12000},
+			{TenantRepoID: "tr2", TenantID: "t2", Org: "NVIDIA", Repo: "dynamo", Plan: "enterprise", EventCount: 12000},
+		}
+		got := BuildWorkList(rows)
+		require.Len(t, got, 1)
+		assert.Equal(t, 12000, got[0].Weight)
+	})
+
+	t.Run("zero weight for new repo", func(t *testing.T) {
+		t.Parallel()
+		rows := []tenant.ImportWorkRow{
+			{TenantRepoID: "tr1", TenantID: "t1", Org: "x", Repo: "new", Plan: "free", EventCount: 0},
+		}
+		got := BuildWorkList(rows)
+		require.Len(t, got, 1)
+		assert.Equal(t, 0, got[0].Weight)
 	})
 }
 

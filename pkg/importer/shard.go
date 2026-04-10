@@ -11,6 +11,7 @@ import (
 type RepoWork struct {
 	Org     string
 	Repo    string
+	Weight  int // event count for sharding weight; 0 = new repo
 	Tenants []TenantRef
 }
 
@@ -43,8 +44,9 @@ func BuildWorkList(rows []tenant.ImportWorkRow) []RepoWork {
 		}
 		idx[key] = len(result)
 		result = append(result, RepoWork{
-			Org:  r.Org,
-			Repo: r.Repo,
+			Org:    r.Org,
+			Repo:   r.Repo,
+			Weight: r.EventCount,
 			Tenants: []TenantRef{{
 				TenantRepoID: r.TenantRepoID,
 				TenantID:     r.TenantID,
