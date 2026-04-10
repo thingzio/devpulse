@@ -2641,7 +2641,7 @@ function removeTrackedRepo(org, repo) {
 function pollRepoImport(org, repo) {
     var name = org + '/' + repo;
     var attempts = 0;
-    var maxAttempts = 60; // 5 minutes at 5s intervals
+    var maxAttempts = 100; // 25 minutes at 15s intervals
     var interval = setInterval(function() {
         attempts++;
         if (attempts > maxAttempts) {
@@ -2658,7 +2658,7 @@ function pollRepoImport(org, repo) {
                 }
             }
         });
-    }, 5000);
+    }, 15000);
 }
 
 function addTrackedRepo(org, repo) {
