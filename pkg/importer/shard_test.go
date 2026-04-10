@@ -156,19 +156,19 @@ func TestShardRepos(t *testing.T) {
 		assertExactCoverage(t, repos, all)
 	})
 
-	t.Run("case insensitive sort by repo then org", func(t *testing.T) {
+	t.Run("equal weight sorts alphabetically by repo then org", func(t *testing.T) {
 		t.Parallel()
 		repos := []RepoWork{
-			{Org: "NVIDIA", Repo: "Zlib"},
-			{Org: "apple", Repo: "aicr"},
-			{Org: "NVIDIA", Repo: "aicr"},
+			{Org: "NVIDIA", Repo: "Zlib", Weight: 100},
+			{Org: "apple", Repo: "aicr", Weight: 100},
+			{Org: "NVIDIA", Repo: "aicr", Weight: 100},
 		}
 
-		// taskCount=1 returns all in sorted order
+		// taskCount=1 returns all in sorted order (weight desc, then alpha)
 		got := ShardRepos(repos, 1, 0)
 		require.Len(t, got, 3)
 
-		// aicr sorts before zlib; within aicr, apple < nvidia
+		// Equal weight → aicr sorts before zlib; within aicr, apple < nvidia
 		assert.Equal(t, "aicr", got[0].Repo)
 		assert.Equal(t, "apple", got[0].Org)
 		assert.Equal(t, "aicr", got[1].Repo)
@@ -224,8 +224,9 @@ func TestShardReposExhaustive(t *testing.T) {
 	orgs := []string{"NVIDIA", "apple", "Google", "meta", "dgxc-io"}
 	for i := range repos {
 		repos[i] = RepoWork{
-			Org:  orgs[i%len(orgs)],
-			Repo: names[i],
+			Org:    orgs[i%len(orgs)],
+			Repo:   names[i],
+			Weight: (i + 1) * 500,
 			Tenants: []TenantRef{
 				{TenantRepoID: fmt.Sprintf("tr-%d", i), TenantID: fmt.Sprintf("t-%d", i%3), Plan: "pro"},
 			},
@@ -256,6 +257,79 @@ func makeRepos(specs ...string) []RepoWork {
 		out[i] = RepoWork{Org: parts[0], Repo: parts[1]}
 	}
 	return out
+}
+
+func TestShardReposWeighted(t *testing.T) {
+	t.Parallel()
+
+	t.Run("heavy repos distributed across tasks", func(t *testing.T) {
+		t.Parallel()
+		repos := []RepoWork{
+			{Org: "a", Repo: "dynamo", Weight: 12000},
+			{Org: "a", Repo: "cccl", Weight: 5000},
+			{Org: "a", Repo: "cuopt", Weight: 2500},
+			{Org: "a", Repo: "nixl", Weight: 3600},
+			{Org: "a", Repo: "aicr", Weight: 1000},
+			{Org: "a", Repo: "small", Weight: 100},
+		}
+
+		shard0 := ShardRepos(repos, 3, 0)
+		shard1 := ShardRepos(repos, 3, 1)
+		shard2 := ShardRepos(repos, 3, 2)
+
+		// dynamo (12000) and cccl (5000) must NOT be in the same shard.
+		has := func(shard []RepoWork, name string) bool {
+			for _, r := range shard {
+				if r.Repo == name {
+					return true
+				}
+			}
+			return false
+		}
+		for i, shard := range [][]RepoWork{shard0, shard1, shard2} {
+			if has(shard, "dynamo") {
+				assert.False(t, has(shard, "cccl"),
+					"shard %d has both dynamo and cccl", i)
+			}
+		}
+
+		// All repos covered.
+		total := len(shard0) + len(shard1) + len(shard2)
+		assert.Equal(t, 6, total)
+	})
+
+	t.Run("zero weight repos still assigned", func(t *testing.T) {
+		t.Parallel()
+		repos := []RepoWork{
+			{Org: "a", Repo: "big", Weight: 10000},
+			{Org: "a", Repo: "new1", Weight: 0},
+			{Org: "a", Repo: "new2", Weight: 0},
+		}
+		all := make([]RepoWork, 0, 3)
+		for idx := range 2 {
+			all = append(all, ShardRepos(repos, 2, idx)...)
+		}
+		assert.Len(t, all, 3)
+	})
+
+	t.Run("equal weights fall back to alphabetical", func(t *testing.T) {
+		t.Parallel()
+		repos := []RepoWork{
+			{Org: "b", Repo: "zebra", Weight: 100},
+			{Org: "a", Repo: "alpha", Weight: 100},
+			{Org: "a", Repo: "beta", Weight: 100},
+		}
+		// With equal weights and 3 tasks, each gets 1 repo.
+		// Order should be deterministic.
+		s0 := ShardRepos(repos, 3, 0)
+		s1 := ShardRepos(repos, 3, 1)
+		s2 := ShardRepos(repos, 3, 2)
+		require.Len(t, s0, 1)
+		require.Len(t, s1, 1)
+		require.Len(t, s2, 1)
+		// Verify determinism across calls.
+		assert.Equal(t, s0, ShardRepos(repos, 3, 0))
+	})
 }
 
 // assertExactCoverage verifies that got contains exactly the same repos as

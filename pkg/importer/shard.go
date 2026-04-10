@@ -57,18 +57,23 @@ func BuildWorkList(rows []tenant.ImportWorkRow) []RepoWork {
 	return result
 }
 
-// ShardRepos deterministically assigns repos to a task shard.
-// Sorts by lowercase(repo), then lowercase(org) as tiebreaker, then
-// assigns every taskCount-th item to the given taskIndex.
+// ShardRepos deterministically assigns repos to a task shard using greedy
+// bin-packing by weight. Heavy repos are spread across tasks to balance
+// cumulative import cost. Ties broken by lower task index for determinism.
 // Guarantees: union of all shards == input, no gaps, no overlaps.
 func ShardRepos(repos []RepoWork, taskCount, taskIndex int) []RepoWork {
 	if len(repos) == 0 || taskCount < 1 {
 		return nil
 	}
 
+	// Sort by weight descending; break ties by lowercase(repo), lowercase(org)
+	// for determinism.
 	sorted := make([]RepoWork, len(repos))
 	copy(sorted, repos)
 	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].Weight != sorted[j].Weight {
+			return sorted[i].Weight > sorted[j].Weight
+		}
 		ri, rj := strings.ToLower(sorted[i].Repo), strings.ToLower(sorted[j].Repo)
 		if ri != rj {
 			return ri < rj
@@ -76,9 +81,24 @@ func ShardRepos(repos []RepoWork, taskCount, taskIndex int) []RepoWork {
 		return strings.ToLower(sorted[i].Org) < strings.ToLower(sorted[j].Org)
 	})
 
+	// Greedy assignment: each repo goes to the task with the lowest
+	// cumulative weight. Ties broken by lower task index for determinism.
+	taskWeights := make([]int, taskCount)
+	assignments := make([]int, len(sorted))
+	for i, r := range sorted {
+		minTask := 0
+		for t := 1; t < taskCount; t++ {
+			if taskWeights[t] < taskWeights[minTask] {
+				minTask = t
+			}
+		}
+		assignments[i] = minTask
+		taskWeights[minTask] += max(r.Weight, 1) // zero-weight = 1 to avoid starvation
+	}
+
 	var shard []RepoWork
 	for i, r := range sorted {
-		if i%taskCount == taskIndex {
+		if assignments[i] == taskIndex {
 			shard = append(shard, r)
 		}
 	}
