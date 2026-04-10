@@ -118,3 +118,13 @@ resource "google_cloud_run_v2_job_iam_member" "run_invoke_import" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.run.email}"
 }
+
+# run.jobs.runWithOverrides is required to pass env var overrides when triggering
+# the import job. roles/run.invoker only grants run.jobs.run (no overrides).
+resource "google_cloud_run_v2_job_iam_member" "run_invoke_import_overrides" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.import.name
+  role     = "roles/run.developer"
+  member   = "serviceAccount:${google_service_account.run.email}"
+}
