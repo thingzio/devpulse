@@ -162,42 +162,6 @@
         }
       },
       {
-        "title": "Import: Tenants per Run",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-tenant-count\"",
-                "aggregation": {
-                  "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_DELTA",
-                  "crossSeriesReducer": "REDUCE_MEAN"
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Import: Weekly Events per Tenant",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-tenant-weekly-events\"",
-                "aggregation": {
-                  "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_DELTA",
-                  "crossSeriesReducer": "REDUCE_MEAN"
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
         "title": "Import: Job Execution Results",
         "xyChart": {
           "dataSets": [{

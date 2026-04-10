@@ -55,62 +55,12 @@ resource "google_logging_metric" "import_duration" {
     unit        = "s"
   }
 
-  value_extractor = "EXTRACT(jsonPayload.duration)"
+  value_extractor = "EXTRACT(jsonPayload.duration_sec)"
 
   bucket_options {
     explicit_buckets {
       bounds = [60, 300, 600, 1800, 3600]
     }
-  }
-}
-
-resource "google_logging_metric" "import_tenant_count" {
-  name    = "${var.prefix}-import-tenant-count"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"import worker complete\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "DISTRIBUTION"
-    unit        = "1"
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.tenants)"
-
-  bucket_options {
-    explicit_buckets {
-      bounds = [10, 50, 100, 200, 500, 1000]
-    }
-  }
-}
-
-resource "google_logging_metric" "tenant_weekly_events" {
-  name    = "${var.prefix}-tenant-weekly-events"
-  project = var.project_id
-  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"tenant usage\""
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "DISTRIBUTION"
-    unit        = "1"
-
-    labels {
-      key         = "tenant_id"
-      value_type  = "STRING"
-      description = "Tenant ID"
-    }
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.weekly_events)"
-
-  bucket_options {
-    explicit_buckets {
-      bounds = [100, 500, 1000, 2000, 5000, 10000, 20000]
-    }
-  }
-
-  label_extractors = {
-    "tenant_id" = "EXTRACT(jsonPayload.tenant_id)"
   }
 }
 
