@@ -65,13 +65,29 @@ func runImport(ctx context.Context) error {
 
 	llmCfg := data.NewLLMConfigFromEnv()
 
-	// Fetch all active repos and build deduplicated work list.
-	rows, err := tenant.ListImportWork(taskCtx, db, config.ImportAdoptTimeout())
+	// Check for single-repo mode (on-demand import).
+	importOrg := config.ImportOrg()
+	importRepo := config.ImportRepo()
+
+	var rows []tenant.ImportWorkRow
+	if importOrg != "" && importRepo != "" {
+		slog.Info("single-repo import mode", "org", importOrg, "repo", importRepo)
+		rows, err = tenant.ListImportWorkForRepo(taskCtx, db, importOrg, importRepo)
+	} else {
+		rows, err = tenant.ListImportWork(taskCtx, db, config.ImportAdoptTimeout())
+	}
 	if err != nil {
 		return fmt.Errorf("listing import work: %w", err)
 	}
 
 	workList := BuildWorkList(rows)
+
+	// In single-repo mode, force single task (no sharding).
+	if importOrg != "" && importRepo != "" {
+		taskCount = 1
+		taskIndex = 0
+	}
+
 	myRepos := ShardRepos(workList, taskCount, taskIndex)
 
 	shardWeight := 0

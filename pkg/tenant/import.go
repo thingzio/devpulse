@@ -141,6 +141,44 @@ const listImportWorkSQL = `
 	  AND (tr.import_done_at IS NOT NULL OR tr.created_at < NOW() - MAKE_INTERVAL(mins => $1))
 	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
 
+const listImportWorkForRepoSQL = `
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
+	       COALESCE(ec.cnt, 0) AS event_count
+	FROM tenant_repo tr
+	JOIN tenant t ON t.id = tr.tenant_id
+	LEFT JOIN (
+		SELECT org, repo, COUNT(*) AS cnt
+		FROM event
+		GROUP BY org, repo
+	) ec ON ec.org = tr.org AND ec.repo = tr.repo
+	WHERE tr.active = TRUE
+	  AND tr.org = $1
+	  AND tr.repo = $2
+	  AND t.tos_accepted_at IS NOT NULL
+	ORDER BY tr.tenant_id`
+
+// ListImportWorkForRepo returns import work rows for a single repo across all tenants.
+func ListImportWorkForRepo(ctx context.Context, db *sql.DB, org, repo string) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkForRepoSQL, org, repo)
+	if err != nil {
+		return nil, fmt.Errorf("listing import work for %s/%s: %w", org, repo, err)
+	}
+	defer rows.Close()
+
+	var result []ImportWorkRow
+	for rows.Next() {
+		var r ImportWorkRow
+		if err := rows.Scan(&r.TenantRepoID, &r.TenantID, &r.Org, &r.Repo, &r.Plan, &r.EventCount); err != nil {
+			return nil, fmt.Errorf("scanning import work row: %w", err)
+		}
+		result = append(result, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating import work for %s/%s: %w", org, repo, err)
+	}
+	return result, nil
+}
+
 const markImportDoneByRepoSQL = `
 	UPDATE tenant_repo
 	SET import_done_at = NOW()
