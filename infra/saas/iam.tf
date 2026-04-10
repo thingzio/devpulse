@@ -109,3 +109,12 @@ resource "google_service_account_iam_member" "deployer_import_sa" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
+
+# Allow serve service to trigger on-demand import jobs
+resource "google_cloud_run_v2_job_iam_member" "run_invoke_import" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.import.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.run.email}"
+}
