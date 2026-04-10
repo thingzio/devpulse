@@ -126,9 +126,15 @@ func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string) ([
 }
 
 const listImportWorkSQL = `
-	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
+	       COALESCE(ec.cnt, 0) AS event_count
 	FROM tenant_repo tr
 	JOIN tenant t ON t.id = tr.tenant_id
+	LEFT JOIN (
+		SELECT org, repo, COUNT(*) AS cnt
+		FROM event
+		GROUP BY org, repo
+	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
@@ -151,6 +157,7 @@ type ImportWorkRow struct {
 	Org          string
 	Repo         string
 	Plan         string
+	EventCount   int
 }
 
 // ListImportWork returns all active tenant_repo rows eligible for import,
@@ -165,7 +172,7 @@ func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
 	var result []ImportWorkRow
 	for rows.Next() {
 		var r ImportWorkRow
-		if err := rows.Scan(&r.TenantRepoID, &r.TenantID, &r.Org, &r.Repo, &r.Plan); err != nil {
+		if err := rows.Scan(&r.TenantRepoID, &r.TenantID, &r.Org, &r.Repo, &r.Plan, &r.EventCount); err != nil {
 			return nil, fmt.Errorf("scanning import work row: %w", err)
 		}
 		result = append(result, r)
