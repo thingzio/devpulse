@@ -138,7 +138,33 @@ const listImportWorkSQL = `
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
+	  AND (tr.import_done_at IS NOT NULL OR tr.created_at < NOW() - MAKE_INTERVAL(mins => $1))
 	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
+
+const listImportWorkForRepoSQL = `
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
+	       COALESCE(ec.cnt, 0) AS event_count
+	FROM tenant_repo tr
+	JOIN tenant t ON t.id = tr.tenant_id
+	LEFT JOIN (
+		SELECT org, repo, COUNT(*) AS cnt
+		FROM event
+		GROUP BY org, repo
+	) ec ON ec.org = tr.org AND ec.repo = tr.repo
+	WHERE tr.active = TRUE
+	  AND tr.org = $1
+	  AND tr.repo = $2
+	  AND t.tos_accepted_at IS NOT NULL
+	ORDER BY tr.tenant_id`
+
+// ListImportWorkForRepo returns import work rows for a single repo across all tenants.
+func ListImportWorkForRepo(ctx context.Context, db *sql.DB, org, repo string) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkForRepoSQL, org, repo)
+	if err != nil {
+		return nil, fmt.Errorf("listing import work for %s/%s: %w", org, repo, err)
+	}
+	return scanImportWorkRows(rows)
+}
 
 const markImportDoneByRepoSQL = `
 	UPDATE tenant_repo
@@ -162,11 +188,16 @@ type ImportWorkRow struct {
 
 // ListImportWork returns all active tenant_repo rows eligible for import,
 // joined with tenant plan. Sorted deterministically for sharding.
-func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
-	rows, err := db.QueryContext(ctx, listImportWorkSQL)
+func ListImportWork(ctx context.Context, db *sql.DB, adoptTimeoutMin int) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkSQL, adoptTimeoutMin)
 	if err != nil {
 		return nil, fmt.Errorf("listing import work: %w", err)
 	}
+	return scanImportWorkRows(rows)
+}
+
+// scanImportWorkRows scans sql.Rows into ImportWorkRow slices.
+func scanImportWorkRows(rows *sql.Rows) ([]ImportWorkRow, error) {
 	defer rows.Close()
 
 	var result []ImportWorkRow
@@ -178,7 +209,7 @@ func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
 		result = append(result, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating import work: %w", err)
+		return nil, fmt.Errorf("iterating import work rows: %w", err)
 	}
 	return result, nil
 }

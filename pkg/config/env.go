@@ -99,6 +99,23 @@ func ImportWorkers() int { return GetEnvAsInt("IMPORT_WORKERS", 2) }
 // Override: IMPORT_TASK_TIMEOUT (default 55).
 func ImportTaskTimeout() int { return GetEnvAsInt("IMPORT_TASK_TIMEOUT", 55) }
 
+// ImportOrg returns the org for single-repo import mode.
+// Override: IMPORT_ORG (default "").
+func ImportOrg() string { return os.Getenv("IMPORT_ORG") }
+
+// ImportRepo returns the repo for single-repo import mode.
+// Override: IMPORT_REPO (default "").
+func ImportRepo() string { return os.Getenv("IMPORT_REPO") }
+
+// ImportAdoptTimeout returns the minutes before a new repo (import_done_at IS NULL)
+// is adopted by the scheduled import as a safety net.
+// Override: IMPORT_ADOPT_TIMEOUT (default 60).
+func ImportAdoptTimeout() int { return GetEnvAsInt("IMPORT_ADOPT_TIMEOUT", 60) }
+
+// ImportJobName returns the fully-qualified Cloud Run import job name for triggering on-demand imports.
+// Override: IMPORT_JOB_NAME (default "").
+func ImportJobName() string { return os.Getenv("IMPORT_JOB_NAME") }
+
 // CloudRunTaskIndex returns the 0-based task index within the job execution.
 // Override: CLOUD_RUN_TASK_INDEX (default 0 for local/single-task runs).
 func CloudRunTaskIndex() int { return GetEnvAsIntNonNeg("CLOUD_RUN_TASK_INDEX", 0) }

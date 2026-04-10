@@ -65,10 +65,14 @@ func runImport(ctx context.Context) error {
 
 	llmCfg := data.NewLLMConfigFromEnv()
 
-	// Fetch all active repos and build deduplicated work list.
-	rows, err := tenant.ListImportWork(taskCtx, db)
+	// Fetch work list — single-repo mode or scheduled.
+	rows, singleRepo, err := fetchWorkList(taskCtx, db)
 	if err != nil {
 		return fmt.Errorf("listing import work: %w", err)
+	}
+	if singleRepo {
+		taskCount = 1
+		taskIndex = 0
 	}
 
 	workList := BuildWorkList(rows)
@@ -174,6 +178,20 @@ func markImportSuccess(ctx context.Context, db *sql.DB, rw RepoWork) {
 			slog.Warn("resetting import errors", "error", err)
 		}
 	}
+}
+
+// fetchWorkList returns import work rows. In single-repo mode (IMPORT_ORG + IMPORT_REPO set),
+// returns only that repo's rows and singleRepo=true. Otherwise returns the full scheduled work list.
+func fetchWorkList(ctx context.Context, db *sql.DB) ([]tenant.ImportWorkRow, bool, error) {
+	org := config.ImportOrg()
+	repo := config.ImportRepo()
+	if org != "" && repo != "" {
+		slog.Info("single-repo import mode", "org", org, "repo", repo)
+		rows, err := tenant.ListImportWorkForRepo(ctx, db, org, repo)
+		return rows, true, err
+	}
+	rows, err := tenant.ListImportWork(ctx, db, config.ImportAdoptTimeout())
+	return rows, false, err
 }
 
 // postImport runs developer enrichment and entity normalization after all repo imports.

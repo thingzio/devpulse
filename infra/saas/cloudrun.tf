@@ -72,6 +72,11 @@ resource "google_cloud_run_v2_service" "serve" {
         value = "/secrets/github-app-key/key.pem"
       }
 
+      env {
+        name  = "IMPORT_JOB_NAME"
+        value = "projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.import.name}"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
