@@ -241,11 +241,11 @@ func TestGetTieredReputationUsernames_LowScoreStaleFirst(t *testing.T) {
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
 	// Set scores: low1=0.2, low2=0.3 (below 0.5), high1=0.8 (above 0.5)
-	// All updated 10 days ago
+	// All deep-scored 10 days ago
 	tenDaysAgo := time.Now().UTC().Add(-10 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "low1", 0.2, tenDaysAgo, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "low2", 0.3, tenDaysAgo, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, tenDaysAgo, false, nil))
+	require.NoError(t, store.updateReputation(ctx, "low1", 0.2, tenDaysAgo, true, nil))
+	require.NoError(t, store.updateReputation(ctx, "low2", 0.3, tenDaysAgo, true, nil))
+	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, tenDaysAgo, true, nil))
 
 	for _, u := range []string{"low1", "low2", "high1"} {
 		_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
@@ -275,9 +275,9 @@ func TestGetTieredReputationUsernames_HighScoreStaleAfterLongerPeriod(t *testing
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	// Updated 35 days ago — beyond the 30-day high threshold
+	// Deep-scored 35 days ago — beyond the 30-day high threshold
 	oldUpdate := time.Now().UTC().Add(-35 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, oldUpdate, false, nil))
+	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, oldUpdate, true, nil))
 
 	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
 		VALUES ('org1', 'repo1', 'high1', 'pr', '2025-01-10', 'http://example.com', '', '')`)

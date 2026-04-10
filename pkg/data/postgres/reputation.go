@@ -88,6 +88,9 @@ const (
 
 	// selectTieredReputationUsernamesSQL selects stale contributors with
 	// different staleness thresholds based on their current score.
+	// Never deep-scored (reputation_deep IS NULL or 0) → always eligible.
+	// Deep-scored with score < boundary → stale after lowThreshold.
+	// Deep-scored with score >= boundary → stale after highThreshold.
 	// $1=org, $2=repo, $3=low-score threshold time, $4=high-score threshold time,
 	// $5=score boundary, $6=limit
 	selectTieredReputationUsernamesSQL = `SELECT d.username
@@ -98,10 +101,12 @@ const (
 		  ` + forkExcludeSQL + `
 		  AND e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
-		  AND (d.reputation_deep IS NULL OR d.reputation_deep = 0
-		   OR d.reputation_updated_at IS NULL
-		   OR (d.reputation < $5 AND d.reputation_updated_at < $3)
-		   OR (d.reputation >= $5 AND d.reputation_updated_at < $4))
+		  AND (
+		    (d.reputation_deep IS NULL OR d.reputation_deep = 0)
+		    OR d.reputation_updated_at IS NULL
+		    OR (d.reputation_deep = 1 AND d.reputation < $5 AND d.reputation_updated_at < $3)
+		    OR (d.reputation_deep = 1 AND d.reputation >= $5 AND d.reputation_updated_at < $4)
+		  )
 		GROUP BY d.username, d.reputation
 		ORDER BY d.reputation ASC
 		LIMIT $6
