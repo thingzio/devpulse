@@ -74,9 +74,14 @@ func runImport(ctx context.Context) error {
 	workList := BuildWorkList(rows)
 	myRepos := ShardRepos(workList, taskCount, taskIndex)
 
+	shardWeight := 0
+	for _, rw := range myRepos {
+		shardWeight += rw.Weight
+	}
 	slog.Info("shard assigned",
 		"total_repos", len(workList),
 		"shard_size", len(myRepos),
+		"shard_weight", shardWeight,
 		"task_index", taskIndex)
 
 	// Fan out to workers.

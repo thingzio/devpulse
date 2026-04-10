@@ -96,7 +96,7 @@ def fmt_line:
     elif $p.msg == "import worker starting" then
         "    \($ts)  worker starting  mode=\($p.mode // "all") task=\($p.task_index // "?")/\($p.task_count // "?") workers=\($p.workers // "?")"
     elif $p.msg == "shard assigned" then
-        "    \($ts)  shard assigned  total=\($p.total_repos // 0) shard=\($p.shard_size // 0)"
+        "    \($ts)  shard assigned  total=\($p.total_repos // 0) shard=\($p.shard_size // 0) weight=\($p.shard_weight // 0)"
     elif $p.msg == "shard progress" then
         "    \($ts)  progress  \($p.completed // 0)/\($p.total // 0) done  errors=\($p.errors // 0)"
     elif $p.msg == "token pool ready" then
