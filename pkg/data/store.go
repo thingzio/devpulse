@@ -78,6 +78,7 @@ type QueryStore interface {
 type EventStore interface {
 	ImportEvents(ctx context.Context, token, owner, repo string, days int) (map[string]int, *ImportSummary, error)
 	UpdateEvents(ctx context.Context, token string, concurrency int) (map[string]int, error)
+	GetMaxEventTime(ctx context.Context, org, repo string) (time.Time, error)
 }
 
 // InsightsStore provides analytics and insights queries.
@@ -123,7 +124,7 @@ type ContainerStore interface {
 
 // RepoMetaStore manages repository metadata imports and queries.
 type RepoMetaStore interface {
-	ImportRepoMeta(ctx context.Context, token, owner, repo string) error
+	ImportRepoMeta(ctx context.Context, token, owner, repo string) (time.Time, error)
 	ImportAllRepoMeta(ctx context.Context, token string) error
 	GetRepoMetas(ctx context.Context, org, repo *string) ([]*RepoMeta, error)
 	GetRepoOverview(ctx context.Context, org *string, days int) ([]*RepoOverview, error)

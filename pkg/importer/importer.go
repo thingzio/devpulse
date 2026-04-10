@@ -91,6 +91,7 @@ func runImport(ctx context.Context) error {
 		slog.Info("import worker complete",
 			"repos", 0,
 			"errors", 0,
+			"skipped", 0,
 			"duration", time.Since(start).String(),
 			"duration_sec", time.Since(start).Seconds())
 		return nil
@@ -98,7 +99,7 @@ func runImport(ctx context.Context) error {
 	work := make(chan RepoWork)
 	var wg sync.WaitGroup
 	shardSize := len(myRepos)
-	var totalRepos, totalErrors atomic.Int32
+	var totalRepos, totalErrors, totalSkipped atomic.Int32
 
 	for range numWorkers {
 		wg.Add(1)
@@ -108,7 +109,12 @@ func runImport(ctx context.Context) error {
 				if taskCtx.Err() != nil {
 					return
 				}
-				if importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg); importErr != nil {
+				importErr, skipped := importRepoWork(taskCtx, db, store, pool, rw, llmCfg)
+				switch {
+				case skipped:
+					totalSkipped.Add(1)
+					markImportSuccess(taskCtx, db, rw)
+				case importErr != nil:
 					totalErrors.Add(1)
 					slog.Error("repo import failed",
 						"org", rw.Org,
@@ -117,21 +123,15 @@ func runImport(ctx context.Context) error {
 					if incErr := tenant.IncrementImportErrorsByRepo(taskCtx, db, rw.Org, rw.Repo, importErr.Error()); incErr != nil {
 						slog.Warn("incrementing import errors", "error", incErr)
 					}
-				} else {
-					if err := tenant.MarkImportDoneByRepo(taskCtx, db, rw.Org, rw.Repo); err != nil {
-						slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
-					}
-					for _, tr := range rw.Tenants {
-						if err := tenant.ResetImportErrors(taskCtx, db, tr.TenantRepoID); err != nil {
-							slog.Warn("resetting import errors", "error", err)
-						}
-					}
+				default:
+					markImportSuccess(taskCtx, db, rw)
 				}
 				done := int(totalRepos.Add(1))
 				slog.Info("shard progress",
 					"completed", done,
 					"total", shardSize,
-					"errors", int(totalErrors.Load()))
+					"errors", int(totalErrors.Load()),
+					"skipped", int(totalSkipped.Load()))
 			}
 		}()
 	}
@@ -149,10 +149,12 @@ func runImport(ctx context.Context) error {
 
 	repos := int(totalRepos.Load())
 	errs := int(totalErrors.Load())
+	skipped := int(totalSkipped.Load())
 	elapsed := time.Since(start)
 	slog.Info("import worker complete",
 		"repos", repos,
 		"errors", errs,
+		"skipped", skipped,
 		"duration", elapsed.String(),
 		"duration_sec", elapsed.Seconds())
 
@@ -160,6 +162,18 @@ func runImport(ctx context.Context) error {
 		return fmt.Errorf("all %d repo imports failed", errs)
 	}
 	return nil
+}
+
+// markImportSuccess marks a repo import as done and resets error counters.
+func markImportSuccess(ctx context.Context, db *sql.DB, rw RepoWork) {
+	if err := tenant.MarkImportDoneByRepo(ctx, db, rw.Org, rw.Repo); err != nil {
+		slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
+	}
+	for _, tr := range rw.Tenants {
+		if err := tenant.ResetImportErrors(ctx, db, tr.TenantRepoID); err != nil {
+			slog.Warn("resetting import errors", "error", err)
+		}
+	}
 }
 
 // postImport runs developer enrichment and entity normalization after all repo imports.
@@ -181,7 +195,7 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 
 // importRepoWork imports shared repo data and handles per-tenant event limits.
 func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
-	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig) error {
+	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig) (error, bool) {
 	bestPlan := bestPlanForRepo(rw.Tenants)
 
 	if limited, err := allTenantsAtLimit(ctx, db, rw.Tenants); err != nil {
@@ -189,7 +203,7 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 	} else if limited {
 		slog.Warn("all tenants at weekly event limit, skipping",
 			"org", rw.Org, "repo", rw.Repo)
-		return nil
+		return nil, false
 	}
 
 	slog.Info("importing repo",
@@ -198,7 +212,11 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 		"plan", bestPlan,
 		"tenants", len(rw.Tenants))
 
-	return importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
+	importErr, skipped := importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
+	if skipped {
+		return nil, true
+	}
+	return importErr, false
 }
 
 // bestPlanForRepo returns the highest-tier plan among all tenants tracking a repo.
@@ -244,7 +262,44 @@ func allTenantsAtLimit(ctx context.Context, db *sql.DB, tenants []TenantRef) (bo
 	return true, nil
 }
 
-func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) error {
+// importMetaAndCheckSkip runs the metadata phase and checks whether the repo
+// can be skipped because pushed_at has not advanced past our last event.
+// Returns (metaOK, skip): metaOK=false means metadata import failed, skip=true
+// means the repo is unchanged and remaining phases should be skipped.
+func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(func() error) error, token, org, repo string) (bool, bool) {
+	var pushedAt time.Time
+	if err := retryRL(func() error {
+		var metaErr error
+		pushedAt, metaErr = store.ImportRepoMeta(ctx, token, org, repo)
+		return metaErr
+	}); err != nil {
+		slog.Error("importing repo meta", "org", org, "repo", repo, "error", err)
+		return false, false
+	}
+
+	if pushedAt.IsZero() {
+		return true, false
+	}
+
+	maxEventTime, err := store.GetMaxEventTime(ctx, org, repo)
+	if err != nil {
+		slog.Warn("checking max event time", "org", org, "repo", repo, "error", err)
+		return true, false
+	}
+
+	if shouldSkipUnchangedRepo(pushedAt, maxEventTime) {
+		slog.Info("repo unchanged, skipping",
+			"org", org,
+			"repo", repo,
+			"pushed_at", pushedAt.Format(time.RFC3339),
+			"last_event", maxEventTime.Format("2006-01-02"))
+		return true, true
+	}
+
+	return true, false
+}
+
+func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (error, bool) {
 	start := time.Now()
 	slog.Info("importing repo", "org", org, "repo", repo)
 
@@ -264,9 +319,12 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	token := tokenForPhase()
 
 	slog.Info("phase: metadata", "org", org, "repo", repo)
-	if err := retryRL(func() error { return store.ImportRepoMeta(ctx, token, org, repo) }); err != nil {
-		slog.Error("importing repo meta", "org", org, "repo", repo, "error", err)
+	metaOK, skip := importMetaAndCheckSkip(ctx, store, retryRL, token, org, repo)
+	if !metaOK {
 		errs++
+	}
+	if skip {
+		return nil, true
 	}
 
 	token = tokenForPhase()
@@ -338,9 +396,9 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
 
 	if errs > 0 {
-		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
+		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo), false
 	}
-	return nil
+	return nil, false
 }
 
 // newRetryRL returns a function that calls fn and, if it fails with a GitHub

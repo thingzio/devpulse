@@ -121,6 +121,9 @@ func (m *mockStore) ImportEvents(_ context.Context, _, _, _ string, _ int) (map[
 func (m *mockStore) UpdateEvents(_ context.Context, _ string, _ int) (map[string]int, error) {
 	return nil, nil
 }
+func (m *mockStore) GetMaxEventTime(_ context.Context, _, _ string) (time.Time, error) {
+	return time.Time{}, nil
+}
 
 // --- InsightsStore ---
 func (m *mockStore) GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*data.InsightsSummary, error) {
@@ -214,8 +217,10 @@ func (m *mockStore) GetContainerActivity(_ context.Context, _, _ *string, _ int)
 }
 
 // --- RepoMetaStore ---
-func (m *mockStore) ImportRepoMeta(_ context.Context, _, _, _ string) error { return nil }
-func (m *mockStore) ImportAllRepoMeta(_ context.Context, _ string) error    { return nil }
+func (m *mockStore) ImportRepoMeta(_ context.Context, _, _, _ string) (time.Time, error) {
+	return time.Time{}, nil
+}
+func (m *mockStore) ImportAllRepoMeta(_ context.Context, _ string) error { return nil }
 func (m *mockStore) GetRepoMetas(_ context.Context, _, _ *string) ([]*data.RepoMeta, error) {
 	return nil, nil
 }

@@ -19,18 +19,18 @@ const (
 	upsertRepoMetaSQL = `INSERT INTO repo_meta (org, repo, stars, forks, open_issues,
 		language, license, archived,
 		has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct,
-		updated_at, last_import_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		updated_at, last_import_at, pushed_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT(org, repo) DO UPDATE SET
-			stars = $17, forks = $18, open_issues = $19, language = $20, license = $21, archived = $22,
-			has_coc = $23, has_contributing = $24, has_readme = $25, has_issue_template = $26, has_pr_template = $27, community_health_pct = $28,
-			updated_at = $29, last_import_at = $30
+			stars = $18, forks = $19, open_issues = $20, language = $21, license = $22, archived = $23,
+			has_coc = $24, has_contributing = $25, has_readme = $26, has_issue_template = $27, has_pr_template = $28, community_health_pct = $29,
+			updated_at = $30, last_import_at = $31, pushed_at = $32
 	`
 
 	updateLastImportAtSQL = `UPDATE repo_meta SET last_import_at = $1 WHERE org = $2 AND repo = $3`
 
 	// selectRepoMetaUpdatedAtSQL: $1=org, $2=repo
-	selectRepoMetaUpdatedAtSQL = `SELECT COALESCE(updated_at, ''), COALESCE(community_health_pct, 0)
+	selectRepoMetaUpdatedAtSQL = `SELECT COALESCE(updated_at, ''), COALESCE(community_health_pct, 0), COALESCE(pushed_at, '')
 		FROM repo_meta
 		WHERE org = $1 AND repo = $2
 	`
@@ -65,11 +65,12 @@ const (
 	`
 )
 
-func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) error {
+func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) (time.Time, error) {
 	var lastUpdated string
 	var healthPct int
-	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct); scanErr != nil && !errors.Is(scanErr, sql.ErrNoRows) {
-		return fmt.Errorf("querying repo meta updated_at for %s/%s: %w", owner, repo, scanErr)
+	var pushedAtStr string
+	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct, &pushedAtStr); scanErr != nil && !errors.Is(scanErr, sql.ErrNoRows) {
+		return time.Time{}, fmt.Errorf("querying repo meta updated_at for %s/%s: %w", owner, repo, scanErr)
 	}
 	if lastUpdated != "" && healthPct > 0 {
 		if t, parseErr := time.Parse("2006-01-02T15:04:05Z", lastUpdated); parseErr == nil {
@@ -79,7 +80,8 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 				if _, err := s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo); err != nil {
 					slog.Warn("failed to update last import time", "owner", owner, "repo", repo, "error", err)
 				}
-				return nil
+				pushedAt, _ := time.Parse("2006-01-02T15:04:05Z", pushedAtStr)
+				return pushedAt, nil
 			}
 		}
 	}
@@ -88,18 +90,18 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 
 	r, resp, err := client.Repositories.Get(ctx, owner, repo)
 	if err != nil {
-		return fmt.Errorf("error getting repo %s/%s: %w", owner, repo, err)
+		return time.Time{}, fmt.Errorf("error getting repo %s/%s: %w", owner, repo, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error getting repo %s/%s: status %d", owner, repo, resp.StatusCode)
+		return time.Time{}, fmt.Errorf("error getting repo %s/%s: status %d", owner, repo, resp.StatusCode)
 	}
 	if rlErr := ghutil.CheckRateLimit(ctx, resp); rlErr != nil {
-		return rlErr
+		return time.Time{}, rlErr
 	}
 
 	cp, rlErr := fetchCommunityProfile(ctx, client, owner, repo)
 	if rlErr != nil {
-		return rlErr
+		return time.Time{}, rlErr
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
@@ -113,14 +115,19 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 		archived = 1
 	}
 
+	pushedAtVal := ""
+	if r.PushedAt != nil {
+		pushedAtVal = r.PushedAt.Time.UTC().Format("2006-01-02T15:04:05Z")
+	}
+
 	_, err = s.db.ExecContext(ctx, upsertRepoMetaSQL,
 		owner, repo, r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
-		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now,
+		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtVal,
 		r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
-		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now,
+		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtVal,
 	)
 	if err != nil {
-		return fmt.Errorf("error upserting repo meta %s/%s: %w", owner, repo, err)
+		return time.Time{}, fmt.Errorf("error upserting repo meta %s/%s: %w", owner, repo, err)
 	}
 
 	today := time.Now().UTC().Format("2006-01-02")
@@ -129,11 +136,12 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) e
 		r.GetStargazersCount(), r.GetForksCount(),
 	)
 	if err != nil {
-		return fmt.Errorf("error upserting repo metric history %s/%s: %w", owner, repo, err)
+		return time.Time{}, fmt.Errorf("error upserting repo metric history %s/%s: %w", owner, repo, err)
 	}
 
 	slog.Debug("metadata done", "org", owner, "repo", repo)
-	return nil
+	pushedAt, _ := time.Parse("2006-01-02T15:04:05Z", pushedAtVal)
+	return pushedAt, nil
 }
 
 type communityProfile struct {
@@ -187,7 +195,7 @@ func (s *Store) ImportAllRepoMeta(ctx context.Context, token string) error {
 	}
 
 	for _, r := range list {
-		if err := s.ImportRepoMeta(ctx, token, r.Org, r.Repo); err != nil {
+		if _, err := s.ImportRepoMeta(ctx, token, r.Org, r.Repo); err != nil {
 			slog.Error("metadata failed", "org", r.Org, "repo", r.Repo, "error", err)
 		}
 	}
