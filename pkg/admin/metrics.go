@@ -364,7 +364,10 @@ func formatTimeSeries(raw string) string {
 
 // analyzeMetrics sends the collected metrics to the Anthropic API for analysis.
 func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics string) (string, error) {
-	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics for DevPulse, a multi-tenant SaaS running on Cloud Run + Cloud SQL PostgreSQL. The import pipeline uses sharded parallel tasks with goroutine workers. Analyze the raw metrics and provide:
+	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics
+for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
+The import pipeline uses sharded parallel tasks with goroutine workers.
+Analyze the raw metrics and provide:
 
 1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
 2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 1s, cold-start latency > 3s, errors, deadlocks, disk growth).
