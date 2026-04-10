@@ -61,7 +61,7 @@ func CheckRateLimit(ctx context.Context, resp *github.Response) error {
 		return nil
 	}
 	if wait > maxWait {
-		return fmt.Errorf("rate limit reset too far in the future: %v", wait)
+		return fmt.Errorf("rate limit reset too far in the future (%v): %w", wait, ErrRateLimited)
 	}
 
 	jitter := time.Duration(rand.IntN(2000)) * time.Millisecond //nolint:gosec // jitter for rate limit backoff, not security-sensitive
