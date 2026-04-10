@@ -301,7 +301,6 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 
 func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (error, bool) {
 	start := time.Now()
-	slog.Info("importing repo", "org", org, "repo", repo)
 
 	// tokenForPhase returns the current pool token, rotating on rate limit.
 	// Each phase gets a potentially fresh token if the previous one was exhausted.
