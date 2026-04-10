@@ -286,6 +286,25 @@ Secondary (abuse) limits return HTTP 403 with `Retry-After`. The importer detect
 | Connection pool | `too many clients` errors | Increase pool size in DATABASE_URL |
 | Cloud SQL CPU | High latency on upserts | Scale to `db-custom-*` tier |
 
+## Scaling Vectors
+
+Ordered by cost (cheapest first):
+
+| Vector | Knob | Effect | Cost |
+|--------|------|--------|------|
+| Task parallelism | `import_parallelism` (Terraform) | More tasks = fewer repos per task = faster wall-clock | ~$0.01/task/run |
+| Worker concurrency | `IMPORT_WORKERS` (env var) | More goroutines per task = more concurrent API calls | Free (limited by DB pool) |
+| Schedule frequency | Cloud Scheduler cron | 2hr → 3hr → 4hr = more quota per run | Free |
+| Token pool growth | GitHub App installations | Each tenant's installation adds 5000 calls/hr | Free (automatic with sign-ups) |
+| Task timeout | `IMPORT_TASK_TIMEOUT` (env var) | Longer timeout = larger repos complete in single run | Free |
+| DB tier | `db_tier` (Terraform) | More CPU/memory/connections for heavier query load | $$ |
+
+**How weighted sharding scales:** The greedy bin-packing algorithm assigns the heaviest repos (by event count) to different tasks first. Adding tasks distributes large repos across more containers. With N large repos, set `import_parallelism >= N` so each large repo gets its own task.
+
+**Token pool economics:** Every tenant who installs the GitHub App contributes 5000 API calls/hr to the shared pool. More customers = more quota = better service for everyone. Current pool: 6 tokens × 5000 = 30,000 calls/hr.
+
+**Rate limit window:** GitHub rate limits reset on a 60-minute sliding window per installation token. A 2-hour import cycle guarantees full quota reset between runs. Extending to 3-4 hours provides even more headroom for large deployments.
+
 ## Database Indexes
 
 Performance indexes beyond primary keys, defined in migration files:
