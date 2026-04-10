@@ -110,7 +110,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	apiCache.startEviction(ctx)
 
-	oauthRL := newRateLimiter(10, time.Minute)
+	oauthRL := newRateLimiter(20, time.Minute)
 	repoSearchRL := newRateLimiter(30, time.Minute)
 
 	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL)
@@ -288,16 +288,31 @@ type pageData struct {
 	Commit       string
 	Date         string
 	Plans        map[string]plan.Limits
+	Error        string
+}
+
+// errMessages maps query param error codes to user-friendly messages.
+var errMessages = map[string]string{
+	"auth_failed":  "Authentication failed. Please try again.",
+	"auth_expired": "Your sign-in session expired. Please try again.",
+	"rate_limit":   "Too many requests. Please wait a moment and try again.",
 }
 
 func landingHandler(opts Options) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var errMsg string
+		if code := r.URL.Query().Get("err"); code != "" {
+			if msg, ok := errMessages[code]; ok {
+				errMsg = msg
+			}
+		}
 		renderTemplate(w, "landing.html", pageData{
 			Title:   "Home",
 			Version: opts.Version,
 			Commit:  opts.Commit,
 			Date:    opts.Date,
 			Plans:   plan.All,
+			Error:   errMsg,
 		})
 	}
 }

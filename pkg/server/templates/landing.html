@@ -2,6 +2,11 @@
 <div class="landing">
   <div class="landing-hero">
     <h1>DevPulse</h1>
+    {{if .Error}}
+    <div class="error" style="margin:10px auto;max-width:500px;padding:10px 16px;border-radius:var(--border-radius);background:var(--error-bg, #fee);color:var(--error-fg, #c00);text-align:center;">
+      <p style="margin:0;">{{.Error}}</p>
+    </div>
+    {{end}}
     <p>Understand the health of any open source project at a glance. Track contributor trends, measure development velocity, and surface risks before they become problems.</p>
     <a href="/auth/github" class="cta-btn">Sign in with GitHub</a>
   </div>
