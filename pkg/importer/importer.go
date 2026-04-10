@@ -328,7 +328,18 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 
 	token = tokenForPhase()
 	slog.Info("phase: events", "org", org, "repo", repo)
-	if err := retryRL(func() error { _, _, err := store.ImportEvents(ctx, token, org, repo, 180); return err }); err != nil {
+	var eventTokenFn data.TokenFunc
+	var eventExhaustFn data.ExhaustFunc
+	if pool != nil {
+		eventTokenFn = func() string { return pool.Token() }
+		eventExhaustFn = func(t string) { pool.Exhaust(t) }
+	} else {
+		eventTokenFn = func() string { return token }
+	}
+	if err := retryRL(func() error {
+		_, _, err := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, 180)
+		return err
+	}); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++
 	}

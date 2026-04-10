@@ -122,7 +122,8 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	for _, r := range list {
 		org, repo := r.Org, r.Repo
 		g.Go(func() error {
-			m, _, importErr := s.ImportEvents(ctx, token, org, repo, data.EventAgeDaysDefault)
+			staticToken := func() string { return token }
+			m, _, importErr := s.ImportEvents(ctx, staticToken, nil, org, repo, data.EventAgeDaysDefault)
 			if importErr != nil {
 				slog.Error("error importing events", "org", org, "repo", repo, "error", importErr)
 				return nil // log and continue, don't abort other repos
@@ -145,18 +146,25 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	return results, nil
 }
 
-func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, days int) (map[string]int, *data.ImportSummary, error) {
-	if token == "" || owner == "" || repo == "" {
-		return nil, nil, errors.New("token, owner, and repo are required")
+func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc, owner, repo string, days int) (map[string]int, *data.ImportSummary, error) {
+	if tokenFn == nil || owner == "" || repo == "" {
+		return nil, nil, errors.New("tokenFn, owner, and repo are required")
 	}
 
 	if days < 1 {
 		days = data.EventAgeDaysDefault
 	}
 
+	token := tokenFn()
+	if token == "" {
+		return nil, nil, errors.New("token pool exhausted")
+	}
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	imp := &eventImporter{
+		tokenFn:      tokenFn,
+		exhaustFn:    exhaustFn,
+		curToken:     token,
 		client:       client,
 		store:        s,
 		owner:        owner,
@@ -242,6 +250,9 @@ func (s *Store) ImportEvents(ctx context.Context, token, owner, repo string, day
 
 type eventImporter struct {
 	mu           sync.Mutex
+	tokenFn      data.TokenFunc
+	exhaustFn    data.ExhaustFunc
+	curToken     string
 	client       *github.Client
 	store        *Store
 	owner        string
@@ -252,6 +263,22 @@ type eventImporter struct {
 	state        map[string]*data.State
 	minEventTime time.Time
 	flushed      int
+}
+
+// rotateToken marks the current token as exhausted and gets a fresh one.
+// Returns true if a new token was obtained.
+func (e *eventImporter) rotateToken(ctx context.Context) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.exhaustFn != nil && e.curToken != "" {
+		e.exhaustFn(e.curToken)
+	}
+	e.curToken = e.tokenFn()
+	if e.curToken == "" {
+		return false
+	}
+	e.client = github.NewClient(net.GetOAuthClient(ctx, e.curToken))
+	return true
 }
 
 func (e *eventImporter) qualifyTypeKey(t string) string {
