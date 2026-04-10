@@ -4,11 +4,8 @@ Pending work items, future improvements, and technical debt.
 
 ## Import Pipeline
 
-- [ ] **Weighted task sharding** — Shard repos by last import event count (descending round-robin) instead of alphabetical. Balances task completion times. New repos without history use median weight. Change isolated to `ShardRepos` in `pkg/importer/shard.go`.
-- [ ] **Task-level scope logging** — After shard assignment, log total new events since last import, stale contributors needing deep rep, and backfill candidates per task. Enables duration projection and progress percentage in `tools/job-detail`.
 - [ ] **Legacy claim queue columns** — Drop `import_claimed_at`, `import_claimed_by`, `import_done_at` columns and `idx_tenant_repo_import_queue` index from `tenant_repo` table. Retained for rollback safety after sharded import refactor (v0.35.0).
 - [ ] **Duplicate `importing repo` log lines** — Each repo logs twice: once from `importRepoWork` (with plan/tenants) and once from `importRepo` (without). Consolidate to single log line.
-- [ ] **Admin metrics review deeprep references** — `pkg/admin/metrics.go` still queries deeprep-specific log-based metrics (scored, rate-limit-pauses, errors) that no longer exist. Update to query import job deep rep logs instead.
 
 ## Plan Features (Phase 2)
 
