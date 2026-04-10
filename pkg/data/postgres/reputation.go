@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-github/v83/github"
 	"github.com/mchmarny/reputer/pkg/score"
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/net"
@@ -85,8 +86,11 @@ const (
 
 	selectDistinctOrgsSQL = `SELECT DISTINCT org FROM event`
 
-	// selectLowestReputationUsernamesSQL: $1=org, $2=repo, $3=threshold, $4=limit
-	selectLowestReputationUsernamesSQL = `SELECT d.username
+	// selectTieredReputationUsernamesSQL selects stale contributors with
+	// different staleness thresholds based on their current score.
+	// $1=org, $2=repo, $3=low-score threshold time, $4=high-score threshold time,
+	// $5=score boundary, $6=limit
+	selectTieredReputationUsernamesSQL = `SELECT d.username
 		FROM developer d
 		JOIN event e ON d.username = e.username
 		WHERE d.reputation IS NOT NULL
@@ -96,10 +100,11 @@ const (
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND (d.reputation_deep IS NULL OR d.reputation_deep = 0
 		   OR d.reputation_updated_at IS NULL
-		   OR d.reputation_updated_at < $3)
+		   OR (d.reputation < $5 AND d.reputation_updated_at < $3)
+		   OR (d.reputation >= $5 AND d.reputation_updated_at < $4))
 		GROUP BY d.username, d.reputation
 		ORDER BY d.reputation ASC
-		LIMIT $4
+		LIMIT $6
 	`
 
 	// selectUserCommitCountSQL: $1=username, $2=since
@@ -213,28 +218,42 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 		return &data.DeepReputationResult{}, nil
 	}
 
-	if staleHours <= 0 {
-		staleHours = reputationStaleHours
-	}
+	// staleHours is ignored — tiered rescoring uses config-driven thresholds:
+	// DEEPREP_LOW_STALE_HOURS (default 168h/7d) for scores < threshold,
+	// DEEPREP_HIGH_STALE_HOURS (default 720h/30d) for scores >= threshold.
+	_ = staleHours
 
 	// Default to no-op if caller doesn't support exhaustion.
 	if exhaustFn == nil {
 		exhaustFn = func(string) {}
 	}
 
-	threshold := time.Now().UTC().Add(-time.Duration(staleHours) * time.Hour).Format("2006-01-02T15:04:05Z")
+	now := time.Now().UTC()
+	lowStaleHours := config.DeepRepLowScoreStaleHours()
+	highStaleHours := config.DeepRepHighScoreStaleHours()
+	scoreBoundary := config.DeepRepScoreThreshold()
 
-	usernames, err := s.getLowestReputationUsernames(ctx, org, repo, threshold, limit)
+	lowThreshold := now.Add(-time.Duration(lowStaleHours) * time.Hour).Format("2006-01-02T15:04:05Z")
+	highThreshold := now.Add(-time.Duration(highStaleHours) * time.Hour).Format("2006-01-02T15:04:05Z")
+
+	usernames, err := s.getTieredReputationUsernames(ctx, org, repo, lowThreshold, highThreshold, scoreBoundary, limit)
 	if err != nil {
-		return nil, fmt.Errorf("error getting lowest reputation usernames: %w", err)
+		return nil, fmt.Errorf("error getting tiered reputation usernames: %w", err)
 	}
 
 	if len(usernames) == 0 {
-		slog.Info("deep reputation: no candidates")
+		slog.Info("deep reputation: no candidates",
+			"low_stale_hours", lowStaleHours,
+			"high_stale_hours", highStaleHours,
+			"score_threshold", scoreBoundary)
 		return &data.DeepReputationResult{}, nil
 	}
 
-	slog.Info("deep reputation scoring", "candidates", len(usernames))
+	slog.Info("deep reputation scoring",
+		"candidates", len(usernames),
+		"low_stale_hours", lowStaleHours,
+		"high_stale_hours", highStaleHours,
+		"score_threshold", scoreBoundary)
 
 	res := &data.DeepReputationResult{}
 
@@ -278,7 +297,12 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 		i++
 	}
 
-	slog.Info("deep reputation done", "scored", res.Scored, "errors", res.Errors)
+	skipped := len(usernames) - res.Scored - res.Errors
+	slog.Info("deep reputation done",
+		"scored", res.Scored,
+		"errors", res.Errors,
+		"skipped", skipped,
+		"candidates", len(usernames))
 
 	return res, nil
 }
@@ -615,14 +639,14 @@ func (s *Store) getStaleReputationUsernames(ctx context.Context, org, repo *stri
 	return list, nil
 }
 
-func (s *Store) getLowestReputationUsernames(ctx context.Context, org, repo *string, threshold string, limit int) ([]string, error) {
+func (s *Store) getTieredReputationUsernames(ctx context.Context, org, repo *string, lowThreshold, highThreshold string, scoreBoundary float64, limit int) ([]string, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(ctx, selectLowestReputationUsernamesSQL, org, repo, threshold, limit)
+	rows, err := s.db.QueryContext(ctx, selectTieredReputationUsernamesSQL, org, repo, lowThreshold, highThreshold, scoreBoundary, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query lowest reputation usernames: %w", err)
+		return nil, fmt.Errorf("querying tiered reputation usernames: %w", err)
 	}
 	defer rows.Close()
 
@@ -630,15 +654,13 @@ func (s *Store) getLowestReputationUsernames(ctx context.Context, org, repo *str
 	for rows.Next() {
 		var username string
 		if err := rows.Scan(&username); err != nil {
-			return nil, fmt.Errorf("failed to scan username: %w", err)
+			return nil, fmt.Errorf("scanning username: %w", err)
 		}
 		list = append(list, username)
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
+		return nil, fmt.Errorf("iterating rows: %w", err)
 	}
-
 	return list, nil
 }
 

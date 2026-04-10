@@ -42,6 +42,15 @@ func GetEnvBool(key string) bool {
 	return v == "true" || v == "1"
 }
 
+// GetEnvAsFloat retrieves the value of the environment variable and
+// converts it to a float64. Returns defaultValue if unset or invalid.
+func GetEnvAsFloat(key string, defaultValue float64) float64 {
+	if v, err := strconv.ParseFloat(os.Getenv(key), 64); err == nil && v > 0 {
+		return v
+	}
+	return defaultValue
+}
+
 // ---------------------------------------------------------------------------
 // Backfill
 // ---------------------------------------------------------------------------
@@ -49,6 +58,22 @@ func GetEnvBool(key string) bool {
 // BackfillMaxDays returns the PR size backfill lookback window in days.
 // Override: BACKFILL_MAX_DAYS (default 90).
 func BackfillMaxDays() int { return GetEnvAsInt("BACKFILL_MAX_DAYS", 90) }
+
+// ---------------------------------------------------------------------------
+// Deep Reputation
+// ---------------------------------------------------------------------------
+
+// DeepRepLowScoreStaleHours returns the rescore interval for contributors
+// with reputation below the score threshold. Override: DEEPREP_LOW_STALE_HOURS (default 168 = 7 days).
+func DeepRepLowScoreStaleHours() int { return GetEnvAsInt("DEEPREP_LOW_STALE_HOURS", 168) }
+
+// DeepRepHighScoreStaleHours returns the rescore interval for contributors
+// with reputation at or above the score threshold. Override: DEEPREP_HIGH_STALE_HOURS (default 720 = 30 days).
+func DeepRepHighScoreStaleHours() int { return GetEnvAsInt("DEEPREP_HIGH_STALE_HOURS", 720) }
+
+// DeepRepScoreThreshold returns the reputation score boundary between low and
+// high rescore tiers. Override: DEEPREP_SCORE_THRESHOLD (default 0.5).
+func DeepRepScoreThreshold() float64 { return GetEnvAsFloat("DEEPREP_SCORE_THRESHOLD", 0.5) }
 
 // ---------------------------------------------------------------------------
 // Database pool
