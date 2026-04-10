@@ -91,7 +91,8 @@ func runImport(ctx context.Context) error {
 		slog.Info("import worker complete",
 			"repos", 0,
 			"errors", 0,
-			"duration", time.Since(start).String())
+			"duration", time.Since(start).String(),
+			"duration_sec", time.Since(start).Seconds())
 		return nil
 	}
 	work := make(chan RepoWork)
@@ -148,10 +149,12 @@ func runImport(ctx context.Context) error {
 
 	repos := int(totalRepos.Load())
 	errs := int(totalErrors.Load())
+	elapsed := time.Since(start)
 	slog.Info("import worker complete",
 		"repos", repos,
 		"errors", errs,
-		"duration", time.Since(start).String())
+		"duration", elapsed.String(),
+		"duration_sec", elapsed.Seconds())
 
 	if errs > 0 && errs == repos {
 		return fmt.Errorf("all %d repo imports failed", errs)
