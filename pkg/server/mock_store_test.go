@@ -121,6 +121,9 @@ func (m *mockStore) ImportEvents(_ context.Context, _, _, _ string, _ int) (map[
 func (m *mockStore) UpdateEvents(_ context.Context, _ string, _ int) (map[string]int, error) {
 	return nil, nil
 }
+func (m *mockStore) GetMaxEventTime(_ context.Context, _, _ string) (time.Time, error) {
+	return time.Time{}, nil
+}
 
 // --- InsightsStore ---
 func (m *mockStore) GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*data.InsightsSummary, error) {

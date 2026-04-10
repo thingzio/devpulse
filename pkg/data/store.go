@@ -78,6 +78,7 @@ type QueryStore interface {
 type EventStore interface {
 	ImportEvents(ctx context.Context, token, owner, repo string, days int) (map[string]int, *ImportSummary, error)
 	UpdateEvents(ctx context.Context, token string, concurrency int) (map[string]int, error)
+	GetMaxEventTime(ctx context.Context, org, repo string) (time.Time, error)
 }
 
 // InsightsStore provides analytics and insights queries.
