@@ -305,6 +305,24 @@ Ordered by cost (cheapest first):
 
 **Rate limit window:** GitHub rate limits reset on a 60-minute sliding window per installation token. A 2-hour import cycle guarantees full quota reset between runs. Extending to 3-4 hours provides even more headroom for large deployments.
 
+## Database Scaling Path
+
+Current: Cloud SQL `db-g1-small` (shared vCPU, 1.7GB RAM, ~$25-30/month).
+
+| Trigger | Upgrade | Cost | Effort |
+|---------|---------|------|--------|
+| CPU > 80% sustained | `db-custom-2-4096` (dedicated 2 vCPU) | ~$50-80/month | Terraform variable change |
+| Need analytical query speed | Managed AlloyDB | ~$100+/month | Connection string swap |
+| Cost optimization at scale | AlloyDB Omni on GCE `e2-small` | ~$15-30/month | Self-managed VM |
+
+**Why PostgreSQL stays:** RLS for tenant isolation (`SET config` per connection), ACID for session/tenant upserts, sub-10ms query latency for dashboard API. BigQuery's 1-3s minimum query time and lack of RLS make it unsuitable for the interactive dashboard workload.
+
+**AlloyDB Omni option:** Google's PostgreSQL engine packaged for self-hosting. Free to run (pay only for compute). Same wire protocol — zero code changes, swap `DATABASE_URL`. Includes columnar engine for analytical queries (time-series aggregations, contributor rankings) without additional indexes. Trade-off: you manage backups, patching, and monitoring instead of Cloud SQL handling it.
+
+**AlloyDB managed option:** Fully managed, same engine as Omni but with automated backups, patching, HA, and GCP Console integration. Higher cost but zero ops. Best fit when query performance matters more than cost.
+
+**Upgrade is a connection string change:** All three options (Cloud SQL tier bump, AlloyDB managed, AlloyDB Omni) are PostgreSQL-compatible. The application connects via `DATABASE_URL` — no code changes, no schema migration, no driver swap needed.
+
 ## Database Indexes
 
 Performance indexes beyond primary keys, defined in migration files:
