@@ -138,6 +138,7 @@ const listImportWorkSQL = `
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
+	  AND (tr.import_done_at IS NOT NULL OR tr.created_at < NOW() - MAKE_INTERVAL(mins => $1))
 	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
 
 const markImportDoneByRepoSQL = `
@@ -162,8 +163,8 @@ type ImportWorkRow struct {
 
 // ListImportWork returns all active tenant_repo rows eligible for import,
 // joined with tenant plan. Sorted deterministically for sharding.
-func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
-	rows, err := db.QueryContext(ctx, listImportWorkSQL)
+func ListImportWork(ctx context.Context, db *sql.DB, adoptTimeoutMin int) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkSQL, adoptTimeoutMin)
 	if err != nil {
 		return nil, fmt.Errorf("listing import work: %w", err)
 	}

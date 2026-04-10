@@ -66,7 +66,7 @@ func runImport(ctx context.Context) error {
 	llmCfg := data.NewLLMConfigFromEnv()
 
 	// Fetch all active repos and build deduplicated work list.
-	rows, err := tenant.ListImportWork(taskCtx, db)
+	rows, err := tenant.ListImportWork(taskCtx, db, config.ImportAdoptTimeout())
 	if err != nil {
 		return fmt.Errorf("listing import work: %w", err)
 	}
