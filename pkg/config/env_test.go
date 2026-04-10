@@ -192,6 +192,34 @@ func TestGCPProjectID(t *testing.T) {
 	})
 }
 
+func TestDeepRepLowScoreStaleHours(t *testing.T) {
+	assert.Equal(t, 168, DeepRepLowScoreStaleHours())
+	t.Setenv("DEEPREP_LOW_STALE_HOURS", "48")
+	assert.Equal(t, 48, DeepRepLowScoreStaleHours())
+}
+
+func TestDeepRepHighScoreStaleHours(t *testing.T) {
+	assert.Equal(t, 720, DeepRepHighScoreStaleHours())
+	t.Setenv("DEEPREP_HIGH_STALE_HOURS", "336")
+	assert.Equal(t, 336, DeepRepHighScoreStaleHours())
+}
+
+func TestDeepRepScoreThreshold(t *testing.T) {
+	assert.Equal(t, 0.5, DeepRepScoreThreshold())
+	t.Setenv("DEEPREP_SCORE_THRESHOLD", "0.7")
+	assert.Equal(t, 0.7, DeepRepScoreThreshold())
+}
+
+func TestGetEnvAsFloat(t *testing.T) {
+	assert.Equal(t, 3.14, GetEnvAsFloat("UNSET_FLOAT_XYZ", 3.14))
+	t.Setenv("TEST_FLOAT", "0.75")
+	assert.Equal(t, 0.75, GetEnvAsFloat("TEST_FLOAT", 1.0))
+	t.Setenv("TEST_FLOAT", "-1.0")
+	assert.Equal(t, 1.0, GetEnvAsFloat("TEST_FLOAT", 1.0), "negative should fall back")
+	t.Setenv("TEST_FLOAT", "abc")
+	assert.Equal(t, 1.0, GetEnvAsFloat("TEST_FLOAT", 1.0), "non-numeric should fall back")
+}
+
 func TestDebugEnabled(t *testing.T) {
 	t.Run("false when not set", func(t *testing.T) {
 		assert.False(t, DebugEnabled())

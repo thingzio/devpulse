@@ -214,85 +214,85 @@ func TestImportReputation_ComputesShallowScores(t *testing.T) {
 	assert.True(t, rep.Valid)
 }
 
-func TestGetLowestReputationUsernames_NilDB(t *testing.T) {
+func TestGetTieredReputationUsernames_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.getLowestReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", 5)
+	_, err := s.getTieredReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 0.5, 5)
 	assert.Error(t, err)
 }
 
-func TestGetLowestReputationUsernames_EmptyDB(t *testing.T) {
+func TestGetTieredReputationUsernames_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	usernames, err := store.getLowestReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", 5)
+	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 0.5, 5)
 	require.NoError(t, err)
 	assert.Empty(t, usernames)
 }
 
-func TestGetLowestReputationUsernames_ReturnsBottomN(t *testing.T) {
+func TestGetTieredReputationUsernames_LowScoreStaleFirst(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
 	devs := []*data.Developer{
 		{Username: "low1", FullName: "Low One"},
 		{Username: "low2", FullName: "Low Two"},
-		{Username: "mid", FullName: "Mid"},
-		{Username: "high", FullName: "High"},
+		{Username: "high1", FullName: "High One"},
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	// Set shallow scores (reputation_deep = 0)
-	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "low1", 0.10, now, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "low2", 0.20, now, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "mid", 0.50, now, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "high", 0.90, now, false, nil))
+	// Set scores: low1=0.2, low2=0.3 (below 0.5), high1=0.8 (above 0.5)
+	// All updated 10 days ago
+	tenDaysAgo := time.Now().UTC().Add(-10 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	require.NoError(t, store.updateReputation(ctx, "low1", 0.2, tenDaysAgo, false, nil))
+	require.NoError(t, store.updateReputation(ctx, "low2", 0.3, tenDaysAgo, false, nil))
+	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, tenDaysAgo, false, nil))
 
-	// Add events so JOIN finds them
-	for _, u := range []string{"low1", "low2", "mid", "high"} {
+	for _, u := range []string{"low1", "low2", "high1"} {
 		_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
 			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
 		require.NoError(t, err)
 	}
 
-	// Threshold in the future so none are "fresh deep"
-	threshold := time.Now().UTC().Add(time.Hour).Format("2006-01-02T15:04:05Z")
-	usernames, err := store.getLowestReputationUsernames(ctx, nil, nil, threshold, 2)
+	// lowThreshold = 7 days ago (low-score users updated 10 days ago ARE stale)
+	// highThreshold = 30 days ago (high-score users updated 10 days ago are NOT stale)
+	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+
+	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
 	require.NoError(t, err)
-	require.Len(t, usernames, 2)
-	assert.Equal(t, "low1", usernames[0])
-	assert.Equal(t, "low2", usernames[1])
+	// low1 and low2 are stale (updated 10d ago > 7d threshold), high1 is NOT stale (10d < 30d threshold)
+	assert.Contains(t, usernames, "low1")
+	assert.Contains(t, usernames, "low2")
+	assert.NotContains(t, usernames, "high1")
 }
 
-func TestGetLowestReputationUsernames_SkipsFreshDeep(t *testing.T) {
+func TestGetTieredReputationUsernames_HighScoreStaleAfterLongerPeriod(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
 	devs := []*data.Developer{
-		{Username: "deepuser", FullName: "Deep User"},
-		{Username: "shallowuser", FullName: "Shallow User"},
+		{Username: "high1", FullName: "High One"},
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "deepuser", 0.10, now, true, nil))     // deep=true, fresh
-	require.NoError(t, store.updateReputation(ctx, "shallowuser", 0.15, now, false, nil)) // shallow
+	// Updated 35 days ago — beyond the 30-day high threshold
+	oldUpdate := time.Now().UTC().Add(-35 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, oldUpdate, false, nil))
 
-	for _, u := range []string{"deepuser", "shallowuser"} {
-		_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
-			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
-		require.NoError(t, err)
-	}
-
-	// Threshold before now -- deepuser's fresh deep score should be excluded
-	threshold := time.Now().UTC().Add(-time.Hour).Format("2006-01-02T15:04:05Z")
-	usernames, err := store.getLowestReputationUsernames(ctx, nil, nil, threshold, 10)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+		VALUES ('org1', 'repo1', 'high1', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
-	assert.Contains(t, usernames, "shallowuser")
-	assert.NotContains(t, usernames, "deepuser")
+
+	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+
+	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
+	require.NoError(t, err)
+	// high1 IS stale now (35d > 30d threshold)
+	assert.Contains(t, usernames, "high1")
 }
 
-func TestGetLowestReputationUsernames_SkipsBots(t *testing.T) {
+func TestGetTieredReputationUsernames_SkipsBots(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
@@ -302,7 +302,7 @@ func TestGetLowestReputationUsernames_SkipsBots(t *testing.T) {
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	now := time.Now().UTC().Add(-10 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
 	require.NoError(t, store.updateReputation(ctx, "realuser", 0.10, now, false, nil))
 	require.NoError(t, store.updateReputation(ctx, "mybot[bot]", 0.05, now, false, nil))
 
@@ -312,8 +312,10 @@ func TestGetLowestReputationUsernames_SkipsBots(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	threshold := time.Now().UTC().Add(time.Hour).Format("2006-01-02T15:04:05Z")
-	usernames, err := store.getLowestReputationUsernames(ctx, nil, nil, threshold, 10)
+	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
+
+	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
 	require.NoError(t, err)
 	assert.Contains(t, usernames, "realuser")
 	assert.NotContains(t, usernames, "mybot[bot]")
