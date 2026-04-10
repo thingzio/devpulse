@@ -41,7 +41,6 @@ type metricsConfig struct {
 	model        string
 	service      string
 	job          string
-	deeprep      string
 	admin        string
 	dbID         string
 }
@@ -55,7 +54,6 @@ func newMetricsConfig() *metricsConfig {
 		model:        config.AnthropicModel(defaultInsightsModel),
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
-		deeprep:      prefix + "-deeprep",
 		admin:        prefix + "-admin",
 		dbID:         project + ":" + prefix + "-pg",
 	}
@@ -223,26 +221,6 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
-			label:  "Deep Reputation: Job Execution Results",
-			filter: fmt.Sprintf(`resource.type="cloud_run_job" AND resource.labels.job_name="%s" AND metric.type="run.googleapis.com/job/completed_execution_count"`, cfg.deeprep),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.result",
-		},
-		{
-			label:  "Deep Reputation: Contributors Scored (hourly)",
-			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-scored"`, "devpulse-saas"),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
-		},
-		{
-			label:  "Deep Reputation: Rate Limit Pauses (hourly)",
-			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-rate-limit-pauses"`, "devpulse-saas"),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
-		},
-		{
-			label:  "Deep Reputation: Errors (by username)",
-			filter: fmt.Sprintf(`metric.type="logging.googleapis.com/user/%s-deeprep-errors"`, "devpulse-saas"),
-			params: dailyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.username",
-		},
-		{
 			label:  "Cloud SQL: CPU Utilization",
 			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/cpu/utilization"`, cfg.dbID),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
@@ -386,7 +364,7 @@ func formatTimeSeries(raw string) string {
 
 // analyzeMetrics sends the collected metrics to the Anthropic API for analysis.
 func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics string) (string, error) {
-	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics for DevPulse, a multi-tenant SaaS running on Cloud Run + Cloud SQL PostgreSQL. Analyze the raw metrics and provide:
+	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics for DevPulse, a multi-tenant SaaS running on Cloud Run + Cloud SQL PostgreSQL. The import pipeline uses sharded parallel tasks with goroutine workers. Analyze the raw metrics and provide:
 
 1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
 2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 1s, cold-start latency > 3s, errors, deadlocks, disk growth).
