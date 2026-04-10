@@ -1809,11 +1809,12 @@ function loadRepoOverview(url) {
                     applySelection('repo', { value: name, label: name });
                 });
                 $nameCell.append($link);
-            } else {
-                $nameCell.text(name).css('color', paused ? 'var(--red)' : 'var(--gray)');
-            }
-            if (paused) {
+            } else if (paused) {
+                $nameCell.text(name).css('color', 'var(--red)');
                 $nameCell.append(' <span style="font-size:0.75em;font-weight:700">(paused)</span>');
+            } else {
+                $nameCell.text(name).css('color', 'var(--gray)');
+                $nameCell.append(' <span style="font-size:0.75em;color:var(--gray);font-style:italic">(importing...)</span>');
             }
             var $row = $('<tr></tr>');
             if (paused) {
@@ -2637,6 +2638,29 @@ function removeTrackedRepo(org, repo) {
     });
 }
 
+function pollRepoImport(org, repo) {
+    var name = org + '/' + repo;
+    var attempts = 0;
+    var maxAttempts = 60; // 5 minutes at 5s intervals
+    var interval = setInterval(function() {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(interval);
+            return;
+        }
+        $.getJSON('/api/repos/overview', function(resp) {
+            var repos = resp.repos || [];
+            for (var i = 0; i < repos.length; i++) {
+                if (repos[i].org + '/' + repos[i].repo === name && repos[i].last_import) {
+                    clearInterval(interval);
+                    loadRepoOverview('/api/repos/overview');
+                    return;
+                }
+            }
+        });
+    }, 5000);
+}
+
 function addTrackedRepo(org, repo) {
     var $status = $('#repo-search-status');
     $status.text('Adding...');
@@ -2645,6 +2669,7 @@ function addTrackedRepo(org, repo) {
         $('#repo-search').val('');
         $('#repo-search-results').removeClass('visible');
         $status.text('');
+        pollRepoImport(org, repo);
     }).fail(function(xhr) {
         var msg = (xhr.responseText || 'Failed to add repo').trim();
         var limitMatch = msg.match(/^repo_limit_reached:(\d+)$/);
