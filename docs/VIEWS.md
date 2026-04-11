@@ -12,7 +12,8 @@ Shows when no repo is selected — your bird's-eye view across all tracked proje
 Is this project alive and well?
 
 - **Project Health** — Bus Factor (how many devs account for 50%+ of work), Pony Factor (how many orgs), and an Overall Health grade. High bus factor = key-person risk. Low pony factor = single-company dependency.
-- **Health Activity** — Daily contributor activity heatmap. Shows whether the project has steady engagement or sporadic bursts — sustained activity signals a healthy community.
+- **Health Scorecard** — Grades across three categories: Demand (community interest and growth), Throughput (how efficiently work moves), and Responsiveness (how quickly the team reacts). Each graded A–F.
+- **Health Activity** — Daily contributor activity sparkline. Shows whether the project has steady engagement or sporadic bursts — sustained activity signals a healthy community.
 - **Repository Status** — Stars, forks, open issues snapshot from GitHub. Lagging indicator but useful for tracking external interest.
 - **Stars Trend** — Daily star count over time. Spikes often correlate with blog posts, HN/Reddit mentions, or conference talks.
 - **Forks Trend** — Daily fork count. Rising forks without rising PRs may mean people are forking but not contributing back.
@@ -46,6 +47,7 @@ Is the code getting proper attention?
 - **Review Latency** — Hours from PR creation to first review. Complements Time to First Response — focused specifically on code review bottlenecks.
 - **Time to Close (Issues)** — Average days to close all issues vs bug issues near releases. Shows whether the team can keep up with incoming work.
 - **Lowest Reputation Contributors** — Flags contributors with limited track record. Useful for identifying PRs that may need extra review scrutiny.
+- **Signals** — Quality alerts highlighting unanswered issues and PRs that may need attention.
 
 ## Community
 
@@ -62,7 +64,17 @@ Who's contributing and are they sticking around?
 
 Raw data exploration.
 
-- **Event Search** — Filter and browse individual PRs, issues, reviews, and comments. Drill down when you need specifics behind the charts.
+- **Event Search** — Filter and browse individual PRs, issues, reviews, comments, and forks. Drill down when you need specifics behind the charts.
+- **Filters** — Narrow results by event type, date range, username, and entity (company). Filters can be combined.
+- **Pagination** — Results are paged with Prev/Next navigation.
+- **Export** — Download the current filtered view as a CSV file.
+
+## Data Export
+
+- **PDF report** — Downloadable report of the current dashboard view. Starter plans and above.
+- **CSV/ZIP export** — ZIP archive with summary, events, developers, insights, and reputation data. Pro plans and above.
+- **Portfolio CSV** — Export all repo metrics from the Repository Overview panel.
+- **Event search CSV** — Export filtered search results from the Events tab.
 
 ## Insights (AI-powered, plan dependent)
 

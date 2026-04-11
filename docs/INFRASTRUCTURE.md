@@ -13,7 +13,7 @@ Internet
    |     +-- Webhook endpoint (GitHub App)
    |     +-- Data API (30+ chart endpoints)
    |
-   +-- Cloud Run job (import, hourly)
+   +-- Cloud Run job (import, every 2 hours)
    |     +-- Per-tenant repo import via GitHub API
    |     +-- Deep reputation scoring (round-robin token pool)
    |     +-- LLM insights generation (Claude Haiku 4.5)
@@ -31,7 +31,7 @@ Cloud SQL PostgreSQL (db-g1-small)
    +-- SaaS tables (tenant, session, tenant_repo, ...)
    +-- RLS policies (tenant isolation)
 
-Cloud Scheduler -> triggers import job hourly
+Cloud Scheduler -> triggers import job every 2 hours
 Secret Manager  -> GitHub App key, OAuth secret, webhook secret, Anthropic API key
 Cloud DNS       -> devpulse.thingz.io
 ```
@@ -50,7 +50,7 @@ The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize c
 
 ## Response Caching
 
-Dashboard data only changes at import time (hourly). Two-layer caching eliminates redundant DB queries:
+Dashboard data only changes at import time (every 2 hours). Two-layer caching eliminates redundant DB queries:
 
 **Server-side (in-memory):** `sync.Map` with 5-minute TTL, keyed by `(tenant_id, path, query_params)`. Protects the DB from concurrent requests across all users viewing the same data. Covers all 25+ insight endpoints via the `insightHandler` and `insightWithEntityHandler` factories. Memory footprint: ~50KB per active tenant (~4MB at 80 tenants).
 
@@ -87,10 +87,10 @@ Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
 | Cloud Run Service (serve) | scale-to-zero (min=0), 1 vCPU/512MB | $5/mo |
-| Cloud Run Job (import) | hourly, ~3 tasks, ~10 min/run | $3.50/mo |
+| Cloud Run Job (import) | every 2 hours, ~3 tasks, ~10 min/run | $3.50/mo |
 | Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
 | Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
-| Cloud Scheduler | 1 hourly job | free (3 free) |
+| Cloud Scheduler | 1 job every 2 hours | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
@@ -264,7 +264,7 @@ Typical totals: **~60-100 calls/repo** incremental, **~150-300** first import. T
 | High activity (incremental) | ~12-25 |
 | First import (moderate) | ~15-30 |
 
-First imports of large repos may span multiple hourly cycles — the importer resumes from saved page state automatically.
+First imports of large repos may span multiple import cycles — the importer resumes from saved page state automatically.
 
 ### Rate Limit Handling
 
@@ -301,7 +301,7 @@ Ordered by cost (cheapest first):
 
 **How weighted sharding scales:** The greedy bin-packing algorithm assigns the heaviest repos (by event count) to different tasks first. Adding tasks distributes large repos across more containers. With N large repos, set `import_parallelism >= N` so each large repo gets its own task.
 
-**Token pool economics:** Every tenant who installs the GitHub App contributes 5000 API calls/hr to the shared pool. More customers = more quota = better service for everyone. Current pool: 6 tokens × 5000 = 30,000 calls/hr.
+**Token pool economics:** Every tenant who installs the GitHub App contributes 5000 API calls/hr to the shared pool. More customers = more quota = better service for everyone. Current pool: 8 tokens × 5000 = 40,000 calls/hr.
 
 **Rate limit window:** GitHub rate limits reset on a 60-minute sliding window per installation token. A 2-hour import cycle guarantees full quota reset between runs. Extending to 3-4 hours provides even more headroom for large deployments.
 
@@ -372,7 +372,7 @@ All infrastructure is defined in `infra/saas/`:
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
 | `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
-| `scheduler.tf` | Hourly import job trigger |
+| `scheduler.tf` | Import job trigger (every 2 hours) |
 | `dns.tf` | Cloud DNS zone |
 | `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
 | `registry.tf` | Artifact Registry standard repo (direct push from CI) |

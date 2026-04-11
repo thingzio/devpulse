@@ -6,9 +6,9 @@ Multi-tenant SaaS for GitHub project health analytics. Three binaries: `devpulse
 
 ```
 GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
-Cloud Scheduler :00 ──→ devpulse (import) ──→ per-tenant install tokens ──→ PostgreSQL
+Cloud Scheduler */2h ──→ devpulse (import) ──→ shared token pool ──→ PostgreSQL
+Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo ──→ on-demand import
 Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
-Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo
 Admin  ──→ devpulse (admin) ──→ IAM auth ──→ tenant plan management ──→ PostgreSQL
 ```
 
@@ -106,13 +106,16 @@ The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (e
 
 1. **Metadata** — repo stars, forks, language, license, community profile
 2. **Events** — PRs, reviews, issues, comments, forks (incremental via pagination state)
-3. **Releases** — tags, dates, asset downloads
-4. **Metric history** — daily star/fork counts
-5. **Container versions** — image version tracking
-6. **Reputation** — deep reputation scoring with round-robin token pool
-7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
+3. **PR size backfill** — backfills additions/deletions for recent PRs (bounded by `BACKFILL_MAX_DAYS`, default 90)
+4. **Releases** — tags, dates, asset downloads
+5. **Metric history** — daily star/fork counts
+6. **Container versions** — image version tracking
+7. **Reputation** — deep reputation scoring with round-robin token pool
+8. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
 
-Token resolution priority: (1) `GITHUB_TOKEN` env var, (2) GitHub App installation token, (3) unauthenticated (60 req/hr, public repos only). See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
+Unchanged repos (no pushes since last import) are skipped automatically to save API quota. On-demand import is triggered via Cloud Run Jobs API when a user adds a new repo (`pkg/server/import_trigger.go`).
+
+**Token pool:** The import job collects installation tokens from all active GitHub App installations across all tenants, deduplicates by installation ID, and rotates via round-robin (`pkg/data/ghutil/tokenpool.go`). Tokens with < 100 remaining quota are skipped. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 
 ## Dashboard
 

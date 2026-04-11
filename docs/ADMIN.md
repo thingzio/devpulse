@@ -38,12 +38,35 @@ See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the full scaling plan and cost es
 
 ### CLI Tools
 
+All tools call the IAM-protected `devpulse-saas-admin` Cloud Run service.
+
 ```shell
-./tools/tenant-list                          # list all tenants
-./tools/tenant-upgrade <username> <plan>     # upgrade tenant plan (free/pro/enterprise)
+./tools/tenant-list                          # list all tenants with plan, repos, events
+./tools/tenant-detail <username>             # detailed tenant view: repos, backfill, contributors
+./tools/tenant-upgrade <username> <plan>     # upgrade tenant plan (free/starter/pro/enterprise)
+./tools/tenant-invite <username>             # invite a new tenant
+./tools/tenant-tokens                        # show GitHub App token quota per installation
+./tools/metrics-review                       # AI-powered review of GCP monitoring metrics
+./tools/repo-reset <org/repo>               # reset import errors for a repo
+./tools/repo-reset --all <username>          # reset all import errors for a tenant
+./tools/job-detail <execution-name>          # show import job execution status and logs
+./tools/db-connect                           # open psql to the production database
+./tools/db-snapshot                          # create a database backup snapshot
 ```
 
-Both tools call the IAM-protected `devpulse-saas-admin` Cloud Run service.
+### Admin Service Endpoints
+
+The admin service (`devpulse-saas-admin`) exposes these IAM-gated endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/tenants` | GET | List all tenants |
+| `/tenant` | GET | Get tenant detail |
+| `/upgrade` | POST | Upgrade tenant plan |
+| `/invite` | POST | Invite new tenant |
+| `/reset-errors` | POST | Reset repo import errors |
+| `/tokens` | GET | GitHub App token quota per installation |
+| `/metrics/review` | GET | AI-powered metrics analysis (Anthropic) |
 
 ### Direct SQL
 
@@ -54,7 +77,7 @@ FROM tenant ORDER BY created_at;
 
 -- Promote to pro
 UPDATE tenant
-SET plan = 'pro', max_repos = 15, max_events_per_week = 15000, updated_at = NOW()
+SET plan = 'pro', max_repos = 25, max_events_per_week = 15000, updated_at = NOW()
 WHERE username = 'their-github-username';
 ```
 
@@ -78,15 +101,19 @@ Created by Terraform (`infra/saas/monitoring.tf`). These are free.
 | `devpulse-saas-sign-ins` | `jsonPayload.msg="user signed in"` | Counter |
 | `devpulse-saas-tos-accepted` | `jsonPayload.msg="tos accepted"` | Counter |
 | `devpulse-saas-import-duration` | `jsonPayload.msg="import worker complete"` | Distribution |
-| `devpulse-saas-import-tenant-count` | `jsonPayload.msg="import worker complete"` | Distribution |
-| `devpulse-saas-tenant-weekly-events` | `jsonPayload.msg="tenant usage"` | Distribution (by tenant_id) |
 | `devpulse-saas-event-limit-reached` | `jsonPayload.msg="weekly event limit reached"` | Counter (by tenant_id) |
+| `devpulse-saas-import-repo-errors` | `jsonPayload.msg="imported" AND jsonPayload.errs>0` | Counter (by repo) |
+| `devpulse-saas-import-repo-skipped-unchanged` | `jsonPayload.msg="skipping unchanged repo"` | Counter (by repo) |
+| `devpulse-saas-backfill-rate-limited` | `jsonPayload.msg="backfill rate limited"` | Counter (by repo) |
+| `devpulse-saas-backfill-completed` | `jsonPayload.msg="backfilled"` | Distribution (updated count) |
+| `devpulse-saas-webhook-installs` | `jsonPayload.msg="installation event"` | Counter |
+| `devpulse-saas-upgrade-requests` | `jsonPayload.msg="upgrade requested"` | Counter |
 
 Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>`.
 
 ### Dashboard
 
-12 widgets in `infra/saas/dashboard.json`:
+22 widgets in `infra/saas/dashboard.json`:
 
 #### Service Widgets (Cloud Run)
 
@@ -98,14 +125,26 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | CPU Utilization | Sustained > 80% = add CPU limit |
 | Memory Utilization | Sustained > 80% = add memory limit |
 | Billable Instance Time | Cost tracking |
+| Application Errors | Error spikes across all services |
+| Admin: Request Count | Admin service usage |
+
+#### Import Widgets
+
+| Widget | What to watch |
+|--------|--------------|
+| Import: Duration | Trending toward 45min = increase parallelism |
+| Import: Job Execution Results | Failed vs succeeded executions |
+| Import: Repo Errors | Persistent repo-level failures |
 
 #### Tenant Widgets (log-based)
 
 | Widget | What to watch |
 |--------|--------------|
 | Sign-ins | New tenant growth rate |
-| Import: Tenant Count | Active tenants per import run |
-| Import: Duration | Trending toward 45min = increase parallelism |
+| ToS Accepted | Conversion from sign-in to active user |
+| Upgrade Requests | Demand for paid plans |
+| Webhook: Installation Events | GitHub App install/uninstall activity |
+| Event Limit Reached | Tenants hitting weekly caps |
 
 #### Database Widgets (Cloud SQL)
 
@@ -114,16 +153,20 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | CPU Utilization | Sustained > 80% = upgrade DB tier |
 | Memory Utilization | Sustained > 80% = upgrade DB tier |
 | Connections | Approaching max = add PgBouncer sidecar |
+| Disk Used | Storage growth trend |
+| Transactions/sec | Query load patterns |
+| Deadlocks | Should be zero; investigate any occurrence |
 
-### Alert Policies (7)
+### Alert Policies (8)
 
 | Alert | Condition | Action |
 |-------|-----------|--------|
 | Upgrade request | User requested plan upgrade | Review and process upgrade |
 | Error rate | Cloud Run 5xx > 5/min for 5min | Investigate service logs |
-| High latency | p99 latency > threshold | Check slow queries, DB load |
-| DB CPU | Cloud SQL CPU sustained > 80% | Upgrade DB tier |
-| DB connections | Connection count approaching max | Increase pool size or add PgBouncer |
+| High latency | p99 latency > 1s for 600s | Check slow queries, DB load |
+| DB CPU | Cloud SQL CPU sustained > 80% for 5min | Upgrade DB tier |
+| DB connections | Connection count > 80 for 5min | Increase pool size or add PgBouncer |
+| DB vacuum lag | Oldest transaction age > 200M for 5min | Check long-running queries, run VACUUM |
 | Import failure | Any failed import job execution | Check import logs |
 | Import repo errors | Repo import errors > 5/hour | Check import logs for persistent repo failures |
 
@@ -140,7 +183,7 @@ gcloud logging read \
 gcloud logging read \
     'resource.type="cloud_run_job" jsonPayload.msg="import worker complete"' \
     --project=$PROJECT_ID --limit=5 \
-    --format='table(timestamp, jsonPayload.tenants, jsonPayload.errors, jsonPayload.duration)'
+    --format='table(timestamp, jsonPayload.repos, jsonPayload.errors, jsonPayload.duration)'
 
 # Errors in last hour
 gcloud logging read \

@@ -14,8 +14,10 @@ This document covers remaining plan features not yet implemented.
 |--------------------------|-------------|-------------|-------------|---------------------|
 | **Private Repos**        | -           | -           | -           | Yes                 |
 | **API Access**           | -           | -           | -           | Yes                 |
-| **Import Frequency**     | Daily       | Hourly      | Hourly      | Hourly + On-demand  |
+| **Import Frequency**     | Daily       | Hourly      | Hourly      | Hourly              |
 | **Dedicated Instance**   | -           | -           | -           | Optional (quoted)   |
+
+> **Note:** On-demand import (trigger import when adding a repo) is now shipped for all plans. The Phase 2 import frequency feature gates the _scheduled_ interval.
 
 ---
 
@@ -67,19 +69,19 @@ Currently repo-add requires a public repo (HEAD request to GitHub API). Private 
 - `pkg/server/repo.go` — skip public check when tenant plan allows private repos
 - Verify GitHub App permissions cover private repo metadata access
 
-## 3. Import Frequency (Daily / Hourly / Hourly + On-demand)
+## 3. Import Frequency (Daily / Hourly)
 
 **Effort:** Medium
 
 The importer uses deterministic task-index sharding. Each Cloud Run task gets a disjoint slice of repos. Repos shared by multiple tenants are imported once and marked done for all.
 
+On-demand import (trigger on repo add) is already shipped via `pkg/server/import_trigger.go` using the Cloud Run Jobs API.
+
 **Changes:**
-- `pkg/plan/plan.go` — add `ImportIntervalHours int` and `OnDemandImport bool`
+- `pkg/plan/plan.go` — add `ImportIntervalHours int`
 - Sharding already ensures each repo is processed at most once per cycle
 - Two Cloud Run jobs: daily-schedule + hourly-schedule, same binary
 - Free repos only claimable when 24h have passed; Starter+ repos claimable every hour
-
-**On-demand import (Enterprise):** Mark a specific repo as ready-to-claim, trigger a Cloud Run job execution via the Cloud Run Jobs API from the site binary.
 
 ---
 
@@ -90,4 +92,3 @@ The importer uses deterministic task-index sharding. Each Cloud Run task gets a 
 | API Access | Auth middleware + GitHub PAT resolution | Medium |
 | Private Repos | Repo-add validation + GitHub App permissions | Low-Medium |
 | Import Frequency | Single scheduled job every 2 hours with sharded tasks | Medium |
-| On-demand Import | Repo-level claim trigger + Cloud Run Jobs API | Medium |

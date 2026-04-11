@@ -122,7 +122,7 @@ terraform init
 terraform apply
 ```
 
-This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + job (import), Cloud Scheduler (hourly trigger), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + job (import) + admin service, Cloud Scheduler (every 2 hours), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
 
 > **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
 
@@ -169,8 +169,8 @@ make bump-minor
 This triggers the release pipeline:
 1. Tests (unit, lint, tfsec, e2e)
 2. Builds `devpulse-site`, `devpulse-import`, and `devpulse-admin` images via goreleaser + ko
-3. Pushes to GHCR
-4. Deploys to Cloud Run via AR remote repo proxy
+3. Pushes directly to Artifact Registry (`us-west1-docker.pkg.dev/devpulseio/devpulse-saas-images`)
+4. Deploys to Cloud Run
 5. Publishes GitHub release
 
 ## 12. Verify
@@ -190,7 +190,7 @@ open https://$DOMAIN
 
 # Trigger manual import (after signing in, installing app, and adding repos)
 gcloud run jobs execute devpulse-saas-import --region=$REGION --project=$PROJECT_ID
-# The import job runs hourly via Cloud Scheduler (includes all phases)
+# The import job runs every 2 hours via Cloud Scheduler (includes all phases)
 
 # Check logs
 gcloud logging read 'resource.type="cloud_run_revision"' \
