@@ -83,7 +83,7 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 			tn.Username, tn.Name, tn.Email, message,
 		)
 
-		if err := devnet.SendEmail(r.Context(), apiKey, tn.Email, supportEmail, subject, html, text); err != nil {
+		if err := devnet.SendEmail(r.Context(), apiKey, supportEmail, supportEmail, subject, html, text, tn.Email); err != nil {
 			slog.Error("sending support email", "username", tn.Username, "error", err)
 			renderHelpWithError(w, tn, "Failed to send message. Please try again later.")
 			return

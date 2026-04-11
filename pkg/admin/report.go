@@ -231,7 +231,7 @@ func renderReportText(summary summaryResponse, analysis string) string {
 }
 
 func sendEmail(ctx context.Context, cfg *reportConfig, subject, html, text string) error {
-	return devnet.SendEmail(ctx, cfg.SendAPIKey, cfg.FromEmail, cfg.ToEmail, subject, html, text)
+	return devnet.SendEmail(ctx, cfg.SendAPIKey, cfg.FromEmail, cfg.ToEmail, subject, html, text, "")
 }
 
 func handleReport(db *sql.DB, mcfg *metricsConfig, rcfg *reportConfig) http.HandlerFunc {

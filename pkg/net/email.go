@@ -19,13 +19,17 @@ var emailClient = &http.Client{Timeout: emailSendTimeout}
 
 // SendEmail sends an email via the Resend API. The apiKey is a Resend API key.
 // from and to are email addresses; subject, html, and text are the message content.
-func SendEmail(ctx context.Context, apiKey, from, to, subject, html, text string) error {
+// replyTo is optional — if non-empty, sets the Reply-To header on the email.
+func SendEmail(ctx context.Context, apiKey, from, to, subject, html, text, replyTo string) error {
 	payload := map[string]any{
 		"from":    from,
 		"to":      []string{to},
 		"subject": subject,
 		"html":    html,
 		"text":    text,
+	}
+	if replyTo != "" {
+		payload["reply_to"] = replyTo
 	}
 
 	body, err := json.Marshal(payload)
