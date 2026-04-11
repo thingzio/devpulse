@@ -1,0 +1,107 @@
+{{define "content"}}
+<div class="landing">
+  <div class="landing-hero">
+    <h1>Changelog</h1>
+    <p>What's new in DevPulse</p>
+  </div>
+
+  <div style="max-width:700px;margin:0 auto">
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 11, 2026</h3>
+      <ul>
+        <li>Added <a href="/settings">Settings page</a> with profile info, plan details, and theme selector</li>
+        <li>GitHub profile data (name, company, location, bio) now imported automatically</li>
+        <li>Improved landing page with beta pricing, onboarding hint, and social sharing previews</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 10, 2026</h3>
+      <ul>
+        <li>Repos now import immediately when added &mdash; no more waiting for the next scheduled run</li>
+        <li>Dashboard shows an importing badge with live progress while your repo loads</li>
+        <li>Faster imports &mdash; unchanged repos are automatically skipped, and tokens rotate on rate limits</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 9, 2026</h3>
+      <ul>
+        <li>Deep reputation scoring now runs inline during import instead of a separate job</li>
+        <li>Expanded <a href="/help">Help page</a> with per-tab panel descriptions and troubleshooting</li>
+        <li>Fixed sign-in issues caused by duplicate OAuth callbacks</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 8, 2026</h3>
+      <ul>
+        <li>Shared token pool across all tenants for better GitHub API rate limit utilization</li>
+        <li>PR size backfill now bounded to 90 days with early exit on rate limit</li>
+        <li>Ghost GitHub users (deleted accounts) no longer cause import errors</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 7, 2026</h3>
+      <ul>
+        <li>Improved mobile layout &mdash; responsive tables, full-width search, and cleaner nav</li>
+        <li>Rate-limited requests now show a friendly message instead of a raw error</li>
+        <li>Health Scorecard cards wrap properly on narrow screens</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 6, 2026</h3>
+      <ul>
+        <li>Weekly reporting &mdash; all charts now show weekly granularity for periods under 6 months</li>
+        <li>New dashboard split: <strong>Portfolio view</strong> (summary + repo list) and <strong>Analytics view</strong> (per-repo tabs)</li>
+        <li>User avatar menu with theme toggle (light, dark, system)</li>
+        <li>Added period presets from 2 weeks to 3 years</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>April 5, 2026</h3>
+      <ul>
+        <li>Improved entity normalization &mdash; Azure and Oracle Cloud Infrastructure aliases now recognized</li>
+        <li>Row-Level Security hardened with COALESCE guards and FORCE policies</li>
+        <li>Added database autovacuum lag monitoring</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>March 30, 2026</h3>
+      <ul>
+        <li>Insight caching &mdash; AI insights regenerate only after 7 days and 10% event change, reducing costs ~85%</li>
+        <li>Server-side response caching with 5-minute TTL for faster dashboard loads</li>
+        <li>PDF and CSV data export for Pro and Enterprise plans</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>March 23, 2026</h3>
+      <ul>
+        <li>AI-generated insights with action items for Starter plans and above</li>
+        <li>Health Scorecard with graded scores across demand, throughput, and responsiveness</li>
+        <li>Content Security Policy headers for improved browser security</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature" style="margin-bottom:20px">
+      <h3>March 16, 2026</h3>
+      <ul>
+        <li>Initial beta launch with project health analytics, contributor trends, and PR velocity tracking</li>
+        <li>GitHub OAuth sign-in and GitHub App integration for data import</li>
+        <li>Free, Starter, Pro, and Enterprise plan tiers</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="landing-footer">
+    <p><a href="/dashboard">Back to Dashboard</a></p>
+  </div>
+</div>
+{{end}}

@@ -51,7 +51,7 @@ var templateFuncs = template.FuncMap{
 
 func init() {
 	// Simple pages using layout.html
-	simplePages := []string{"landing.html", "tos.html", "help.html", "settings.html"}
+	simplePages := []string{"landing.html", "tos.html", "help.html", "settings.html", "changelog.html"}
 	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
 	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
@@ -181,6 +181,9 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
 	mux.HandleFunc("GET /help", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "help.html", pageData{Title: "Help", Plans: plan.All})
+	})
+	mux.HandleFunc("GET /changelog", func(w http.ResponseWriter, _ *http.Request) {
+		renderTemplate(w, "changelog.html", pageData{Title: "Changelog"})
 	})
 	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
 		middleware.ClearSessionCookie(w)
