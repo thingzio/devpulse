@@ -96,9 +96,9 @@ func TestRenderReportHTML_WithDeltas(t *testing.T) {
 
 	assert.Contains(t, html, "Platform Summary")
 	assert.Contains(t, html, "2026-04-11")
-	assert.Contains(t, html, "25")                    // tenants current
-	assert.Contains(t, html, "+5 (25.0%)")             // delta
-	assert.Contains(t, html, "acme/api")               // error repo
+	assert.Contains(t, html, "25")                      // tenants current
+	assert.Contains(t, html, "+5 (25.0%)")              // delta
+	assert.Contains(t, html, "acme/api")                // error repo
 	assert.Contains(t, html, "rate limited")            // last error
 	assert.Contains(t, html, "All systems operational") // analysis
 	assert.NotContains(t, html, "unavailable")

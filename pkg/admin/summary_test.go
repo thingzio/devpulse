@@ -96,11 +96,11 @@ func TestComputeDelta_ZeroPrevious(t *testing.T) {
 
 func TestComputeDelta_NoDifference(t *testing.T) {
 	s := platformStats{
-		Tenants:      10,
-		Repos:        5,
-		Events:       500,
-		Contributors: 20,
-		Installations: 3,
+		Tenants:         10,
+		Repos:           5,
+		Events:          500,
+		Contributors:    20,
+		Installations:   3,
 		ReposWithErrors: 1,
 	}
 

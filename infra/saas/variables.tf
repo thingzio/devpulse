@@ -49,7 +49,7 @@ variable "notification_email" {
 variable "admin_invoker_emails" {
   description = "GCP identities allowed to invoke the admin service"
   type        = list(string)
-  default     = ["mchmarny@gmail.com"]
+  default     = ["mark@chmarny.com"]
 }
 
 variable "db_tier" {
@@ -79,11 +79,11 @@ variable "import_task_timeout" {
 variable "report_to_email" {
   description = "Daily report recipient email"
   type        = string
-  default     = ""
+  default     = "mark@chmarny.com"
 }
 
 variable "report_from_email" {
   description = "Daily report sender email (must be verified in SendGrid)"
   type        = string
-  default     = ""
+  default     = "devpulse@thingz.io"
 }
