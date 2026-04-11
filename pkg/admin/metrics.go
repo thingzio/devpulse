@@ -160,6 +160,7 @@ type metricQuery struct {
 
 func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQuery {
 	return []metricQuery{
+		// --- Service ---
 		{
 			label:  "Service: Request Count (req/s by response class)",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.service),
@@ -201,6 +202,17 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MAX",
 		},
 		{
+			label:  "Service: Billable Instance Time (s/s)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/container/billable_instance_time"`, cfg.service),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_RATE&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		// --- Import ---
+		{
+			label:  "Import: Duration (seconds)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-duration"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_MEAN",
+		},
+		{
 			label:  "Import: Job Execution Results",
 			filter: fmt.Sprintf(`resource.type="cloud_run_job" AND resource.labels.job_name="%s" AND metric.type="run.googleapis.com/job/completed_execution_count"`, cfg.job),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.result",
@@ -220,6 +232,7 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-backfill-completed"`,
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
+		// --- Cloud SQL ---
 		{
 			label:  "Cloud SQL: CPU Utilization",
 			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/cpu/utilization"`, cfg.dbID),
@@ -251,8 +264,34 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
 		},
 		{
+			label:  "Cloud SQL: Disk Used (bytes)",
+			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/disk/bytes_used"`, cfg.dbID),
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+		},
+		// --- User Engagement ---
+		{
 			label:  "Sign-ins (daily)",
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-sign-ins"`,
+			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "ToS Accepted (daily)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-tos-accepted"`,
+			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Upgrade Requests (daily)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-upgrade-requests"`,
+			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Webhook: Installation Events (daily)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-webhook-installs"`,
+			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Event Limit Reached (daily)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-event-limit-reached"`,
 			params: "aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
@@ -263,6 +302,7 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 				cfg.service),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
+		// --- Admin ---
 		{
 			label:  "Admin: Request Count",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.admin),
@@ -272,6 +312,60 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			label:  "Admin: Request Latency p99 (ms)",
 			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_latencies"`, cfg.admin),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MEAN",
+		},
+	}
+}
+
+// trendDays is the lookback window for the trend/baseline comparison section.
+const trendDays = 7
+
+// trendQueries returns a subset of high-signal metrics for trend comparison.
+// These use daily alignment to give one data point per day over the trend window.
+func trendQueries(cfg *metricsConfig) []metricQuery {
+	daily := "aggregation.alignmentPeriod=86400s"
+	return []metricQuery{
+		{
+			label:  "Service: Request Count (daily total)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.service),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Service: Request Latency p99 (daily max, ms)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_latencies"`, cfg.service),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MAX",
+		},
+		{
+			label:  "Import: Job Execution Results (daily)",
+			filter: fmt.Sprintf(`resource.type="cloud_run_job" AND resource.labels.job_name="%s" AND metric.type="run.googleapis.com/job/completed_execution_count"`, cfg.job),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.result",
+		},
+		{
+			label:  "Import: Repo Errors (daily total)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-errors"`,
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label:  "Cloud SQL: CPU Utilization (daily avg)",
+			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/cpu/utilization"`, cfg.dbID),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+		},
+		{
+			label:  "Cloud SQL: Connections (daily max)",
+			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/postgresql/num_backends"`, cfg.dbID),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_MAX",
+		},
+		{
+			label:  "Sign-ins (daily)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-sign-ins"`,
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
+		},
+		{
+			label: "Application Errors (daily total)",
+			filter: fmt.Sprintf(
+				`resource.type="cloud_run_revision" AND resource.labels.service_name="%s"`+
+					` AND metric.type="logging.googleapis.com/log_entry_count" AND metric.labels.severity="ERROR"`,
+				cfg.service),
+			params: daily + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 	}
 }
@@ -294,6 +388,20 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 			continue
 		}
 		fmt.Fprintf(&b, "--- %s ---\n%s\n\n", q.label, formatTimeSeries(raw))
+	}
+
+	// Append 7-day trend data when the primary window is shorter.
+	if days < trendDays {
+		trendStart := now.Add(-time.Duration(trendDays) * 24 * time.Hour)
+		fmt.Fprintf(&b, "=== 7-Day Trend Baseline ===\n\n")
+		for _, q := range trendQueries(cfg) {
+			raw, err := queryTimeSeries(ctx, cfg.projectID, token, q.filter, q.params, trendStart, now)
+			if err != nil {
+				fmt.Fprintf(&b, "--- %s ---\n  (error: %s)\n\n", q.label, err)
+				continue
+			}
+			fmt.Fprintf(&b, "--- %s ---\n%s\n\n", q.label, formatTimeSeries(raw))
+		}
 	}
 
 	return b.String()
@@ -337,10 +445,7 @@ func formatTimeSeries(raw string) string {
 			prefix = strings.Join(parts, " ") + ": "
 		}
 
-		limit := 8
-		if len(ts.Points) < limit {
-			limit = len(ts.Points)
-		}
+		limit := min(8, len(ts.Points))
 		var vals []string
 		for _, p := range ts.Points[:limit] {
 			ts := p.Interval.StartTime
@@ -366,12 +471,45 @@ func formatTimeSeries(raw string) string {
 func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics string) (string, error) {
 	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics
 for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
-The import pipeline uses sharded parallel tasks with goroutine workers.
+
+## Architecture
+- **Serve service** (devpulse-saas-serve): HTTP server, min_instance_count=0 (scale-to-zero).
+- **Import job** (devpulse-saas-import): Batch worker, runs every 2 hours via Cloud Scheduler.
+  Each execution uses 3 tasks × 2 goroutine workers. Imports events, runs deep reputation
+  analysis inline, then generates LLM insights per repo.
+- **Admin service** (devpulse-saas-admin): IAM-gated, scale-to-zero, writeTimeout=90s.
+- **Shared token pool**: Import mints GitHub installation tokens from ALL active installations
+  across ALL tenants, deduplicates by installation ID, round-robin with pre-flight quota check
+  (skips tokens with <100 remaining). Tokens auto-skip when exhausted via Exhaust()/ActiveCount().
+- **PR Backfill**: Bounded to last 90 days, 500 PRs/run max, newest-first. 0 updated PRs is
+  normal when all recent PRs already have size data — this is NOT a stall.
+
+## Known Baselines & Thresholds
+- DB connection pools: serve=17max/5idle, import=5max/2idle, admin=3max/1idle.
+- Alert thresholds: p99 latency >1s for 600s, 5xx >5/min for 5min, DB CPU >80% for 5min,
+  DB connections >80 for 5min, cold-start latency >3s.
+- Admin writeTimeout is 90s — responses up to ~85s are allowed but concerning.
+- GitHub rate limit: per-installation, 60-min sliding window (NOT top-of-hour reset).
+
+## User Engagement Metrics Context
+- Sign-ins, ToS Accepted, Upgrade Requests, Webhook Installs, Event Limit Reached are
+  business signals. Correlate them with load metrics (e.g. latency spikes during sign-in bursts).
+- "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
+- "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
+
+## Analysis Instructions
 Analyze the raw metrics and provide:
 
 1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
-2. **Risks** — Anything approaching danger zones (CPU > 80%, latency p99 > 1s, cold-start latency > 3s, errors, deadlocks, disk growth).
-3. **Recommended Actions** — Concrete steps to address any issues found.
+   Correlate across metric categories (e.g. latency + request count + import timing).
+2. **Risks** — Rate each 🔴 (critical), 🟠 (warning), or 🟡 (watch).
+   Only flag metrics that are abnormal relative to the baselines above.
+3. **Recommended Actions** — Concrete steps. Categorize as Immediate / Short-term / Medium-term.
+   Do NOT recommend features that already exist (token pool retry, connection pool bounds, backfill limits).
+
+If a "7-Day Trend Baseline" section is present, compare today's metrics against the trailing
+7-day pattern. Flag regressions (e.g. "p99 latency is 3× the 7-day daily average") and
+improvements. This is the most valuable part of the analysis.
 
 Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly.`
 
