@@ -17,7 +17,7 @@
         <li><strong>Sign in</strong> &mdash; authenticate with your GitHub account using the Sign In button on the landing page. DevPulse uses GitHub OAuth, so no separate account is needed.</li>
         <li><strong>Install the GitHub App</strong> &mdash; after signing in, <a href="https://github.com/apps/DevPulseThingz" target="_blank">install the DevPulse GitHub App</a> on the organizations whose repos you want to track. This grants DevPulse read-only API access to import repository data. Signing in alone is not enough &mdash; the app must be installed separately for each organization.</li>
         <li><strong>Add repos</strong> &mdash; use the search bar at the top of the dashboard to find any public GitHub repository by typing <code>org/repo</code>. Click the result to add it to your tracked list.</li>
-        <li><strong>Wait for import</strong> &mdash; data imports run hourly. Newly added repos will show "Pending" until the next import cycle completes. Your first import may take longer depending on the repository's history size.</li>
+        <li><strong>Wait for import</strong> &mdash; when you add a repo, an on-demand import starts automatically. Scheduled imports also run every two hours for all tracked repos. Your first import may take longer depending on the repository's history size.</li>
         <li><strong>Explore</strong> &mdash; once imported, use the tabbed dashboard to view health, activity, velocity, quality, community metrics, event logs, and AI-generated insights.</li>
       </ul>
     </div>
@@ -50,6 +50,7 @@
       <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Is this project alive and well?</p>
       <ul>
         <li><strong>Project Health</strong> &mdash; Bus Factor (devs behind 50%+ of work), Pony Factor (orgs behind 50%+ of work), and Overall Health grade. High bus factor = key-person risk. Low pony factor = single-company dependency.</li>
+        <li><strong>Health Scorecard</strong> &mdash; grades across three categories: <strong>Demand</strong> (community interest and growth), <strong>Throughput</strong> (how efficiently work moves), and <strong>Responsiveness</strong> (how quickly the team reacts). Each category is graded A&ndash;F based on the underlying metrics.</li>
         <li><strong>Health Activity</strong> &mdash; daily contributor activity. Shows whether the project has steady engagement or sporadic bursts &mdash; sustained activity signals a healthy community.</li>
         <li><strong>Repository Status</strong> &mdash; stars, forks, open issues snapshot from GitHub. Lagging indicator but useful for tracking external interest.</li>
         <li><strong>Stars Trend</strong> &mdash; daily star count over time. Spikes often correlate with blog posts, HN/Reddit mentions, or conference talks.</li>
@@ -90,6 +91,7 @@
         <li><strong>Review Latency</strong> &mdash; hours from PR creation to first review. Focused specifically on code review bottlenecks.</li>
         <li><strong>Time to Close (Issues)</strong> &mdash; average days to close all issues vs bug issues near releases. Shows whether the team can keep up with incoming work.</li>
         <li><strong>Lowest Reputation Contributors</strong> &mdash; flags contributors with limited track record. Useful for identifying PRs that may need extra review scrutiny.</li>
+        <li><strong>Signals</strong> &mdash; quality alerts highlighting unanswered issues and PRs that may need attention.</li>
       </ul>
     </div>
 
@@ -110,7 +112,10 @@
       <h3>Events Tab</h3>
       <p style="font-size:0.88em;color:var(--gray);line-height:1.4;margin-bottom:8px;">Raw data exploration.</p>
       <ul>
-        <li><strong>Event Search</strong> &mdash; filter and browse individual PRs, issues, reviews, and comments. Drill down when you need specifics behind the charts.</li>
+        <li><strong>Event Search</strong> &mdash; filter and browse individual PRs, issues, reviews, comments, and forks. Drill down when you need specifics behind the charts.</li>
+        <li><strong>Filters</strong> &mdash; narrow results by event type, date range, username, and entity (company). Filters can be combined.</li>
+        <li><strong>Pagination</strong> &mdash; results are paged. Use Prev/Next to navigate large result sets.</li>
+        <li><strong>Export search results</strong> &mdash; click "Export CSV" above the results table to download the current filtered view as a CSV file.</li>
       </ul>
     </div>
 
@@ -129,18 +134,38 @@
         <li><strong>Organization filter</strong> &mdash; type <code>org:name</code> in the dashboard search bar to scope all charts and metrics to repositories in a specific GitHub organization.</li>
         <li><strong>Repository filter</strong> &mdash; type <code>repo:name</code> to drill down into a single repository. You can also click any repo name in the overview table to filter by that repo.</li>
         <li><strong>Entity filter</strong> &mdash; on the Events tab, use the Entity field to filter events by contributor company or organization affiliation (e.g., "google", "microsoft").</li>
-        <li><strong>Period selector</strong> &mdash; use the dropdown to adjust the time range (1, 3, 6, or 12 months). All charts, banner stats, and metrics update to reflect the selected period.</li>
+        <li><strong>Period selector</strong> &mdash; use the dropdown to adjust the time range. Options range from 2 weeks to 36 months (2w, 3w, 4w, 3mo, 6mo, 9mo, 12mo, 18mo, 24mo, 36mo), filtered by your plan's data retention limit and available data. All charts, banner stats, and metrics update to reflect the selected period.</li>
         <li><strong>Event type filter</strong> &mdash; on the Events tab, filter by specific event types like pushes, pull requests, issues, reviews, or releases.</li>
         <li><strong>Combining filters</strong> &mdash; organization, repository, entity, and period filters can be combined. For example, filter by org, select a 3-month period, and view only PR events.</li>
       </ul>
     </div>
 
     <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Data Export</h3>
+      <ul>
+        <li><strong>PDF report</strong> &mdash; click the PDF button in the toolbar to generate a downloadable report of the current dashboard view. Available on Starter plans and above.</li>
+        <li><strong>CSV/ZIP export</strong> &mdash; click the CSV button to download a ZIP archive containing summary, events, developers, insights, and reputation data for the selected scope. Available on Pro plans and above.</li>
+        <li><strong>Portfolio CSV</strong> &mdash; on the Portfolio view, use the "Export All (CSV)" link in the Repository Overview panel to export all repo metrics.</li>
+        <li><strong>Event search CSV</strong> &mdash; on the Events tab, use the "Export CSV" button to download filtered search results.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
+      <h3>Settings</h3>
+      <ul>
+        <li><strong>Profile</strong> &mdash; view your GitHub username, name, and email as imported from your GitHub profile.</li>
+        <li><strong>Plan &amp; usage</strong> &mdash; see your current plan, repo count vs limit, weekly event limit, account creation date, and last login.</li>
+        <li><strong>Theme</strong> &mdash; switch between Light, Dark, or System theme. Your preference is saved in the browser.</li>
+      </ul>
+    </div>
+
+    <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Usage Limits</h3>
       <ul>
-        <li><strong>Free tier</strong> &mdash; {{(index .Plans "free").MaxRepos}} repos, {{comma (index .Plans "free").MaxEventsPerWeek}} events per week</li>
-        <li><strong>Pro tier</strong> &mdash; {{(index .Plans "pro").MaxRepos}} repos, {{comma (index .Plans "pro").MaxEventsPerWeek}} events per week</li>
-        <li><strong>Enterprise</strong> &mdash; {{(index .Plans "enterprise").MaxRepos}} repos, {{comma (index .Plans "enterprise").MaxEventsPerWeek}} events per week</li>
+        <li><strong>Free</strong> &mdash; {{(index .Plans "free").MaxRepos}} repo, {{comma (index .Plans "free").MaxEventsPerWeek}} events/week, 3 months data retention, no AI insights, no exports</li>
+        <li><strong>Starter</strong> &mdash; {{(index .Plans "starter").MaxRepos}} repos, {{comma (index .Plans "starter").MaxEventsPerWeek}} events/week, 6 months retention, AI insights, PDF export</li>
+        <li><strong>Pro</strong> &mdash; {{(index .Plans "pro").MaxRepos}} repos, {{comma (index .Plans "pro").MaxEventsPerWeek}} events/week, 12 months retention, AI insights, deep reputation, PDF + CSV export</li>
+        <li><strong>Enterprise</strong> &mdash; unlimited repos, unlimited events/week, unlimited retention, AI insights, deep reputation, PDF + CSV export, on-demand imports</li>
         <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your plan limits</li>
         <li><strong>Import pauses</strong> &mdash; when the weekly event limit is reached, imports pause automatically until the following week. Existing data remains fully accessible.</li>
         <li><strong>Upgrading</strong> &mdash; click "Request Upgrade" when you hit a limit, or email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> to discuss plan options</li>
@@ -151,7 +176,7 @@
       <h3>Troubleshooting</h3>
       <ul>
         <li><strong>Stuck in sign-in loop</strong> &mdash; visit <a href="/auth/reset">/auth/reset</a> to clear your session cookie and try again. This usually resolves expired or corrupted session state.</li>
-        <li><strong>Repo shows "Pending"</strong> &mdash; data imports run hourly. Newly added repos will populate after the next import cycle. If it stays pending for more than 2 hours, check that the GitHub App is installed on the repo's organization.</li>
+        <li><strong>Repo shows "Pending"</strong> &mdash; adding a repo triggers an on-demand import automatically. If the repo stays pending for more than a few minutes, check that the GitHub App is installed on the repo's organization.</li>
         <li><strong>Charts empty after selecting a repo</strong> &mdash; ensure the period selector covers a range that includes imported data. Try extending to 6 or 12 months. Some repos may have sparse activity in shorter windows.</li>
         <li><strong>Can't add a repo</strong> &mdash; only public repositories can be added. Double-check the spelling of the org/repo name. The repository must exist and be publicly accessible on GitHub.</li>
         <li><strong>Import errors or "Bad credentials"</strong> &mdash; the <a href="https://github.com/apps/DevPulseThingz" target="_blank">DevPulse GitHub App</a> must be installed on the organization that owns the repo. Signing in via GitHub OAuth is not enough &mdash; the app installation is a separate step that grants API access for data imports.</li>
