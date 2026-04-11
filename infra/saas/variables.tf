@@ -75,3 +75,15 @@ variable "import_task_timeout" {
   type        = number
   default     = 55
 }
+
+variable "report_to_email" {
+  description = "Daily report recipient email"
+  type        = string
+  default     = ""
+}
+
+variable "report_from_email" {
+  description = "Daily report sender email (must be verified in SendGrid)"
+  type        = string
+  default     = ""
+}

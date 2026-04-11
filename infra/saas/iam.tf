@@ -128,3 +128,11 @@ resource "google_cloud_run_v2_job_iam_member" "run_invoke_import_overrides" {
   role     = "roles/run.developer"
   member   = "serviceAccount:${google_service_account.run.email}"
 }
+
+resource "google_cloud_run_v2_service_iam_member" "deployer_admin_invoker" {
+  name     = google_cloud_run_v2_service.admin.name
+  location = var.region
+  project  = var.project_id
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.deployer.email}"
+}

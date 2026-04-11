@@ -306,6 +306,31 @@ resource "google_cloud_run_v2_service" "admin" {
         value = "/secrets/github-app-key/key.pem"
       }
 
+      env {
+        name = "SENDGRID_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.sendgrid_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "REPORT_TO_EMAIL"
+        value = var.report_to_email
+      }
+
+      env {
+        name  = "REPORT_FROM_EMAIL"
+        value = var.report_from_email
+      }
+
+      env {
+        name  = "REPORT_SUBJECT_PREFIX"
+        value = "DevPulse Daily Report"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
