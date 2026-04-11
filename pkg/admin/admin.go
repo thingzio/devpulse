@@ -51,7 +51,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
 	mux.HandleFunc("POST /invite", handleInvite(db))
 	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
-	mux.HandleFunc("GET /metrics/review", handleMetricsReview(mcfg))
+	mux.HandleFunc("GET /metrics", handleMetricsReview(mcfg))
 	mux.HandleFunc("GET /tokens", handleTokenStatus(db))
 
 	address := "0.0.0.0:" + port
