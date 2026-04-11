@@ -51,6 +51,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
 	mux.HandleFunc("POST /invite", handleInvite(db))
 	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
+	mux.HandleFunc("GET /summary", handleSummary(db))
 	mux.HandleFunc("GET /metrics", handleMetricsReview(mcfg))
 	mux.HandleFunc("GET /tokens", handleTokenStatus(db))
 
