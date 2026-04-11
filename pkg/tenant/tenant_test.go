@@ -116,23 +116,44 @@ func TestUpsertAndGetTenant(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Create tenant without profile fields (simulates pre-existing user).
 	tn, err := UpsertTenant(ctx, db, 12345, "testuser", "test@example.com", "https://avatar.url", "", "", "", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, tn.ID)
 	assert.Equal(t, int64(12345), tn.GitHubID)
 	assert.Equal(t, "testuser", tn.Username)
+	assert.Equal(t, "test@example.com", tn.Email)
 	assert.Equal(t, 3, tn.MaxRepos)
 	assert.Equal(t, "free", tn.Plan)
+	// Profile fields empty when not provided.
+	assert.Empty(t, tn.Name)
+	assert.Empty(t, tn.Company)
+	assert.Empty(t, tn.Location)
+	assert.Empty(t, tn.Bio)
 
 	got, err := GetTenantByGitHubID(ctx, db, 12345)
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, got.ID)
+	assert.Empty(t, got.Name)
 
-	// Upsert updates profile fields
-	tn2, err := UpsertTenant(ctx, db, 12345, "newname", "new@example.com", "https://new.url", "", "", "", "")
+	// Upsert with profile fields (simulates re-authentication).
+	tn2, err := UpsertTenant(ctx, db, 12345, "newname", "new@example.com", "https://new.url",
+		"New User", "NVIDIA", "Portland, OR", "Building things")
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, tn2.ID)
 	assert.Equal(t, "newname", tn2.Username)
+	assert.Equal(t, "New User", tn2.Name)
+	assert.Equal(t, "NVIDIA", tn2.Company)
+	assert.Equal(t, "Portland, OR", tn2.Location)
+	assert.Equal(t, "Building things", tn2.Bio)
+
+	// Verify profile fields persist through GetTenantByID.
+	got2, err := GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New User", got2.Name)
+	assert.Equal(t, "NVIDIA", got2.Company)
+	assert.Equal(t, "Portland, OR", got2.Location)
+	assert.Equal(t, "Building things", got2.Bio)
 }
 
 func TestGetTenantByID(t *testing.T) {

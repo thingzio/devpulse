@@ -12,21 +12,30 @@ func TestListTenantSummaries(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
+	// User without profile fields (pre-existing / invited).
 	_, err := UpsertTenant(ctx, db, 80001, "summaryuser1", "s1@test.com", "", "", "", "", "")
 	require.NoError(t, err)
-	_, err = UpsertTenant(ctx, db, 80002, "summaryuser2", "s2@test.com", "", "", "", "", "")
+	// User with profile fields (re-authenticated).
+	_, err = UpsertTenant(ctx, db, 80002, "summaryuser2", "s2@test.com", "", "Some User", "Acme", "NYC", "Dev")
 	require.NoError(t, err)
 
 	summaries, err := ListTenantSummaries(ctx, db)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(summaries), 2)
 
-	usernames := make(map[string]bool)
+	byUsername := make(map[string]TenantSummary)
 	for _, s := range summaries {
-		usernames[s.Username] = true
+		byUsername[s.Username] = s
 	}
-	assert.True(t, usernames["summaryuser1"])
-	assert.True(t, usernames["summaryuser2"])
+	// Missing profile: name empty, email present.
+	s1 := byUsername["summaryuser1"]
+	assert.Equal(t, "s1@test.com", s1.Email)
+	assert.Empty(t, s1.Name)
+
+	// Populated profile: name present.
+	s2 := byUsername["summaryuser2"]
+	assert.Equal(t, "Some User", s2.Name)
+	assert.Equal(t, "s2@test.com", s2.Email)
 }
 
 func TestListTenantSummaries_WithSession(t *testing.T) {
@@ -56,6 +65,7 @@ func TestGetTenantDetailByUsername(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
+	// Create without profile fields first.
 	tn, err := UpsertTenant(ctx, db, 80004, "detailuser", "detail@test.com", "https://avatar.test", "", "", "", "")
 	require.NoError(t, err)
 	require.NoError(t, UpdatePlan(ctx, db, tn.ID, "pro", 25, 15000))
@@ -68,6 +78,23 @@ func TestGetTenantDetailByUsername(t *testing.T) {
 	assert.Equal(t, "pro", detail.Plan)
 	assert.Equal(t, 25, detail.MaxRepos)
 	assert.Equal(t, 15000, detail.MaxEventsPerWeek)
+	// Profile fields empty before re-auth.
+	assert.Empty(t, detail.Name)
+	assert.Empty(t, detail.Company)
+	assert.Empty(t, detail.Location)
+	assert.Empty(t, detail.Bio)
+
+	// Re-authenticate with profile fields.
+	_, err = UpsertTenant(ctx, db, 80004, "detailuser", "detail@test.com", "https://avatar.test",
+		"Detail User", "Acme Corp", "London", "Engineer")
+	require.NoError(t, err)
+
+	detail2, err := GetTenantDetailByUsername(ctx, db, "detailuser")
+	require.NoError(t, err)
+	assert.Equal(t, "Detail User", detail2.Name)
+	assert.Equal(t, "Acme Corp", detail2.Company)
+	assert.Equal(t, "London", detail2.Location)
+	assert.Equal(t, "Engineer", detail2.Bio)
 }
 
 func TestGetTenantDetailByUsername_NotFound(t *testing.T) {
