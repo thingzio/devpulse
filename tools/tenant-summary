@@ -31,32 +31,28 @@ UPDATED="$(echo "${BODY}" | jq -r '.updated_at')"
 printf "\nDevPulse Platform Summary — %s (updated %s)\n\n" "${DATE}" "${UPDATED}"
 
 echo "${BODY}" | jq -r '
-def fmt_delta(d; pct):
+def fd(d; p):
     if d == null then "—"
-    elif pct == null then (if d > 0 then "+\(d)" elif d < 0 then "\(d)" else "0" end)
-    else (if d > 0 then "+\(d) (\(pct | . * 100 | round / 100)%)"
-          elif d < 0 then "\(d) (\(pct | . * 100 | round / 100)%)"
+    elif p == null then (if d > 0 then "+\(d)" elif d < 0 then "\(d)" else "0" end)
+    else (if d > 0 then "+\(d) (\(p | . * 100 | round / 100)%)"
+          elif d < 0 then "\(d) (\(p | . * 100 | round / 100)%)"
           else "0 (0%)" end)
     end;
 
-def row(label; val; dod_d; dod_p; wow_d; wow_p; mom_d; mom_p):
-    [label,
-     (val | tostring),
-     fmt_delta(dod_d; dod_p),
-     fmt_delta(wow_d; wow_p),
-     fmt_delta(mom_d; mom_p)];
+def r(n; v; dd; dp; wd; wp; md; mp):
+    [n, (v | tostring), fd(dd; dp), fd(wd; wp), fd(md; mp)];
 
 ["METRIC", "CURRENT", "DoD", "WoW", "MoM"],
-row("Tenants";        .current.tenants;           .dod.tenants; .dod.tenants_pct; .wow.tenants; .wow.tenants_pct; .mom.tenants; .mom.tenants_pct),
-row("  Free";         .current.tenants_free;      .dod.tenants; null;             .wow.tenants; null;             .mom.tenants; null),
-row("  Starter";      .current.tenants_starter;   null; null; null; null; null; null),
-row("  Pro";          .current.tenants_pro;        null; null; null; null; null; null),
-row("  Enterprise";   .current.tenants_enterprise; null; null; null; null; null; null),
-row("Repos";          .current.repos;              .dod.repos; .dod.repos_pct; .wow.repos; .wow.repos_pct; .mom.repos; .mom.repos_pct),
-row("Events";         .current.events;             .dod.events; .dod.events_pct; .wow.events; .wow.events_pct; .mom.events; .mom.events_pct),
-row("Contributors";   .current.contributors;       .dod.contributors; .dod.contributors_pct; .wow.contributors; .wow.contributors_pct; .mom.contributors; .mom.contributors_pct),
-row("Installations";  .current.installations;      .dod.installations; .dod.installations_pct; .wow.installations; .wow.installations_pct; .mom.installations; .mom.installations_pct),
-row("Repos w/ Errors"; .current.repos_with_errors; .dod.repos_with_errors; .dod.repos_with_errors_pct; .wow.repos_with_errors; .wow.repos_with_errors_pct; .mom.repos_with_errors; .mom.repos_with_errors_pct)
+r("Tenants";        .current.tenants;           .dod.tenants; .dod.tenants_pct; .wow.tenants; .wow.tenants_pct; .mom.tenants; .mom.tenants_pct),
+r("  Free";         .current.tenants_free;      .dod.tenants; null;             .wow.tenants; null;             .mom.tenants; null),
+r("  Starter";      .current.tenants_starter;   null; null; null; null; null; null),
+r("  Pro";          .current.tenants_pro;        null; null; null; null; null; null),
+r("  Enterprise";   .current.tenants_enterprise; null; null; null; null; null; null),
+r("Repos";          .current.repos;              .dod.repos; .dod.repos_pct; .wow.repos; .wow.repos_pct; .mom.repos; .mom.repos_pct),
+r("Events";         .current.events;             .dod.events; .dod.events_pct; .wow.events; .wow.events_pct; .mom.events; .mom.events_pct),
+r("Contributors";   .current.contributors;       .dod.contributors; .dod.contributors_pct; .wow.contributors; .wow.contributors_pct; .mom.contributors; .mom.contributors_pct),
+r("Installations";  .current.installations;      .dod.installations; .dod.installations_pct; .wow.installations; .wow.installations_pct; .mom.installations; .mom.installations_pct),
+r("Repos w/ Errors"; .current.repos_with_errors; .dod.repos_with_errors; .dod.repos_with_errors_pct; .wow.repos_with_errors; .wow.repos_with_errors_pct; .mom.repos_with_errors; .mom.repos_with_errors_pct)
 | @tsv' | column -t -s $'\t'
 
 # Error repos
