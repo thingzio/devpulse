@@ -77,6 +77,21 @@ resource "google_cloud_run_v2_service" "serve" {
         value = "projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.import.name}"
       }
 
+      env {
+        name = "SEND_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.send_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "SUPPORT_EMAIL"
+        value = var.support_email
+      }
+
       resources {
         limits = {
           cpu    = "1000m"

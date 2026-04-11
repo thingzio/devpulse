@@ -1,18 +1,16 @@
 package admin
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/thingzio/devpulse/pkg/config"
+	devnet "github.com/thingzio/devpulse/pkg/net"
 )
 
 const defaultReportDays = 1
@@ -233,43 +231,7 @@ func renderReportText(summary summaryResponse, analysis string) string {
 }
 
 func sendEmail(ctx context.Context, cfg *reportConfig, subject, html, text string) error {
-	payload := map[string]any{
-		"from":    cfg.FromEmail,
-		"to":      []string{cfg.ToEmail},
-		"subject": subject,
-		"html":    html,
-		"text":    text,
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshaling email payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://api.resend.com/emails", bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("creating resend request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cfg.SendAPIKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := analysisClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("sending email via resend: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		return nil
-	}
-
-	respBody, _ := io.ReadAll(resp.Body)
-	truncated := string(respBody)
-	if len(truncated) > 200 {
-		truncated = truncated[:200]
-	}
-	return fmt.Errorf("resend returned %d: %s", resp.StatusCode, truncated)
+	return devnet.SendEmail(ctx, cfg.SendAPIKey, cfg.FromEmail, cfg.ToEmail, subject, html, text)
 }
 
 func handleReport(db *sql.DB, mcfg *metricsConfig, rcfg *reportConfig) http.HandlerFunc {

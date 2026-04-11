@@ -179,9 +179,8 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /auth/github", oauthRL(oauthStartHandler(oauthCfg)))
 	mux.HandleFunc("GET /auth/github/callback", oauthCallbackHandler(db, oauthCfg))
 	mux.HandleFunc("POST /webhook/github", WebhookHandler(db, webhookSecret))
-	mux.HandleFunc("GET /help", func(w http.ResponseWriter, _ *http.Request) {
-		renderTemplate(w, "help.html", pageData{Title: "Help", Plans: plan.All})
-	})
+	mux.HandleFunc("GET /help", helpPageHandler(db))
+	mux.HandleFunc("POST /help/contact", helpContactHandler(db))
 	mux.HandleFunc("GET /changelog", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "changelog.html", pageData{Title: "Changelog"})
 	})

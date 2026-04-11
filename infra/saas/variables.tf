@@ -87,3 +87,9 @@ variable "report_from_email" {
   type        = string
   default     = "devpulse@thingz.io"
 }
+
+variable "support_email" {
+  description = "Support contact form recipient email"
+  type        = string
+  default     = "devpulse@thingz.io"
+}
