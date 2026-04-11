@@ -271,7 +271,7 @@ func (s *Store) ImportDeepReputation(ctx context.Context, tokenFn data.TokenFunc
 			break
 		}
 
-		slog.Info("reputation", "user", username, "progress", fmt.Sprintf("%d/%d", i+1, len(usernames)))
+		slog.Info("reputation", "user", username, "index", i+1, "total", len(usernames))
 
 		if _, deepErr := s.ComputeDeepReputation(ctx, token, username); deepErr != nil {
 			// Rate limited — exhaust this token and retry same user with next token.
@@ -522,11 +522,12 @@ func (s *Store) gatherFullSignals(ctx context.Context, client *github.Client, us
 	sig.TrustedOrgMember = sig.OrgMember
 
 	var forkedCount int64
+	const maxRepoPages = 50
 	repoOpts := &github.RepositoryListByUserOptions{
 		Type:        "owner",
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
-	for {
+	for page := 0; page < maxRepoPages; page++ {
 		repos, repoResp, repoErr := client.Repositories.ListByUser(ctx, username, repoOpts)
 		if repoErr != nil {
 			slog.Debug("error listing repos for fork count", "username", username, "error", repoErr)

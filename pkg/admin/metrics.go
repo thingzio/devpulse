@@ -62,7 +62,7 @@ func newMetricsConfig() *metricsConfig {
 func handleMetricsReview(cfg *metricsConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if cfg.anthropicKey == "" {
-			http.Error(w, "ANTHROPIC_API_KEY not configured", http.StatusServiceUnavailable)
+			http.Error(w, "anthropic API key not configured", http.StatusServiceUnavailable)
 			return
 		}
 

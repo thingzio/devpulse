@@ -166,6 +166,64 @@ func TestHandleGetTenant_MissingUsername(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "username query parameter is required")
 }
 
+func TestRequireIAMAuth_AllowsHealth(t *testing.T) {
+	t.Parallel()
+
+	handler := requireIAMAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRequireIAMAuth_BlocksWithoutHeader(t *testing.T) {
+	t.Parallel()
+
+	handler := requireIAMAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/tenants", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestRequireIAMAuth_AllowsWithAuthorization(t *testing.T) {
+	t.Parallel()
+
+	handler := requireIAMAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/tenants", nil)
+	req.Header.Set("Authorization", "Bearer some-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRequireIAMAuth_AllowsWithServerlessHeader(t *testing.T) {
+	t.Parallel()
+
+	handler := requireIAMAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/tokens", nil)
+	req.Header.Set("X-Serverless-Authorization", "Bearer some-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
 func TestFormatTimeSeries_ValidDoubles(t *testing.T) {
 	t.Parallel()
 

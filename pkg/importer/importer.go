@@ -355,8 +355,11 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		eventTokenFn = func() string { return token }
 	}
 	if err := retryRL(func() error {
-		_, _, err := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, 180)
-		return err
+		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, 180)
+		if importErr != nil {
+			return fmt.Errorf("importing events: %w", importErr)
+		}
+		return nil
 	}); err != nil {
 		slog.Error("importing events", "org", org, "repo", repo, "error", err)
 		errs++

@@ -16,7 +16,8 @@ func TestBuildAuthURL(t *testing.T) {
 		RedirectURL: "https://example.com/auth/github/callback",
 	}
 
-	url, state := BuildAuthURL(cfg)
+	url, state, err := BuildAuthURL(cfg)
+	require.NoError(t, err)
 	require.NotEmpty(t, state)
 	assert.Contains(t, url, "github.com/login/oauth/authorize")
 	assert.Contains(t, url, "client_id=test-client-id")
@@ -30,7 +31,8 @@ func TestBuildAuthURL_CustomAuthURL(t *testing.T) {
 		AuthURL:  "https://custom.example.com/auth",
 	}
 
-	url, _ := BuildAuthURL(cfg)
+	url, _, err := BuildAuthURL(cfg)
+	require.NoError(t, err)
 	assert.Contains(t, url, "custom.example.com/auth")
 }
 
@@ -168,7 +170,8 @@ func TestFetchUser_EmailFallbackFailure(t *testing.T) {
 
 func TestBuildAuthURL_StateLength(t *testing.T) {
 	cfg := &Config{ClientID: "abc"}
-	_, state := BuildAuthURL(cfg)
+	_, state, err := BuildAuthURL(cfg)
+	require.NoError(t, err)
 	// randomState() returns hex of 16 bytes = 32 chars
 	assert.Len(t, state, 32)
 }

@@ -1,11 +1,13 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func TestRequireAuth_NoCookie(t *testing.T) {
@@ -53,4 +55,33 @@ func TestClearSessionCookie(t *testing.T) {
 func TestCookieNameFor(t *testing.T) {
 	assert.Equal(t, "__Host-session", cookieNameFor(true))
 	assert.Equal(t, "session", cookieNameFor(false))
+}
+
+func TestWithTenantContext(t *testing.T) {
+	ctx := context.Background()
+	tn := &tenant.Tenant{ID: "t-123", Username: "testuser"}
+
+	ctx = WithTenantContext(ctx, tn)
+	got := TenantFromContext(ctx)
+	assert.NotNil(t, got)
+	assert.Equal(t, "t-123", got.ID)
+	assert.Equal(t, "testuser", got.Username)
+}
+
+func TestRequireAuth_EmptyCookieValue(t *testing.T) {
+	// Empty cookie value — middleware should redirect.
+	handler := RequireAuth(nil, "/login")(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	req.AddCookie(&http.Cookie{Name: "not-the-session", Value: "anything"})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// Wrong cookie name means r.Cookie() returns ErrNoCookie → redirect.
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("Location"))
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/plan"
@@ -116,7 +117,7 @@ func queryParamInt(r *http.Request, key string, def int) int {
 		return def
 	}
 
-	if i < 14 || i > 3650 {
+	if i < config.QueryParamMinDays() || i > config.QueryParamMaxDays() {
 		return def
 	}
 

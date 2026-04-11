@@ -195,20 +195,22 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 			earliest = st.Since
 		}
 		slog.Debug("resume state",
-			"repo", owner+"/"+repo,
+			"org", owner,
+			"repo", repo,
 			"type", t,
 			"since", st.Since.Format("2006-01-02"),
 			"page", st.Page)
 	}
 	slog.Info("importing events",
-		"repo", owner+"/"+repo,
+		"org", owner,
+		"repo", repo,
 		"since", earliest.Format("2006-01-02"))
 	var g errgroup.Group
 	for i := range importers {
 		fn := importers[i]
 		g.Go(func() error {
 			if err := fn(ctx); err != nil {
-				slog.Error("event import failed", "repo", owner+"/"+repo, "error", err)
+				slog.Error("event import failed", "org", owner, "repo", repo, "error", err)
 			}
 			return nil // log and continue, don't cancel siblings
 		})
@@ -222,9 +224,9 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 
 	if err := imp.backfillPRSize(ctx); err != nil {
 		if ghutil.IsRateLimited(err) {
-			slog.Warn("backfill rate limited", "repo", owner+"/"+repo, "error", err)
+			slog.Warn("backfill rate limited", "org", owner, "repo", repo, "error", err)
 		} else {
-			slog.Warn("error backfilling PR size data", "repo", owner+"/"+repo, "error", err)
+			slog.Warn("error backfilling PR size data", "org", owner, "repo", repo, "error", err)
 		}
 	}
 
@@ -233,7 +235,8 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 		total += v
 	}
 	slog.Info("events imported",
-		"repo", owner+"/"+repo,
+		"org", owner,
+		"repo", repo,
 		"events", total,
 		"developers", len(imp.users),
 		"since", earliest.Format("2006-01-02"))
@@ -290,7 +293,7 @@ func (e *eventImporter) retryOnRateLimit(ctx context.Context, fn func() error) e
 		return nil
 	}
 	if !ghutil.IsRateLimited(err) {
-		return err
+		return fmt.Errorf("non-retryable error: %w", err)
 	}
 	slog.Debug("rate limited, rotating token", "org", e.owner, "repo", e.repo)
 	if !e.rotateToken(ctx) {
@@ -305,10 +308,10 @@ func (e *eventImporter) qualifyTypeKey(t string) string {
 
 func (e *eventImporter) updatePage(eventType string, page int) {
 	e.mu.Lock()
+	defer e.mu.Unlock()
 	if s, ok := e.state[eventType]; ok {
 		s.Page = page
 	}
-	e.mu.Unlock()
 }
 
 type eventExtra struct {
@@ -502,7 +505,8 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	e.mu.Unlock()
 
 	slog.Info("events progress",
-		"repo", e.owner+"/"+e.repo,
+		"org", e.owner,
+		"repo", e.repo,
 		"batch", len(events),
 		"total", total,
 		"developers", len(users),
@@ -572,6 +576,7 @@ func parsePRNumberFromURL(url string) int {
 	return n
 }
 
+//nolint:dupl // pagination boilerplate shared with importIssueEvents/importForkEvents; different API + item processing
 func (e *eventImporter) importPREvents(ctx context.Context) error {
 	slog.Debug("starting pr event import", "page", e.state[data.EventTypePR].Page, "since", e.state[data.EventTypePR].Since.Format("2006-01-02"))
 
@@ -600,7 +605,7 @@ func (e *eventImporter) importPREvents(ctx context.Context) error {
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing PRs: %w", err)
 		}
 		slog.Debug("pr events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -682,11 +687,11 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 		return nil
 	}
 
-	slog.Info("backfilling PR sizes", "repo", e.owner+"/"+e.repo, "total", len(prs))
+	slog.Info("backfilling PR sizes", "org", e.owner, "repo", e.repo, "total", len(prs))
 	updated := 0
 	for i, p := range prs {
 		if i > 0 && i%50 == 0 {
-			slog.Info("PR backfill progress", "repo", e.owner+"/"+e.repo, "processed", i, "total", len(prs))
+			slog.Info("PR backfill progress", "org", e.owner, "repo", e.repo, "processed", i, "total", len(prs))
 		}
 		if ctx.Err() != nil {
 			return fmt.Errorf("backfill PR size canceled: %w", ctx.Err())
@@ -700,7 +705,7 @@ func (e *eventImporter) backfillPRSize(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("PR backfill complete", "repo", e.owner+"/"+e.repo, "updated", updated, "total", len(prs))
+	slog.Info("PR backfill complete", "org", e.owner, "repo", e.repo, "updated", updated, "total", len(prs))
 	return nil
 }
 
@@ -783,7 +788,7 @@ func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing PR reviews for #%d: %w", prNumber, err)
 		}
 
 		for i := range reviews {
@@ -810,6 +815,7 @@ func (e *eventImporter) importPRReviews(ctx context.Context, prNumber int) error
 	return nil
 }
 
+//nolint:dupl // pagination boilerplate shared with importPREvents/importForkEvents; different API + item processing
 func (e *eventImporter) importIssueEvents(ctx context.Context) error {
 	slog.Debug("starting issue event import", "page", e.state[data.EventTypeIssue].Page, "since", e.state[data.EventTypeIssue].Since.Format("2006-01-02"))
 
@@ -839,7 +845,7 @@ func (e *eventImporter) importIssueEvents(ctx context.Context) error {
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing issues: %w", err)
 		}
 		slog.Debug("issue events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -912,7 +918,7 @@ func (e *eventImporter) importIssueCommentEvents(ctx context.Context) error {
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing issue comments: %w", err)
 		}
 		slog.Debug("issue comment events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -975,7 +981,7 @@ func (e *eventImporter) importPRReviewEvents(ctx context.Context) error {
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing PR comments: %w", err)
 		}
 		slog.Debug("pr review events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 
@@ -1009,6 +1015,7 @@ func (e *eventImporter) importPRReviewEvents(ctx context.Context) error {
 	return nil
 }
 
+//nolint:dupl // pagination boilerplate shared with importPREvents/importIssueEvents; different API + item processing
 func (e *eventImporter) importForkEvents(ctx context.Context) error {
 	slog.Debug("starting fork event import", "page", e.state[data.EventTypeFork].Page, "since", e.state[data.EventTypeFork].Since.Format("2006-01-02"))
 
@@ -1035,7 +1042,7 @@ func (e *eventImporter) importForkEvents(ctx context.Context) error {
 			}
 			return ghutil.CheckRateLimit(ctx, resp)
 		}); err != nil {
-			return err
+			return fmt.Errorf("listing forks: %w", err)
 		}
 		slog.Debug("fork events", "found", len(items), "next_page", resp.NextPage, "last_page", resp.LastPage, "rate", ghutil.RateInfo(&resp.Rate))
 

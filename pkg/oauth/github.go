@@ -46,8 +46,11 @@ type GitHubUser struct {
 }
 
 // BuildAuthURL returns the GitHub OAuth authorization URL and a random state token.
-func BuildAuthURL(cfg *Config) (string, string) {
-	state := randomState()
+func BuildAuthURL(cfg *Config) (string, string, error) {
+	state, err := randomState()
+	if err != nil {
+		return "", "", fmt.Errorf("generating oauth state: %w", err)
+	}
 	authURL := cfg.AuthURL
 	if authURL == "" {
 		authURL = defaultAuthURL
@@ -58,7 +61,7 @@ func BuildAuthURL(cfg *Config) (string, string) {
 		"scope":        {oauthScope},
 		"state":        {state},
 	}
-	return authURL + "?" + v.Encode(), state
+	return authURL + "?" + v.Encode(), state, nil
 }
 
 // ExchangeCode exchanges an authorization code for an access token.
@@ -180,10 +183,10 @@ func fetchPrimaryEmail(ctx context.Context, emailsURL, token string) string {
 	return ""
 }
 
-func randomState() string {
+func randomState() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
+		return "", fmt.Errorf("crypto/rand failed: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }

@@ -55,9 +55,15 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("GET /tokens", handleTokenStatus(db))
 
 	address := "0.0.0.0:" + port
+
+	var handler http.Handler = mux
+	if config.AdminRequireIAM() {
+		handler = requireIAMAuth(mux)
+	}
+
 	srv := &http.Server{
 		Addr:              address,
-		Handler:           mux,
+		Handler:           handler,
 		ReadTimeout:       readTimeout,
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      writeTimeout,
@@ -87,6 +93,28 @@ func Run(ctx context.Context) error {
 		slog.Error("shutdown failed", "error", err)
 	}
 	return nil
+}
+
+// requireIAMAuth is defense-in-depth middleware that verifies Cloud Run IAM
+// authentication headers are present. On Cloud Run, authenticated requests
+// carry Authorization or X-Serverless-Authorization headers set by IAM.
+// If neither is present, the request likely bypassed IAM (misconfiguration).
+// The /health endpoint is exempt (Cloud Run probes do not carry auth).
+func requireIAMAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") == "" && r.Header.Get("X-Serverless-Authorization") == "" {
+			slog.Warn("admin request missing IAM auth header",
+				"path", r.URL.Path,
+				"remote", r.RemoteAddr)
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func handleListTenants(db *sql.DB) http.HandlerFunc {
@@ -131,7 +159,8 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 
 		td, err := tenant.GetTenantDetailByUsername(qctx, db, username)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("tenant not found: %s", username), http.StatusNotFound)
+			slog.Debug("tenant not found", "username", username, "error", err)
+			http.Error(w, "tenant not found", http.StatusNotFound)
 			return
 		}
 
@@ -209,7 +238,8 @@ func handleUpgrade(db *sql.DB) http.HandlerFunc {
 
 		tenantID, err := tenant.GetTenantIDByUsername(r.Context(), db, req.Username)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("tenant not found: %s", req.Username), http.StatusNotFound)
+			slog.Debug("tenant not found for upgrade", "username", req.Username, "error", err)
+			http.Error(w, "tenant not found", http.StatusNotFound)
 			return
 		}
 
@@ -266,7 +296,7 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 		ghID, err := resolveGitHubUserID(r.Context(), req.Username)
 		if err != nil {
 			slog.Error("resolving GitHub user", "username", req.Username, "error", err)
-			http.Error(w, fmt.Sprintf("GitHub user not found: %s", req.Username), http.StatusNotFound)
+			http.Error(w, "GitHub user not found", http.StatusNotFound)
 			return
 		}
 
@@ -368,7 +398,8 @@ func handleTokenStatus(db *sql.DB) http.HandlerFunc {
 
 		tenants, err := tenant.GetActiveTenants(r.Context(), db)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("getting tenants: %v", err), http.StatusInternalServerError)
+			slog.Error("getting tenants for token status", "error", err)
+			http.Error(w, "error listing tenants", http.StatusInternalServerError)
 			return
 		}
 
@@ -410,13 +441,15 @@ func handleTokenStatus(db *sql.DB) http.HandlerFunc {
 func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/rate_limit", nil)
 	if err != nil {
-		return tokenStatus{Error: fmt.Sprintf("creating request: %v", err)}
+		slog.Error("creating rate limit request", "error", err)
+		return tokenStatus{Error: "request error"}
 	}
 	net.SetGitHubHeaders(req, token)
 
 	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
-		return tokenStatus{Error: fmt.Sprintf("calling rate_limit: %v", err)}
+		slog.Error("calling rate limit API", "error", err)
+		return tokenStatus{Error: "rate limit check failed"}
 	}
 	defer resp.Body.Close()
 
@@ -430,7 +463,8 @@ func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
 		} `json:"resources"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&rl); err != nil {
-		return tokenStatus{Error: fmt.Sprintf("decoding rate_limit: %v", err)}
+		slog.Error("decoding rate limit response", "error", err)
+		return tokenStatus{Error: "response decode error"}
 	}
 
 	core := rl.Resources.Core
@@ -449,7 +483,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) { //nolint:unparam // s
 	b, err := json.Marshal(v)
 	if err != nil {
 		slog.Error("failed to marshal JSON", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

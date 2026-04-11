@@ -28,14 +28,14 @@ func insightWithEntityHandler(defaultStore data.Store, label string, fn func(con
 		entity := optional(r.URL.Query().Get("e"))
 		res, err := fn(r.Context(), s, p.org, p.repo, entity, p.days)
 		if err != nil {
-			slog.Error("failed to get "+label, "error", err)
+			slog.Error("insight query failed", "type", label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
 			return
 		}
 
 		b, err := json.Marshal(res)
 		if err != nil {
-			slog.Error("failed to marshal "+label, "error", err)
+			slog.Error("insight marshal failed", "type", label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error encoding "+label)
 			return
 		}
@@ -63,14 +63,14 @@ func insightHandler(defaultStore data.Store, label string, fn func(context.Conte
 		p := parseInsightParams(r)
 		res, err := fn(r.Context(), s, p.org, p.repo, p.days)
 		if err != nil {
-			slog.Error("failed to get "+label, "error", err)
+			slog.Error("insight query failed", "type", label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error querying "+label)
 			return
 		}
 
 		b, err := json.Marshal(res)
 		if err != nil {
-			slog.Error("failed to marshal "+label, "error", err)
+			slog.Error("insight marshal failed", "type", label, "error", err)
 			writeError(w, http.StatusInternalServerError, "error encoding "+label)
 			return
 		}

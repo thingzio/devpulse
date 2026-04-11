@@ -120,15 +120,17 @@ func Run(ctx context.Context, opts Options) error {
 
 	apiCache.startEviction(ctx)
 
-	oauthRL := newRateLimiter(20, time.Minute)
-	repoSearchRL := newRateLimiter(30, time.Minute)
+	oauthRL := newRateLimiter(config.OAuthRateLimit(), time.Minute)
+	defer oauthRL.stop()
+	repoSearchRL := newRateLimiter(config.RepoSearchRateLimit(), time.Minute)
+	defer repoSearchRL.stop()
 
 	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, trigger)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
 		Addr:              address,
-		Handler:           securityHeaders(mux),
+		Handler:           middleware.Recovery(securityHeaders(mux)),
 		ReadTimeout:       serverReadTimeout,
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		WriteTimeout:      serverWriteTimeout,
@@ -151,15 +153,12 @@ func Run(ctx context.Context, opts Options) error {
 	case <-ctx.Done():
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ServerShutdownTimeout())*time.Second)
 	defer cancel()
 
 	if err := s.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("shutdown failed", "error", err)
 	}
-
-	oauthRL.stop()
-	repoSearchRL.stop()
 
 	return nil
 }
@@ -284,7 +283,7 @@ func renderTemplate(w http.ResponseWriter, name string, data any) {
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout.html", data); err != nil {
 		slog.Error("failed to render template", "name", name, "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -402,7 +401,12 @@ func settingsHandler(db *sql.DB) http.HandlerFunc {
 
 func oauthStartHandler(cfg *oauth.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, state := oauth.BuildAuthURL(cfg)
+		url, state, err := oauth.BuildAuthURL(cfg)
+		if err != nil {
+			slog.Error("building oauth URL", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "oauth_state",
 			Value:    state,
@@ -544,7 +548,7 @@ func tenantListHandler(db *sql.DB, label string, queryFn func(context.Context, *
 		}
 		result, err := queryFn(r.Context(), db, tn.ID)
 		if err != nil {
-			slog.Error("listing "+label, "error", err)
+			slog.Error("listing failed", "resource", label, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -607,7 +611,7 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger) http.HandlerFunc {
 			}
 		}
 		if install == nil {
-			http.Error(w, "No GitHub App installation found. Go to https://github.com/apps/DevPulseThingz and click Configure to install the app.",
+			http.Error(w, "no GitHub App installation found — go to https://github.com/apps/DevPulseThingz and click Configure to install the app",
 				http.StatusBadRequest)
 			return
 		}
@@ -623,7 +627,7 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger) http.HandlerFunc {
 		}
 
 		go func() { //nolint:gosec // fire-and-forget: goroutine intentionally outlives the HTTP request
-			triggerCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			triggerCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ServerTriggerTimeout())*time.Second)
 			defer cancel()
 			if triggerErr := trigger.TriggerRepoImport(triggerCtx, org, repo); triggerErr != nil {
 				slog.Error("triggering on-demand import", "org", org, "repo", repo, "error", triggerErr)
@@ -808,7 +812,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		slog.Error("failed to marshal JSON", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -155,6 +155,61 @@ func AnthropicModel(defaultModel string) string { return GetEnv("ANTHROPIC_MODEL
 func GCPProjectID() string { return GetEnv("GCP_PROJECT_ID", "devpulseio") }
 
 // ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+// AdminRequireIAM returns true if the admin server should verify Cloud Run
+// IAM auth headers are present on every request (defense-in-depth).
+// Override: ADMIN_REQUIRE_IAM (default true). Set to "false" for local dev.
+func AdminRequireIAM() bool {
+	v := strings.ToLower(os.Getenv("ADMIN_REQUIRE_IAM"))
+	if v == "false" || v == "0" {
+		return false
+	}
+	return true // default: require IAM
+}
+
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
+
+// ServerShutdownTimeout returns the graceful shutdown timeout.
+// Override: SERVER_SHUTDOWN_TIMEOUT_SEC (default 5).
+func ServerShutdownTimeout() int { return GetEnvAsInt("SERVER_SHUTDOWN_TIMEOUT_SEC", 5) }
+
+// ServerTriggerTimeout returns the timeout for fire-and-forget import triggers.
+// Override: SERVER_TRIGGER_TIMEOUT_SEC (default 30).
+func ServerTriggerTimeout() int { return GetEnvAsInt("SERVER_TRIGGER_TIMEOUT_SEC", 30) }
+
+// OAuthRateLimit returns the max OAuth requests per minute per IP.
+// Override: OAUTH_RATE_LIMIT (default 20).
+func OAuthRateLimit() int { return GetEnvAsInt("OAUTH_RATE_LIMIT", 20) }
+
+// RepoSearchRateLimit returns the max repo-search requests per minute per IP.
+// Override: REPO_SEARCH_RATE_LIMIT (default 30).
+func RepoSearchRateLimit() int { return GetEnvAsInt("REPO_SEARCH_RATE_LIMIT", 30) }
+
+// QueryParamMinDays returns the minimum allowed value for the days query parameter.
+// Override: QUERY_PARAM_MIN_DAYS (default 14).
+func QueryParamMinDays() int { return GetEnvAsInt("QUERY_PARAM_MIN_DAYS", 14) }
+
+// QueryParamMaxDays returns the maximum allowed value for the days query parameter.
+// Override: QUERY_PARAM_MAX_DAYS (default 3650).
+func QueryParamMaxDays() int { return GetEnvAsInt("QUERY_PARAM_MAX_DAYS", 3650) }
+
+// ---------------------------------------------------------------------------
+// HTTP Transport
+// ---------------------------------------------------------------------------
+
+// HTTPMaxIdleConns returns the max idle connections for the shared HTTP transport.
+// Override: HTTP_MAX_IDLE_CONNS (default 50).
+func HTTPMaxIdleConns() int { return GetEnvAsInt("HTTP_MAX_IDLE_CONNS", 50) }
+
+// HTTPMaxIdleConnsPerHost returns the max idle connections per host.
+// Override: HTTP_MAX_IDLE_CONNS_PER_HOST (default 10).
+func HTTPMaxIdleConnsPerHost() int { return GetEnvAsInt("HTTP_MAX_IDLE_CONNS_PER_HOST", 10) }
+
+// ---------------------------------------------------------------------------
 // Observability
 // ---------------------------------------------------------------------------
 
