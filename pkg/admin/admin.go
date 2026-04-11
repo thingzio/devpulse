@@ -41,6 +41,7 @@ func Run(ctx context.Context) error {
 	db := store.DB()
 	port := config.GetEnv("PORT", portDefault)
 	mcfg := newMetricsConfig()
+	rcfg := loadReportConfig()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -53,6 +54,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
 	mux.HandleFunc("GET /summary", handleSummary(db))
 	mux.HandleFunc("GET /metrics", handleMetricsReview(mcfg))
+	mux.HandleFunc("POST /report", handleReport(db, mcfg, rcfg))
 	mux.HandleFunc("GET /tokens", handleTokenStatus(db))
 
 	address := "0.0.0.0:" + port
