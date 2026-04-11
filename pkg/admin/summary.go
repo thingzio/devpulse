@@ -151,8 +151,8 @@ func collectSummary(ctx context.Context, db *sql.DB) (summaryResponse, error) {
 	}
 
 	today := time.Now().UTC().Format("2006-01-02")
-	if err := upsertStats(ctx, db, today, current); err != nil {
-		return summaryResponse{}, fmt.Errorf("upserting stats: %w", err)
+	if upsertErr := upsertStats(ctx, db, today, current); upsertErr != nil {
+		return summaryResponse{}, fmt.Errorf("upserting stats: %w", upsertErr)
 	}
 
 	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")

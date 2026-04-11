@@ -38,10 +38,12 @@ func loadReportConfig() *reportConfig {
 	}
 }
 
+const emDash = "\u2014"
+
 // deltaIntStr formats an int delta pointer as "+N (X.Y%)" or returns "—" if nil.
 func deltaIntStr(val *int, pct *float64) string {
 	if val == nil {
-		return "\u2014"
+		return emDash
 	}
 	sign := "+"
 	if *val < 0 {
@@ -56,7 +58,7 @@ func deltaIntStr(val *int, pct *float64) string {
 // deltaInt64Str formats an int64 delta pointer similarly.
 func deltaInt64Str(val *int64, pct *float64) string {
 	if val == nil {
-		return "\u2014"
+		return emDash
 	}
 	sign := "+"
 	if *val < 0 {
@@ -69,11 +71,11 @@ func deltaInt64Str(val *int64, pct *float64) string {
 }
 
 type metricRow struct {
-	label    string
-	current  string
-	dod      string
-	wow      string
-	mom      string
+	label       string
+	current     string
+	dod         string
+	wow         string
+	mom         string
 	invertColor bool // true = positive is bad (e.g. errors)
 }
 
@@ -92,20 +94,16 @@ func buildMetricRows(s summaryResponse) []metricRow {
 		{label: "Repos w/ Errors", current: fmt.Sprintf("%d", cur.ReposWithErrors), invertColor: true},
 	}
 
-	type deltaFields struct {
-		d *statsDelta
-	}
-
 	extractDelta := func(d *statsDelta, idx int) string {
 		if d == nil {
-			return "\u2014"
+			return emDash
 		}
 		switch idx {
 		case 0:
 			return deltaIntStr(d.Tenants, d.TenantsPct)
 		case 1, 2, 3, 4:
 			// Plan breakdown deltas not tracked individually in statsDelta
-			return "\u2014"
+			return emDash
 		case 5:
 			return deltaIntStr(d.Repos, d.ReposPct)
 		case 6:
@@ -117,7 +115,7 @@ func buildMetricRows(s summaryResponse) []metricRow {
 		case 9:
 			return deltaIntStr(d.ReposWithErrors, d.ErrorsPct)
 		default:
-			return "\u2014"
+			return emDash
 		}
 	}
 
@@ -132,7 +130,7 @@ func buildMetricRows(s summaryResponse) []metricRow {
 
 // deltaColor returns an inline CSS color for a delta cell.
 func deltaColor(cell string, invert bool) string {
-	if cell == "\u2014" {
+	if cell == emDash {
 		return "#888"
 	}
 	positive := strings.HasPrefix(cell, "+")

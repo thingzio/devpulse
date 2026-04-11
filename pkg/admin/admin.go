@@ -482,7 +482,7 @@ func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) { //nolint:unparam // status kept for consistency with server.writeJSON
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		slog.Error("failed to marshal JSON", "error", err)
