@@ -153,6 +153,15 @@ func AddTenantRepos(ctx context.Context, db *sql.DB, tenantID string, repos []Or
 	return tx.Commit()
 }
 
+// CountTenantRepos returns the number of active repos for a tenant.
+func CountTenantRepos(ctx context.Context, db *sql.DB, tenantID string) (int, error) {
+	var count int
+	if err := db.QueryRowContext(ctx, countTenantReposSQL, tenantID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting tenant repos: %w", err)
+	}
+	return count, nil
+}
+
 // ListTenantRepos returns all active repos for a tenant.
 func ListTenantRepos(ctx context.Context, db *sql.DB, tenantID string) ([]TenantRepo, error) {
 	rows, err := db.QueryContext(ctx, listTenantReposSQL, tenantID)

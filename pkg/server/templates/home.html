@@ -64,12 +64,11 @@
             </button>
             <div class="user-menu" id="user-menu" style="display:none;">
                 <div class="user-menu-header">{{ .username }}</div>
-                <div class="user-menu-plan">{{ .plan }} plan</div>
+                {{ if .name }}<div class="user-menu-name">{{ .name }}</div>{{ end }}
                 <div class="user-menu-divider"></div>
-                <button class="user-menu-item" id="theme-toggle">
-                    <span class="theme-label-light">Dark mode</span>
-                    <span class="theme-label-dark">Light mode</span>
-                </button>
+                <a href="/settings" class="user-menu-item">Settings</a>
+                <div class="user-menu-divider"></div>
+                <a href="/auth/reset" class="user-menu-item user-menu-signout">Sign out</a>
             </div>
         </div>
     </section>

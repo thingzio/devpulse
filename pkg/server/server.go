@@ -51,7 +51,7 @@ var templateFuncs = template.FuncMap{
 
 func init() {
 	// Simple pages using layout.html
-	simplePages := []string{"landing.html", "tos.html", "help.html"}
+	simplePages := []string{"landing.html", "tos.html", "help.html", "settings.html"}
 	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
 	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
@@ -198,6 +198,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	mux.Handle("GET /tos", wrap(tosPageHandler()))
 	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
 	mux.Handle("GET /dashboard", wrap(dashboardHandler(opts)))
+	mux.Handle("GET /settings", wrap(settingsHandler(db)))
 	mux.Handle("POST /auth/signout", wrap(signoutHandler(db)))
 
 	// Tenant management API
@@ -345,6 +346,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			"build_date":    opts.Date,
 			"period_days":   180,
 			"username":      tn.Username,
+			"name":          tn.Name,
 			"avatar_url":    tn.AvatarURL,
 			"plan":          tn.Plan,
 			"pdf_export":    limits.PDFExport,
@@ -354,6 +356,47 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 		}); err != nil {
 			slog.Error("rendering dashboard", "error", err)
 		}
+	}
+}
+
+func settingsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Redirect(w, r, "/auth/github", http.StatusFound)
+			return
+		}
+
+		limits, _ := plan.Get(tn.Plan)
+		repoCount, _ := tenant.CountTenantRepos(r.Context(), db, tn.ID)
+		lastSignIn := tenant.GetLastSignIn(r.Context(), db, tn.ID)
+
+		const unlimitedLabel = "unlimited"
+		maxRepos := fmt.Sprintf("%d", limits.MaxRepos)
+		if limits.MaxRepos == 0 {
+			maxRepos = unlimitedLabel
+		}
+		maxEvents := fmt.Sprintf("%d", limits.MaxEventsPerWeek)
+		if limits.MaxEventsPerWeek == 0 {
+			maxEvents = unlimitedLabel
+		}
+		lastLogin := "never"
+		if lastSignIn != nil {
+			lastLogin = lastSignIn.Format("2006-01-02")
+		}
+
+		renderTemplate(w, "settings.html", map[string]any{
+			"Title":      "Settings",
+			"username":   tn.Username,
+			"name":       tn.Name,
+			"email":      tn.Email,
+			"plan":       tn.Plan,
+			"repo_count": repoCount,
+			"max_repos":  maxRepos,
+			"max_events": maxEvents,
+			"created_at": tn.CreatedAt.Format("2006-01-02"),
+			"last_login": lastLogin,
+		})
 	}
 }
 

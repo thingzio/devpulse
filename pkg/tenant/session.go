@@ -67,6 +67,17 @@ func DestroySession(ctx context.Context, db *sql.DB, rawToken string) error {
 	return nil
 }
 
+const lastSignInSQL = `SELECT MAX(created_at) FROM session WHERE tenant_id = $1`
+
+// GetLastSignIn returns the most recent session creation time for a tenant.
+func GetLastSignIn(ctx context.Context, db *sql.DB, tenantID string) *time.Time {
+	var t sql.NullTime
+	if err := db.QueryRowContext(ctx, lastSignInSQL, tenantID).Scan(&t); err != nil || !t.Valid {
+		return nil
+	}
+	return &t.Time
+}
+
 // CleanExpiredSessions removes all expired sessions.
 func CleanExpiredSessions(ctx context.Context, db *sql.DB) (int64, error) {
 	res, err := db.ExecContext(ctx, cleanExpiredSessionsSQL)

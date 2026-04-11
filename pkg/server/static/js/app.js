@@ -249,11 +249,6 @@ $(function () {
         $("#user-menu").toggle();
     });
 
-    // Theme toggle inside user menu
-    $("#theme-toggle").click(function () {
-        toggleTheme();
-    });
-
     // Close menu on outside click
     $(document).click(function (e) {
         if (!$(e.target).closest('.user-menu-wrap').length) {
