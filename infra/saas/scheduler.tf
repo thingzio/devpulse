@@ -17,10 +17,11 @@ resource "google_cloud_scheduler_job" "import" {
 }
 
 resource "google_cloud_scheduler_job" "daily_report" {
-  name     = "${var.prefix}-daily-report"
-  schedule = "0 7 * * *"
-  project  = var.project_id
-  region   = var.region
+  name      = "${var.prefix}-daily-report"
+  schedule  = "0 17 * * *"
+  time_zone = "America/Los_Angeles"
+  project   = var.project_id
+  region    = var.region
 
   http_target {
     http_method = "POST"
