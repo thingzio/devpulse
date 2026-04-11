@@ -88,19 +88,17 @@ Plain text fallback included for non-HTML email clients.
 
 Subject: `DevPulse Daily Report — 2026-04-11`
 
-## Secret Config
+## Config
 
-New Cloud Secret `report-config` (JSON):
+**Secret (Secret Manager):**
+- `sendgrid-api-key` — SendGrid API token only
 
-```json
-{
-  "sendgrid_api_key": "SG...",
-  "to_email": "user@example.com",
-  "from_email": "reports@devpulse.thingz.io"
-}
-```
+**Env vars (Cloud Run):**
+- `REPORT_TO_EMAIL` — recipient email address
+- `REPORT_FROM_EMAIL` — sender email (must be verified in SendGrid)
+- `REPORT_SUBJECT_PREFIX` — defaults to "DevPulse Daily Report"
 
-Mounted on admin service. If missing, `POST /report` returns 503. `GET /summary` works independently.
+If `SENDGRID_API_KEY` is missing, `POST /report` returns 503. `GET /summary` works independently.
 
 ## Scripts
 

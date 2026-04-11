@@ -113,9 +113,10 @@ type reportResponse struct {
 }
 
 type reportConfig struct {
-	SendGridAPIKey string `json:"sendgrid_api_key"`
-	ToEmail        string `json:"to_email"`
-	FromEmail      string `json:"from_email"`
+	SendGridAPIKey string // from secret: SENDGRID_API_KEY
+	ToEmail        string // from env: REPORT_TO_EMAIL
+	FromEmail      string // from env: REPORT_FROM_EMAIL
+	SubjectPrefix  string // from env: REPORT_SUBJECT_PREFIX (default "DevPulse Daily Report")
 }
 ```
 
@@ -364,7 +365,7 @@ Expected: FAIL — functions undefined
 **Step 3: Write `pkg/admin/report.go`**
 
 Contents:
-- `loadReportConfig()` — reads `REPORT_CONFIG` env var (JSON string from secret mount) into `reportConfig` struct
+- `loadReportConfig()` — reads `SENDGRID_API_KEY` (from secret), `REPORT_TO_EMAIL`, `REPORT_FROM_EMAIL`, `REPORT_SUBJECT_PREFIX` (env vars) into `reportConfig` struct. Returns nil if API key is empty.
 - `renderReportHTML(summary summaryResponse, analysis string) string` — builds HTML email with:
   - Subject: "DevPulse Daily Report — YYYY-MM-DD"
   - Section 1: Platform Summary table (counts + DoD/WoW/MoM with directional arrows ↑↓)
@@ -489,19 +490,36 @@ git commit -S -m "feat: add tools/tenant-summary CLI script"
 
 ---
 
-### Task 9: Terraform — Secret, Scheduler, Env Mount
+### Task 9: Terraform — Secret, Scheduler, Env Vars
 
 **Files:**
-- Modify: `infra/saas/secrets.tf` — add `report-config` secret + IAM binding
-- Modify: `infra/saas/cloudrun.tf` — mount secret as env var on admin service
+- Modify: `infra/saas/secrets.tf` — add `sendgrid-api-key` secret + IAM binding
+- Modify: `infra/saas/cloudrun.tf` — mount secret + env vars on admin service
 - Modify: `infra/saas/scheduler.tf` — add daily report scheduler job
 - Modify: `infra/saas/iam.tf` — grant deployer SA invoker on admin service (for scheduler)
+- Modify: `infra/saas/variables.tf` — add report email variables
 
-**Step 1: Add secret to `secrets.tf`**
+**Step 1: Add variables to `variables.tf`**
 
 ```hcl
-resource "google_secret_manager_secret" "report_config" {
-  secret_id = "${var.prefix}-report-config"
+variable "report_to_email" {
+  description = "Daily report recipient email"
+  type        = string
+  default     = ""
+}
+
+variable "report_from_email" {
+  description = "Daily report sender email (must be verified in SendGrid)"
+  type        = string
+  default     = ""
+}
+```
+
+**Step 2: Add secret to `secrets.tf`**
+
+```hcl
+resource "google_secret_manager_secret" "sendgrid_api_key" {
+  secret_id = "${var.prefix}-sendgrid-api-key"
   project   = var.project_id
 
   replication {
@@ -511,25 +529,40 @@ resource "google_secret_manager_secret" "report_config" {
   depends_on = [google_project_service.default]
 }
 
-resource "google_secret_manager_secret_iam_member" "run_report_config" {
-  secret_id = google_secret_manager_secret.report_config.id
+resource "google_secret_manager_secret_iam_member" "run_sendgrid" {
+  secret_id = google_secret_manager_secret.sendgrid_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run.email}"
 }
 ```
 
-**Step 2: Mount on admin service in `cloudrun.tf`**
+**Step 3: Mount secret + env vars on admin service in `cloudrun.tf`**
 
-Add env block to the admin service containers block:
+Add env blocks to the admin service containers block:
 ```hcl
 env {
-  name = "REPORT_CONFIG"
+  name = "SENDGRID_API_KEY"
   value_source {
     secret_key_ref {
-      secret  = google_secret_manager_secret.report_config.secret_id
+      secret  = google_secret_manager_secret.sendgrid_api_key.secret_id
       version = "latest"
     }
   }
+}
+
+env {
+  name  = "REPORT_TO_EMAIL"
+  value = var.report_to_email
+}
+
+env {
+  name  = "REPORT_FROM_EMAIL"
+  value = var.report_from_email
+}
+
+env {
+  name  = "REPORT_SUBJECT_PREFIX"
+  value = "DevPulse Daily Report"
 }
 ```
 
@@ -604,7 +637,7 @@ curl -s localhost:8080/metrics?days=1
 - **Shared summary logic**: Extract `collectSummary(ctx, db) (summaryResponse, error)` from the handler so both `GET /summary` and `POST /report` can call it without HTTP overhead.
 - **Metrics function reuse**: `collectAllMetrics` and `analyzeMetrics` in `metrics.go` are already pure functions — `POST /report` calls them directly.
 - **SendGrid API**: Use raw HTTP POST to `https://api.sendgrid.com/v3/mail/send` — no SDK dependency. The `analysisClient` (90s timeout) is appropriate since email send is fast but the metrics collection preceding it is slow.
-- **Report config**: `loadReportConfig()` reads `REPORT_CONFIG` env var. Returns `nil` if empty — `POST /report` returns 503 gracefully. `GET /summary` is independent.
+- **Report config**: `loadReportConfig()` reads `SENDGRID_API_KEY` (secret), `REPORT_TO_EMAIL`, `REPORT_FROM_EMAIL`, `REPORT_SUBJECT_PREFIX` (env vars). Returns `nil` if API key is empty — `POST /report` returns 503 gracefully. `GET /summary` is independent.
 - **Bot exclusion in contributors count**: Use `username NOT LIKE '%[bot]'` — consistent with existing `ContribExcludeSQL` but simplified since we're not joining the event table. The `developer` table only contains usernames that have authored events.
 - **Error repos query**: Uses `tenant_repo` directly — `import_errors` already represents consecutive failures (resets on success).
 - **Migration ordering**: File is `010_platform_stats.sql`. Migrations run in filename order via `applyMigrations` with advisory lock.
