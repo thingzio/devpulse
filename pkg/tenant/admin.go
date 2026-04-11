@@ -13,6 +13,7 @@ import (
 type TenantSummary struct {
 	Username         string
 	Email            string
+	Name             string
 	Plan             string
 	MaxRepos         int
 	MaxEventsPerWeek int
@@ -25,6 +26,10 @@ type TenantDetail struct {
 	ID               string
 	Username         string
 	Email            string
+	Name             string
+	Company          string
+	Location         string
+	Bio              string
 	Plan             string
 	MaxRepos         int
 	MaxEventsPerWeek int
@@ -61,8 +66,8 @@ const (
 		RETURNING id`
 
 	listTenantSummariesSQL = `
-		SELECT t.username, COALESCE(t.email, ''), t.plan,
-		       t.max_repos, t.max_events_per_week,
+		SELECT t.username, COALESCE(t.email, ''), COALESCE(t.name, ''),
+		       t.plan, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
 		FROM tenant t
 		LEFT JOIN session s ON s.tenant_id = t.id
@@ -70,8 +75,9 @@ const (
 		ORDER BY t.created_at`
 
 	getTenantDetailByUsernameSQL = `
-		SELECT t.id, t.username, t.email, t.plan,
-		       t.max_repos, t.max_events_per_week,
+		SELECT t.id, t.username, t.email,
+		       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
+		       t.plan, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
 		FROM tenant t
 		LEFT JOIN session s ON s.tenant_id = t.id
@@ -145,7 +151,8 @@ func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, erro
 		var t TenantSummary
 		var lastSignIn sql.NullTime
 		if err := rows.Scan(
-			&t.Username, &t.Email, &t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
+			&t.Username, &t.Email, &t.Name,
+			&t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
 			&t.CreatedAt, &lastSignIn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning tenant summary: %w", err)
@@ -167,8 +174,9 @@ func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string)
 	var lastSignIn sql.NullTime
 	var email sql.NullString
 	err := db.QueryRowContext(ctx, getTenantDetailByUsernameSQL, username).Scan(
-		&td.ID, &td.Username, &email, &td.Plan,
-		&td.MaxRepos, &td.MaxEventsPerWeek,
+		&td.ID, &td.Username, &email,
+		&td.Name, &td.Company, &td.Location, &td.Bio,
+		&td.Plan, &td.MaxRepos, &td.MaxEventsPerWeek,
 		&td.CreatedAt, &lastSignIn,
 	)
 	if err != nil {

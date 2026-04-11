@@ -13,7 +13,7 @@ func TestIncrementImportErrors(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 5001, "erruser", "e@test.com", "")
+	tn, err := UpsertTenant(ctx, db, 5001, "erruser", "e@test.com", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
@@ -40,7 +40,7 @@ func TestResetImportErrors(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 5002, "resetuser", "r@test.com", "")
+	tn, err := UpsertTenant(ctx, db, 5002, "resetuser", "r@test.com", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))

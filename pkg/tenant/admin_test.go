@@ -12,9 +12,9 @@ func TestListTenantSummaries(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	_, err := UpsertTenant(ctx, db, 80001, "summaryuser1", "s1@test.com", "")
+	_, err := UpsertTenant(ctx, db, 80001, "summaryuser1", "s1@test.com", "", "", "", "", "")
 	require.NoError(t, err)
-	_, err = UpsertTenant(ctx, db, 80002, "summaryuser2", "s2@test.com", "")
+	_, err = UpsertTenant(ctx, db, 80002, "summaryuser2", "s2@test.com", "", "", "", "", "")
 	require.NoError(t, err)
 
 	summaries, err := ListTenantSummaries(ctx, db)
@@ -33,7 +33,7 @@ func TestListTenantSummaries_WithSession(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 80003, "sessionsummary", "", "")
+	tn, err := UpsertTenant(ctx, db, 80003, "sessionsummary", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	_, err = CreateSession(ctx, db, tn.ID, 7*24*60*60*1e9) // 7 days
@@ -56,7 +56,7 @@ func TestGetTenantDetailByUsername(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 80004, "detailuser", "detail@test.com", "https://avatar.test")
+	tn, err := UpsertTenant(ctx, db, 80004, "detailuser", "detail@test.com", "https://avatar.test", "", "", "", "")
 	require.NoError(t, err)
 	require.NoError(t, UpdatePlan(ctx, db, tn.ID, "pro", 25, 15000))
 
@@ -82,7 +82,7 @@ func TestGetTenantIDByUsername(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 80005, "idbyname", "", "")
+	tn, err := UpsertTenant(ctx, db, 80005, "idbyname", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	id, err := GetTenantIDByUsername(ctx, db, "idbyname")
@@ -131,7 +131,7 @@ func TestClearUpgradeRequest(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 80008, "upgradeuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 80008, "upgradeuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	// Request upgrade first
@@ -156,7 +156,7 @@ func TestRequestUpgrade(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 80009, "requpgrade", "u@test.com", "")
+	tn, err := UpsertTenant(ctx, db, 80009, "requpgrade", "u@test.com", "", "", "", "", "")
 	require.NoError(t, err)
 
 	// First request returns details

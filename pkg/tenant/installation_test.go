@@ -13,7 +13,7 @@ func TestSaveAndListInstallations(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60001, "installuser", "i@test.com", "")
+	tn, err := UpsertTenant(ctx, db, 60001, "installuser", "i@test.com", "", "", "", "", "")
 	require.NoError(t, err)
 
 	perms, err := json.Marshal(map[string]string{"contents": "read"})
@@ -39,7 +39,7 @@ func TestSaveInstallation_Upsert(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60002, "upsertinstall", "", "")
+	tn, err := UpsertTenant(ctx, db, 60002, "upsertinstall", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 2001, "Organization", "oldlogin", nil))
@@ -57,7 +57,7 @@ func TestSuspendInstallation(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60003, "suspenduser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60003, "suspenduser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 3001, "Organization", "org1", nil))
@@ -74,7 +74,7 @@ func TestGetInstallationForOrg(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60004, "orginstall", "", "")
+	tn, err := UpsertTenant(ctx, db, 60004, "orginstall", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 4001, "Organization", "activeorg", nil))
@@ -103,7 +103,7 @@ func TestAddAndListTenantRepos(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60005, "repouser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60005, "repouser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	repos := []OrgRepo{
@@ -127,7 +127,7 @@ func TestDeactivateTenantRepo(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60006, "deactivateuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60006, "deactivateuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	repos := []OrgRepo{
@@ -148,7 +148,7 @@ func TestDeactivateTenantRepo_ReactivateByAdd(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60007, "reactivateuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60007, "reactivateuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
@@ -171,7 +171,7 @@ func TestAddTenantRepos_RepoLimitExceeded(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60008, "limituser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60008, "limituser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	// Default free plan has max_repos=3 (from DB default after migration).
@@ -197,7 +197,7 @@ func TestListTenantRepos_EmptyResult(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 60009, "emptyrepouser", "", "")
+	tn, err := UpsertTenant(ctx, db, 60009, "emptyrepouser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	list, err := ListTenantRepos(ctx, db, tn.ID)
@@ -210,12 +210,12 @@ func TestGetActiveTenants(t *testing.T) {
 	ctx := context.Background()
 
 	// Tenant without ToS should not appear
-	tn1, err := UpsertTenant(ctx, db, 70001, "notos", "", "")
+	tn1, err := UpsertTenant(ctx, db, 70001, "notos", "", "", "", "", "", "")
 	require.NoError(t, err)
 	require.NoError(t, AddTenantRepos(ctx, db, tn1.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
 
 	// Tenant with ToS and active repo should appear
-	tn2, err := UpsertTenant(ctx, db, 70002, "withtos", "", "")
+	tn2, err := UpsertTenant(ctx, db, 70002, "withtos", "", "", "", "", "", "")
 	require.NoError(t, err)
 	require.NoError(t, AcceptToS(ctx, db, tn2.ID))
 	require.NoError(t, AddTenantRepos(ctx, db, tn2.ID, []OrgRepo{{Org: "org", Repo: "repo2"}}))
@@ -238,7 +238,7 @@ func TestGetActiveInstallations(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 70003, "activeinstuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 70003, "activeinstuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 7001, "Organization", "active", nil))
@@ -256,7 +256,7 @@ func TestGetActiveReposForInstall(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 70004, "activerepouser", "", "")
+	tn, err := UpsertTenant(ctx, db, 70004, "activerepouser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 8001, "Organization", "myorg", nil))

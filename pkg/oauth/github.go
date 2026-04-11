@@ -39,6 +39,10 @@ type GitHubUser struct {
 	Login     string `json:"login"`
 	Email     string `json:"email"`
 	AvatarURL string `json:"avatar_url"`
+	Name      string `json:"name"`
+	Company   string `json:"company"`
+	Location  string `json:"location"`
+	Bio       string `json:"bio"`
 }
 
 // BuildAuthURL returns the GitHub OAuth authorization URL and a random state token.

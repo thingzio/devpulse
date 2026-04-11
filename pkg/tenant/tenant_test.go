@@ -116,7 +116,7 @@ func TestUpsertAndGetTenant(t *testing.T) {
 
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 12345, "testuser", "test@example.com", "https://avatar.url")
+	tn, err := UpsertTenant(ctx, db, 12345, "testuser", "test@example.com", "https://avatar.url", "", "", "", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, tn.ID)
 	assert.Equal(t, int64(12345), tn.GitHubID)
@@ -129,7 +129,7 @@ func TestUpsertAndGetTenant(t *testing.T) {
 	assert.Equal(t, tn.ID, got.ID)
 
 	// Upsert updates profile fields
-	tn2, err := UpsertTenant(ctx, db, 12345, "newname", "new@example.com", "https://new.url")
+	tn2, err := UpsertTenant(ctx, db, 12345, "newname", "new@example.com", "https://new.url", "", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, tn.ID, tn2.ID)
 	assert.Equal(t, "newname", tn2.Username)
@@ -139,7 +139,7 @@ func TestGetTenantByID(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 33333, "iduser", "", "")
+	tn, err := UpsertTenant(ctx, db, 33333, "iduser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	got, err := GetTenantByID(ctx, db, tn.ID)
@@ -151,7 +151,7 @@ func TestAcceptToS(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 99999, "tosuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 99999, "tosuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 	require.Nil(t, tn.ToSAcceptedAt)
 
@@ -167,7 +167,7 @@ func TestUpdatePlan(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 44444, "planuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 44444, "planuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, "free", tn.Plan)
 	assert.Equal(t, 3, tn.MaxRepos)
@@ -187,7 +187,7 @@ func TestSessionLifecycle(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 55555, "sessuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55555, "sessuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	rawToken, err := CreateSession(ctx, db, tn.ID, 7*24*time.Hour)
@@ -209,7 +209,7 @@ func TestExpiredSession(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 55556, "expuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55556, "expuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	rawToken, err := CreateSession(ctx, db, tn.ID, -1*time.Hour)
@@ -223,7 +223,7 @@ func TestCleanExpiredSessions(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	tn, err := UpsertTenant(ctx, db, 55557, "cleanuser", "", "")
+	tn, err := UpsertTenant(ctx, db, 55557, "cleanuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
 	// Create expired session

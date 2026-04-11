@@ -15,6 +15,7 @@ type upgradeResponse struct {
 type tenantSummary struct {
 	Username         string `json:"username"`
 	Email            string `json:"email"`
+	Name             string `json:"name"`
 	Plan             string `json:"plan"`
 	MaxRepos         int    `json:"max_repos"`
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
@@ -25,6 +26,10 @@ type tenantSummary struct {
 type tenantDetail struct {
 	Username         string       `json:"username"`
 	Email            string       `json:"email"`
+	Name             string       `json:"name"`
+	Company          string       `json:"company"`
+	Location         string       `json:"location"`
+	Bio              string       `json:"bio"`
 	Plan             string       `json:"plan"`
 	MaxRepos         int          `json:"max_repos"`
 	MaxEventsPerWeek int          `json:"max_events_per_week"`

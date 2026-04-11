@@ -430,7 +430,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 			return
 		}
 
-		tn, err := tenant.UpsertTenant(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL)
+		tn, err := tenant.UpsertTenant(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL, user.Name, user.Company, user.Location, user.Bio)
 		if err != nil {
 			slog.Error("upserting tenant", "error", err)
 			clearAndRedirect(w, r, "auth_failed")

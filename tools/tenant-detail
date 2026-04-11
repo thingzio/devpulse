@@ -37,7 +37,13 @@ fi
 # Identity
 echo ""
 echo "IDENTITY"
-echo "${BODY}" | jq -r '"  Username:  \(.username)\n  Email:     \(.email // "n/a")"'
+echo "${BODY}" | jq -r '
+    "  Username:  \(.username)",
+    "  Name:      \(.name // "-")",
+    "  Email:     \(.email // "-")",
+    "  Company:   \(.company // "-")",
+    "  Location:  \(.location // "-")",
+    "  Bio:       \(.bio // "-")"'
 
 # Status
 echo ""

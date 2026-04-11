@@ -15,6 +15,10 @@ type Tenant struct {
 	Username           string
 	Email              string
 	AvatarURL          string
+	Name               string
+	Company            string
+	Location           string
+	Bio                string
 	MaxRepos           int
 	MaxEventsPerWeek   int
 	Plan               string
@@ -25,23 +29,30 @@ type Tenant struct {
 }
 
 const upsertTenantSQL = `
-	INSERT INTO tenant (github_id, username, email, avatar_url)
-	VALUES ($1, $2, $3, $4)
+	INSERT INTO tenant (github_id, username, email, avatar_url, name, company, location, bio)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	ON CONFLICT (github_id) DO UPDATE SET
 		username = EXCLUDED.username,
 		email = EXCLUDED.email,
 		avatar_url = EXCLUDED.avatar_url,
+		name = EXCLUDED.name,
+		company = EXCLUDED.company,
+		location = EXCLUDED.location,
+		bio = EXCLUDED.bio,
 		updated_at = NOW()
-	RETURNING id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
+	RETURNING id, github_id, username, email, avatar_url, name, company, location, bio,
+	          max_repos, max_events_per_week, plan,
 	          tos_accepted_at, upgrade_requested_at, created_at, updated_at`
 
 const getTenantByGitHubIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
+	SELECT id, github_id, username, email, avatar_url, name, company, location, bio,
+	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, max_repos, max_events_per_week, plan,
+	SELECT id, github_id, username, email, avatar_url, name, company, location, bio,
+	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM tenant WHERE id = $1`
 
@@ -58,6 +69,7 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	var t Tenant
 	err := row.Scan(
 		&t.ID, &t.GitHubID, &t.Username, &t.Email, &t.AvatarURL,
+		&t.Name, &t.Company, &t.Location, &t.Bio,
 		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -67,8 +79,8 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 }
 
 // UpsertTenant creates or updates a tenant by GitHub ID.
-func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL string) (*Tenant, error) {
-	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL))
+func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string) (*Tenant, error) {
+	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
 	if err != nil {
 		return nil, fmt.Errorf("upserting tenant: %w", err)
 	}

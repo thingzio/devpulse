@@ -103,6 +103,7 @@ func handleListTenants(db *sql.DB) http.HandlerFunc {
 			out[i] = tenantSummary{
 				Username:         t.Username,
 				Email:            t.Email,
+				Name:             t.Name,
 				Plan:             t.Plan,
 				MaxRepos:         t.MaxRepos,
 				MaxEventsPerWeek: t.MaxEventsPerWeek,
@@ -137,6 +138,10 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 		out := tenantDetail{
 			Username:         td.Username,
 			Email:            td.Email,
+			Name:             td.Name,
+			Company:          td.Company,
+			Location:         td.Location,
+			Bio:              td.Bio,
 			Plan:             td.Plan,
 			MaxRepos:         td.MaxRepos,
 			MaxEventsPerWeek: td.MaxEventsPerWeek,
