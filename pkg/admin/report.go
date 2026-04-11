@@ -31,10 +31,10 @@ func loadReportConfig() *reportConfig {
 		return nil
 	}
 	return &reportConfig{
-		SendAPIKey: key,
-		ToEmail:        to,
-		FromEmail:      from,
-		SubjectPrefix:  config.GetEnv("REPORT_SUBJECT_PREFIX", "DevPulse Daily Report"),
+		SendAPIKey:    key,
+		ToEmail:       to,
+		FromEmail:     from,
+		SubjectPrefix: config.GetEnv("REPORT_SUBJECT_PREFIX", "DevPulse Daily Report"),
 	}
 }
 
