@@ -205,6 +205,29 @@ func TestListTenantRepos_EmptyResult(t *testing.T) {
 	assert.Empty(t, list)
 }
 
+func TestCountTenantRepos(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60010, "countuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Zero repos initially.
+	count, err := CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// Add repos and verify count.
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{
+		{Org: "orgA", Repo: "repo1"},
+		{Org: "orgA", Repo: "repo2"},
+	}))
+
+	count, err = CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+}
+
 func TestGetActiveTenants(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

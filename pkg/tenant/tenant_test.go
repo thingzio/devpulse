@@ -238,3 +238,26 @@ func TestCleanExpiredSessions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), cleaned)
 }
+
+func TestGetLastSignIn(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	t.Run("nil when no sessions", func(t *testing.T) {
+		tn, err := UpsertTenant(ctx, db, 55558, "nosessuser", "", "", "", "", "", "")
+		require.NoError(t, err)
+		assert.Nil(t, GetLastSignIn(ctx, db, tn.ID))
+	})
+
+	t.Run("returns most recent session time", func(t *testing.T) {
+		tn, err := UpsertTenant(ctx, db, 55559, "signinuser", "", "", "", "", "", "")
+		require.NoError(t, err)
+
+		_, err = CreateSession(ctx, db, tn.ID, 7*24*time.Hour)
+		require.NoError(t, err)
+
+		got := GetLastSignIn(ctx, db, tn.ID)
+		require.NotNil(t, got)
+		assert.WithinDuration(t, time.Now(), *got, 5*time.Second)
+	})
+}
