@@ -40,18 +40,21 @@ const upsertTenantSQL = `
 		location = EXCLUDED.location,
 		bio = EXCLUDED.bio,
 		updated_at = NOW()
-	RETURNING id, github_id, username, email, avatar_url, name, company, location, bio,
+	RETURNING id, github_id, username, email, avatar_url,
+		          COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
 	          max_repos, max_events_per_week, plan,
 	          tos_accepted_at, upgrade_requested_at, created_at, updated_at`
 
 const getTenantByGitHubIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, name, company, location, bio,
+	SELECT id, github_id, username, email, avatar_url,
+	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
 	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
-	SELECT id, github_id, username, email, avatar_url, name, company, location, bio,
+	SELECT id, github_id, username, email, avatar_url,
+	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
 	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM tenant WHERE id = $1`

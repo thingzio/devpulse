@@ -18,7 +18,7 @@ const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES
 
 const validateSessionSQL = `
 	SELECT t.id, t.github_id, t.username, t.email, t.avatar_url,
-	       t.name, t.company, t.location, t.bio,
+	       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
 	       t.max_repos, t.max_events_per_week, t.plan, t.tos_accepted_at, t.upgrade_requested_at, t.created_at, t.updated_at
 	FROM session s
 	JOIN tenant t ON t.id = s.tenant_id
