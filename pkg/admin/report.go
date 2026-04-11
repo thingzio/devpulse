@@ -18,7 +18,7 @@ import (
 const defaultReportDays = 1
 
 func loadReportConfig() *reportConfig {
-	key := os.Getenv("SENDGRID_API_KEY")
+	key := os.Getenv("SEND_API_KEY")
 	if key == "" {
 		return nil
 	}
@@ -31,7 +31,7 @@ func loadReportConfig() *reportConfig {
 		return nil
 	}
 	return &reportConfig{
-		SendGridAPIKey: key,
+		SendAPIKey: key,
 		ToEmail:        to,
 		FromEmail:      from,
 		SubjectPrefix:  config.GetEnv("REPORT_SUBJECT_PREFIX", "DevPulse Daily Report"),
@@ -234,15 +234,11 @@ func renderReportText(summary summaryResponse, analysis string) string {
 
 func sendEmail(ctx context.Context, cfg *reportConfig, subject, html, text string) error {
 	payload := map[string]any{
-		"personalizations": []map[string]any{
-			{"to": []map[string]string{{"email": cfg.ToEmail}}},
-		},
-		"from":    map[string]string{"email": cfg.FromEmail},
+		"from":    cfg.FromEmail,
+		"to":      []string{cfg.ToEmail},
 		"subject": subject,
-		"content": []map[string]string{
-			{"type": "text/plain", "value": text},
-			{"type": "text/html", "value": html},
-		},
+		"html":    html,
+		"text":    text,
 	}
 
 	body, err := json.Marshal(payload)
@@ -251,20 +247,20 @@ func sendEmail(ctx context.Context, cfg *reportConfig, subject, html, text strin
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://api.sendgrid.com/v3/mail/send", bytes.NewReader(body))
+		"https://api.resend.com/emails", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("creating sendgrid request: %w", err)
+		return fmt.Errorf("creating resend request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+cfg.SendGridAPIKey)
+	req.Header.Set("Authorization", "Bearer "+cfg.SendAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := analysisClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("sending email via sendgrid: %w", err)
+		return fmt.Errorf("sending email via resend: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusAccepted {
+	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
@@ -273,7 +269,7 @@ func sendEmail(ctx context.Context, cfg *reportConfig, subject, html, text strin
 	if len(truncated) > 200 {
 		truncated = truncated[:200]
 	}
-	return fmt.Errorf("sendgrid returned %d: %s", resp.StatusCode, truncated)
+	return fmt.Errorf("resend returned %d: %s", resp.StatusCode, truncated)
 }
 
 func handleReport(db *sql.DB, mcfg *metricsConfig, rcfg *reportConfig) http.HandlerFunc {

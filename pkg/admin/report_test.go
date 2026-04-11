@@ -15,21 +15,21 @@ func TestLoadReportConfig_Missing(t *testing.T) {
 }
 
 func TestLoadReportConfig_Valid(t *testing.T) {
-	t.Setenv("SENDGRID_API_KEY", "SG.test-key")
+	t.Setenv("SEND_API_KEY", "re_test-key")
 	t.Setenv("REPORT_TO_EMAIL", "to@example.com")
 	t.Setenv("REPORT_FROM_EMAIL", "from@example.com")
 	t.Setenv("REPORT_SUBJECT_PREFIX", "Test Report")
 
 	cfg := loadReportConfig()
 	require.NotNil(t, cfg)
-	assert.Equal(t, "SG.test-key", cfg.SendGridAPIKey)
+	assert.Equal(t, "re_test-key", cfg.SendAPIKey)
 	assert.Equal(t, "to@example.com", cfg.ToEmail)
 	assert.Equal(t, "from@example.com", cfg.FromEmail)
 	assert.Equal(t, "Test Report", cfg.SubjectPrefix)
 }
 
 func TestLoadReportConfig_DefaultPrefix(t *testing.T) {
-	t.Setenv("SENDGRID_API_KEY", "SG.key")
+	t.Setenv("SEND_API_KEY", "re_key")
 	t.Setenv("REPORT_TO_EMAIL", "to@example.com")
 	t.Setenv("REPORT_FROM_EMAIL", "from@example.com")
 

@@ -137,8 +137,8 @@ type reportResponse struct {
 }
 
 type reportConfig struct {
-	SendGridAPIKey string
-	ToEmail        string
-	FromEmail      string
-	SubjectPrefix  string
+	SendAPIKey    string
+	ToEmail       string
+	FromEmail     string
+	SubjectPrefix string
 }

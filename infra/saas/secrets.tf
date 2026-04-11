@@ -78,8 +78,8 @@ resource "google_secret_manager_secret_iam_member" "import_github_app" {
   member    = "serviceAccount:${google_service_account.import.email}"
 }
 
-resource "google_secret_manager_secret" "sendgrid_api_key" {
-  secret_id = "${var.prefix}-sendgrid-api-key"
+resource "google_secret_manager_secret" "send_api_key" {
+  secret_id = "${var.prefix}-send-api-key"
   project   = var.project_id
 
   replication {
@@ -89,8 +89,8 @@ resource "google_secret_manager_secret" "sendgrid_api_key" {
   depends_on = [google_project_service.default]
 }
 
-resource "google_secret_manager_secret_iam_member" "run_sendgrid" {
-  secret_id = google_secret_manager_secret.sendgrid_api_key.id
+resource "google_secret_manager_secret_iam_member" "run_send" {
+  secret_id = google_secret_manager_secret.send_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.run.email}"
 }
