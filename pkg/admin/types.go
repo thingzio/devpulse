@@ -85,3 +85,60 @@ type inviteResponse struct {
 	MaxRepos         int    `json:"max_repos"`
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
 }
+
+type platformStats struct {
+	Tenants           int   `json:"tenants"`
+	TenantsFree       int   `json:"tenants_free"`
+	TenantsStarter    int   `json:"tenants_starter"`
+	TenantsPro        int   `json:"tenants_pro"`
+	TenantsEnterprise int   `json:"tenants_enterprise"`
+	Repos             int   `json:"repos"`
+	Events            int64 `json:"events"`
+	Contributors      int   `json:"contributors"`
+	Installations     int   `json:"installations"`
+	ReposWithErrors   int   `json:"repos_with_errors"`
+}
+
+type statsDelta struct {
+	Tenants         *int     `json:"tenants,omitempty"`
+	TenantsPct      *float64 `json:"tenants_pct,omitempty"`
+	Repos           *int     `json:"repos,omitempty"`
+	ReposPct        *float64 `json:"repos_pct,omitempty"`
+	Events          *int64   `json:"events,omitempty"`
+	EventsPct       *float64 `json:"events_pct,omitempty"`
+	Contributors    *int     `json:"contributors,omitempty"`
+	ContribPct      *float64 `json:"contributors_pct,omitempty"`
+	Installations   *int     `json:"installations,omitempty"`
+	InstallPct      *float64 `json:"installations_pct,omitempty"`
+	ReposWithErrors *int     `json:"repos_with_errors,omitempty"`
+	ErrorsPct       *float64 `json:"repos_with_errors_pct,omitempty"`
+}
+
+type errorRepo struct {
+	Org       string `json:"org"`
+	Repo      string `json:"repo"`
+	Errors    int    `json:"errors"`
+	LastError string `json:"last_error"`
+}
+
+type summaryResponse struct {
+	Date       string        `json:"date"`
+	Current    platformStats `json:"current"`
+	DoD        *statsDelta   `json:"dod,omitempty"`
+	WoW        *statsDelta   `json:"wow,omitempty"`
+	MoM        *statsDelta   `json:"mom,omitempty"`
+	ErrorRepos []errorRepo   `json:"error_repos"`
+	UpdatedAt  string        `json:"updated_at"`
+}
+
+type reportResponse struct {
+	Sent  bool   `json:"sent"`
+	Error string `json:"error,omitempty"`
+}
+
+type reportConfig struct {
+	SendGridAPIKey string
+	ToEmail        string
+	FromEmail      string
+	SubjectPrefix  string
+}
