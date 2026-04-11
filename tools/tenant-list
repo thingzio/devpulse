@@ -35,4 +35,4 @@ echo "${BODY}" | jq -r '
         (if .max_events_per_week == 0 then "∞" else (.max_events_per_week | tostring) end),
         .created_at,
         (if .last_sign_in == "" or .last_sign_in == null then "never" else .last_sign_in end)
-    ]) | @tsv' | column -t
+    ]) | @tsv' | column -t -s $'\t'
