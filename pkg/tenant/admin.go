@@ -12,6 +12,7 @@ import (
 // TenantSummary is a lightweight tenant record for admin listing.
 type TenantSummary struct {
 	Username         string
+	Email            string
 	Plan             string
 	MaxRepos         int
 	MaxEventsPerWeek int
@@ -60,7 +61,8 @@ const (
 		RETURNING id`
 
 	listTenantSummariesSQL = `
-		SELECT t.username, t.plan, t.max_repos, t.max_events_per_week,
+		SELECT t.username, COALESCE(t.email, ''), t.plan,
+		       t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
 		FROM tenant t
 		LEFT JOIN session s ON s.tenant_id = t.id
@@ -143,7 +145,7 @@ func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, erro
 		var t TenantSummary
 		var lastSignIn sql.NullTime
 		if err := rows.Scan(
-			&t.Username, &t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
+			&t.Username, &t.Email, &t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
 			&t.CreatedAt, &lastSignIn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning tenant summary: %w", err)

@@ -26,9 +26,10 @@ if [[ "${HTTP_CODE}" != "200" ]]; then
 fi
 
 echo "${BODY}" | jq -r '
-    ["USERNAME", "PLAN", "REPOS", "EVENTS/WK", "CREATED", "LAST-SIGN-IN"],
+    ["USERNAME", "EMAIL", "PLAN", "REPOS", "EVENTS/WK", "CREATED", "LAST-SIGN-IN"],
     (.[] | [
         .username,
+        (if .email == "" or .email == null then "-" else .email end),
         .plan,
         (if .max_repos == 0 then "∞" else (.max_repos | tostring) end),
         (if .max_events_per_week == 0 then "∞" else (.max_events_per_week | tostring) end),

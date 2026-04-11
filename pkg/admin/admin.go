@@ -102,6 +102,7 @@ func handleListTenants(db *sql.DB) http.HandlerFunc {
 		for i, t := range tenants {
 			out[i] = tenantSummary{
 				Username:         t.Username,
+				Email:            t.Email,
 				Plan:             t.Plan,
 				MaxRepos:         t.MaxRepos,
 				MaxEventsPerWeek: t.MaxEventsPerWeek,
