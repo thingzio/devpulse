@@ -129,22 +129,6 @@ db-down: ## Stops local Postgres
 .PHONY: db-connect
 db-connect: ## Opens psql shell to local Postgres
 	psql "$(DEV_DB)"
-
-.PHONY: stats
-stats: ## Shows tenant and repo stats from local Postgres
-	@psql "$(DEV_DB)" -t --no-align -F'|' -c " \
-		SELECT 'Tenants', COUNT(*) FROM tenant \
-		UNION ALL \
-		SELECT 'Active repos', COUNT(*) FROM tenant_repo WHERE active = TRUE \
-		UNION ALL \
-		SELECT 'Imported repos', COUNT(DISTINCT rm.org || '/' || rm.repo) \
-			FROM tenant_repo tr JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo WHERE tr.active = TRUE \
-		UNION ALL \
-		SELECT 'Total events', COUNT(*) FROM event; \
-	" | while IFS='|' read -r label val; do \
-		[ -n "$$label" ] && printf "%-20s %s\n" "$$label" "$$val"; \
-	done
-	@echo ""
 	@echo "Recent sign-ins:"
 	@psql "$(DEV_DB)" -t --no-align -F'|' -c " \
 		SELECT username, to_char(updated_at, 'YYYY-MM-DD HH24:MI') FROM tenant ORDER BY updated_at DESC LIMIT 5; \
