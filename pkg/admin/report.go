@@ -257,7 +257,7 @@ func handleReport(db *sql.DB, mcfg *metricsConfig, rcfg *reportConfig) http.Hand
 			slog.Warn("failed to get GCP token for report, skipping metrics", "error", err)
 		} else {
 			metrics := collectAllMetrics(ctx, mcfg, token, defaultReportDays)
-			a, aErr := analyzeMetrics(ctx, mcfg, metrics)
+			a, aErr := analyzeMetrics(ctx, mcfg, metrics, formatHTML)
 			if aErr != nil {
 				slog.Warn("metrics analysis failed for report, continuing without", "error", aErr)
 			} else {

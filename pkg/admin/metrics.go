@@ -82,7 +82,12 @@ func handleMetricsReview(cfg *metricsConfig) http.HandlerFunc {
 
 		metrics := collectAllMetrics(r.Context(), cfg, token, days)
 
-		analysis, err := analyzeMetrics(r.Context(), cfg, metrics)
+		format := formatText
+		if r.URL.Query().Get("format") == "html" {
+			format = formatHTML
+		}
+
+		analysis, err := analyzeMetrics(r.Context(), cfg, metrics, format)
 		if err != nil {
 			slog.Error("failed to analyze metrics", "error", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -467,9 +472,12 @@ func formatTimeSeries(raw string) string {
 	return b.String()
 }
 
-// analyzeMetrics sends the collected metrics to the Anthropic API for analysis.
-func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics string) (string, error) {
-	systemPrompt := `You are a DevOps analyst reviewing GCP infrastructure metrics
+const (
+	formatText = "text"
+	formatHTML = "html"
+)
+
+const analysisBasePrompt = `You are a DevOps analyst reviewing GCP infrastructure metrics
 for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 
 ## Architecture
@@ -497,26 +505,43 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 - "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
 - "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
 
-## Output Format
-Respond with clean HTML suitable for embedding in an email body. Use only inline styles.
-Use <h4> for section headings, <ul>/<li> for bullet points, <strong> for emphasis.
-Do NOT use Markdown. Do NOT wrap output in <html>, <head>, or <body> tags.
-
 ## Analysis Instructions
 Provide a brief, actionable analysis in three sections:
 
-1. <h4>Key Observations</h4> — Only anomalies, threshold breaches, or notable trends.
+1. Key Observations — Only anomalies, threshold breaches, or notable trends.
    One bullet per finding. Correlate across categories (e.g. latency + import timing).
    Skip anything that looks normal.
-2. <h4>Risks</h4> — Rate each: 🔴 critical, 🟠 warning, 🟡 watch.
+2. Risks — Rate each: 🔴 critical, 🟠 warning, 🟡 watch.
    Only flag metrics abnormal relative to the baselines above. If none, say "No risks identified."
-3. <h4>Actions</h4> — Concrete next steps only if risks were found. One line each.
+3. Actions — Concrete next steps only if risks were found. One line each.
    Do NOT recommend features that already exist (token pool retry, connection pool bounds, backfill limits).
 
 If a "7-Day Trend Baseline" section is present, compare today's metrics against the trailing
 7-day pattern. Flag regressions and improvements inline within Key Observations.
 
 Target length: 10-15 bullet points total. If everything looks healthy, say so in 2-3 sentences.`
+
+const analysisHTMLSuffix = `
+
+## Output Format
+Respond with clean HTML suitable for embedding in an email body. Use only inline styles.
+Use <h4> for section headings, <ul>/<li> for bullet points, <strong> for emphasis.
+Do NOT use Markdown. Do NOT wrap output in <html>, <head>, or <body> tags.`
+
+const analysisTextSuffix = `
+
+## Output Format
+Respond in plain text. Use bullet points (- ) for lists. Use ALL CAPS for section headings.
+Do NOT use Markdown formatting (no #, **, or backticks).`
+
+// analyzeMetrics sends the collected metrics to the Anthropic API for analysis.
+// format should be formatText or formatHTML.
+func analyzeMetrics(ctx context.Context, cfg *metricsConfig, metrics, format string) (string, error) {
+	suffix := analysisTextSuffix
+	if format == formatHTML {
+		suffix = analysisHTMLSuffix
+	}
+	systemPrompt := analysisBasePrompt + suffix
 
 	body, err := json.Marshal(map[string]any{
 		"model":      cfg.model,
