@@ -115,19 +115,19 @@ DEV_DB := postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable
 setup: ## Validates and installs all local dev tool dependencies
 	tools/setup-tools
 
-.PHONY: up
-up: ## Starts local Postgres (docker compose)
+.PHONY: db-up
+db-up: ## Starts local Postgres (docker compose)
 	docker compose up -d
 	@echo "Waiting for Postgres..."
 	@until docker compose exec -T db pg_isready -U devpulse >/dev/null 2>&1; do sleep 1; done
 	@echo "Postgres ready: $(DEV_DB)"
 
-.PHONY: down
-down: ## Stops local Postgres
+.PHONY: db-down
+db-down: ## Stops local Postgres
 	docker compose down
 
-.PHONY: db
-db: ## Opens psql shell to local Postgres
+.PHONY: db-connect
+db-connect: ## Opens psql shell to local Postgres
 	psql "$(DEV_DB)"
 
 .PHONY: stats
