@@ -24,7 +24,7 @@ const (
 	defaultInsightsModel = "claude-sonnet-4-6"
 	metricsHTTPTimeout   = 30 * time.Second
 	analysisHTTPTimeout  = 90 * time.Second
-	analysisMaxTokens    = 4096
+	analysisMaxTokens    = 2048
 	defaultDays          = 2
 	maxDays              = 30
 )
@@ -497,21 +497,26 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 - "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
 - "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
 
-## Analysis Instructions
-Analyze the raw metrics and provide:
+## Output Format
+Respond with clean HTML suitable for embedding in an email body. Use only inline styles.
+Use <h4> for section headings, <ul>/<li> for bullet points, <strong> for emphasis.
+Do NOT use Markdown. Do NOT wrap output in <html>, <head>, or <body> tags.
 
-1. **Key Observations** — What stands out? Anomalies, trends, threshold breaches.
-   Correlate across metric categories (e.g. latency + request count + import timing).
-2. **Risks** — Rate each 🔴 (critical), 🟠 (warning), or 🟡 (watch).
-   Only flag metrics that are abnormal relative to the baselines above.
-3. **Recommended Actions** — Concrete steps. Categorize as Immediate / Short-term / Medium-term.
+## Analysis Instructions
+Provide a brief, actionable analysis in three sections:
+
+1. <h4>Key Observations</h4> — Only anomalies, threshold breaches, or notable trends.
+   One bullet per finding. Correlate across categories (e.g. latency + import timing).
+   Skip anything that looks normal.
+2. <h4>Risks</h4> — Rate each: 🔴 critical, 🟠 warning, 🟡 watch.
+   Only flag metrics abnormal relative to the baselines above. If none, say "No risks identified."
+3. <h4>Actions</h4> — Concrete next steps only if risks were found. One line each.
    Do NOT recommend features that already exist (token pool retry, connection pool bounds, backfill limits).
 
 If a "7-Day Trend Baseline" section is present, compare today's metrics against the trailing
-7-day pattern. Flag regressions (e.g. "p99 latency is 3× the 7-day daily average") and
-improvements. This is the most valuable part of the analysis.
+7-day pattern. Flag regressions and improvements inline within Key Observations.
 
-Be concise. Use bullet points. Skip metrics that look normal. If everything looks healthy, say so briefly.`
+Target length: 10-15 bullet points total. If everything looks healthy, say so in 2-3 sentences.`
 
 	body, err := json.Marshal(map[string]any{
 		"model":      cfg.model,

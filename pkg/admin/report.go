@@ -188,7 +188,7 @@ func renderReportHTML(summary summaryResponse, analysis string) string {
 	if analysis == "" {
 		b.WriteString(`<div style="padding:12px;background:#fef3c7;border-radius:6px;color:#92400e;">Metrics analysis unavailable</div>`)
 	} else {
-		fmt.Fprintf(&b, `<div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;white-space:pre-wrap;font-size:13px;">%s</div>`, analysis)
+		fmt.Fprintf(&b, `<div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:13px;line-height:1.5;">%s</div>`, analysis)
 	}
 
 	b.WriteString(`</body></html>`)
