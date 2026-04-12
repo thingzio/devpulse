@@ -218,6 +218,8 @@ When asked to "update changelog" (or similar):
 
 **Rules:**
 - One entry per day regardless of how many commits span multiple days
-- Focus on what changed for the user, not how it was implemented
+- **Only include changes visible to end users of the web app** — new UI features, behavior changes, bug fixes they'd notice
+- Do NOT include: admin/operator tooling (CLI scripts, daily reports, Terraform), internal refactors, infra changes, CI/CD, API-only changes, or implementation details
+- The test is: "Would a user signing into devpulse.thingz.io notice this?" — if no, skip it
 - Link to relevant pages where applicable (e.g. `<a href="/help">Help page</a>`)
 - Keep descriptions concise — one sentence per bullet
