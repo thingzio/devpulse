@@ -188,27 +188,25 @@
   </div>
 
   {{if .Email}}
-  <div class="help-section" id="help-contact">
+  <div class="landing-feature help-section" style="margin-bottom:20px" id="help-contact">
     <h3>Contact Support</h3>
-    <div>
-      {{if .Sent}}
-      <div style="padding:12px;background:var(--bg-success,#dcfce7);border:1px solid var(--border-success,#86efac);border-radius:6px;margin-bottom:12px;">
-        Message sent. We'll get back to you at <strong>{{.Email}}</strong>.
-      </div>
-      {{else}}
-      {{if .Error}}
-      <div style="padding:12px;background:var(--bg-warning,#fef3c7);border:1px solid var(--border-warning,#fcd34d);border-radius:6px;margin-bottom:12px;color:var(--text-warning,#92400e);">
-        {{.Error}}
-      </div>
-      {{end}}
-      <p style="margin-bottom:8px;color:var(--gray);font-size:0.9em;">Sending as <strong>{{.Username}}</strong> ({{.Email}})</p>
-      <form method="POST" action="/help/contact">
-        <textarea name="message" rows="5" required placeholder="Describe your issue or question..."
-          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.95em;resize:vertical;background:var(--bg);color:var(--text);"></textarea>
-        <button type="submit" style="margin-top:8px;padding:8px 20px;background:var(--link);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.95em;">Send Message</button>
-      </form>
-      {{end}}
+    {{if .Sent}}
+    <div style="padding:12px;background:var(--bg-success,#dcfce7);border:1px solid var(--border-success,#86efac);border-radius:6px;">
+      Message sent. We'll get back to you at <strong>{{.Email}}</strong>.
     </div>
+    {{else}}
+    {{if .Error}}
+    <div style="padding:12px;background:var(--bg-warning,#fef3c7);border:1px solid var(--border-warning,#fcd34d);border-radius:6px;margin-bottom:12px;color:var(--text-warning,#92400e);">
+      {{.Error}}
+    </div>
+    {{end}}
+    <p style="margin-bottom:8px;color:var(--gray);font-size:0.9em;">Sending as <strong>{{.Username}}</strong> ({{.Email}})</p>
+    <form method="POST" action="/help/contact">
+      <textarea name="message" rows="5" required placeholder="Describe your issue or question..."
+        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.95em;resize:vertical;background:var(--bg);color:var(--text);"></textarea>
+      <button type="submit" style="margin-top:8px;padding:8px 20px;background:var(--link);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.95em;">Send Message</button>
+    </form>
+    {{end}}
   </div>
   {{end}}
 

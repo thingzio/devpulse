@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,9 @@ type helpData struct {
 	Email    string
 	Sent     bool
 	Error    string
+	Plan     string
+	Repos    int
+	Created  string
 }
 
 // tryGetTenant attempts to read the session cookie and validate it.
@@ -45,11 +49,20 @@ func helpPageHandler(db *sql.DB) http.HandlerFunc {
 			Plans: plan.All,
 		}
 		if tn := tryGetTenant(r, db); tn != nil {
-			d.Username = tn.Username
-			d.Name = tn.Name
-			d.Email = tn.Email
+			populateHelpTenant(&d, tn, r.Context(), db)
 		}
 		renderTemplate(w, "help.html", d)
+	}
+}
+
+func populateHelpTenant(d *helpData, tn *tenant.Tenant, ctx context.Context, db *sql.DB) {
+	d.Username = tn.Username
+	d.Name = tn.Name
+	d.Email = tn.Email
+	d.Plan = tn.Plan
+	d.Created = tn.CreatedAt.Format("2006-01-02")
+	if count, err := tenant.CountTenantRepos(ctx, db, tn.ID); err == nil {
+		d.Repos = count
 	}
 }
 
@@ -65,52 +78,54 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 		supportEmail := os.Getenv("SUPPORT_EMAIL")
 		if apiKey == "" || supportEmail == "" {
 			slog.Error("support email not configured")
-			renderHelpWithError(w, tn, "Contact form is not available at this time.")
+			renderHelpWithError(w, r, db, tn, "Contact form is not available at this time.")
 			return
 		}
 
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		message := strings.TrimSpace(r.FormValue("message"))
 		if message == "" {
-			renderHelpWithError(w, tn, "Please enter a message.")
+			renderHelpWithError(w, r, db, tn, "Please enter a message.")
 			return
 		}
 
+		repoCount, _ := tenant.CountTenantRepos(r.Context(), db, tn.ID)
+		created := tn.CreatedAt.Format("2006-01-02")
+
 		subject := fmt.Sprintf("DevPulse Support Request - %s (%s)", tn.Username, tn.Name)
-		text := fmt.Sprintf("From: %s (%s)\nEmail: %s\n\n%s", tn.Username, tn.Name, tn.Email, message)
+		text := fmt.Sprintf("From: %s (%s)\nEmail: %s\nPlan: %s\nRepos: %d\nMember since: %s\n\n%s",
+			tn.Username, tn.Name, tn.Email, tn.Plan, repoCount, created, message)
 		html := fmt.Sprintf(
-			`<p><strong>From:</strong> %s (%s)<br><strong>Email:</strong> %s</p><hr><p style="white-space:pre-wrap;">%s</p>`,
-			tn.Username, tn.Name, tn.Email, message,
+			`<p><strong>From:</strong> %s (%s)<br><strong>Email:</strong> %s<br>`+
+				`<strong>Plan:</strong> %s<br><strong>Repos:</strong> %d<br>`+
+				`<strong>Member since:</strong> %s</p><hr><p style="white-space:pre-wrap;">%s</p>`,
+			tn.Username, tn.Name, tn.Email, tn.Plan, repoCount, created, message,
 		)
 
 		if err := devnet.SendEmail(r.Context(), apiKey, supportEmail, supportEmail, subject, html, text, tn.Email); err != nil {
 			slog.Error("sending support email", "username", tn.Username, "error", err)
-			renderHelpWithError(w, tn, "Failed to send message. Please try again later.")
+			renderHelpWithError(w, r, db, tn, "Failed to send message. Please try again later.")
 			return
 		}
 
 		slog.Info("support email sent", "from", tn.Email, "username", tn.Username)
 
 		d := helpData{
-			Title:    "Help",
-			Plans:    plan.All,
-			Username: tn.Username,
-			Name:     tn.Name,
-			Email:    tn.Email,
-			Sent:     true,
+			Title: "Help",
+			Plans: plan.All,
+			Sent:  true,
 		}
+		populateHelpTenant(&d, tn, r.Context(), db)
 		renderTemplate(w, "help.html", d)
 	}
 }
 
-func renderHelpWithError(w http.ResponseWriter, tn *tenant.Tenant, msg string) {
+func renderHelpWithError(w http.ResponseWriter, r *http.Request, db *sql.DB, tn *tenant.Tenant, msg string) {
 	d := helpData{
-		Title:    "Help",
-		Plans:    plan.All,
-		Username: tn.Username,
-		Name:     tn.Name,
-		Email:    tn.Email,
-		Error:    msg,
+		Title: "Help",
+		Plans: plan.All,
+		Error: msg,
 	}
+	populateHelpTenant(&d, tn, r.Context(), db)
 	renderTemplate(w, "help.html", d)
 }
