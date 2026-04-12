@@ -194,3 +194,30 @@ Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`
 - **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
 - **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to Artifact Registry (`devpulse-saas-images`)
 - **Deploy**: Cloud Run service + job (import) + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`
+
+## Changelog Updates
+
+When asked to "update changelog" (or similar):
+
+1. Read `pkg/server/templates/changelog.html` to see current entries
+2. Review git log since the last changelog date: `git log --oneline --since="YYYY-MM-DD"`
+3. Summarize **user-visible and user-impacting changes only** — skip internal refactors, lint fixes, CI changes, or implementation details that don't affect the user experience
+4. Add a new entry at the top with **today's date**, using the same HTML structure as existing entries
+5. Remove the oldest (last) entry to keep the list from growing indefinitely
+6. Commit with message: `feat: update changelog with <date> entries`
+
+**Entry format** (matches existing pattern):
+```html
+<div class="landing-feature" style="margin-bottom:20px">
+  <h3>Month Day, Year</h3>
+  <ul>
+    <li>User-visible change description</li>
+  </ul>
+</div>
+```
+
+**Rules:**
+- One entry per day regardless of how many commits span multiple days
+- Focus on what changed for the user, not how it was implemented
+- Link to relevant pages where applicable (e.g. `<a href="/help">Help page</a>`)
+- Keep descriptions concise — one sentence per bullet
