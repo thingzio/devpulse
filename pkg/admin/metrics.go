@@ -505,12 +505,25 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 - "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
 - "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
 
+## Known Conditions (suppress — do NOT report these)
+The following are acknowledged, expected, or deprioritized. Do NOT mention them in
+observations, risks, or actions unless they represent a NEW change from their known state:
+- Admin service high p99 latency: Single-user internal tool, latency is not a concern.
+  Only flag if the service is returning errors or timing out (>90s).
+- Alternating high/low p99 daily pattern on serve service: Known periodic behavior,
+  likely import-correlated. Only flag if the daily max exceeds 15s or the pattern changes.
+- Weekend/Monday sign-in and traffic dips: Normal usage pattern. Only flag if weekday
+  traffic also declines for 3+ consecutive days.
+- Cold-start latency ~2s: Well within the 3s threshold. Only flag if it exceeds 2.5s.
+- Disk utilization flat at ~2%: Not a concern. Only flag if growth trend appears.
+- DB connections well below threshold: Only flag if daily max exceeds 40.
+
 ## Analysis Instructions
 Provide a brief, actionable analysis in three sections:
 
 1. Key Observations — Only anomalies, threshold breaches, or notable trends.
    One bullet per finding. Correlate across categories (e.g. latency + import timing).
-   Skip anything that looks normal.
+   Skip anything that looks normal or is listed in Known Conditions above.
 2. Risks — Rate each: 🔴 critical, 🟠 warning, 🟡 watch.
    Only flag metrics abnormal relative to the baselines above. If none, say "No risks identified."
 3. Actions — Concrete next steps only if risks were found. One line each.
