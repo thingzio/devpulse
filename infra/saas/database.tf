@@ -1,67 +1,9 @@
-resource "google_sql_database_instance" "default" {
-  name             = "${var.prefix}-pg"
-  database_version = "POSTGRES_16"
-  region           = var.region
-  project          = var.project_id
+# Database and instance are owned by shared infra (thingzio/infra).
+# DevPulse creates only its service-specific user.
 
-  settings {
-    tier              = var.db_tier
-    edition           = "ENTERPRISE"
-    availability_type = "ZONAL"
-    disk_autoresize   = true
-
-    ip_configuration { #tfsec:ignore:google-sql-encrypt-in-transit-data -- ssl_mode=ENCRYPTED_ONLY used (provider v7+, tfsec checks require_ssl)
-      ipv4_enabled                                  = false
-      private_network                               = google_compute_network.default.id
-      enable_private_path_for_google_cloud_services = true
-      ssl_mode                                      = "ENCRYPTED_ONLY"
-    }
-
-    backup_configuration {
-      enabled                        = true
-      point_in_time_recovery_enabled = true
-      start_time                     = "03:00"
-    }
-
-    database_flags {
-      name  = "cloudsql.iam_authentication"
-      value = "on"
-    }
-
-    database_flags {
-      name  = "log_temp_files"
-      value = "0"
-    }
-
-    database_flags {
-      name  = "log_connections"
-      value = "on"
-    }
-
-    database_flags {
-      name  = "log_disconnections"
-      value = "on"
-    }
-
-    database_flags {
-      name  = "log_lock_waits"
-      value = "on"
-    }
-
-    database_flags {
-      name  = "log_checkpoints"
-      value = "on"
-    }
-  }
-
-  deletion_protection = true
-
-  depends_on = [google_service_networking_connection.private]
-}
-
-resource "google_sql_database" "default" {
-  name     = "devpulse"
-  instance = google_sql_database_instance.default.name
+data "google_sql_database_instance" "shared" {
+  name    = var.db_instance_name
+  project = var.project_id
 }
 
 resource "random_password" "db_password" {
@@ -71,6 +13,6 @@ resource "random_password" "db_password" {
 
 resource "google_sql_user" "app" {
   name     = "devpulse"
-  instance = google_sql_database_instance.default.name
+  instance = data.google_sql_database_instance.shared.name
   password = random_password.db_password.result
 }
