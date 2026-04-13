@@ -1,7 +1,7 @@
 variable "project_id" {
   description = "GCP project ID for the SaaS deployment"
   type        = string
-  default     = "devpulseio"
+  default     = "thingzio"
 }
 
 variable "region" {
@@ -52,12 +52,6 @@ variable "admin_invoker_emails" {
   default     = ["mark@chmarny.com"]
 }
 
-variable "db_tier" {
-  description = "Cloud SQL machine tier"
-  type        = string
-  default     = "db-g1-small"
-}
-
 variable "import_parallelism" {
   description = "Number of concurrent import job tasks per execution"
   type        = number
@@ -92,4 +86,36 @@ variable "support_email" {
   description = "Support contact form recipient email"
   type        = string
   default     = "devpulse@thingz.io"
+}
+
+# --- Shared infrastructure (from thingzio/infra) ---
+
+variable "vpc_id" {
+  description = "Shared VPC network ID"
+  type        = string
+  default     = "projects/thingzio/global/networks/thingzio-vpc"
+}
+
+variable "subnet_id" {
+  description = "Shared VPC subnet ID"
+  type        = string
+  default     = "projects/thingzio/regions/us-west1/subnetworks/thingzio-subnet"
+}
+
+variable "db_instance_name" {
+  description = "Shared Cloud SQL instance name"
+  type        = string
+  default     = "thingzio-pg"
+}
+
+variable "db_connection_name" {
+  description = "Shared Cloud SQL connection string (project:region:instance)"
+  type        = string
+  default     = "thingzio:us-west1:thingzio-pg"
+}
+
+variable "db_name" {
+  description = "Database name within the shared Cloud SQL instance"
+  type        = string
+  default     = "thingz"
 }
