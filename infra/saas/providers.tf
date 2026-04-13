@@ -13,8 +13,8 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "devpulse-state"
-    prefix = "infra"
+    bucket = "thingzio-infra-state"
+    prefix = "devpulse"
   }
 }
 
