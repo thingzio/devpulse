@@ -1,13 +1,16 @@
 locals {
+  # Shared infra references (from variables, not remote state)
+  vpc_id        = var.vpc_id
+  subnet_id     = var.subnet_id
+  db_connection = var.db_connection_name
+
+  # Service-specific APIs (shared infra already enables compute, sqladmin,
+  # servicenetworking, monitoring, iam, and others).
   services = [
     "artifactregistry.googleapis.com",
     "run.googleapis.com",
-    "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
     "cloudscheduler.googleapis.com",
-    "dns.googleapis.com",
-    "servicenetworking.googleapis.com",
-    "compute.googleapis.com",
     "monitoring.googleapis.com",
     "iam.googleapis.com",
   ]
