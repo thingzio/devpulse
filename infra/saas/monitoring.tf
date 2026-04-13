@@ -302,50 +302,6 @@ resource "google_monitoring_alert_policy" "high_latency" {
   }
 }
 
-resource "google_monitoring_alert_policy" "db_cpu" {
-  display_name          = "${var.prefix}-db-cpu"
-  project               = var.project_id
-  combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.email.name]
-
-  conditions {
-    display_name = "Cloud SQL CPU > 80%"
-    condition_threshold {
-      filter          = "resource.type = \"cloudsql_database\" AND resource.labels.database_id = \"${var.project_id}:${google_sql_database_instance.default.name}\" AND metric.type = \"cloudsql.googleapis.com/database/cpu/utilization\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 0.8
-      duration        = "300s"
-
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_MEAN"
-      }
-    }
-  }
-}
-
-resource "google_monitoring_alert_policy" "db_connections" {
-  display_name          = "${var.prefix}-db-connections"
-  project               = var.project_id
-  combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.email.name]
-
-  conditions {
-    display_name = "Cloud SQL connections > 80"
-    condition_threshold {
-      filter          = "resource.type = \"cloudsql_database\" AND resource.labels.database_id = \"${var.project_id}:${google_sql_database_instance.default.name}\" AND metric.type = \"cloudsql.googleapis.com/database/postgresql/num_backends\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 80
-      duration        = "300s"
-
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_MEAN"
-      }
-    }
-  }
-}
-
 resource "google_monitoring_alert_policy" "import_failure" {
   display_name          = "${var.prefix}-import-failure"
   project               = var.project_id
@@ -391,25 +347,4 @@ resource "google_monitoring_alert_policy" "import_repo_errors" {
   }
 }
 
-resource "google_monitoring_alert_policy" "db_vacuum_lag" {
-  display_name          = "${var.prefix}-db-vacuum-lag"
-  project               = var.project_id
-  combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.email.name]
-
-  conditions {
-    display_name = "Oldest transaction age > 200M"
-    condition_threshold {
-      filter          = "resource.type = \"cloudsql_database\" AND resource.labels.database_id = \"${var.project_id}:${google_sql_database_instance.default.name}\" AND metric.type = \"cloudsql.googleapis.com/database/postgresql/vacuum/oldest_transaction_age\""
-      comparison      = "COMPARISON_GT"
-      threshold_value = 200000000
-      duration        = "300s"
-
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_MEAN"
-      }
-    }
-  }
-}
 
