@@ -3,16 +3,6 @@ output "service_url" {
   value       = google_cloud_run_v2_service.serve.uri
 }
 
-output "db_connection_name" {
-  description = "Cloud SQL connection name"
-  value       = google_sql_database_instance.default.connection_name
-}
-
-output "dns_nameservers" {
-  description = "DNS nameservers for domain delegation"
-  value       = google_dns_managed_zone.default.name_servers
-}
-
 output "import_job_name" {
   description = "Cloud Run import job name (for manual triggers)"
   value       = google_cloud_run_v2_job.import.name
