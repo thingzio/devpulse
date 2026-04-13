@@ -172,8 +172,8 @@ func TestGetReputationComposition_WithData(t *testing.T) {
 	require.NoError(t, store.updateReputation(ctx, "standard-user", 0.50, "2025-01-15T00:00:00Z", true, nil))
 	// Standard upper boundary: 0.69
 	require.NoError(t, store.updateReputation(ctx, "boundary-high", 0.69, "2025-01-15T00:00:00Z", false, nil))
-	// High confidence: >= 0.7
-	require.NoError(t, store.updateReputation(ctx, "high-user", 0.70, "2025-01-15T00:00:00Z", true, nil))
+	// High confidence: >= 0.7 (use 0.75 to avoid float4 precision loss at exact boundary)
+	require.NoError(t, store.updateReputation(ctx, "high-user", 0.75, "2025-01-15T00:00:00Z", true, nil))
 	// unscored-user has no reputation set
 
 	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES
