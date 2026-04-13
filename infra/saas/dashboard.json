@@ -205,7 +205,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -222,7 +222,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -239,7 +239,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -256,7 +256,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/disk/bytes_used\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/disk/bytes_used\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_MEAN"
@@ -273,7 +273,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/transaction_count\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/transaction_count\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_RATE",
@@ -291,7 +291,7 @@
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"devpulseio:devpulse-saas-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/deadlock_count\"",
+                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/deadlock_count\"",
                 "aggregation": {
                   "alignmentPeriod": "300s",
                   "perSeriesAligner": "ALIGN_DELTA",
