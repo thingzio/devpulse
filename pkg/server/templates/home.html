@@ -444,13 +444,14 @@
             <article>
                 <div class="tbl" style="position:relative;">
                     <div class="content-header">
-                        Lowest Reputation Contributors
+                        Reputation Composition
                     </div>
                     <div class="reputation-counts" id="reputation-counts" style="padding:0.25rem 1rem;font-size:0.85rem;color:var(--fg-muted);"></div>
-                    <div class="tbl-chart tbl-home">
+                    <div class="tbl-chart tbl-home" style="display:flex;align-items:center;justify-content:center;">
                         <canvas class="chart" id="reputation-chart"></canvas>
                     </div>
-                    <span class="insight-desc">Excludes bots and fork-only contributors. Click a bar to view GitHub profile.</span>
+                    <div id="reputation-depth" style="text-align:center;font-size:0.85rem;color:var(--fg-muted);padding:0.25rem 0;"></div>
+                    <span class="insight-desc">Contributor reputation score distribution. Excludes bots and fork-only contributors.</span>
                 </div>
             </article>
         </section>

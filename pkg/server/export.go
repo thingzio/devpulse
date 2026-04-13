@@ -167,18 +167,15 @@ func exportInsightsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *
 }
 
 func exportReputationCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
-	rep, err := s.GetReputationDistribution(ctx, o, r, nil, days)
-	if err != nil || rep == nil || len(rep.Labels) == 0 {
+	rep, err := s.GetReputationComposition(ctx, o, r, nil, days)
+	if err != nil || rep == nil || rep.Scored == 0 {
 		return
 	}
-	rows := make([][]string, 0, 1+len(rep.Labels))
-	rows = append(rows, []string{"range", "count"})
-	for i, label := range rep.Labels {
-		val := ""
-		if i < len(rep.Data) {
-			val = fmt.Sprintf("%.0f", rep.Data[i])
-		}
-		rows = append(rows, []string{label, val})
+	rows := [][]string{
+		{"bucket", "count"},
+		{"alert", fmt.Sprintf("%d", rep.Alert)},
+		{"standard", fmt.Sprintf("%d", rep.Standard)},
+		{"high_confidence", fmt.Sprintf("%d", rep.HighConfidence)},
 	}
 	writeCSVFile(zw, prefix+"reputation.csv", rows)
 }

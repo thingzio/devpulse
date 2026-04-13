@@ -2017,14 +2017,6 @@ function loadContainerActivityChart(url) {
     });
 }
 
-function reputationBarColors(values) {
-    return values.map(function (v) {
-        if (v >= 0.7) return '#2da44e';
-        if (v >= 0.4) return '#bf8700';
-        return '#cf222e';
-    });
-}
-
 function loadReputationChart(url) {
     $.get(url, function (data) {
         if (data.total > 0) {
@@ -2033,50 +2025,60 @@ function loadReputationChart(url) {
             $("#reputation-counts").text('');
         }
         if (reputationChart) reputationChart.destroy();
-        if (!data.labels || data.labels.length === 0) {
+        if (!data.scored) {
+            $("#reputation-depth").text('');
             return;
         }
+
+        var shallow = data.scored - data.deep;
+        var shallowPct = Math.round((shallow / data.scored) * 100);
+        var deepPct = 100 - shallowPct;
+        $("#reputation-depth").text('Shallow: ' + shallowPct + '% \u00b7 Deep: ' + deepPct + '%');
+
         reputationChart = new Chart($("#reputation-chart")[0].getContext("2d"), {
-            type: 'bar',
+            type: 'doughnut',
             data: {
-                labels: formatLabels(data.labels),
+                labels: ['Alert (< 0.3)', 'Standard (0.3\u20130.7)', 'High Confidence (\u2265 0.7)'],
                 datasets: [{
-                    label: 'Score',
-                    data: data.data,
-                    backgroundColor: reputationBarColors(data.data),
-                    borderWidth: 0,
-                    barPercentage: 0.6,
-                    categoryPercentage: 0.8
+                    data: [data.alert, data.standard, data.high_confidence],
+                    backgroundColor: ['#cf222e', '#bf8700', '#2da44e'],
+                    borderWidth: 0
                 }]
             },
             options: {
-                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '60%',
                 plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        max: 1.0,
-                        ticks: { font: { size: 14 } }
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 12 }, padding: 12 }
                     },
-                    y: {
-                        ticks: { font: { size: 14 } },
-                        afterFit: (axis) => { axis.paddingTop = 4; axis.paddingBottom = 4; }
-                    }
-                },
-                onHover: (evt, item) => {
-                    evt.native.target.style.cursor = item.length ? 'pointer' : 'default';
-                },
-                onClick: (evt, item) => {
-                    if (item.length) {
-                        const username = reputationChart.data.labels[item[0].index];
-                        window.open('https://github.com/' + encodeURIComponent(username), '_blank');
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                var pct = data.scored > 0 ? Math.round((ctx.raw / data.scored) * 100) : 0;
+                                return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+                            }
+                        }
                     }
                 }
-            }
+            },
+            plugins: [{
+                id: 'centerText',
+                afterDraw: function (chart) {
+                    var ctx = chart.ctx;
+                    var cx = (chart.chartArea.left + chart.chartArea.right) / 2;
+                    var cy = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+                    ctx.save();
+                    ctx.font = 'bold 1.5rem sans-serif';
+                    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#333';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(data.scored, cx, cy);
+                    ctx.restore();
+                }
+            }]
         });
     });
 }

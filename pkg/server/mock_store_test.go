@@ -17,7 +17,7 @@ type mockStore struct {
 	getPortfolioSummaryFn       func(ctx context.Context, org, repo *string, days int) (*data.PortfolioSummary, error)
 	getEventTypeSeriesFn        func(ctx context.Context, org, repo, entity *string, days int) (*data.EventTypeSeries, error)
 	getDeveloperPercentagesFn   func(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error)
-	getReputationDistributionFn func(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationDistribution, error)
+	getReputationCompositionFn  func(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationComposition, error)
 	searchEventsFn              func(ctx context.Context, q *data.EventSearchCriteria) ([]*data.EventDetails, error)
 	getRepoInsightsEventCountFn func(ctx context.Context, org, repo string) (int, error)
 }
@@ -251,9 +251,9 @@ func (m *mockStore) GetOrComputeDeepReputation(_ context.Context, _, _ string) (
 func (m *mockStore) ComputeDeepReputation(_ context.Context, _, _ string) (*data.UserReputation, error) {
 	return nil, nil
 }
-func (m *mockStore) GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationDistribution, error) {
-	if m.getReputationDistributionFn != nil {
-		return m.getReputationDistributionFn(ctx, org, repo, entity, days)
+func (m *mockStore) GetReputationComposition(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationComposition, error) {
+	if m.getReputationCompositionFn != nil {
+		return m.getReputationCompositionFn(ctx, org, repo, entity, days)
 	}
 	return nil, nil
 }

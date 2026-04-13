@@ -397,12 +397,14 @@ type DeepReputationResult struct {
 	Errors  int `json:"errors" yaml:"errors"`
 }
 
-// ReputationDistribution is the dashboard chart data.
-type ReputationDistribution struct {
-	Labels []string  `json:"labels" yaml:"labels"`
-	Data   []float64 `json:"data" yaml:"data"`
-	Scored int       `json:"scored" yaml:"scored"`
-	Total  int       `json:"total" yaml:"total"`
+// ReputationComposition is the dashboard chart data for repo-wide reputation.
+type ReputationComposition struct {
+	Alert          int `json:"alert" yaml:"alert"`
+	Standard       int `json:"standard" yaml:"standard"`
+	HighConfidence int `json:"high_confidence" yaml:"high_confidence"`
+	Deep           int `json:"deep" yaml:"deep"`
+	Scored         int `json:"scored" yaml:"scored"`
+	Total          int `json:"total" yaml:"total"`
 }
 
 // UserReputation is returned by the on-demand deep score endpoint.

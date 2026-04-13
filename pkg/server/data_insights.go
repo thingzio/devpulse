@@ -213,8 +213,8 @@ func insightsForksAndActivityAPIHandler(store data.Store) http.HandlerFunc {
 }
 
 func insightsReputationAPIHandler(store data.Store) http.HandlerFunc {
-	return insightWithEntityHandler(store, "reputation distribution", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
-		return s.GetReputationDistribution(ctx, o, r, e, m)
+	return insightWithEntityHandler(store, "reputation composition", func(ctx context.Context, s data.Store, o, r, e *string, m int) (any, error) {
+		return s.GetReputationComposition(ctx, o, r, e, m)
 	})
 }
 

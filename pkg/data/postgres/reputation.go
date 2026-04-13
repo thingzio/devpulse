@@ -54,26 +54,29 @@ const (
 		  AND reputation_updated_at >= $2
 	`
 
-	// selectReputationSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectReputationSQL = `SELECT d.username, d.reputation
-		FROM developer d
-		JOIN event e ON d.username = e.username
-		WHERE e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.date >= $4
-		  AND d.reputation IS NOT NULL
-		  ` + botExcludeDSQL + `
-		  ` + forkExcludeSQL + `
-		GROUP BY d.username, d.reputation
-		ORDER BY d.reputation ASC
-		LIMIT 10
+	// selectReputationCompositionSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectReputationCompositionSQL = `SELECT
+		COUNT(*) FILTER (WHERE d.reputation < 0.3)                         AS alert,
+		COUNT(*) FILTER (WHERE d.reputation >= 0.3 AND d.reputation < 0.7) AS standard,
+		COUNT(*) FILTER (WHERE d.reputation >= 0.7)                        AS high_confidence,
+		COUNT(*) FILTER (WHERE d.reputation_deep = 1)                      AS deep,
+		COUNT(*)                                                           AS scored
+		FROM (
+			SELECT DISTINCT d.username, d.reputation, d.reputation_deep
+			FROM developer d
+			JOIN event e ON d.username = e.username
+			WHERE e.org = COALESCE($1, e.org)
+			  AND e.repo = COALESCE($2, e.repo)
+			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+			  AND e.date >= $4
+			  AND d.reputation IS NOT NULL
+			  ` + botExcludeDSQL + `
+			  ` + forkExcludeSQL + `
+		) d
 	`
 
-	// selectReputationCountSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectReputationCountSQL = `SELECT
-		COUNT(DISTINCT e.username) AS total,
-		COUNT(DISTINCT CASE WHEN d.reputation IS NOT NULL THEN e.username END) AS scored
+	// selectReputationTotalSQL: $1=org, $2=repo, $3=entity, $4=since
+	selectReputationTotalSQL = `SELECT COUNT(DISTINCT e.username)
 		FROM event e
 		JOIN developer d ON e.username = d.username
 		WHERE e.org = COALESCE($1, e.org)
@@ -411,43 +414,26 @@ func (s *Store) ComputeDeepReputation(ctx context.Context, token, username strin
 	}, nil
 }
 
-func (s *Store) GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationDistribution, error) {
+func (s *Store) GetReputationComposition(ctx context.Context, org, repo, entity *string, days int) (*data.ReputationComposition, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectReputationSQL, org, repo, entity, since)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query reputation distribution: %w", err)
-	}
-	defer rows.Close()
+	c := &data.ReputationComposition{}
 
-	d := &data.ReputationDistribution{
-		Labels: make([]string, 0),
-		Data:   make([]float64, 0),
+	if err := s.db.QueryRowContext(ctx, selectReputationCompositionSQL, org, repo, entity, since).Scan(
+		&c.Alert, &c.Standard, &c.HighConfidence, &c.Deep, &c.Scored,
+	); err != nil {
+		return nil, fmt.Errorf("failed to query reputation composition: %w", err)
 	}
 
-	for rows.Next() {
-		var username string
-		var rep float64
-		if err := rows.Scan(&username, &rep); err != nil {
-			return nil, fmt.Errorf("failed to scan reputation row: %w", err)
-		}
-		d.Labels = append(d.Labels, username)
-		d.Data = append(d.Data, rep)
+	if err := s.db.QueryRowContext(ctx, selectReputationTotalSQL, org, repo, entity, since).Scan(&c.Total); err != nil {
+		return nil, fmt.Errorf("failed to query reputation total: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
-	}
-
-	if err := s.db.QueryRowContext(ctx, selectReputationCountSQL, org, repo, entity, since).Scan(&d.Total, &d.Scored); err != nil {
-		return nil, fmt.Errorf("failed to query reputation counts: %w", err)
-	}
-
-	return d, nil
+	return c, nil
 }
 
 func (s *Store) gatherLocalSignals(ctx context.Context, username, since string, stats *globalStats) score.Signals {

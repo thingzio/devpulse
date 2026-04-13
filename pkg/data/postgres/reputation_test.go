@@ -11,20 +11,24 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
-func TestGetReputationDistribution_NilDB(t *testing.T) {
+func TestGetReputationComposition_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReputationDistribution(ctx, nil, nil, nil, 180)
+	_, err := s.GetReputationComposition(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
-func TestGetReputationDistribution_EmptyDB(t *testing.T) {
+func TestGetReputationComposition_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 180)
+	comp, err := store.GetReputationComposition(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Empty(t, dist.Labels)
-	assert.Empty(t, dist.Data)
+	assert.Equal(t, 0, comp.Alert)
+	assert.Equal(t, 0, comp.Standard)
+	assert.Equal(t, 0, comp.HighConfidence)
+	assert.Equal(t, 0, comp.Deep)
+	assert.Equal(t, 0, comp.Scored)
+	assert.Equal(t, 0, comp.Total)
 }
 
 func TestUpdateReputation(t *testing.T) {
@@ -146,33 +150,55 @@ func TestGetDistinctOrgs_NilDB(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGetReputationDistribution_WithData(t *testing.T) {
+func TestGetReputationComposition_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
 	devs := []*data.Developer{
-		{Username: "highscore", FullName: "High Score"},
-		{Username: "lowscore", FullName: "Low Score"},
+		{Username: "alert-user", FullName: "Alert User"},
+		{Username: "boundary-low", FullName: "Boundary Low"},
+		{Username: "standard-user", FullName: "Standard User"},
+		{Username: "boundary-high", FullName: "Boundary High"},
+		{Username: "high-user", FullName: "High User"},
+		{Username: "unscored-user", FullName: "Unscored User"},
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	require.NoError(t, store.updateReputation(ctx, "highscore", 0.95, "2025-01-15T00:00:00Z", false, nil))
-	require.NoError(t, store.updateReputation(ctx, "lowscore", 0.30, "2025-01-15T00:00:00Z", false, nil))
+	// Alert: < 0.3
+	require.NoError(t, store.updateReputation(ctx, "alert-user", 0.29, "2025-01-15T00:00:00Z", false, nil))
+	// Standard boundary: exactly 0.3
+	require.NoError(t, store.updateReputation(ctx, "boundary-low", 0.30, "2025-01-15T00:00:00Z", false, nil))
+	// Standard mid-range
+	require.NoError(t, store.updateReputation(ctx, "standard-user", 0.50, "2025-01-15T00:00:00Z", true, nil))
+	// Standard upper boundary: 0.69
+	require.NoError(t, store.updateReputation(ctx, "boundary-high", 0.69, "2025-01-15T00:00:00Z", false, nil))
+	// High confidence: >= 0.7
+	require.NoError(t, store.updateReputation(ctx, "high-user", 0.70, "2025-01-15T00:00:00Z", true, nil))
+	// unscored-user has no reputation set
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
-		VALUES
-		('org1', 'repo1', 'highscore', 'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'lowscore', 'pr', '2025-01-10', 'http://example.com', '', '')`)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES
+		('org1', 'repo1', 'alert-user',    'pr', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'boundary-low',  'pr', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'standard-user', 'pr', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'boundary-high', 'pr', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'high-user',     'pr', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'unscored-user', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
-	dist, err := store.GetReputationDistribution(ctx, nil, nil, nil, 730)
+	comp, err := store.GetReputationComposition(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
-	require.Len(t, dist.Labels, 2)
-	// Ordered by reputation ASC (lowest first)
-	assert.Equal(t, "lowscore", dist.Labels[0])
-	assert.InDelta(t, 0.30, dist.Data[0], 0.001)
-	assert.Equal(t, "highscore", dist.Labels[1])
-	assert.InDelta(t, 0.95, dist.Data[1], 0.001)
+
+	// Bucket counts
+	assert.Equal(t, 1, comp.Alert, "alert: scores < 0.3")
+	assert.Equal(t, 3, comp.Standard, "standard: scores 0.3-0.69")
+	assert.Equal(t, 1, comp.HighConfidence, "high confidence: scores >= 0.7")
+
+	// Depth counts
+	assert.Equal(t, 2, comp.Deep, "deep-scored contributors")
+
+	// Totals
+	assert.Equal(t, 5, comp.Scored, "scored contributors")
+	assert.Equal(t, 6, comp.Total, "total contributors including unscored")
 }
 
 func TestImportReputation_NilDB(t *testing.T) {

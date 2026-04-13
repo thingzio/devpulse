@@ -143,7 +143,7 @@ type ReputationStore interface {
 	ImportDeepReputation(ctx context.Context, tokenFn TokenFunc, exhaustFn ExhaustFunc, limit, staleHours int, org, repo *string) (*DeepReputationResult, error)
 	GetOrComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
 	ComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
-	GetReputationDistribution(ctx context.Context, org, repo, entity *string, days int) (*ReputationDistribution, error)
+	GetReputationComposition(ctx context.Context, org, repo, entity *string, days int) (*ReputationComposition, error)
 }
 
 // InsightsGenerationStore manages LLM-generated repo insights.
