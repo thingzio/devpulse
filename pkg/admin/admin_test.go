@@ -51,26 +51,27 @@ func TestNewMetricsConfig_Defaults(t *testing.T) {
 
 	cfg := newMetricsConfig()
 
-	assert.Equal(t, "devpulseio", cfg.projectID)
+	assert.Equal(t, "thingzio", cfg.projectID)
 	assert.Equal(t, "", cfg.anthropicKey)
 	assert.Equal(t, defaultInsightsModel, cfg.model)
 	assert.Equal(t, "devpulse-saas-serve", cfg.service)
 	assert.Equal(t, "devpulse-saas-import", cfg.job)
 	assert.Equal(t, "devpulse-saas-admin", cfg.admin)
-	assert.Equal(t, "devpulseio:devpulse-saas-pg", cfg.dbID)
+	assert.Equal(t, "thingzio:thingzio-pg", cfg.dbID)
 }
 
 func TestNewMetricsConfig_CustomEnv(t *testing.T) {
 	t.Setenv("GCP_PROJECT_ID", "my-project")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-key")
 	t.Setenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+	t.Setenv("DB_INSTANCE_ID", "custom-pg")
 
 	cfg := newMetricsConfig()
 
 	assert.Equal(t, "my-project", cfg.projectID)
 	assert.Equal(t, "sk-test-key", cfg.anthropicKey)
 	assert.Equal(t, "claude-haiku-4-5-20251001", cfg.model)
-	assert.Equal(t, "my-project:devpulse-saas-pg", cfg.dbID)
+	assert.Equal(t, "my-project:custom-pg", cfg.dbID)
 }
 
 func TestHandleUpgrade_EmptyBody(t *testing.T) {

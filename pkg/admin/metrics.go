@@ -55,7 +55,7 @@ func newMetricsConfig() *metricsConfig {
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
 		admin:        prefix + "-admin",
-		dbID:         project + ":" + prefix + "-pg",
+		dbID:         project + ":" + config.DBInstanceID(),
 	}
 }
 
