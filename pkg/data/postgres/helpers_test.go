@@ -294,7 +294,12 @@ func TestGeneratePeriods_Monthly(t *testing.T) {
 }
 
 func TestGapFiller(t *testing.T) {
-	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+	// Use dynamically generated periods so the test doesn't drift with time.
+	periods := generatePeriods(28)
+	require.GreaterOrEqual(t, len(periods), 2, "need at least 2 periods")
+	labels := []string{periods[0], periods[len(periods)-1]}
+
+	gf := newGapFiller(28, labels)
 
 	intData := gf.fillInt([]int{10, 30})
 	found := 0
@@ -311,7 +316,11 @@ func TestGapFiller(t *testing.T) {
 }
 
 func TestGapFillSlice(t *testing.T) {
-	gf := newGapFiller(28, []string{"2026-03-09", "2026-03-23"})
+	periods := generatePeriods(28)
+	require.GreaterOrEqual(t, len(periods), 2, "need at least 2 periods")
+	labels := []string{periods[0], periods[len(periods)-1]}
+
+	gf := newGapFiller(28, labels)
 
 	intResult := gapFillSlice(gf, []int{5, 15})
 	assert.Equal(t, len(gf.periods), len(intResult))
