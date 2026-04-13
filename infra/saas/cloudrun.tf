@@ -14,8 +14,8 @@ resource "google_cloud_run_v2_service" "serve" {
 
     vpc_access {
       network_interfaces {
-        network    = google_compute_network.default.id
-        subnetwork = google_compute_subnetwork.default.id
+        network    = local.vpc_id
+        subnetwork = local.subnet_id
       }
       egress = "PRIVATE_RANGES_ONLY"
     }
@@ -29,7 +29,7 @@ resource "google_cloud_run_v2_service" "serve" {
 
       env {
         name  = "DATABASE_URL"
-        value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+        value = "host=/cloudsql/${local.db_connection} dbname=${var.db_name} user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
       }
 
       env {
@@ -133,7 +133,7 @@ resource "google_cloud_run_v2_service" "serve" {
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
-        instances = [google_sql_database_instance.default.connection_name]
+        instances = [local.db_connection]
       }
     }
   }
@@ -165,8 +165,8 @@ resource "google_cloud_run_v2_job" "import" {
 
       vpc_access {
         network_interfaces {
-          network    = google_compute_network.default.id
-          subnetwork = google_compute_subnetwork.default.id
+          network    = local.vpc_id
+          subnetwork = local.subnet_id
         }
         egress = "PRIVATE_RANGES_ONLY"
       }
@@ -176,7 +176,7 @@ resource "google_cloud_run_v2_job" "import" {
 
         env {
           name  = "DATABASE_URL"
-          value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+          value = "host=/cloudsql/${local.db_connection} dbname=${var.db_name} user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
         }
 
         env {
@@ -246,7 +246,7 @@ resource "google_cloud_run_v2_job" "import" {
       volumes {
         name = "cloudsql"
         cloud_sql_instance {
-          instances = [google_sql_database_instance.default.connection_name]
+          instances = [local.db_connection]
         }
       }
     }
@@ -273,8 +273,8 @@ resource "google_cloud_run_v2_service" "admin" {
 
     vpc_access {
       network_interfaces {
-        network    = google_compute_network.default.id
-        subnetwork = google_compute_subnetwork.default.id
+        network    = local.vpc_id
+        subnetwork = local.subnet_id
       }
       egress = "PRIVATE_RANGES_ONLY"
     }
@@ -288,7 +288,7 @@ resource "google_cloud_run_v2_service" "admin" {
 
       env {
         name  = "DATABASE_URL"
-        value = "host=/cloudsql/${google_sql_database_instance.default.connection_name} dbname=devpulse user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+        value = "host=/cloudsql/${local.db_connection} dbname=${var.db_name} user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
       }
 
       env {
@@ -387,7 +387,7 @@ resource "google_cloud_run_v2_service" "admin" {
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
-        instances = [google_sql_database_instance.default.connection_name]
+        instances = [local.db_connection]
       }
     }
   }
