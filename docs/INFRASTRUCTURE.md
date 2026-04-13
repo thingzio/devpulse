@@ -26,14 +26,14 @@ Internet
          +-- App webhooks (installation events)
          +-- API (events, metadata, releases)
 
-Cloud SQL PostgreSQL (db-g1-small)
+Cloud SQL PostgreSQL (shared instance: thingzio-pg, database: thingz)
    +-- Base tables (event, developer, repo_meta, release, ...)
    +-- SaaS tables (tenant, session, tenant_repo, ...)
    +-- RLS policies (tenant isolation)
 
 Cloud Scheduler -> triggers import job every 2 hours
 Secret Manager  -> GitHub App key, OAuth secret, webhook secret, Anthropic API key
-Cloud DNS       -> devpulse.thingz.io
+Cloudflare DNS  -> devpulse.thingz.io
 ```
 
 ## Compute
@@ -185,21 +185,7 @@ With insight caching, the Anthropic API drops from the dominant cost to a minor 
 
 ## Database Scaling Plan
 
-Start small, upgrade in-place as tenant count grows. Each Cloud SQL tier change is a Terraform apply with zero downtime (with HA) or ~1-3 minutes (without). The AlloyDB migration is a planned maintenance event.
-
-### Tier upgrades via Terraform
-
-```hcl
-# Change one variable to upgrade DB tier
-variable "db_tier" {
-  default = "db-custom-1-3840"  # was "db-g1-small"
-}
-```
-
-```shell
-terraform plan   # review changes
-terraform apply  # zero downtime upgrade
-```
+The shared Cloud SQL instance (`thingzio-pg`) is owned by the `thingzio/infra` repo. DB tier changes are made there, not in DevPulse Terraform. Each Cloud SQL tier change is a Terraform apply with zero downtime (with HA) or ~1-3 minutes (without). The AlloyDB migration is a planned maintenance event.
 
 ### AlloyDB Migration (1,000+ tenants)
 
@@ -364,19 +350,19 @@ All infrastructure is defined in `infra/saas/`:
 
 | File | Resources |
 |------|-----------|
-| `providers.tf` | Terraform + Google provider config, GCS state backend |
-| `variables.tf` | Project ID, region, domain, DB tier, import parallelism |
-| `main.tf` | GCP API enablement |
-| `network.tf` | VPC, private service access |
-| `database.tf` | Cloud SQL instance, database, IAM users |
+| `providers.tf` | Terraform + Google provider config, GCS state backend (`thingzio-infra-state/devpulse`) |
+| `variables.tf` | Project ID, region, domain, import parallelism, shared infra refs (VPC, subnet, DB) |
+| `main.tf` | GCP API enablement, locals for shared infra references |
+| `database.tf` | DB user (`devpulse`) in shared Cloud SQL instance |
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
 | `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
-| `scheduler.tf` | Import job trigger (every 2 hours) |
-| `dns.tf` | Cloud DNS zone |
-| `monitoring.tf` | Uptime checks, log-based metrics, alert policies, email notifications |
+| `scheduler.tf` | Import job trigger (every 2 hours) + daily report |
+| `monitoring.tf` | Uptime checks, log-based metrics, service-level alert policies, email notifications |
 | `registry.tf` | Artifact Registry standard repo (direct push from CI) |
-| `outputs.tf` | Service URL, DB connection, DNS nameservers |
+| `outputs.tf` | Service URL, deployer SA, WIF provider |
+
+Shared infrastructure (VPC, Cloud SQL instance, DB monitoring) is owned by the `thingzio/infra` repo.
 
 ## Cost Optimization
 

@@ -21,14 +21,9 @@ export REGION="us-west1"
 export DOMAIN="devpulse.thingz.io"
 ```
 
-## 2. Create Terraform State Bucket
+## 2. Terraform State Bucket
 
-```shell
-gcloud storage buckets create gs://devpulse-state \
-    --project=$PROJECT_ID \
-    --location=us \
-    --uniform-bucket-level-access
-```
+DevPulse uses the shared state bucket `gs://thingzio-infra-state` with prefix `devpulse`. This bucket is created by the `thingzio/infra` repo — no action needed here.
 
 ## 3. Register GitHub OAuth App
 
@@ -122,7 +117,7 @@ terraform init
 terraform apply
 ```
 
-This creates: VPC + subnet, Cloud SQL (password-based user), Secret Manager, service accounts, Artifact Registry standard repo, Cloud Run service + job (import) + admin service, Cloud Scheduler (every 2 hours), Cloud DNS zone, WIF for GitHub Actions, monitoring alerts + log metrics.
+This creates: DB user (`devpulse`) in shared Cloud SQL instance, Secret Manager secrets, service accounts, Artifact Registry standard repo, Cloud Run service + job (import) + admin service, Cloud Scheduler (every 2 hours), WIF for GitHub Actions, monitoring alerts + log metrics. VPC, Cloud SQL instance, and DB monitoring are owned by `thingzio/infra`.
 
 > **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
 
@@ -143,13 +138,16 @@ cd ../..  # back to repo root
 This creates 9 variables in the GitHub `saas` environment:
 `WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
 
-## 9. Delegate DNS
+## 9. Configure DNS
 
-At your domain registrar, update NS records for your domain to Cloud DNS nameservers from Terraform output:
+DNS is managed on Cloudflare. Add a CNAME record for `devpulse` pointing to `ghs.googlehosted.com.` and create a Cloud Run domain mapping:
 
 ```shell
-terraform -chdir=infra/saas output dns_nameservers
-dig NS $DOMAIN
+gcloud beta run domain-mappings create \
+    --service=devpulse-saas-serve \
+    --domain=$DOMAIN \
+    --project=$PROJECT_ID \
+    --region=$REGION
 ```
 
 ## 10. Create Monitoring Dashboard
