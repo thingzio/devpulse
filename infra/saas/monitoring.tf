@@ -347,4 +347,7 @@ resource "google_monitoring_alert_policy" "import_repo_errors" {
   }
 }
 
-
+resource "google_monitoring_dashboard" "devpulse" {
+  project        = var.project_id
+  dashboard_json = file("${path.module}/dashboard.json")
+}
