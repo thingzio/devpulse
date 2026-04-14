@@ -23,7 +23,7 @@ func TestGetMaxEventTime_WithEvents(t *testing.T) {
 
 	// Insert developer (required by FK).
 	_, err := store.db.ExecContext(ctx,
-		`INSERT INTO developer (username, full_name) VALUES ('user1', 'User One')`)
+		`INSERT INTO devpulse_developer (username, full_name) VALUES ('user1', 'User One')`)
 	require.NoError(t, err)
 
 	// Insert test events with known created_at timestamps.
@@ -31,7 +31,7 @@ func TestGetMaxEventTime_WithEvents(t *testing.T) {
 	// Mix date-only and full RFC3339 formats to match real data.
 	for _, ts := range []string{"2025-01-15", "2025-03-20T21:14:12Z", "2025-02-10"} {
 		_, insertErr := store.db.ExecContext(ctx,
-			`INSERT INTO event (org, repo, username, type, date, url, mentions, labels, created_at)
+			`INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels, created_at)
 			 VALUES ($1, $2, 'user1', 'pr', $3, '', '', '', $3)`,
 			"testorg", "testrepo", ts)
 		require.NoError(t, insertErr)

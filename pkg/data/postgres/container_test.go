@@ -30,7 +30,7 @@ func TestGetContainerActivity_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO container_version (org, repo, package, version_id, tag, created_at)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_container_version(org, repo, package, version_id, tag, created_at)
 		VALUES
 		('org1', 'repo1', 'pkg1', 1, 'v1.0.0', '2025-01-15T10:00:00Z'),
 		('org1', 'repo1', 'pkg1', 2, 'v1.1.0', '2025-01-20T10:00:00Z'),
@@ -49,7 +49,7 @@ func TestGetContainerActivity_FilterByOrg(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO container_version (org, repo, package, version_id, tag, created_at)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_container_version(org, repo, package, version_id, tag, created_at)
 		VALUES
 		('org1', 'repo1', 'pkg1', 1, 'v1.0.0', '2025-01-15T10:00:00Z'),
 		('org2', 'repo2', 'pkg2', 2, 'v1.0.0', '2025-01-20T10:00:00Z')`)

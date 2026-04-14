@@ -75,36 +75,36 @@ func seedTwoTenants(t *testing.T, db *sql.DB) (string, string) {
 	// Create tenants.
 	var tidA, tidB string
 	err := db.QueryRowContext(ctx,
-		`INSERT INTO tenant (github_id, username, email, tos_accepted_at) VALUES (1001, 'alice', 'alice@test.com', NOW()) RETURNING id`,
+		`INSERT INTO devpulse_tenant(github_id, username, email, tos_accepted_at) VALUES (1001, 'alice', 'alice@test.com', NOW()) RETURNING id`,
 	).Scan(&tidA)
 	require.NoError(t, err)
 
 	err = db.QueryRowContext(ctx,
-		`INSERT INTO tenant (github_id, username, email, tos_accepted_at) VALUES (1002, 'bob', 'bob@test.com', NOW()) RETURNING id`,
+		`INSERT INTO devpulse_tenant(github_id, username, email, tos_accepted_at) VALUES (1002, 'bob', 'bob@test.com', NOW()) RETURNING id`,
 	).Scan(&tidB)
 	require.NoError(t, err)
 
 	// Add repos for each tenant.
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO tenant_repo (tenant_id, org, repo) VALUES ($1, 'orgA', 'repoA')`, tidA)
+		`INSERT INTO devpulse_tenant_repo(tenant_id, org, repo) VALUES ($1, 'orgA', 'repoA')`, tidA)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO tenant_repo (tenant_id, org, repo) VALUES ($1, 'orgB', 'repoB')`, tidB)
+		`INSERT INTO devpulse_tenant_repo(tenant_id, org, repo) VALUES ($1, 'orgB', 'repoB')`, tidB)
 	require.NoError(t, err)
 
 	// Insert a developer shared across repos.
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO developer (username, full_name) VALUES ('dev1', 'Developer One')`)
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('dev1', 'Developer One')`)
 	require.NoError(t, err)
 
 	// Insert events for each repo.
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES ('orgA', 'repoA', 'dev1', 'push', NOW(), '', '', '')`)
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels) VALUES ('orgA', 'repoA', 'dev1', 'push', NOW(), '', '', '')`)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES ('orgB', 'repoB', 'dev1', 'push', NOW(), '', '', '')`)
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels) VALUES ('orgB', 'repoB', 'dev1', 'push', NOW(), '', '', '')`)
 	require.NoError(t, err)
 
 	return tidA, tidB
@@ -125,12 +125,12 @@ func TestRLS_ScopedConnectionSeesOnlyOwnTenantEvents(t *testing.T) {
 
 	// Tenant A should see only orgA/repoA events.
 	var count int
-	err = conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM event").Scan(&count)
+	err = conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_event").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count, "tenant A should see exactly 1 event")
 
 	var org string
-	err = conn.QueryRowContext(ctx, "SELECT org FROM event").Scan(&org)
+	err = conn.QueryRowContext(ctx, "SELECT org FROM devpulse_event").Scan(&org)
 	require.NoError(t, err)
 	assert.Equal(t, "orgA", org, "tenant A should only see orgA events")
 }
@@ -148,12 +148,12 @@ func TestRLS_ScopedConnectionSeesOnlyOwnTenantRepos(t *testing.T) {
 	require.NoError(t, err)
 
 	var count int
-	err = conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM tenant_repo").Scan(&count)
+	err = conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_tenant_repo").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count, "tenant A should see exactly 1 repo")
 
 	var repo string
-	err = conn.QueryRowContext(ctx, "SELECT repo FROM tenant_repo").Scan(&repo)
+	err = conn.QueryRowContext(ctx, "SELECT repo FROM devpulse_tenant_repo").Scan(&repo)
 	require.NoError(t, err)
 	assert.Equal(t, "repoA", repo)
 }
@@ -174,13 +174,13 @@ func TestRLS_CrossTenantAccessBlocked(t *testing.T) {
 	// Tenant A must not see orgB events.
 	var count int
 	err = conn.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM event WHERE org = 'orgB'").Scan(&count)
+		"SELECT COUNT(*) FROM devpulse_event WHERE org = 'orgB'").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count, "tenant A must not see tenant B events")
 
 	// Tenant A must not see tenant B repos.
 	err = conn.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tenant_repo WHERE repo = 'repoB'").Scan(&count)
+		"SELECT COUNT(*) FROM devpulse_tenant_repo WHERE repo = 'repoB'").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count, "tenant A must not see tenant B repos")
 }
@@ -192,11 +192,11 @@ func TestRLS_UnscopedConnectionSeesAllData(t *testing.T) {
 
 	// No set_config — simulates importer/admin behavior.
 	var count int
-	err := appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM event").Scan(&count)
+	err := appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_event").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count, "unscoped connection should see all events")
 
-	err = appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM tenant_repo").Scan(&count)
+	err = appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_tenant_repo").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count, "unscoped connection should see all repos")
 }
@@ -208,11 +208,11 @@ func TestRLS_UnscopedConnectionCanInsert(t *testing.T) {
 
 	// Importer inserts events without set_config.
 	_, err := appDB.ExecContext(ctx,
-		`INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES ('orgA', 'repoA', 'dev1', 'issue', NOW(), '', '', '')`)
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels) VALUES ('orgA', 'repoA', 'dev1', 'issue', NOW(), '', '', '')`)
 	require.NoError(t, err, "unscoped insert into event should succeed")
 
 	var count int
-	err = appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM event WHERE type = 'issue'").Scan(&count)
+	err = appDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_event WHERE type = 'issue'").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -222,9 +222,9 @@ func TestRLS_ForceRowLevelSecurityEnabled(t *testing.T) {
 	ctx := context.Background()
 
 	tables := []string{
-		"event", "developer", "repo_meta", "release", "release_asset",
-		"container_version", "repo_metric_history", "repo_insights",
-		"tenant_repo", "tenant_member", "github_app_installation", "session",
+		"devpulse_event", "devpulse_developer", "devpulse_repo_meta", "devpulse_release", "devpulse_release_asset",
+		"devpulse_container_version", "devpulse_repo_metric_history", "devpulse_repo_insights",
+		"devpulse_tenant_repo", "devpulse_tenant_member", "devpulse_github_app_installation", "devpulse_session",
 	}
 
 	for _, table := range tables {
@@ -245,10 +245,10 @@ func TestRLS_ScopedConnectionDeveloperIsolation(t *testing.T) {
 
 	// Add a second developer only referenced in orgB events.
 	_, err := appDB.ExecContext(ctx,
-		`INSERT INTO developer (username, full_name) VALUES ('dev2', 'Developer Two')`)
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('dev2', 'Developer Two')`)
 	require.NoError(t, err)
 	_, err = appDB.ExecContext(ctx,
-		`INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES ('orgB', 'repoB', 'dev2', 'pr', NOW(), '', '', '')`)
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels) VALUES ('orgB', 'repoB', 'dev2', 'pr', NOW(), '', '', '')`)
 	require.NoError(t, err)
 
 	// Scope to tenant A — should only see dev1 (via orgA events).
@@ -259,7 +259,7 @@ func TestRLS_ScopedConnectionDeveloperIsolation(t *testing.T) {
 	require.NoError(t, err)
 
 	var countA int
-	err = connA.QueryRowContext(ctx, "SELECT COUNT(*) FROM developer").Scan(&countA)
+	err = connA.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_developer").Scan(&countA)
 	require.NoError(t, err)
 	assert.Equal(t, 1, countA, "tenant A should see only dev1")
 
@@ -271,7 +271,7 @@ func TestRLS_ScopedConnectionDeveloperIsolation(t *testing.T) {
 	require.NoError(t, err)
 
 	var countB int
-	err = connB.QueryRowContext(ctx, "SELECT COUNT(*) FROM developer").Scan(&countB)
+	err = connB.QueryRowContext(ctx, "SELECT COUNT(*) FROM devpulse_developer").Scan(&countB)
 	require.NoError(t, err)
 	assert.Equal(t, 2, countB, "tenant B should see dev1 and dev2")
 }

@@ -27,7 +27,7 @@ func TestGetRepoMetas_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_meta (org, repo, stars, forks, open_issues, language, license, archived)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived)
 		VALUES ('org1', 'repo1', 100, 50, 10, 'Go', 'Apache-2.0', 0)`)
 	require.NoError(t, err)
 
@@ -44,7 +44,7 @@ func TestGetRepoMetas_WithFilter(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_meta (org, repo, stars, forks, open_issues, language, license, archived)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived)
 		VALUES
 		('org1', 'repo1', 100, 50, 10, 'Go', 'Apache-2.0', 0),
 		('org2', 'repo2', 200, 80, 5, 'Python', 'MIT', 0)`)
@@ -76,14 +76,14 @@ func TestGetRepoOverview_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_meta (org, repo, stars, forks, open_issues, language, license, archived, last_import_at)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived, last_import_at)
 		VALUES ('org1', 'repo1', 100, 50, 10, 'Go', 'Apache-2.0', 0, '2026-03-02T10:00:00Z')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name) VALUES ('user1', 'User One'), ('user2', 'User Two')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('user1', 'User One'), ('user2', 'User Two')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('org1', 'repo1', 'user1', 'push', '2026-03-01', '', '', ''),
 		('org1', 'repo1', 'user2', 'issue', '2026-03-02', '', '', '')`)
@@ -106,7 +106,7 @@ func TestGetRepoOverview_WithOrgFilter(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_meta (org, repo, stars, forks, open_issues, language, license, archived)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived)
 		VALUES
 		('org1', 'repo1', 100, 50, 10, 'Go', 'Apache-2.0', 0),
 		('org2', 'repo2', 200, 80, 5, 'Python', 'MIT', 0)`)

@@ -30,7 +30,7 @@ func TestGetReleaseCadence_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'Release 1', '2025-01-15T00:00:00Z', 0),
 		('org1', 'repo1', 'v1.1.0-rc1', 'RC1', '2025-01-20T00:00:00Z', 1),
@@ -55,7 +55,7 @@ func TestGetReleaseCadence_WithFilter(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'Release 1', '2025-01-15T00:00:00Z', 0),
 		('org2', 'repo2', 'v2.0.0', 'Release 2', '2025-01-20T00:00:00Z', 0)`)
@@ -90,13 +90,13 @@ func TestGetReleaseDownloads_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'Release 1', '2025-01-15T00:00:00Z', 0),
 		('org1', 'repo1', 'v1.1.0', 'Release 1.1', '2025-02-10T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release_asset(org, repo, tag, name, content_type, size, download_count)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'app_linux_amd64.tar.gz', 'application/gzip', 1000, 150),
 		('org1', 'repo1', 'v1.0.0', 'app_darwin_arm64.tar.gz', 'application/gzip', 1000, 50),
@@ -117,13 +117,13 @@ func TestGetReleaseDownloads_WithFilter(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'Release 1', '2025-01-15T00:00:00Z', 0),
 		('org2', 'repo2', 'v2.0.0', 'Release 2', '2025-01-20T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release_asset(org, repo, tag, name, content_type, size, download_count)
 		VALUES
 		('org1', 'repo1', 'v1.0.0', 'app.tar.gz', 'application/gzip', 1000, 100),
 		('org2', 'repo2', 'v2.0.0', 'app.tar.gz', 'application/gzip', 1000, 200)`)
@@ -156,7 +156,7 @@ func TestGetReleaseDownloadsByTag_WithData(t *testing.T) {
 	store := setupTestDB(t)
 
 	// Insert 11 releases spanning recent months
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease) VALUES
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease) VALUES
 		('org1', 'repo1', 'v0.1.0', 'R0.1', '2025-01-01T00:00:00Z', 0),
 		('org1', 'repo1', 'v0.2.0', 'R0.2', '2025-02-01T00:00:00Z', 0),
 		('org1', 'repo1', 'v0.3.0', 'R0.3', '2025-03-01T00:00:00Z', 0),
@@ -170,7 +170,7 @@ func TestGetReleaseDownloadsByTag_WithData(t *testing.T) {
 		('org1', 'repo1', 'v1.1.0', 'R1.1', '2025-11-01T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release_asset(org, repo, tag, name, content_type, size, download_count) VALUES
 		('org1', 'repo1', 'v0.1.0', 'app.tar.gz', 'application/gzip', 100, 5000),
 		('org1', 'repo1', 'v0.2.0', 'app.tar.gz', 'application/gzip', 100, 10),
 		('org1', 'repo1', 'v0.3.0', 'app.tar.gz', 'application/gzip', 100, 20),
@@ -203,7 +203,7 @@ func TestGetReleaseCadence_WithDeployments(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
 		VALUES ('org1', 'repo1', 'v1.0', 'v1.0', '2025-01-15T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
@@ -218,11 +218,11 @@ func TestGetReleaseCadence_MergeFallback(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name) VALUES ('alice', 'Alice')`)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
 	// No releases for org2 -- insert merged PRs instead
-	_, err = store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels, state, created_at, merged_at)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, merged_at)
 		VALUES ('org2', 'repo2', 'alice', 'pr', '2025-01-10', 'http://a', '', '', 'merged', '2025-01-10T10:00:00Z', '2025-01-10T12:00:00Z'),
 		       ('org2', 'repo2', 'alice', 'pr', '2025-01-11', 'http://b', '', '', 'merged', '2025-01-11T10:00:00Z', '2025-01-11T12:00:00Z')`)
 	require.NoError(t, err)
@@ -241,13 +241,13 @@ func TestGetReleaseDownloadsByTag_Dedup(t *testing.T) {
 	store := setupTestDB(t)
 
 	// Only 3 releases -- the top downloaded IS in the recent 9
-	_, err := store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease) VALUES
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease) VALUES
 		('org1', 'repo1', 'v1.0.0', 'R1', '2025-10-01T00:00:00Z', 0),
 		('org1', 'repo1', 'v1.1.0', 'R2', '2025-11-01T00:00:00Z', 0),
 		('org1', 'repo1', 'v1.2.0', 'R3', '2025-12-01T00:00:00Z', 0)`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release_asset(org, repo, tag, name, content_type, size, download_count) VALUES
 		('org1', 'repo1', 'v1.0.0', 'app.tar.gz', 'application/gzip', 100, 10),
 		('org1', 'repo1', 'v1.1.0', 'app.tar.gz', 'application/gzip', 100, 500),
 		('org1', 'repo1', 'v1.2.0', 'app.tar.gz', 'application/gzip', 100, 20)`)

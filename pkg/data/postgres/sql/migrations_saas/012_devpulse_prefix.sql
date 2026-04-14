@@ -129,7 +129,9 @@ ALTER TABLE devpulse_github_app_installation FORCE ROW LEVEL SECURITY;
 ALTER TABLE devpulse_session FORCE ROW LEVEL SECURITY;
 
 -- ─── Recreate tenant_repo_filter policies with devpulse_ references ─
+-- Drop first for idempotency (fresh DBs already have these from 001)
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_event;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_event
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -137,6 +139,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_event
           AND tr.org = devpulse_event.org AND tr.repo = devpulse_event.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_repo_meta;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_meta
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -144,6 +147,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_meta
           AND tr.org = devpulse_repo_meta.org AND tr.repo = devpulse_repo_meta.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_release;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_release
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -151,6 +155,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_release
           AND tr.org = devpulse_release.org AND tr.repo = devpulse_release.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_release_asset;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_release_asset
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -158,6 +163,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_release_asset
           AND tr.org = devpulse_release_asset.org AND tr.repo = devpulse_release_asset.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_container_version;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_container_version
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -165,6 +171,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_container_version
           AND tr.org = devpulse_container_version.org AND tr.repo = devpulse_container_version.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_repo_metric_history;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_metric_history
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -172,6 +179,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_metric_history
           AND tr.org = devpulse_repo_metric_history.org AND tr.repo = devpulse_repo_metric_history.repo AND tr.active = true
     ));
 
+DROP POLICY IF EXISTS devpulse_tenant_repo_filter ON devpulse_repo_insights;
 CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_insights
     USING (EXISTS (
         SELECT 1 FROM devpulse_tenant_repo tr
@@ -181,6 +189,7 @@ CREATE POLICY devpulse_tenant_repo_filter ON devpulse_repo_insights
 
 -- ─── Recreate developer filter policy ───────────────────────────────
 
+DROP POLICY IF EXISTS devpulse_tenant_developer_filter ON devpulse_developer;
 CREATE POLICY devpulse_tenant_developer_filter ON devpulse_developer
     USING (EXISTS (
         SELECT 1 FROM devpulse_event e
@@ -191,38 +200,54 @@ CREATE POLICY devpulse_tenant_developer_filter ON devpulse_developer
 
 -- ─── Recreate direct tenant_id filter policies ──────────────────────
 
+DROP POLICY IF EXISTS devpulse_tenant_direct ON devpulse_tenant_repo;
 CREATE POLICY devpulse_tenant_direct ON devpulse_tenant_repo
     USING (tenant_id = NULLIF(COALESCE(current_setting('app.tenant_id', true), ''), '')::uuid);
+DROP POLICY IF EXISTS devpulse_tenant_direct ON devpulse_tenant_member;
 CREATE POLICY devpulse_tenant_direct ON devpulse_tenant_member
     USING (tenant_id = NULLIF(COALESCE(current_setting('app.tenant_id', true), ''), '')::uuid);
+DROP POLICY IF EXISTS devpulse_tenant_direct ON devpulse_github_app_installation;
 CREATE POLICY devpulse_tenant_direct ON devpulse_github_app_installation
     USING (tenant_id = NULLIF(COALESCE(current_setting('app.tenant_id', true), ''), '')::uuid);
+DROP POLICY IF EXISTS devpulse_tenant_direct ON devpulse_session;
 CREATE POLICY devpulse_tenant_direct ON devpulse_session
     USING (tenant_id = NULLIF(COALESCE(current_setting('app.tenant_id', true), ''), '')::uuid);
 
 -- ─── Recreate bypass policies on all 12 RLS tables ──────────────────
 
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_event;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_event
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_developer;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_developer
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_repo_meta;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_repo_meta
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_release;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_release
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_release_asset;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_release_asset
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_container_version;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_container_version
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_repo_metric_history;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_repo_metric_history
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_repo_insights;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_repo_insights
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_tenant_repo;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_tenant_repo
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_tenant_member;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_tenant_member
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_github_app_installation;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_github_app_installation
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');
+DROP POLICY IF EXISTS devpulse_bypass_when_no_tenant ON devpulse_session;
 CREATE POLICY devpulse_bypass_when_no_tenant ON devpulse_session
     USING (COALESCE(current_setting('app.tenant_id', true), '') = '');

@@ -42,7 +42,7 @@ func TestUpdateReputation(t *testing.T) {
 
 	var rep float64
 	var updatedAt string
-	err := store.db.QueryRowContext(ctx, "SELECT reputation, reputation_updated_at FROM developer WHERE username = $1", "repuser").
+	err := store.db.QueryRowContext(ctx, "SELECT reputation, reputation_updated_at FROM devpulse_developer WHERE username = $1", "repuser").
 		Scan(&rep, &updatedAt)
 	require.NoError(t, err)
 	assert.InDelta(t, 0.85, rep, 0.001)
@@ -64,7 +64,7 @@ func TestGetStaleReputationUsernames_NullReputation(t *testing.T) {
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
 	// Add an event so the JOIN finds the user
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES ('org1', 'repo1', 'staleuser', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
@@ -81,7 +81,7 @@ func TestGetStaleReputationUsernames_FreshReputation(t *testing.T) {
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
 	// Add event
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES ('org1', 'repo1', 'freshuser', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestGetStaleReputationUsernames_SkipsBots(t *testing.T) {
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('org1', 'repo1', 'realuser', 'pr', '2025-01-10', 'http://example.com', '', ''),
 		('org1', 'repo1', 'dependabot[bot]', 'pr', '2025-01-10', 'http://example.com', '', '')`)
@@ -127,10 +127,10 @@ func TestGetDistinctOrgs(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name) VALUES ('user1', 'User One')`)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer (username, full_name) VALUES ('user1', 'User One')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('org1', 'repo1', 'user1', 'pr', '2025-01-10', 'http://example.com', '', ''),
 		('org2', 'repo2', 'user1', 'pr', '2025-01-10', 'http://example.com', '', '')`)
@@ -176,7 +176,7 @@ func TestGetReputationComposition_WithData(t *testing.T) {
 	require.NoError(t, store.updateReputation(ctx, "high-user", 0.75, "2025-01-15T00:00:00Z", true, nil))
 	// unscored-user has no reputation set
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels) VALUES
 		('org1', 'repo1', 'alert-user',    'pr', '2025-01-10', 'http://example.com', '', ''),
 		('org1', 'repo1', 'boundary-low',  'pr', '2025-01-10', 'http://example.com', '', ''),
 		('org1', 'repo1', 'standard-user', 'pr', '2025-01-10', 'http://example.com', '', ''),
@@ -225,7 +225,7 @@ func TestImportReputation_ComputesShallowScores(t *testing.T) {
 
 	// Use today's date so recency signal is non-zero
 	today := time.Now().UTC().Format("2006-01-02")
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://example.com', '', '')`, today)
 	require.NoError(t, err)
 
@@ -235,7 +235,7 @@ func TestImportReputation_ComputesShallowScores(t *testing.T) {
 
 	// Verify score was stored and non-zero (recency + engagement signals active)
 	var rep sql.NullFloat64
-	scanErr := store.db.QueryRowContext(ctx, "SELECT reputation FROM developer WHERE username = 'alice'").Scan(&rep)
+	scanErr := store.db.QueryRowContext(ctx, "SELECT reputation FROM devpulse_developer WHERE username = 'alice'").Scan(&rep)
 	require.NoError(t, scanErr)
 	assert.True(t, rep.Valid)
 }
@@ -274,7 +274,7 @@ func TestGetTieredReputationUsernames_LowScoreStaleFirst(t *testing.T) {
 	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, tenDaysAgo, true, nil))
 
 	for _, u := range []string{"low1", "low2", "high1"} {
-		_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+		_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
 		require.NoError(t, err)
 	}
@@ -305,7 +305,7 @@ func TestGetTieredReputationUsernames_HighScoreStaleAfterLongerPeriod(t *testing
 	oldUpdate := time.Now().UTC().Add(-35 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
 	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, oldUpdate, true, nil))
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES ('org1', 'repo1', 'high1', 'pr', '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
@@ -333,7 +333,7 @@ func TestGetTieredReputationUsernames_SkipsBots(t *testing.T) {
 	require.NoError(t, store.updateReputation(ctx, "mybot[bot]", 0.05, now, false, nil))
 
 	for _, u := range []string{"realuser", "mybot[bot]"} {
-		_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+		_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
 		require.NoError(t, err)
 	}
@@ -387,7 +387,7 @@ func TestGetStaleReputationUsernames_FilterByOrg(t *testing.T) {
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('nvidia', 'repo1', 'orguser', 'pr', '2025-01-10', 'http://example.com', '', ''),
 		('other', 'repo2', 'otheruser', 'pr', '2025-01-10', 'http://example.com', '', '')`)
@@ -410,7 +410,7 @@ func TestGetStaleReputationUsernames_FilterByOrgAndRepo(t *testing.T) {
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('nvidia', 'skyhook', 'repouser', 'pr', '2025-01-10', 'http://example.com', '', ''),
 		('nvidia', 'other', 'otherrepo', 'pr', '2025-01-10', 'http://example.com', '', '')`)
@@ -428,10 +428,10 @@ func TestGatherLocalSignals(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name) VALUES ('user1', 'User One'), ('user2', 'User Two')`)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer (username, full_name) VALUES ('user1', 'User One'), ('user2', 'User Two')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
 		VALUES
 		('org1', 'repo1', 'user1', 'pr', '2025-01-10', 'http://example.com', '', ''),
 		('org1', 'repo1', 'user1', 'pr', '2025-01-11', 'http://example.com', '', ''),

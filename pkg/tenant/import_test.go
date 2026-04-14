@@ -20,19 +20,19 @@ func TestIncrementImportErrors(t *testing.T) {
 
 	var repoID string
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT id FROM tenant_repo WHERE tenant_id = $1 AND org = 'org' AND repo = 'repo'`, tn.ID).Scan(&repoID))
+		`SELECT id FROM devpulse_tenant_repo WHERE tenant_id = $1 AND org = 'org' AND repo = 'repo'`, tn.ID).Scan(&repoID))
 
 	for i := 1; i <= 3; i++ {
 		require.NoError(t, IncrementImportErrors(ctx, db, repoID, "test error"))
 		var count int
 		require.NoError(t, db.QueryRowContext(ctx,
-			`SELECT import_errors FROM tenant_repo WHERE id = $1`, repoID).Scan(&count))
+			`SELECT import_errors FROM devpulse_tenant_repo WHERE id = $1`, repoID).Scan(&count))
 		assert.Equal(t, i, count)
 	}
 
 	var lastErr string
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT COALESCE(import_last_error, '') FROM tenant_repo WHERE id = $1`, repoID).Scan(&lastErr))
+		`SELECT COALESCE(import_last_error, '') FROM devpulse_tenant_repo WHERE id = $1`, repoID).Scan(&lastErr))
 	assert.Equal(t, "test error", lastErr)
 }
 
@@ -47,7 +47,7 @@ func TestResetImportErrors(t *testing.T) {
 
 	var repoID string
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT id FROM tenant_repo WHERE tenant_id = $1 AND org = 'org' AND repo = 'repo'`, tn.ID).Scan(&repoID))
+		`SELECT id FROM devpulse_tenant_repo WHERE tenant_id = $1 AND org = 'org' AND repo = 'repo'`, tn.ID).Scan(&repoID))
 
 	require.NoError(t, IncrementImportErrors(ctx, db, repoID, "some error"))
 	require.NoError(t, IncrementImportErrors(ctx, db, repoID, "another error"))
@@ -57,7 +57,7 @@ func TestResetImportErrors(t *testing.T) {
 	var count int
 	var lastErr sql.NullString
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT import_errors, import_last_error FROM tenant_repo WHERE id = $1`, repoID).Scan(&count, &lastErr))
+		`SELECT import_errors, import_last_error FROM devpulse_tenant_repo WHERE id = $1`, repoID).Scan(&count, &lastErr))
 	assert.Equal(t, 0, count)
 	assert.False(t, lastErr.Valid, "import_last_error should be NULL after reset")
 }

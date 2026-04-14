@@ -29,7 +29,7 @@ func TestGetRepoMetricHistory_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_metric_history(org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org1', 'repo1', '2026-03-11', 105, 52),
@@ -48,7 +48,7 @@ func TestGetRepoMetricHistory_WithFilter(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_metric_history(org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org2', 'repo2', '2026-03-10', 200, 80)`)
@@ -66,7 +66,7 @@ func TestGetRepoMetricHistory_AggregateByDate(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
-	_, err := store.db.ExecContext(ctx, `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_metric_history(org, repo, date, stars, forks)
 		VALUES
 		('org1', 'repo1', '2026-03-10', 100, 50),
 		('org1', 'repo1', '2026-03-11', 105, 52),

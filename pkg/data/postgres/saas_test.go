@@ -18,7 +18,7 @@ func TestRunSaaSMigrations(t *testing.T) {
 	var exists bool
 	err = db.QueryRow(`SELECT EXISTS (
 		SELECT 1 FROM information_schema.tables
-		WHERE table_name = 'tenant' AND table_schema = current_schema()
+		WHERE table_name = 'devpulse_tenant' AND table_schema = current_schema()
 	)`).Scan(&exists)
 	require.NoError(t, err)
 	assert.True(t, exists, "tenant table should exist")
@@ -26,7 +26,7 @@ func TestRunSaaSMigrations(t *testing.T) {
 	// Verify session table exists
 	err = db.QueryRow(`SELECT EXISTS (
 		SELECT 1 FROM information_schema.tables
-		WHERE table_name = 'session' AND table_schema = current_schema()
+		WHERE table_name = 'devpulse_session' AND table_schema = current_schema()
 	)`).Scan(&exists)
 	require.NoError(t, err)
 	assert.True(t, exists, "session table should exist")

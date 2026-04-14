@@ -35,33 +35,33 @@ func TestDeleteRepoData_WithData(t *testing.T) {
 	store := setupTestDB(t)
 
 	// Insert a developer (required by event FK)
-	_, err := store.db.ExecContext(ctx, `INSERT INTO developer (username, full_name) VALUES ('testuser', 'Test User')`)
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('testuser', 'Test User')`)
 	require.NoError(t, err)
 
 	// Insert events
-	_, err = store.db.ExecContext(ctx, `INSERT INTO event (org, repo, username, type, date, url, mentions, labels) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels) VALUES
 		('myorg', 'myrepo', 'testuser', 'pr', '2025-01-01', 'http://example.com/1', '', ''),
 		('myorg', 'myrepo', 'testuser', 'issue', '2025-01-02', 'http://example.com/2', '', ''),
 		('myorg', 'otherrepo', 'testuser', 'pr', '2025-01-03', 'http://example.com/3', '', '')`)
 	require.NoError(t, err)
 
 	// Insert repo_meta
-	_, err = store.db.ExecContext(ctx, `INSERT INTO repo_meta (org, repo, stars, forks, open_issues) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues) VALUES
 		('myorg', 'myrepo', 10, 5, 2),
 		('myorg', 'otherrepo', 20, 10, 4)`)
 	require.NoError(t, err)
 
 	// Insert releases and assets
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release (org, repo, tag, name, published_at, prerelease) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease) VALUES
 		('myorg', 'myrepo', 'v1.0', 'Release 1', '2025-01-01', 0)`)
 	require.NoError(t, err)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_release_asset(org, repo, tag, name, content_type, size, download_count) VALUES
 		('myorg', 'myrepo', 'v1.0', 'binary.tar.gz', 'application/gzip', 1024, 50),
 		('myorg', 'myrepo', 'v1.0', 'checksums.txt', 'text/plain', 256, 30)`)
 	require.NoError(t, err)
 
 	// Insert state
-	_, err = store.db.ExecContext(ctx, `INSERT INTO state (query, org, repo, page, since) VALUES
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_state(query, org, repo, page, since) VALUES
 		('pr', 'myorg', 'myrepo', 5, 1700000000)`)
 	require.NoError(t, err)
 
@@ -77,12 +77,12 @@ func TestDeleteRepoData_WithData(t *testing.T) {
 
 	// Verify otherrepo data is untouched
 	var count int
-	err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM event WHERE org = 'myorg' AND repo = 'otherrepo'`).Scan(&count)
+	err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM devpulse_event WHERE org = 'myorg' AND repo = 'otherrepo'`).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Verify developer is NOT deleted
-	err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM developer WHERE username = 'testuser'`).Scan(&count)
+	err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM devpulse_developer WHERE username = 'testuser'`).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
