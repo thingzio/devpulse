@@ -57,25 +57,25 @@ EXCEPTION WHEN undefined_table THEN NULL; WHEN duplicate_table THEN NULL; END $$
 -- ─── Rename 7 SaaS indexes ──────────────────────────────────────────
 
 DO $$ BEGIN ALTER INDEX idx_session_tenant RENAME TO idx_devpulse_session_tenant;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_session_expires RENAME TO idx_devpulse_session_expires;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_tenant_repo_tenant RENAME TO idx_devpulse_tenant_repo_tenant;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_tenant_member_github RENAME TO idx_devpulse_tenant_member_github;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_github_app_installation_tenant RENAME TO idx_devpulse_github_app_installation_tenant;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_tenant_repo_import_queue RENAME TO idx_devpulse_tenant_repo_import_queue;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER INDEX idx_tenant_repo_rls RENAME TO idx_devpulse_tenant_repo_rls;
-EXCEPTION WHEN undefined_object THEN NULL; END $$;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL; END $$;
 
 -- ─── Drop all old RLS policies ──────────────────────────────────────
 -- Policy USING clauses contain hardcoded table references (e.g. tenant_repo)

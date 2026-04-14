@@ -55,46 +55,46 @@ END $$;
 -- Indexes (from 001)
 DO $$ BEGIN
   ALTER INDEX idx_event_org_repo_date RENAME TO idx_devpulse_event_org_repo_date;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_event_org_repo_type_date RENAME TO idx_devpulse_event_org_repo_type_date;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_event_org_repo_created_at RENAME TO idx_devpulse_event_org_repo_created_at;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_event_username RENAME TO idx_devpulse_event_username;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_developer_reputation RENAME TO idx_devpulse_developer_reputation;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 -- Indexes (from 003)
 DO $$ BEGIN
   ALTER INDEX idx_event_org_repo_number RENAME TO idx_devpulse_event_org_repo_number;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_event_username_org_repo RENAME TO idx_devpulse_event_username_org_repo;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_event_org_repo_number_type RENAME TO idx_devpulse_event_org_repo_number_type;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   ALTER INDEX idx_developer_entity_null RENAME TO idx_devpulse_developer_entity_null;
-EXCEPTION WHEN undefined_object THEN NULL;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_object THEN NULL;
 END $$;
