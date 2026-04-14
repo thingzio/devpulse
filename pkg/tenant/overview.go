@@ -60,10 +60,10 @@ const tenantRepoOverviewSQL = `
 		COALESCE(rm.last_import_at, ''),
 		tr.import_errors,
 		COALESCE(tr.import_last_error, '')
-	FROM tenant_repo tr
-	LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
-	LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo AND e.date >= $2
-	LEFT JOIN developer d ON e.username = d.username
+	FROM devpulse_tenant_repo tr
+	LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
+	LEFT JOIN devpulse_event e ON tr.org = e.org AND tr.repo = e.repo AND e.date >= $2
+	LEFT JOIN devpulse_developer d ON e.username = d.username
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE
 	GROUP BY tr.org, tr.repo, rm.stars, rm.forks, rm.open_issues,
 		rm.language, rm.license, rm.last_import_at,
@@ -72,10 +72,10 @@ const tenantRepoOverviewSQL = `
 
 const tenantLimitsSQL = `
 	SELECT plan, max_repos, max_events_per_week
-	FROM tenant WHERE id = $1`
+	FROM devpulse_tenant WHERE id = $1`
 
 const tenantActiveRepoCountSQL = `
-	SELECT COUNT(*) FROM tenant_repo WHERE tenant_id = $1 AND active = TRUE`
+	SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE`
 
 // GetOverview returns the full overview response with repo data and usage summary.
 func GetOverview(ctx context.Context, db *sql.DB, tenantID string, days int) (*OverviewResponse, error) {
@@ -154,8 +154,8 @@ func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int,
 	var count int
 	err := db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
-		FROM event e
-		JOIN tenant_repo tr ON tr.org = e.org AND tr.repo = e.repo
+		FROM devpulse_event e
+		JOIN devpulse_tenant_repo tr ON tr.org = e.org AND tr.repo = e.repo
 		WHERE tr.tenant_id = $1 AND tr.active = TRUE AND e.date >= $2`,
 		tenantID, weekStart).Scan(&count)
 	if err != nil {

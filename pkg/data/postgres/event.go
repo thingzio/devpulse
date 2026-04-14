@@ -48,7 +48,7 @@ const (
 	sortDirection    string = "desc"
 	// selectPRsMissingSizeSQL: $1=org, $2=repo, $3=min_created_at
 	selectPRsMissingSizeSQL = `SELECT org, repo, number
-		FROM event
+		FROM devpulse_event
 		WHERE type = 'pr'
 		  AND org = $1
 		  AND repo = $2
@@ -62,13 +62,13 @@ const (
 
 	// updatePRSizeSQL: $1=additions, $2=deletions, $3=changed_files, $4=commits,
 	//                  $5=org, $6=repo, $7=number
-	updatePRSizeSQL = `UPDATE event
+	updatePRSizeSQL = `UPDATE devpulse_event
 		SET additions = $1, deletions = $2, changed_files = $3, commits = $4
 		WHERE type = 'pr' AND org = $5 AND repo = $6 AND number = $7
 	`
 
 	// insertEventSQL: 18 INSERT params + 14 ON CONFLICT params = 32 total
-	insertEventSQL = `INSERT INTO event (
+	insertEventSQL = `INSERT INTO devpulse_event (
 			org, repo, username, type, date, url, mentions, labels,
 			state, number, created_at, closed_at, merged_at, additions, deletions,
 			changed_files, commits, title
@@ -76,15 +76,15 @@ const (
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT(org, repo, username, type, date) DO UPDATE SET
 			url = $19, mentions = $20, labels = $21,
-			state = COALESCE($22, event.state),
-			number = COALESCE($23, event.number),
-			created_at = COALESCE($24, event.created_at),
-			closed_at = COALESCE($25, event.closed_at),
-			merged_at = COALESCE($26, event.merged_at),
-			additions = COALESCE($27, event.additions),
-			deletions = COALESCE($28, event.deletions),
-			changed_files = COALESCE($29, event.changed_files),
-			commits = COALESCE($30, event.commits),
+			state = COALESCE($22, devpulse_event.state),
+			number = COALESCE($23, devpulse_event.number),
+			created_at = COALESCE($24, devpulse_event.created_at),
+			closed_at = COALESCE($25, devpulse_event.closed_at),
+			merged_at = COALESCE($26, devpulse_event.merged_at),
+			additions = COALESCE($27, devpulse_event.additions),
+			deletions = COALESCE($28, devpulse_event.deletions),
+			changed_files = COALESCE($29, devpulse_event.changed_files),
+			commits = COALESCE($30, devpulse_event.commits),
 			title = $31
 	`
 )

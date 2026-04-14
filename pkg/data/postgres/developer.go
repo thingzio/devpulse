@@ -21,7 +21,7 @@ const (
 	// ON CONFLICT UPDATE: $7=full_name, $8=email, $9=avatar, $10=url, $11=entity(case check), $12=entity(else)
 	// NULLIF($6,'') ensures new developers start with entity=NULL (never enriched).
 	// ON CONFLICT keeps existing entity when incoming is '' (partial user from event API).
-	insertDeveloperSQL = `INSERT INTO developer (
+	insertDeveloperSQL = `INSERT INTO devpulse_developer (
 			username,
 			full_name,
 			email,
@@ -35,7 +35,7 @@ const (
 			email = $8,
 			avatar = $9,
 			url = $10,
-			entity = CASE WHEN $11 = '' THEN developer.entity ELSE $12 END
+			entity = CASE WHEN $11 = '' THEN devpulse_developer.entity ELSE $12 END
 	`
 
 	selectDeveloperSQL = `SELECT
@@ -45,14 +45,14 @@ const (
 			avatar,
 			url,
 			COALESCE(entity, '') AS entity
-		FROM developer
+		FROM devpulse_developer
 		WHERE username = $1
 	`
 
-	selectDeveloperUsernameSQL = `SELECT DISTINCT username FROM developer`
+	selectDeveloperUsernameSQL = `SELECT DISTINCT username FROM devpulse_developer`
 
 	selectNoFullNameDeveloperUsernameSQL = `SELECT DISTINCT username
-		FROM developer
+		FROM devpulse_developer
 		WHERE full_name IS NULL
 		OR full_name = ''
 	`
@@ -60,23 +60,23 @@ const (
 	// selectUnenrichedDeveloperUsernameSQL returns developers whose entity has never
 	// been populated from GitHub (NULL = never enriched). Limit prevents burning
 	// too much API quota in a single execution.
-	selectUnenrichedDeveloperUsernameSQL = `SELECT username FROM developer WHERE entity IS NULL LIMIT 200`
+	selectUnenrichedDeveloperUsernameSQL = `SELECT username FROM devpulse_developer WHERE entity IS NULL LIMIT 200`
 
 	// updateDeveloperEntitySQL is used by enrichment — always writes entity (even '').
 	// This marks developers as "enriched but no company" so they are not re-fetched.
-	updateDeveloperEntitySQL = `UPDATE developer SET entity = $2 WHERE username = $1`
+	updateDeveloperEntitySQL = `UPDATE devpulse_developer SET entity = $2 WHERE username = $1`
 
 	queryDeveloperSQL = `SELECT
 			username,
 			COALESCE(entity, '') AS entity
-		FROM developer
+		FROM devpulse_developer
 		WHERE username ILIKE $1
 		OR email ILIKE $2
 		OR entity ILIKE $3
 		LIMIT $4
 	`
 
-	updateDeveloperNamesSQL = `UPDATE developer SET full_name = $1 WHERE username = $2`
+	updateDeveloperNamesSQL = `UPDATE devpulse_developer SET full_name = $1 WHERE username = $2`
 )
 
 func (s *Store) GetDeveloperUsernames(ctx context.Context) ([]string, error) {
@@ -133,7 +133,7 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 	// Build multi-row INSERT ... ON CONFLICT DO UPDATE.
 	// Single statement = single implicit transaction = no deadlock possible.
 	var b strings.Builder
-	b.WriteString(`INSERT INTO developer (username, full_name, email, avatar, url, entity) VALUES `)
+	b.WriteString(`INSERT INTO devpulse_developer (username, full_name, email, avatar, url, entity) VALUES `)
 
 	args := make([]any, 0, len(devs)*6)
 	for i, d := range devs {
@@ -151,7 +151,7 @@ func (s *Store) SaveDevelopers(ctx context.Context, devs []*data.Developer) erro
 		email = EXCLUDED.email,
 		avatar = EXCLUDED.avatar,
 		url = EXCLUDED.url,
-		entity = CASE WHEN EXCLUDED.entity IS NULL THEN developer.entity ELSE EXCLUDED.entity END`)
+		entity = CASE WHEN EXCLUDED.entity IS NULL THEN devpulse_developer.entity ELSE EXCLUDED.entity END`)
 
 	if _, err := s.db.ExecContext(ctx, b.String(), args...); err != nil {
 		return fmt.Errorf("batch saving %d developers: %w", len(devs), err)

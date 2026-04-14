@@ -7,17 +7,17 @@ import (
 )
 
 const incrementImportErrorsSQL = `
-	UPDATE tenant_repo
+	UPDATE devpulse_tenant_repo
 	SET import_errors = import_errors + 1, import_last_error = $2
 	WHERE id = $1`
 
 const resetImportErrorsSQL = `
-	UPDATE tenant_repo
+	UPDATE devpulse_tenant_repo
 	SET import_errors = 0, import_last_error = NULL
 	WHERE id = $1`
 
 const resetImportErrorsByRepoSQL = `
-	UPDATE tenant_repo
+	UPDATE devpulse_tenant_repo
 	SET import_errors = 0, import_last_error = NULL
 	WHERE org = $1 AND repo = $2 AND import_errors > 0`
 
@@ -60,20 +60,20 @@ type ActiveRepo struct {
 
 const getActiveTenantsSQL = `
 	SELECT DISTINCT t.id, t.username
-	FROM tenant t
-	JOIN tenant_repo tr ON tr.tenant_id = t.id
+	FROM devpulse_tenant t
+	JOIN devpulse_tenant_repo tr ON tr.tenant_id = t.id
 	WHERE tr.active = TRUE AND t.tos_accepted_at IS NOT NULL`
 
 const getActiveInstallationsSQL = `
 	SELECT installation_id, target_login
-	FROM github_app_installation
+	FROM devpulse_github_app_installation
 	WHERE tenant_id = $1 AND suspended_at IS NULL
 	  AND ($2 = 0 OR app_id IS NULL OR app_id = $2)`
 
 const getActiveReposForInstallSQL = `
 	SELECT tr.org, tr.repo
-	FROM tenant_repo tr
-	JOIN github_app_installation gi ON gi.tenant_id = tr.tenant_id AND gi.target_login = tr.org
+	FROM devpulse_tenant_repo tr
+	JOIN devpulse_github_app_installation gi ON gi.tenant_id = tr.tenant_id AND gi.target_login = tr.org
 	WHERE tr.tenant_id = $1 AND gi.installation_id = $2 AND tr.active = TRUE`
 
 // ActiveInstallation holds the GitHub installation ID and target org login.
@@ -132,11 +132,11 @@ func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string, ap
 const listImportWorkSQL = `
 	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
 	       COALESCE(ec.cnt, 0) AS event_count
-	FROM tenant_repo tr
-	JOIN tenant t ON t.id = tr.tenant_id
+	FROM devpulse_tenant_repo tr
+	JOIN devpulse_tenant t ON t.id = tr.tenant_id
 	LEFT JOIN (
 		SELECT org, repo, COUNT(*) AS cnt
-		FROM event
+		FROM devpulse_event
 		GROUP BY org, repo
 	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.active = TRUE
@@ -148,11 +148,11 @@ const listImportWorkSQL = `
 const listImportWorkForRepoSQL = `
 	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
 	       COALESCE(ec.cnt, 0) AS event_count
-	FROM tenant_repo tr
-	JOIN tenant t ON t.id = tr.tenant_id
+	FROM devpulse_tenant_repo tr
+	JOIN devpulse_tenant t ON t.id = tr.tenant_id
 	LEFT JOIN (
 		SELECT org, repo, COUNT(*) AS cnt
-		FROM event
+		FROM devpulse_event
 		GROUP BY org, repo
 	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.active = TRUE
@@ -171,12 +171,12 @@ func ListImportWorkForRepo(ctx context.Context, db *sql.DB, org, repo string) ([
 }
 
 const markImportDoneByRepoSQL = `
-	UPDATE tenant_repo
+	UPDATE devpulse_tenant_repo
 	SET import_done_at = NOW()
 	WHERE org = $1 AND repo = $2 AND active = TRUE`
 
 const incrementImportErrorsByRepoSQL = `
-	UPDATE tenant_repo
+	UPDATE devpulse_tenant_repo
 	SET import_errors = import_errors + 1, import_last_error = $3
 	WHERE org = $1 AND repo = $2 AND active = TRUE`
 

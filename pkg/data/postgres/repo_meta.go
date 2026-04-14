@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	upsertRepoMetaSQL = `INSERT INTO repo_meta (org, repo, stars, forks, open_issues,
+	upsertRepoMetaSQL = `INSERT INTO devpulse_repo_meta (org, repo, stars, forks, open_issues,
 		language, license, archived,
 		has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct,
 		updated_at, last_import_at, pushed_at)
@@ -27,11 +27,11 @@ const (
 			updated_at = $30, last_import_at = $31, pushed_at = $32
 	`
 
-	updateLastImportAtSQL = `UPDATE repo_meta SET last_import_at = $1 WHERE org = $2 AND repo = $3`
+	updateLastImportAtSQL = `UPDATE devpulse_repo_meta SET last_import_at = $1 WHERE org = $2 AND repo = $3`
 
 	// selectRepoMetaUpdatedAtSQL: $1=org, $2=repo
 	selectRepoMetaUpdatedAtSQL = `SELECT COALESCE(updated_at, ''), COALESCE(community_health_pct, 0), COALESCE(pushed_at, '')
-		FROM repo_meta
+		FROM devpulse_repo_meta
 		WHERE org = $1 AND repo = $2
 	`
 
@@ -39,7 +39,7 @@ const (
 	selectRepoMetaSQL = `SELECT org, repo, stars, forks, open_issues, language, license, archived,
 			has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct,
 			updated_at
-		FROM repo_meta
+		FROM devpulse_repo_meta
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 		ORDER BY org, repo
@@ -55,9 +55,9 @@ const (
 			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` AND d.reputation IS NOT NULL THEN e.username END),
 			rm.language, rm.license, rm.archived,
 			rm.last_import_at
-		FROM repo_meta rm
-		LEFT JOIN event e ON rm.org = e.org AND rm.repo = e.repo AND e.date >= $1
-		LEFT JOIN developer d ON e.username = d.username
+		FROM devpulse_repo_meta rm
+		LEFT JOIN devpulse_event e ON rm.org = e.org AND rm.repo = e.repo AND e.date >= $1
+		LEFT JOIN devpulse_developer d ON e.username = d.username
 		WHERE rm.org = COALESCE($2, rm.org)
 		GROUP BY rm.org, rm.repo, rm.stars, rm.forks, rm.open_issues,
 			rm.language, rm.license, rm.archived, rm.last_import_at

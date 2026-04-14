@@ -1,6 +1,6 @@
--- DevPulse base schema
+-- DevPulse base schema (prefixed for shared database)
 
-CREATE TABLE IF NOT EXISTS developer (
+CREATE TABLE IF NOT EXISTS devpulse_developer (
     username TEXT NOT NULL,
     full_name TEXT NOT NULL,
     email TEXT,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS developer (
     PRIMARY KEY (username)
 );
 
-CREATE TABLE IF NOT EXISTS event (
+CREATE TABLE IF NOT EXISTS devpulse_event (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     username TEXT NOT NULL,
@@ -34,10 +34,10 @@ CREATE TABLE IF NOT EXISTS event (
     changed_files INTEGER,
     commits INTEGER,
     PRIMARY KEY (org, repo, username, type, date),
-    FOREIGN KEY(username) REFERENCES developer(username) ON DELETE CASCADE
+    FOREIGN KEY(username) REFERENCES devpulse_developer(username) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS repo_meta (
+CREATE TABLE IF NOT EXISTS devpulse_repo_meta (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     stars INTEGER NOT NULL DEFAULT 0,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS repo_meta (
     PRIMARY KEY (org, repo)
 );
 
-CREATE TABLE IF NOT EXISTS release (
+CREATE TABLE IF NOT EXISTS devpulse_release (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     tag TEXT NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS release (
     PRIMARY KEY (org, repo, tag)
 );
 
-CREATE TABLE IF NOT EXISTS release_asset (
+CREATE TABLE IF NOT EXISTS devpulse_release_asset (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     tag TEXT NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS release_asset (
     PRIMARY KEY (org, repo, tag, name)
 );
 
-CREATE TABLE IF NOT EXISTS container_version (
+CREATE TABLE IF NOT EXISTS devpulse_container_version (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     package TEXT NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS container_version (
     PRIMARY KEY (org, repo, package, version_id)
 );
 
-CREATE TABLE IF NOT EXISTS repo_metric_history (
+CREATE TABLE IF NOT EXISTS devpulse_repo_metric_history (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     date TEXT NOT NULL,
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS repo_metric_history (
     PRIMARY KEY (org, repo, date)
 );
 
-CREATE TABLE IF NOT EXISTS repo_insights (
+CREATE TABLE IF NOT EXISTS devpulse_repo_insights (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
     insights_json TEXT NOT NULL,
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS repo_insights (
     PRIMARY KEY (org, repo)
 );
 
-CREATE TABLE IF NOT EXISTS state (
+CREATE TABLE IF NOT EXISTS devpulse_state (
     query TEXT NOT NULL,
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
@@ -117,15 +117,22 @@ CREATE TABLE IF NOT EXISTS state (
     PRIMARY KEY (query, org, repo)
 );
 
-CREATE TABLE IF NOT EXISTS sub (
+CREATE TABLE IF NOT EXISTS devpulse_sub (
     type TEXT NOT NULL,
     old TEXT NOT NULL,
     new TEXT NOT NULL,
     PRIMARY KEY (type, old)
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_org_repo_date ON event (org, repo, date);
-CREATE INDEX IF NOT EXISTS idx_event_org_repo_type_date ON event (org, repo, type, date);
-CREATE INDEX IF NOT EXISTS idx_event_org_repo_created_at ON event (org, repo, created_at);
-CREATE INDEX IF NOT EXISTS idx_event_username ON event (username);
-CREATE INDEX IF NOT EXISTS idx_developer_reputation ON developer (reputation);
+-- Base indexes (from original 001)
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_date ON devpulse_event (org, repo, date);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_type_date ON devpulse_event (org, repo, type, date);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_created_at ON devpulse_event (org, repo, created_at);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_username ON devpulse_event (username);
+CREATE INDEX IF NOT EXISTS idx_devpulse_developer_reputation ON devpulse_developer (reputation);
+
+-- Performance indexes (from original 003)
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_number ON devpulse_event (org, repo, number);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_username_org_repo ON devpulse_event (username, org, repo);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_number_type ON devpulse_event (org, repo, number, type, created_at);
+CREATE INDEX IF NOT EXISTS idx_devpulse_developer_entity_null ON devpulse_developer (username) WHERE entity IS NULL;

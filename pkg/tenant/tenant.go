@@ -29,7 +29,7 @@ type Tenant struct {
 }
 
 const upsertTenantSQL = `
-	INSERT INTO tenant (github_id, username, email, avatar_url, name, company, location, bio)
+	INSERT INTO devpulse_tenant (github_id, username, email, avatar_url, name, company, location, bio)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	ON CONFLICT (github_id) DO UPDATE SET
 		username = EXCLUDED.username,
@@ -50,21 +50,21 @@ const getTenantByGitHubIDSQL = `
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
 	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
-	FROM tenant WHERE github_id = $1`
+	FROM devpulse_tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
 	SELECT id, github_id, username, email, avatar_url,
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
 	       max_repos, max_events_per_week, plan,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
-	FROM tenant WHERE id = $1`
+	FROM devpulse_tenant WHERE id = $1`
 
-const acceptToSSQL = `UPDATE tenant SET tos_accepted_at = NOW(), updated_at = NOW() WHERE id = $1`
+const acceptToSSQL = `UPDATE devpulse_tenant SET tos_accepted_at = NOW(), updated_at = NOW() WHERE id = $1`
 
-const updatePlanSQL = `UPDATE tenant SET plan = $2, max_repos = $3, max_events_per_week = $4, updated_at = NOW() WHERE id = $1`
+const updatePlanSQL = `UPDATE devpulse_tenant SET plan = $2, max_repos = $3, max_events_per_week = $4, updated_at = NOW() WHERE id = $1`
 
 const requestUpgradeSQL = `
-	UPDATE tenant SET upgrade_requested_at = NOW(), updated_at = NOW()
+	UPDATE devpulse_tenant SET upgrade_requested_at = NOW(), updated_at = NOW()
 	WHERE id = $1 AND upgrade_requested_at IS NULL
 	RETURNING username, email, plan, max_repos`
 

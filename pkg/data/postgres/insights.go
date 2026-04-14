@@ -14,8 +14,8 @@ const (
 	// selectBusFactorSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectBusFactorSQL = `WITH dev_counts AS (
 			SELECT e.username, COUNT(*) AS cnt
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.org = COALESCE($1, e.org)
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -37,8 +37,8 @@ const (
 	// selectPonyFactorSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectPonyFactorSQL = `WITH ent_counts AS (
 			SELECT d.entity, COUNT(*) AS cnt
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.org = COALESCE($1, e.org)
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -61,8 +61,8 @@ const (
 	// %[1]s = GroupExpr(gran, "e.date")
 	selectRetentionTpl = `WITH first_seen AS (
 			SELECT e.username, MIN(%[1]s) AS first_period
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.org = COALESCE($1, e.org)
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -73,8 +73,8 @@ const (
 		),
 		periods AS (
 			SELECT DISTINCT e.username, %[1]s AS period
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.org = COALESCE($5, e.org)
 			  AND e.repo = COALESCE($6, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
@@ -97,8 +97,8 @@ const (
 			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'pr'
 		  AND e.merged_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
@@ -117,15 +117,15 @@ const (
 			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
 		  AND LOWER(e.labels) LIKE '%%bug%%'
 		  AND EXISTS (
-		      SELECT 1 FROM release r
+		      SELECT 1 FROM devpulse_release r
 		      WHERE r.org = e.org AND r.repo = e.repo
 		        AND EXTRACT(EPOCH FROM (e.created_at::timestamp - r.published_at::timestamp)) / 86400.0 BETWEEN 0 AND 7
 		  )
@@ -144,8 +144,8 @@ const (
 			%s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
@@ -165,8 +165,8 @@ const (
 			%s AS period,
 			SUM(CASE WHEN e.type = 'fork' THEN 1 ELSE 0 END) AS forks,
 			COUNT(*) AS events
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -182,8 +182,8 @@ const (
 			%s AS period,
 			SUM(CASE WHEN e.type = $1 THEN 1 ELSE 0 END) AS prs,
 			SUM(CASE WHEN e.type = $2 THEN 1 ELSE 0 END) AS reviews
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.org = COALESCE($3, e.org)
 		  AND e.repo = COALESCE($4, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($5, COALESCE(d.entity, ''))
@@ -199,12 +199,12 @@ const (
 	selectChangeFailuresTpl = `SELECT
 		%s AS period,
 		COUNT(*) AS failures
-	FROM event e
-	JOIN developer d ON e.username = d.username
+	FROM devpulse_event e
+	JOIN devpulse_developer d ON e.username = d.username
 	WHERE (
 	    (e.type = 'issue' AND LOWER(e.labels) LIKE '%%bug%%'
 	     AND EXISTS (
-	        SELECT 1 FROM release r
+	        SELECT 1 FROM devpulse_release r
 	        WHERE r.org = e.org AND r.repo = e.repo
 	          AND EXTRACT(EPOCH FROM (e.created_at::timestamp - r.published_at::timestamp)) / 86400.0 BETWEEN 0 AND 7
 	     ))
@@ -225,7 +225,7 @@ const (
 	selectDeploymentCountTpl = `SELECT
 		%s AS period,
 		COUNT(*) AS cnt
-	FROM release
+	FROM devpulse_release
 	WHERE org = COALESCE($1, org)
 	  AND repo = COALESCE($2, repo)
 	  AND published_at >= $3
@@ -237,17 +237,17 @@ const (
 	// %[1]s = GroupExpr(gran, "date"), %[2]s = GroupExpr(gran, "pr.created_at")
 	selectReviewLatencyTpl = `WITH periods AS (
 		SELECT DISTINCT %[1]s AS period
-		FROM event
+		FROM devpulse_event
 		WHERE date >= $1
 	),
 	latency AS (
 		SELECT
 			%[2]s AS period,
 			(EXTRACT(EPOCH FROM (MIN(rev.created_at::timestamp) - MIN(pr.created_at::timestamp))) / 3600.0) AS hours
-		FROM event pr
-		JOIN event rev ON pr.org = rev.org AND pr.repo = rev.repo AND pr.number = rev.number
+		FROM devpulse_event pr
+		JOIN devpulse_event rev ON pr.org = rev.org AND pr.repo = rev.repo AND pr.number = rev.number
 			AND rev.type = 'pr_review'
-		JOIN developer d ON pr.username = d.username
+		JOIN devpulse_developer d ON pr.username = d.username
 		WHERE pr.type = 'pr'
 		  AND pr.number IS NOT NULL
 		  AND pr.created_at IS NOT NULL
@@ -277,8 +277,8 @@ const (
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS medium,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS large,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS xlarge
-	FROM event e
-	JOIN developer d ON e.username = d.username
+	FROM devpulse_event e
+	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
 	  AND e.created_at IS NOT NULL
 	  AND e.org = COALESCE($1, e.org)
@@ -294,16 +294,16 @@ const (
 	// %[1]s = GroupExpr(gran, "date"), %[2]s = MomentumInterval(gran), %[3]s = MomentumFormat(gran)
 	selectContributorMomentumTpl = `WITH periods AS (
 		SELECT DISTINCT %[1]s AS period
-		FROM event
+		FROM devpulse_event
 		WHERE date >= $1
 	)
 	SELECT
 		p.period,
 		COUNT(DISTINCT e.username) AS active
 	FROM periods p
-	JOIN event e ON %[1]s >= TO_CHAR(((CASE WHEN length(p.period) = 7 THEN p.period || '-01' ELSE p.period END)::date - INTERVAL '%[2]s'), %[3]s)
+	JOIN devpulse_event e ON %[1]s >= TO_CHAR(((CASE WHEN length(p.period) = 7 THEN p.period || '-01' ELSE p.period END)::date - INTERVAL '%[2]s'), %[3]s)
 		AND %[1]s <= p.period
-	JOIN developer d ON e.username = d.username
+	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.org = COALESCE($2, e.org)
 	  AND e.repo = COALESCE($3, e.repo)
 	  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
@@ -325,8 +325,8 @@ const (
 			MIN(CASE WHEN e.type = 'issue_comment' THEN e.date END) AS first_comment,
 			MIN(CASE WHEN e.type = 'pr' THEN e.date END) AS first_pr,
 			MIN(CASE WHEN e.type = 'pr' AND e.state = 'merged' THEN e.date END) AS first_merge
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -334,7 +334,7 @@ const (
 		GROUP BY e.username
 	),
 	periods AS (
-		SELECT DISTINCT %[1]s AS period FROM event WHERE date >= $4
+		SELECT DISTINCT %[1]s AS period FROM devpulse_event WHERE date >= $4
 	)
 	SELECT
 		p.period,
@@ -365,8 +365,8 @@ const (
 			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS pr_medium,
 			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS pr_large,
 			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS pr_xlarge
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.username = $1
 		  AND e.org = COALESCE($2, e.org)
 		  AND e.repo = COALESCE($3, e.repo)
@@ -396,8 +396,8 @@ const (
 				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS pr_medium,
 				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS pr_large,
 				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS pr_xlarge
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.org = COALESCE($6, e.org)
 			  AND e.repo = COALESCE($7, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($8, COALESCE(d.entity, ''))
@@ -422,12 +422,12 @@ const (
 		COUNT(DISTINCT e.org || '/' || e.repo),
 		COUNT(*),
 		COUNT(DISTINCT e.username),
-		COALESCE((SELECT MAX(rm.last_import_at) FROM repo_meta rm
+		COALESCE((SELECT MAX(rm.last_import_at) FROM devpulse_repo_meta rm
 			WHERE rm.org = COALESCE($1, rm.org) AND rm.repo = COALESCE($2, rm.repo)), '')
-	FROM event e
+	FROM devpulse_event e
 	WHERE e.org = COALESCE($1, e.org)
 	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE((SELECT d.entity FROM developer d WHERE d.username = e.username), '') = COALESCE($3, COALESCE((SELECT d.entity FROM developer d WHERE d.username = e.username), ''))
+	  AND COALESCE((SELECT d.entity FROM devpulse_developer d WHERE d.username = e.username), '') = COALESCE($3, COALESCE((SELECT d.entity FROM devpulse_developer d WHERE d.username = e.username), ''))
 	  AND e.date >= $4
 	  ` + botExcludeSQL + `
 	  ` + forkExcludeSQL + `
@@ -438,8 +438,8 @@ const (
 	selectIssueOpenCloseRatioTpl = `SELECT period, SUM(opened) AS opened, SUM(closed) AS closed
 		FROM (
 			SELECT %[1]s AS period, 1 AS opened, 0 AS closed
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
 			  AND e.created_at IS NOT NULL
 			  AND e.org = COALESCE($1, e.org)
@@ -449,8 +449,8 @@ const (
 			  ` + botExcludeTpl + `
 			UNION ALL
 			SELECT %[2]s AS period, 0 AS opened, 1 AS closed
-			FROM event e
-			JOIN developer d ON e.username = d.username
+			FROM devpulse_event e
+			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
 			  AND e.closed_at IS NOT NULL
 			  AND e.org = COALESCE($5, e.org)
@@ -472,10 +472,10 @@ const (
 			MIN(
 				EXTRACT(EPOCH FROM (c.created_at::timestamp - e.created_at::timestamp)) / 3600.0
 			) AS hours_to_first
-		FROM event e
-		JOIN event c ON c.org = e.org AND c.repo = e.repo AND c.number = e.number
+		FROM devpulse_event e
+		JOIN devpulse_event c ON c.org = e.org AND c.repo = e.repo AND c.number = e.number
 			AND c.type = 'issue_comment' AND c.created_at > e.created_at
-		JOIN developer d ON e.username = d.username
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
 		  AND e.created_at IS NOT NULL
 		  AND e.number IS NOT NULL
@@ -492,10 +492,10 @@ const (
 			MIN(
 				EXTRACT(EPOCH FROM (c.created_at::timestamp - e.created_at::timestamp)) / 3600.0
 			) AS hours_to_first
-		FROM event e
-		JOIN event c ON c.org = e.org AND c.repo = e.repo AND c.number = e.number
+		FROM devpulse_event e
+		JOIN devpulse_event c ON c.org = e.org AND c.repo = e.repo AND c.number = e.number
 			AND c.type = 'pr_review' AND c.created_at > e.created_at
-		JOIN developer d ON e.username = d.username
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'pr'
 		  AND e.created_at IS NOT NULL
 		  AND e.number IS NOT NULL
@@ -521,8 +521,8 @@ const (
 		COUNT(*) AS total_open,
 		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END), 0) AS over_30,
 		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END), 0) AS over_90
-	FROM event e
-	JOIN developer d ON e.username = d.username
+	FROM devpulse_event e
+	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
 	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
 	  AND e.created_at IS NOT NULL
@@ -536,8 +536,8 @@ const (
 	// selectUnansweredRateSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectUnansweredRateSQL = `WITH items AS (
     SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
-    FROM event e
-    JOIN developer d ON e.username = d.username
+    FROM devpulse_event e
+    JOIN devpulse_developer d ON e.username = d.username
     WHERE e.type IN ('issue', 'pr')
       AND e.number IS NOT NULL
       AND e.created_at IS NOT NULL
@@ -551,7 +551,7 @@ const (
 responded AS (
     SELECT DISTINCT i.org, i.repo, i.number
     FROM items i
-    JOIN event r ON r.org = i.org AND r.repo = i.repo AND r.number = i.number
+    JOIN devpulse_event r ON r.org = i.org AND r.repo = i.repo AND r.number = i.number
       AND r.type IN ('issue_comment', 'pr_review')
       AND r.username != i.username
       AND r.created_at > i.created_at
@@ -567,12 +567,12 @@ SELECT
 	selectResponseSLOSQL = `WITH first_response AS (
     SELECT e.org, e.repo, e.number,
         MIN(EXTRACT(EPOCH FROM (r.created_at::timestamp - e.created_at::timestamp)) / 3600.0) AS hours
-    FROM event e
-    JOIN event r ON r.org = e.org AND r.repo = e.repo AND r.number = e.number
+    FROM devpulse_event e
+    JOIN devpulse_event r ON r.org = e.org AND r.repo = e.repo AND r.number = e.number
         AND r.type IN ('issue_comment', 'pr_review')
         AND r.username != e.username
         AND r.created_at > e.created_at
-    JOIN developer d ON e.username = d.username
+    JOIN devpulse_developer d ON e.username = d.username
     WHERE e.type IN ('issue', 'pr')
       AND e.number IS NOT NULL
       AND e.created_at IS NOT NULL
@@ -595,7 +595,7 @@ FROM first_response
         COALESCE(SUM(stars), 0) AS stars,
         COALESCE(SUM(forks), 0) AS forks,
         COALESCE(SUM(open_issues), 0) AS open_issues
-    FROM repo_meta
+    FROM devpulse_repo_meta
     WHERE org = COALESCE($1, org)
       AND repo = COALESCE($2, repo)
 ),
@@ -605,7 +605,7 @@ prev_snapshot AS (
         COALESCE(SUM(h.forks), 0) AS forks
     FROM (
         SELECT DISTINCT ON (org, repo) org, repo, stars, forks
-        FROM repo_metric_history
+        FROM devpulse_repo_metric_history
         WHERE org = COALESCE($1, org)
           AND repo = COALESCE($2, repo)
           AND date <= $4
@@ -621,7 +621,7 @@ pr_stats AS (
         COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (
             ORDER BY EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 3600.0
         ) FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS median_merge_h
-    FROM event e
+    FROM devpulse_event e
     WHERE e.type = 'pr'
       AND e.org = COALESCE($1, e.org)
       AND e.repo = COALESCE($2, e.repo)
@@ -638,7 +638,7 @@ FROM current_totals c, prev_snapshot p, pr_stats ps
 	// selectSignalsSQL: $1=org, $2=7_days_ago, $3=14_days_ago, $4=limit
 	selectSignalsSQL = `WITH this_week AS (
     SELECT e.org, e.repo, COUNT(*) AS events
-    FROM event e
+    FROM devpulse_event e
     WHERE e.org = COALESCE($1, e.org)
       AND e.date >= $2
       ` + botExcludeSQL + `
@@ -647,7 +647,7 @@ FROM current_totals c, prev_snapshot p, pr_stats ps
 ),
 last_week AS (
     SELECT e.org, e.repo, COUNT(*) AS events
-    FROM event e
+    FROM devpulse_event e
     WHERE e.org = COALESCE($1, e.org)
       AND e.date >= $3 AND e.date < $2
       ` + botExcludeSQL + `
@@ -670,8 +670,8 @@ LIMIT $4
 
 	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
 	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -1274,7 +1274,7 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	}
 
 	var rep sql.NullFloat64
-	if scanErr := s.db.QueryRowContext(ctx, `SELECT reputation FROM developer WHERE username = $1`, username).Scan(&rep); scanErr == nil && rep.Valid {
+	if scanErr := s.db.QueryRowContext(ctx, `SELECT reputation FROM devpulse_developer WHERE username = $1`, username).Scan(&rep); scanErr == nil && rep.Valid {
 		result.Reputation = &rep.Float64
 	}
 

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	deleteReleaseAssetsSQL = `DELETE FROM release_asset WHERE org = $1 AND repo = $2`
-	deleteReleasesSQL      = `DELETE FROM release WHERE org = $1 AND repo = $2`
-	deleteEventsSQL        = `DELETE FROM event WHERE org = $1 AND repo = $2`
-	deleteRepoMetaSQL      = `DELETE FROM repo_meta WHERE org = $1 AND repo = $2`
-	deleteStateSQL         = `DELETE FROM state WHERE org = $1 AND repo = $2`
+	deleteReleaseAssetsSQL = `DELETE FROM devpulse_release_asset WHERE org = $1 AND repo = $2`
+	deleteReleasesSQL      = `DELETE FROM devpulse_release WHERE org = $1 AND repo = $2`
+	deleteEventsSQL        = `DELETE FROM devpulse_event WHERE org = $1 AND repo = $2`
+	deleteRepoMetaSQL      = `DELETE FROM devpulse_repo_meta WHERE org = $1 AND repo = $2`
+	deleteStateSQL         = `DELETE FROM devpulse_state WHERE org = $1 AND repo = $2`
 )
 
 func (s *Store) DeleteRepoData(ctx context.Context, org, repo string) (*data.DeleteResult, error) {

@@ -10,7 +10,7 @@ import (
 
 const (
 	selectRepoLikeSQL = `SELECT org, repo, COUNT(*) as event_count
-		FROM event
+		FROM devpulse_event
 		WHERE repo ILIKE $1
 		GROUP BY org, repo
 		ORDER BY org DESC, repo DESC

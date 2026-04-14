@@ -10,18 +10,18 @@ import (
 )
 
 const collectStatsSQL = `SELECT
-    (SELECT COUNT(*) FROM tenant),
-    (SELECT COUNT(*) FROM tenant WHERE plan = 'free'),
-    (SELECT COUNT(*) FROM tenant WHERE plan = 'starter'),
-    (SELECT COUNT(*) FROM tenant WHERE plan = 'pro'),
-    (SELECT COUNT(*) FROM tenant WHERE plan = 'enterprise'),
-    (SELECT COUNT(*) FROM tenant_repo WHERE active = TRUE),
-    (SELECT COUNT(*) FROM event),
-    (SELECT COUNT(DISTINCT username) FROM developer WHERE username NOT LIKE '%[bot]'),
-    (SELECT COUNT(*) FROM github_app_installation WHERE suspended_at IS NULL),
-    (SELECT COUNT(DISTINCT id) FROM tenant_repo WHERE active = TRUE AND import_errors > 0)`
+    (SELECT COUNT(*) FROM devpulse_tenant),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE plan = 'free'),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE plan = 'starter'),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE plan = 'pro'),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE plan = 'enterprise'),
+    (SELECT COUNT(*) FROM devpulse_tenant_repo WHERE active = TRUE),
+    (SELECT COUNT(*) FROM devpulse_event),
+    (SELECT COUNT(DISTINCT username) FROM devpulse_developer WHERE username NOT LIKE '%[bot]'),
+    (SELECT COUNT(*) FROM devpulse_github_app_installation WHERE suspended_at IS NULL),
+    (SELECT COUNT(DISTINCT id) FROM devpulse_tenant_repo WHERE active = TRUE AND import_errors > 0)`
 
-const upsertStatsSQL = `INSERT INTO platform_stats
+const upsertStatsSQL = `INSERT INTO devpulse_platform_stats
     (date, tenants, tenants_free, tenants_starter, tenants_pro, tenants_enterprise,
      repos, events, contributors, installations, repos_with_errors, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
@@ -35,10 +35,10 @@ const upsertStatsSQL = `INSERT INTO platform_stats
 
 const getStatsSQL = `SELECT tenants, tenants_free, tenants_starter, tenants_pro, tenants_enterprise,
     repos, events, contributors, installations, repos_with_errors
-    FROM platform_stats WHERE date = $1`
+    FROM devpulse_platform_stats WHERE date = $1`
 
 const errorReposSQL = `SELECT org, repo, import_errors, COALESCE(import_last_error, '')
-    FROM tenant_repo WHERE active = TRUE AND import_errors > 0
+    FROM devpulse_tenant_repo WHERE active = TRUE AND import_errors > 0
     ORDER BY import_errors DESC`
 
 func collectStats(ctx context.Context, db *sql.DB) (platformStats, error) {

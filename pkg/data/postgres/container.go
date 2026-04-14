@@ -16,7 +16,7 @@ import (
 
 const (
 	// upsertContainerVersionSQL: 6 params
-	upsertContainerVersionSQL = `INSERT INTO container_version (org, repo, package, version_id, tag, created_at)
+	upsertContainerVersionSQL = `INSERT INTO devpulse_container_version (org, repo, package, version_id, tag, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT(org, repo, package, version_id) DO UPDATE SET
 			tag = excluded.tag,
@@ -25,7 +25,7 @@ const (
 
 	// selectLatestContainerVersionSQL: $1=org, $2=repo, $3=package
 	selectLatestContainerVersionSQL = `SELECT COALESCE(MAX(created_at), '')
-		FROM container_version
+		FROM devpulse_container_version
 		WHERE org = $1 AND repo = $2 AND package = $3
 	`
 
@@ -34,7 +34,7 @@ const (
 	selectContainerActivityTpl = `SELECT
 		%s AS period,
 		COUNT(*) AS versions
-	FROM container_version cv
+	FROM devpulse_container_version cv
 	WHERE cv.org = COALESCE($1, cv.org)
 	  AND cv.repo = COALESCE($2, cv.repo)
 	  AND cv.created_at >= $3

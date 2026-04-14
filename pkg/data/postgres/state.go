@@ -11,17 +11,17 @@ import (
 )
 
 var stateQueries = map[string]string{
-	"developer": "SELECT COUNT(*) FROM developer",
-	"event":     "SELECT COUNT(*) FROM event",
-	"type":      "SELECT COUNT(DISTINCT type) FROM event",
+	"developer": "SELECT COUNT(*) FROM devpulse_developer",
+	"event":     "SELECT COUNT(*) FROM devpulse_event",
+	"type":      "SELECT COUNT(DISTINCT type) FROM devpulse_event",
 }
 
 const (
-	insertStateSQL = `INSERT INTO state (query, org, repo, page, since) VALUES ($1, $2, $3, $4, $5)
+	insertStateSQL = `INSERT INTO devpulse_state (query, org, repo, page, since) VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT(query, org, repo) DO UPDATE SET page = $6, since = $7
 	`
 
-	selectStateSQL = `SELECT since, page FROM state WHERE query = $1 AND org = $2 AND repo = $3`
+	selectStateSQL = `SELECT since, page FROM devpulse_state WHERE query = $1 AND org = $2 AND repo = $3`
 )
 
 func (s *Store) GetState(ctx context.Context, query, org, repo string, min time.Time) (*data.State, error) {
@@ -87,7 +87,7 @@ func (s *Store) ClearState(ctx context.Context, org, repo string) error {
 		return data.ErrDBNotInitialized
 	}
 
-	q := "DELETE FROM state WHERE org = $1 AND repo = $2"
+	q := "DELETE FROM devpulse_state WHERE org = $1 AND repo = $2"
 	if _, err := s.db.ExecContext(ctx, q, org, repo); err != nil {
 		return fmt.Errorf("failed to clear state for %s/%s: %w", org, repo, err)
 	}

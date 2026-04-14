@@ -10,7 +10,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
-const selectMaxEventTimeSQL = `SELECT MAX(created_at) FROM event WHERE org = $1 AND repo = $2`
+const selectMaxEventTimeSQL = `SELECT MAX(created_at) FROM devpulse_event WHERE org = $1 AND repo = $2`
 
 func (s *Store) GetMaxEventTime(ctx context.Context, org, repo string) (time.Time, error) {
 	if s.db == nil {

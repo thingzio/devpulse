@@ -17,8 +17,8 @@ const (
 			SELECT
 				d.entity,
 				COUNT(*) as events
-			FROM developer d
-			JOIN event e ON d.username = e.username
+			FROM devpulse_developer d
+			JOIN devpulse_event e ON d.username = e.username
 			WHERE d.entity IS NOT NULL AND d.entity <> ''
 			AND e.date >= $1
 			AND d.entity = COALESCE($2, d.entity)
@@ -38,8 +38,8 @@ const (
 			SELECT
 				COALESCE(NULLIF(d.username, ''), 'unknown') AS username,
 				COUNT(*) as events
-			FROM developer d
-			JOIN event e ON d.username = e.username
+			FROM devpulse_developer d
+			JOIN devpulse_event e ON d.username = e.username
 			WHERE e.date >= $1
 			AND d.entity = COALESCE($2, d.entity)
 			AND e.org = COALESCE($3, e.org)
@@ -53,18 +53,18 @@ const (
 	`
 
 	selectOrgLikeSQL = `SELECT org, COUNT(DISTINCT repo) as repo_count, COUNT(*) as event_count
-		FROM event
+		FROM devpulse_event
 		WHERE org ILIKE $1
 		GROUP BY org
 		ORDER BY org DESC
 		LIMIT $2
 	`
 
-	selectAllOrgReposSQL = `SELECT DISTINCT org, repo FROM event ORDER BY 1, 2`
+	selectAllOrgReposSQL = `SELECT DISTINCT org, repo FROM devpulse_event ORDER BY 1, 2`
 
 	selectDeveloperSearchSQL = `SELECT DISTINCT d.username
-		FROM developer d
-		JOIN event e ON d.username = e.username
+		FROM devpulse_developer d
+		JOIN devpulse_event e ON d.username = e.username
 		WHERE d.username ILIKE $1
 		  AND e.org = COALESCE($2, e.org)
 		  AND e.repo = COALESCE($3, e.repo)

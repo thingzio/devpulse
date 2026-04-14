@@ -18,7 +18,7 @@ import (
 
 const (
 	// upsertRepoMetricHistorySQL: 7 params
-	upsertRepoMetricHistorySQL = `INSERT INTO repo_metric_history (org, repo, date, stars, forks)
+	upsertRepoMetricHistorySQL = `INSERT INTO devpulse_repo_metric_history (org, repo, date, stars, forks)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT(org, repo, date) DO UPDATE SET
 			stars = $6, forks = $7
@@ -26,7 +26,7 @@ const (
 
 	// selectRepoMetricHistorySQL: $1=org, $2=repo, $3=since
 	selectRepoMetricHistorySQL = `SELECT org, repo, date, stars, forks
-		FROM repo_metric_history
+		FROM devpulse_repo_metric_history
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 		  AND date >= $3
@@ -36,7 +36,7 @@ const (
 	// selectRepoMetricHistoryAggSQL: $1=org (label), $2=org (filter), $3=since
 	selectRepoMetricHistoryAggSQL = `SELECT COALESCE($1, '') AS org, '' AS repo, date,
 			SUM(stars) AS stars, SUM(forks) AS forks
-		FROM repo_metric_history
+		FROM devpulse_repo_metric_history
 		WHERE org = COALESCE($2, org)
 		  AND date >= $3
 		GROUP BY date

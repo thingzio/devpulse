@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	insertSubSQL = `INSERT INTO sub (type, old, new) VALUES ($1, $2, $3)
+	insertSubSQL = `INSERT INTO devpulse_sub (type, old, new) VALUES ($1, $2, $3)
 		ON CONFLICT(type, old) DO UPDATE SET new = $4
 	`
 
-	selectSubSQL = `SELECT type, old, new FROM sub`
+	selectSubSQL = `SELECT type, old, new FROM devpulse_sub`
 
-	updateDeveloperPropertySQL = `UPDATE developer SET %s = $1 WHERE %s = $2`
+	updateDeveloperPropertySQL = `UPDATE devpulse_developer SET %s = $1 WHERE %s = $2`
 )
 
 func (s *Store) applyDeveloperSub(ctx context.Context, sub *data.Substitution) error {

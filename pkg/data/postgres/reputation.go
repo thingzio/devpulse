@@ -24,8 +24,8 @@ const (
 
 	// selectStaleReputationUsernamesSQL: $1=org, $2=repo, $3=threshold
 	selectStaleReputationUsernamesSQL = `SELECT DISTINCT d.username
-		FROM developer d
-		JOIN event e ON d.username = e.username
+		FROM devpulse_developer d
+		JOIN devpulse_event e ON d.username = e.username
 		WHERE 1=1
 		  ` + botExcludeDSQL + `
 		  ` + forkExcludeSQL + `
@@ -38,7 +38,7 @@ const (
 	`
 
 	// updateReputationSQL: $1=reputation, $2=updated_at, $3=deep, $4=signals, $5=username
-	updateReputationSQL = `UPDATE developer
+	updateReputationSQL = `UPDATE devpulse_developer
 		SET reputation = $1, reputation_updated_at = $2, reputation_deep = $3,
 		    reputation_signals = $4
 		WHERE username = $5
@@ -46,7 +46,7 @@ const (
 
 	// selectUserReputationSQL: $1=username, $2=threshold
 	selectUserReputationSQL = `SELECT reputation, reputation_signals
-		FROM developer
+		FROM devpulse_developer
 		WHERE username = $1
 		  AND reputation IS NOT NULL
 		  AND reputation_deep = 1
@@ -63,8 +63,8 @@ const (
 		COUNT(*)                                                           AS scored
 		FROM (
 			SELECT DISTINCT d.username, d.reputation, d.reputation_deep
-			FROM developer d
-			JOIN event e ON d.username = e.username
+			FROM devpulse_developer d
+			JOIN devpulse_event e ON d.username = e.username
 			WHERE e.org = COALESCE($1, e.org)
 			  AND e.repo = COALESCE($2, e.repo)
 			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -77,8 +77,8 @@ const (
 
 	// selectReputationTotalSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectReputationTotalSQL = `SELECT COUNT(DISTINCT e.username)
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
 		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
@@ -87,7 +87,7 @@ const (
 		  ` + forkExcludeSQL + `
 	`
 
-	selectDistinctOrgsSQL = `SELECT DISTINCT org FROM event`
+	selectDistinctOrgsSQL = `SELECT DISTINCT org FROM devpulse_event`
 
 	// selectTieredReputationUsernamesSQL selects stale contributors with
 	// different staleness thresholds based on their current score.
@@ -97,8 +97,8 @@ const (
 	// $1=org, $2=repo, $3=low-score threshold time, $4=high-score threshold time,
 	// $5=score boundary, $6=limit
 	selectTieredReputationUsernamesSQL = `SELECT d.username
-		FROM developer d
-		JOIN event e ON d.username = e.username
+		FROM devpulse_developer d
+		JOIN devpulse_event e ON d.username = e.username
 		WHERE d.reputation IS NOT NULL
 		  ` + botExcludeDSQL + `
 		  ` + forkExcludeSQL + `
@@ -116,22 +116,22 @@ const (
 	`
 
 	// selectUserCommitCountSQL: $1=username, $2=since
-	selectUserCommitCountSQL = `SELECT COUNT(*) FROM event
+	selectUserCommitCountSQL = `SELECT COUNT(*) FROM devpulse_event
 		WHERE username = $1 AND date >= $2
 	`
 
 	// selectTotalCommitCountSQL: $1=since
-	selectTotalCommitCountSQL = `SELECT COUNT(*) FROM event
+	selectTotalCommitCountSQL = `SELECT COUNT(*) FROM devpulse_event
 		WHERE date >= $1
 	`
 
 	// selectTotalContributorCountSQL: $1=since
-	selectTotalContributorCountSQL = `SELECT COUNT(DISTINCT username) FROM event
+	selectTotalContributorCountSQL = `SELECT COUNT(DISTINCT username) FROM devpulse_event
 		WHERE date >= $1
 	`
 
 	// selectLastCommitDateSQL: $1=username
-	selectLastCommitDateSQL = `SELECT MAX(date) FROM event
+	selectLastCommitDateSQL = `SELECT MAX(date) FROM devpulse_event
 		WHERE username = $1
 	`
 )

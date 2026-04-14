@@ -17,7 +17,7 @@ import (
 
 const (
 	// insertReleaseSQL: 9 params
-	insertReleaseSQL = `INSERT INTO release (org, repo, tag, name, published_at, prerelease)
+	insertReleaseSQL = `INSERT INTO devpulse_release (org, repo, tag, name, published_at, prerelease)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT(org, repo, tag) DO UPDATE SET
 			name = $7, published_at = $8, prerelease = $9
@@ -29,7 +29,7 @@ const (
 			%s AS period,
 			COUNT(*) AS total,
 			SUM(CASE WHEN prerelease = 0 THEN 1 ELSE 0 END) AS stable
-		FROM release
+		FROM devpulse_release
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 		  AND published_at >= $3
@@ -38,7 +38,7 @@ const (
 	`
 
 	// insertReleaseAssetSQL: 10 params
-	insertReleaseAssetSQL = `INSERT INTO release_asset (org, repo, tag, name, content_type, size, download_count)
+	insertReleaseAssetSQL = `INSERT INTO devpulse_release_asset (org, repo, tag, name, content_type, size, download_count)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT(org, repo, tag, name) DO UPDATE SET
 			content_type = $8, size = $9, download_count = $10
@@ -49,8 +49,8 @@ const (
 	selectReleaseDownloadsTpl = `SELECT
 			%s AS period,
 			SUM(ra.download_count) AS downloads
-		FROM release_asset ra
-		JOIN release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
+		FROM devpulse_release_asset ra
+		JOIN devpulse_release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
 		WHERE ra.org = COALESCE($1, ra.org)
 		  AND ra.repo = COALESCE($2, ra.repo)
 		  AND r.published_at >= $3
@@ -63,8 +63,8 @@ const (
 	selectMergedPRDeploymentsTpl = `SELECT
 			%s AS period,
 			COUNT(*) AS cnt
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'pr'
 		  AND e.state = 'merged'
 		  AND e.merged_at IS NOT NULL
@@ -79,14 +79,14 @@ const (
 
 	// selectLatestReleaseSQL: $1=org, $2=repo
 	selectLatestReleaseSQL = `SELECT COALESCE(MAX(published_at), '')
-		FROM release
+		FROM devpulse_release
 		WHERE org = $1 AND repo = $2
 	`
 
 	// selectReleaseDownloadsByTagSQL: $1=org, $2=repo, $3=since, $4=org, $5=repo, $6=since
 	selectReleaseDownloadsByTagSQL = `WITH recent AS (
 			SELECT r.org, r.repo, r.tag, r.published_at
-			FROM release r
+			FROM devpulse_release r
 			WHERE r.org = COALESCE($1, r.org)
 			  AND r.repo = COALESCE($2, r.repo)
 			  AND r.published_at >= $3
@@ -94,8 +94,8 @@ const (
 			LIMIT 9
 		), top AS (
 			SELECT ra.org, ra.repo, ra.tag, r.published_at
-			FROM release_asset ra
-			JOIN release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
+			FROM devpulse_release_asset ra
+			JOIN devpulse_release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
 			WHERE ra.org = COALESCE($4, ra.org)
 			  AND ra.repo = COALESCE($5, ra.repo)
 			  AND r.published_at >= $6
@@ -109,7 +109,7 @@ const (
 		)
 		SELECT c.tag, COALESCE(SUM(ra.download_count), 0) AS downloads
 		FROM combined c
-		LEFT JOIN release_asset ra ON c.org = ra.org AND c.repo = ra.repo AND c.tag = ra.tag
+		LEFT JOIN devpulse_release_asset ra ON c.org = ra.org AND c.repo = ra.repo AND c.tag = ra.tag
 		GROUP BY c.tag, c.published_at
 		ORDER BY c.published_at
 	`

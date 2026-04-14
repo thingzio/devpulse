@@ -39,7 +39,7 @@ type OrgRepo struct {
 }
 
 const saveInstallationSQL = `
-	INSERT INTO github_app_installation (tenant_id, installation_id, target_type, target_login, permissions, app_id)
+	INSERT INTO devpulse_github_app_installation (tenant_id, installation_id, target_type, target_login, permissions, app_id)
 	VALUES ($1, $2, $3, $4, $5, $6)
 	ON CONFLICT (installation_id) DO UPDATE SET
 		tenant_id = EXCLUDED.tenant_id,
@@ -51,31 +51,31 @@ const saveInstallationSQL = `
 
 const listInstallationsSQL = `
 	SELECT id, tenant_id, installation_id, target_type, target_login, suspended_at, created_at
-	FROM github_app_installation WHERE tenant_id = $1 ORDER BY created_at`
+	FROM devpulse_github_app_installation WHERE tenant_id = $1 ORDER BY created_at`
 
-const suspendInstallationSQL = `UPDATE github_app_installation SET suspended_at = NOW() WHERE installation_id = $1`
+const suspendInstallationSQL = `UPDATE devpulse_github_app_installation SET suspended_at = NOW() WHERE installation_id = $1`
 
 const addTenantRepoSQL = `
-	INSERT INTO tenant_repo (tenant_id, org, repo)
+	INSERT INTO devpulse_tenant_repo (tenant_id, org, repo)
 	VALUES ($1, $2, $3)
 	ON CONFLICT (tenant_id, org, repo) DO UPDATE SET active = TRUE`
 
 const listTenantReposSQL = `
 	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, tr.active, rm.last_import_at
-	FROM tenant_repo tr
-	LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
+	FROM devpulse_tenant_repo tr
+	LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE ORDER BY tr.org, tr.repo`
 
 const deactivateTenantRepoSQL = `
-	UPDATE tenant_repo SET active = FALSE WHERE tenant_id = $1 AND org = $2 AND repo = $3`
+	UPDATE devpulse_tenant_repo SET active = FALSE WHERE tenant_id = $1 AND org = $2 AND repo = $3`
 
-const countTenantReposSQL = `SELECT COUNT(*) FROM tenant_repo WHERE tenant_id = $1 AND active = TRUE`
+const countTenantReposSQL = `SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE`
 
-const getTenantMaxReposSQL = `SELECT max_repos FROM tenant WHERE id = $1`
+const getTenantMaxReposSQL = `SELECT max_repos FROM devpulse_tenant WHERE id = $1`
 
 const getInstallationForOrgSQL = `
 	SELECT installation_id, target_login
-	FROM github_app_installation
+	FROM devpulse_github_app_installation
 	WHERE tenant_id = $1 AND target_login = $2 AND suspended_at IS NULL
 	  AND ($3 = 0 OR app_id IS NULL OR app_id = $3)
 	LIMIT 1`

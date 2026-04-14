@@ -53,14 +53,14 @@ type RepoDetail struct {
 }
 
 const (
-	selectTenantIDByUsernameSQL = `SELECT id FROM tenant WHERE username = $1`
+	selectTenantIDByUsernameSQL = `SELECT id FROM devpulse_tenant WHERE username = $1`
 
 	clearUpgradeRequestSQL = `
-		UPDATE tenant SET upgrade_requested_at = NULL, updated_at = NOW()
+		UPDATE devpulse_tenant SET upgrade_requested_at = NULL, updated_at = NOW()
 		WHERE id = $1`
 
 	insertMinimalTenantSQL = `
-		INSERT INTO tenant (github_id, username)
+		INSERT INTO devpulse_tenant (github_id, username)
 		VALUES ($1, $2)
 		ON CONFLICT (github_id) DO UPDATE SET updated_at = NOW()
 		RETURNING id`
@@ -69,8 +69,8 @@ const (
 		SELECT t.username, COALESCE(t.email, ''), COALESCE(t.name, ''),
 		       t.plan, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
-		FROM tenant t
-		LEFT JOIN session s ON s.tenant_id = t.id
+		FROM devpulse_tenant t
+		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
 		GROUP BY t.id
 		ORDER BY t.created_at`
 
@@ -79,8 +79,8 @@ const (
 		       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
 		       t.plan, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
-		FROM tenant t
-		LEFT JOIN session s ON s.tenant_id = t.id
+		FROM devpulse_tenant t
+		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
 		WHERE t.username = $1
 		GROUP BY t.id`
 
@@ -102,11 +102,11 @@ const (
 		                   AND d.reputation_deep = 1 THEN e.username END),
 		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
 		                   AND (d.reputation IS NULL OR d.reputation_deep IS NULL OR d.reputation_deep = 0) THEN e.username END)
-		FROM tenant_repo tr
-		LEFT JOIN repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
-		LEFT JOIN event e ON tr.org = e.org AND tr.repo = e.repo
+		FROM devpulse_tenant_repo tr
+		LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
+		LEFT JOIN devpulse_event e ON tr.org = e.org AND tr.repo = e.repo
 		       AND e.date >= $2
-		LEFT JOIN developer d ON e.username = d.username
+		LEFT JOIN devpulse_developer d ON e.username = d.username
 		WHERE tr.tenant_id = $1 AND tr.active = TRUE
 		GROUP BY tr.org, tr.repo, rm.last_import_at
 		ORDER BY tr.org, tr.repo`

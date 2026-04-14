@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	selectMinEventDateSQL = `SELECT COALESCE(MIN(date), '') FROM event
+	selectMinEventDateSQL = `SELECT COALESCE(MIN(date), '') FROM devpulse_event
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 	`
@@ -32,8 +32,8 @@ const (
 				CASE WHEN e.type = $6 THEN 1 ELSE 0 END as issue_comments,
 				CASE WHEN e.type = $7 THEN 1 ELSE 0 END as forks
 			FROM generate_series($1::date, $2::date, '1 day'::interval) AS dates(d)
-			LEFT JOIN event e ON dates.d::date = e.date::date
-			JOIN developer d ON e.username = d.username
+			LEFT JOIN devpulse_event e ON dates.d::date = e.date::date
+			JOIN devpulse_developer d ON e.username = d.username
 			AND e.org = COALESCE($8, e.org)
 			AND e.repo = COALESCE($9, e.repo)
 			AND d.entity = COALESCE($10, d.entity)
@@ -66,8 +66,8 @@ const (
 			d.avatar,
 			d.url,
 			d.entity
-		FROM event e
-		JOIN developer d ON e.username = d.username
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.date >= COALESCE($1, e.date)
 		AND e.date <= COALESCE($2, e.date)
 		AND e.type = COALESCE($3, e.type)

@@ -14,19 +14,19 @@ import (
 // ErrSessionInvalid is returned when a session is expired or not found.
 var ErrSessionInvalid = errors.New("session expired or not found")
 
-const createSessionSQL = `INSERT INTO session (id, tenant_id, expires_at) VALUES ($1, $2, NOW() + $3::interval)`
+const createSessionSQL = `INSERT INTO devpulse_session (id, tenant_id, expires_at) VALUES ($1, $2, NOW() + $3::interval)`
 
 const validateSessionSQL = `
 	SELECT t.id, t.github_id, t.username, t.email, t.avatar_url,
 	       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
 	       t.max_repos, t.max_events_per_week, t.plan, t.tos_accepted_at, t.upgrade_requested_at, t.created_at, t.updated_at
-	FROM session s
-	JOIN tenant t ON t.id = s.tenant_id
+	FROM devpulse_session s
+	JOIN devpulse_tenant t ON t.id = s.tenant_id
 	WHERE s.id = $1 AND s.expires_at > NOW()`
 
-const destroySessionSQL = `DELETE FROM session WHERE id = $1`
+const destroySessionSQL = `DELETE FROM devpulse_session WHERE id = $1`
 
-const cleanExpiredSessionsSQL = `DELETE FROM session WHERE expires_at <= NOW()`
+const cleanExpiredSessionsSQL = `DELETE FROM devpulse_session WHERE expires_at <= NOW()`
 
 // CreateSession generates a random 256-bit token, stores its SHA-256 hash
 // in the database, and returns the raw token for the cookie.
@@ -67,7 +67,7 @@ func DestroySession(ctx context.Context, db *sql.DB, rawToken string) error {
 	return nil
 }
 
-const lastSignInSQL = `SELECT MAX(created_at) FROM session WHERE tenant_id = $1`
+const lastSignInSQL = `SELECT MAX(created_at) FROM devpulse_session WHERE tenant_id = $1`
 
 // GetLastSignIn returns the most recent session creation time for a tenant.
 func GetLastSignIn(ctx context.Context, db *sql.DB, tenantID string) *time.Time {

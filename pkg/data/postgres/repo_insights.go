@@ -11,26 +11,26 @@ import (
 )
 
 const (
-	upsertRepoInsightsSQL = `INSERT INTO repo_insights (org, repo, insights_json, period_months, model, generated_at, event_count)
+	upsertRepoInsightsSQL = `INSERT INTO devpulse_repo_insights (org, repo, insights_json, period_months, model, generated_at, event_count)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT(org, repo) DO UPDATE SET
 			insights_json = $8, period_months = $9, model = $10, generated_at = $11, event_count = $12
 	`
 
 	selectRepoInsightsSQL = `SELECT org, repo, insights_json, period_months, model, generated_at, event_count
-		FROM repo_insights
+		FROM devpulse_repo_insights
 		WHERE org = COALESCE($1, org)
 		  AND repo = COALESCE($2, repo)
 		ORDER BY org, repo
 	`
 
 	selectRepoInsightsGeneratedAtSQL = `SELECT COALESCE(generated_at, '')
-		FROM repo_insights
+		FROM devpulse_repo_insights
 		WHERE org = $1 AND repo = $2
 	`
 
 	selectRepoInsightsEventCountSQL = `SELECT COALESCE(event_count, 0)
-		FROM repo_insights
+		FROM devpulse_repo_insights
 		WHERE org = $1 AND repo = $2
 	`
 )

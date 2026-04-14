@@ -15,7 +15,7 @@ const (
 	queryEntitySQL = `SELECT
 			entity,
 			COUNT(*) as developers
-		FROM developer
+		FROM devpulse_developer
 		WHERE entity ILIKE $1
 		GROUP BY
 			entity
@@ -26,23 +26,23 @@ const (
 	selectEntityDevelopersSQL = `SELECT
 			username,
 			COALESCE(entity, '') AS entity
-		FROM developer
+		FROM devpulse_developer
 		WHERE entity = $1
 		ORDER BY 1
 	`
 
 	selectEntityLikeSQL = `SELECT d.entity, COUNT(*) as event_count
-		FROM developer d
-		JOIN event e ON d.username = e.username
+		FROM devpulse_developer d
+		JOIN devpulse_event e ON d.username = e.username
 		WHERE d.entity ILIKE $1
 		GROUP BY d.entity
 		ORDER BY d.entity DESC
 		LIMIT $2
 	`
 
-	selectEntityNamesSQL = `SELECT DISTINCT entity FROM developer WHERE entity IS NOT NULL and entity != ''`
+	selectEntityNamesSQL = `SELECT DISTINCT entity FROM devpulse_developer WHERE entity IS NOT NULL and entity != ''`
 
-	updateEntityNamesSQL = `UPDATE developer SET entity = $1 WHERE entity = $2`
+	updateEntityNamesSQL = `UPDATE devpulse_developer SET entity = $1 WHERE entity = $2`
 )
 
 func (s *Store) GetEntityLike(ctx context.Context, query string, limit int) ([]*data.ListItem, error) {
