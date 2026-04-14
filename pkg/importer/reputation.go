@@ -34,7 +34,7 @@ func collectTokenPool(ctx context.Context, db *sql.DB, ghAppConfig *tenant.GitHu
 	var tokens []string
 
 	for _, tn := range tenants {
-		installs, err := tenant.GetActiveInstallations(ctx, db, tn.ID)
+		installs, err := tenant.GetActiveInstallations(ctx, db, tn.ID, ghAppConfig.AppID)
 		if err != nil || len(installs) == 0 {
 			continue
 		}

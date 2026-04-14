@@ -19,8 +19,8 @@ func TestSaveAndListInstallations(t *testing.T) {
 	perms, err := json.Marshal(map[string]string{"contents": "read"})
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 1001, "Organization", "myorg", perms))
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 1002, "User", "myuser", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 1001, "Organization", "myorg", perms, 100))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 1002, "User", "myuser", nil, 100))
 
 	list, err := ListInstallations(ctx, db, tn.ID)
 	require.NoError(t, err)
@@ -42,10 +42,10 @@ func TestSaveInstallation_Upsert(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 60002, "upsertinstall", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 2001, "Organization", "oldlogin", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 2001, "Organization", "oldlogin", nil, 100))
 
 	// Upsert same installation_id with new target_login
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 2001, "Organization", "newlogin", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 2001, "Organization", "newlogin", nil, 100))
 
 	list, err := ListInstallations(ctx, db, tn.ID)
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestSuspendInstallation(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 60003, "suspenduser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 3001, "Organization", "org1", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 3001, "Organization", "org1", nil, 100))
 
 	require.NoError(t, SuspendInstallation(ctx, db, 3001))
 
@@ -77,24 +77,24 @@ func TestGetInstallationForOrg(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 60004, "orginstall", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 4001, "Organization", "activeorg", nil))
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 4002, "Organization", "suspendorg", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 4001, "Organization", "activeorg", nil, 100))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 4002, "Organization", "suspendorg", nil, 100))
 	require.NoError(t, SuspendInstallation(ctx, db, 4002))
 
 	// Active installation found
-	inst, err := GetInstallationForOrg(ctx, db, tn.ID, "activeorg")
+	inst, err := GetInstallationForOrg(ctx, db, tn.ID, "activeorg", 100)
 	require.NoError(t, err)
 	require.NotNil(t, inst)
 	assert.Equal(t, int64(4001), inst.ID)
 	assert.Equal(t, "activeorg", inst.Login)
 
 	// Suspended installation not returned
-	inst, err = GetInstallationForOrg(ctx, db, tn.ID, "suspendorg")
+	inst, err = GetInstallationForOrg(ctx, db, tn.ID, "suspendorg", 100)
 	require.NoError(t, err)
 	assert.Nil(t, inst)
 
 	// Non-existent org returns nil
-	inst, err = GetInstallationForOrg(ctx, db, tn.ID, "noorg")
+	inst, err = GetInstallationForOrg(ctx, db, tn.ID, "noorg", 100)
 	require.NoError(t, err)
 	assert.Nil(t, inst)
 }
@@ -264,11 +264,11 @@ func TestGetActiveInstallations(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 70003, "activeinstuser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 7001, "Organization", "active", nil))
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 7002, "Organization", "suspended", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 7001, "Organization", "active", nil, 100))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 7002, "Organization", "suspended", nil, 100))
 	require.NoError(t, SuspendInstallation(ctx, db, 7002))
 
-	insts, err := GetActiveInstallations(ctx, db, tn.ID)
+	insts, err := GetActiveInstallations(ctx, db, tn.ID, 100)
 	require.NoError(t, err)
 	require.Len(t, insts, 1)
 	assert.Equal(t, int64(7001), insts[0].ID)
@@ -282,7 +282,7 @@ func TestGetActiveReposForInstall(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 70004, "activerepouser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 8001, "Organization", "myorg", nil))
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 8001, "Organization", "myorg", nil, 100))
 	repos := []OrgRepo{
 		{Org: "myorg", Repo: "repo1"},
 		{Org: "myorg", Repo: "repo2"},

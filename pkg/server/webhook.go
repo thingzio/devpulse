@@ -80,6 +80,7 @@ func handleInstallationEvent(ctx context.Context, db *sql.DB, body []byte) error
 		Action       string `json:"action"`
 		Installation struct {
 			ID      int64 `json:"id"`
+			AppID   int64 `json:"app_id"`
 			Account struct {
 				Login string `json:"login"`
 				Type  string `json:"type"`
@@ -99,6 +100,7 @@ func handleInstallationEvent(ctx context.Context, db *sql.DB, body []byte) error
 	slog.Info("installation event",
 		"action", payload.Action,
 		"installation_id", payload.Installation.ID,
+		"app_id", payload.Installation.AppID,
 		"sender_id", payload.Sender.ID,
 	)
 
@@ -110,7 +112,7 @@ func handleInstallationEvent(ctx context.Context, db *sql.DB, body []byte) error
 		}
 
 		if err := tenant.SaveInstallation(ctx, db, tn.ID, payload.Installation.ID,
-			payload.Installation.Account.Type, payload.Installation.Account.Login, nil); err != nil {
+			payload.Installation.Account.Type, payload.Installation.Account.Login, nil, payload.Installation.AppID); err != nil {
 			return fmt.Errorf("saving installation: %w", err)
 		}
 

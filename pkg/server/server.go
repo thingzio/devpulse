@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,7 @@ func Run(ctx context.Context, opts Options) error {
 		RedirectURL:  baseURL + "/auth/github/callback",
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
+	ghAppID, _ := strconv.ParseInt(os.Getenv("GITHUB_APP_ID"), 10, 64)
 
 	trigger, err := newImportTrigger(ctx, config.ImportJobName())
 	if err != nil {
@@ -125,7 +127,7 @@ func Run(ctx context.Context, opts Options) error {
 	repoSearchRL := newRateLimiter(config.RepoSearchRateLimit(), time.Minute)
 	defer repoSearchRL.stop()
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, trigger)
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, trigger, ghAppID)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
@@ -163,7 +165,11 @@ func Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
-func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string, opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter, trigger *importTrigger) *http.ServeMux {
+func makeRouter(
+	db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string,
+	opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter,
+	trigger *importTrigger, ghAppID int64,
+) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -205,7 +211,7 @@ func makeRouter(db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSec
 	// Tenant management API
 	mux.Handle("GET /api/repos", wrap(listReposHandler(db)))
 	mux.Handle("GET /api/repos/overview", wrap(repoOverviewHandler(db)))
-	mux.Handle("POST /api/repos", wrap(addRepoHandler(db, trigger)))
+	mux.Handle("POST /api/repos", wrap(addRepoHandler(db, trigger, ghAppID)))
 	mux.Handle("DELETE /api/repos/{org}/{repo}", wrap(deleteRepoHandler(db)))
 	mux.Handle("POST /api/upgrade-request", wrap(upgradeRequestHandler(db)))
 	mux.Handle("GET /api/repos/available", repoSearchRL(wrap(availableReposHandler(db))))
@@ -570,7 +576,7 @@ func listInstallationsHandler(db *sql.DB) http.HandlerFunc {
 	})
 }
 
-func addRepoHandler(db *sql.DB, trigger *importTrigger) http.HandlerFunc {
+func addRepoHandler(db *sql.DB, trigger *importTrigger, ghAppID int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
@@ -595,14 +601,14 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger) http.HandlerFunc {
 		// Tenant must have at least one GitHub App installation.
 		// Try org-specific first, then fall back to any active installation
 		// (any installation token can access public repos).
-		install, err := tenant.GetInstallationForOrg(r.Context(), db, tn.ID, org)
+		install, err := tenant.GetInstallationForOrg(r.Context(), db, tn.ID, org, ghAppID)
 		if err != nil {
 			slog.Error("checking installation", "org", org, "error", err)
 			http.Error(w, "error checking installation", http.StatusInternalServerError)
 			return
 		}
 		if install == nil {
-			installs, err := tenant.GetActiveInstallations(r.Context(), db, tn.ID)
+			installs, err := tenant.GetActiveInstallations(r.Context(), db, tn.ID, ghAppID)
 			if err != nil {
 				slog.Error("checking installations", "error", err)
 				http.Error(w, "error checking installation", http.StatusInternalServerError)

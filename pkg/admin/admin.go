@@ -410,7 +410,7 @@ func handleTokenStatus(db *sql.DB) http.HandlerFunc {
 		var results []tokenStatus
 
 		for _, tn := range tenants {
-			installs, instErr := tenant.GetActiveInstallations(r.Context(), db, tn.ID)
+			installs, instErr := tenant.GetActiveInstallations(r.Context(), db, tn.ID, ghAppConfig.AppID)
 			if instErr != nil || len(installs) == 0 {
 				continue
 			}

@@ -67,7 +67,8 @@ const getActiveTenantsSQL = `
 const getActiveInstallationsSQL = `
 	SELECT installation_id, target_login
 	FROM github_app_installation
-	WHERE tenant_id = $1 AND suspended_at IS NULL`
+	WHERE tenant_id = $1 AND suspended_at IS NULL
+	  AND ($2 = 0 OR app_id IS NULL OR app_id = $2)`
 
 const getActiveReposForInstallSQL = `
 	SELECT tr.org, tr.repo
@@ -104,8 +105,11 @@ func GetActiveTenants(ctx context.Context, db *sql.DB) ([]ActiveTenant, error) {
 }
 
 // GetActiveInstallations returns non-suspended installations for a tenant.
-func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string) ([]ActiveInstallation, error) {
-	rows, err := db.QueryContext(ctx, getActiveInstallationsSQL, tenantID)
+// appID filters to installations belonging to this GitHub App (0 means no filter).
+//
+//nolint:dupl // same row-scan pattern as GetActiveReposForInstall but different query/type
+func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string, appID int64) ([]ActiveInstallation, error) {
+	rows, err := db.QueryContext(ctx, getActiveInstallationsSQL, tenantID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("querying installations: %w", err)
 	}
@@ -231,6 +235,8 @@ func IncrementImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo, err
 }
 
 // GetActiveReposForInstall returns active repos for a tenant's installation.
+//
+//nolint:dupl // same row-scan pattern as GetActiveInstallations but different query/type
 func GetActiveReposForInstall(ctx context.Context, db *sql.DB, tenantID string, installationID int64) ([]ActiveRepo, error) {
 	rows, err := db.QueryContext(ctx, getActiveReposForInstallSQL, tenantID, installationID)
 	if err != nil {

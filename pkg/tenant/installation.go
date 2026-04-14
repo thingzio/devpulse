@@ -39,13 +39,14 @@ type OrgRepo struct {
 }
 
 const saveInstallationSQL = `
-	INSERT INTO github_app_installation (tenant_id, installation_id, target_type, target_login, permissions)
-	VALUES ($1, $2, $3, $4, $5)
+	INSERT INTO github_app_installation (tenant_id, installation_id, target_type, target_login, permissions, app_id)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	ON CONFLICT (installation_id) DO UPDATE SET
 		tenant_id = EXCLUDED.tenant_id,
 		target_type = EXCLUDED.target_type,
 		target_login = EXCLUDED.target_login,
 		permissions = EXCLUDED.permissions,
+		app_id = EXCLUDED.app_id,
 		suspended_at = NULL`
 
 const listInstallationsSQL = `
@@ -76,11 +77,13 @@ const getInstallationForOrgSQL = `
 	SELECT installation_id, target_login
 	FROM github_app_installation
 	WHERE tenant_id = $1 AND target_login = $2 AND suspended_at IS NULL
+	  AND ($3 = 0 OR app_id IS NULL OR app_id = $3)
 	LIMIT 1`
 
 // SaveInstallation stores or updates a GitHub App installation for a tenant.
-func SaveInstallation(ctx context.Context, db *sql.DB, tenantID string, installationID int64, targetType, targetLogin string, permissions []byte) error {
-	_, err := db.ExecContext(ctx, saveInstallationSQL, tenantID, installationID, targetType, targetLogin, permissions)
+// appID is the GitHub App ID from the webhook payload (installation.app_id).
+func SaveInstallation(ctx context.Context, db *sql.DB, tenantID string, installationID int64, targetType, targetLogin string, permissions []byte, appID int64) error {
+	_, err := db.ExecContext(ctx, saveInstallationSQL, tenantID, installationID, targetType, targetLogin, permissions, appID)
 	if err != nil {
 		return fmt.Errorf("saving installation: %w", err)
 	}
@@ -194,9 +197,10 @@ func DeactivateTenantRepo(ctx context.Context, db *sql.DB, tenantID, org, repo s
 }
 
 // GetInstallationForOrg returns the active installation for a tenant's org, if any.
-func GetInstallationForOrg(ctx context.Context, db *sql.DB, tenantID, org string) (*ActiveInstallation, error) {
+// appID filters to installations belonging to this GitHub App (0 means no filter).
+func GetInstallationForOrg(ctx context.Context, db *sql.DB, tenantID, org string, appID int64) (*ActiveInstallation, error) {
 	var inst ActiveInstallation
-	err := db.QueryRowContext(ctx, getInstallationForOrgSQL, tenantID, org).Scan(&inst.ID, &inst.Login)
+	err := db.QueryRowContext(ctx, getInstallationForOrgSQL, tenantID, org, appID).Scan(&inst.ID, &inst.Login)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
