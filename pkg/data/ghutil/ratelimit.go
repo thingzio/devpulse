@@ -28,6 +28,16 @@ const maxWait = 15 * time.Minute
 // Callers with a token pool should exhaust this token and try another.
 var ErrRateLimited = errors.New("github token rate limited")
 
+// IsServerError reports whether err (or any error in its chain) indicates a
+// GitHub server error (5xx). These are transient and worth retrying.
+func IsServerError(err error) bool {
+	var errResp *github.ErrorResponse
+	if errors.As(err, &errResp) {
+		return errResp.Response != nil && errResp.Response.StatusCode >= 500
+	}
+	return false
+}
+
 // IsRateLimited reports whether err (or any error in its chain) indicates a
 // GitHub rate limit has been reached. Matches ErrRateLimited, github.RateLimitError,
 // and github.AbuseRateLimitError.

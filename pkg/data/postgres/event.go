@@ -285,21 +285,35 @@ func (e *eventImporter) rotateToken(ctx context.Context) bool {
 }
 
 // retryOnRateLimit executes fn. If it returns a rate-limit error, rotates
-// the token and retries once. Returns the original error if rotation fails
-// or the retry also fails.
+// the token and retries once. If it returns a GitHub server error (5xx),
+// backs off briefly and retries once. Returns the original error if
+// rotation fails or the retry also fails.
 func (e *eventImporter) retryOnRateLimit(ctx context.Context, fn func() error) error {
 	err := fn()
 	if err == nil {
 		return nil
 	}
-	if !ghutil.IsRateLimited(err) {
-		return fmt.Errorf("non-retryable error: %w", err)
+	if ghutil.IsRateLimited(err) {
+		slog.Debug("rate limited, rotating token", "org", e.owner, "repo", e.repo)
+		if !e.rotateToken(ctx) {
+			return fmt.Errorf("all tokens exhausted: %w", err)
+		}
+		return fn()
 	}
-	slog.Debug("rate limited, rotating token", "org", e.owner, "repo", e.repo)
-	if !e.rotateToken(ctx) {
-		return fmt.Errorf("all tokens exhausted: %w", err)
+	if ghutil.IsServerError(err) {
+		slog.Warn("github server error, retrying after backoff",
+			"org", e.owner, "repo", e.repo, "error", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+		if retryErr := fn(); retryErr != nil {
+			return fmt.Errorf("server error after retry: %w", retryErr)
+		}
+		return nil
 	}
-	return fn()
+	return fmt.Errorf("non-retryable error: %w", err)
 }
 
 func (e *eventImporter) qualifyTypeKey(t string) string {
@@ -380,6 +394,13 @@ func (e *eventImporter) loadState(ctx context.Context) error {
 		// Always start from page 1. Results are sorted newest-first (created desc),
 		// so resuming from a saved page skips new events created since the last run.
 		state.Page = 1
+
+		// Clamp since to minEventTime — stored timestamps can be arbitrarily old
+		// and cause GitHub API 500s on large repos (e.g. kubernetes/kubernetes).
+		if state.Since.Before(e.minEventTime) {
+			state.Since = e.minEventTime
+		}
+
 		e.state[t] = state
 	}
 

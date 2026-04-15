@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -97,6 +98,45 @@ func TestWaitForRateReset(t *testing.T) {
 			},
 		}
 		assert.False(t, WaitForRateReset(ctx, err))
+	})
+}
+
+func TestIsServerError(t *testing.T) {
+	t.Run("nil error", func(t *testing.T) {
+		assert.False(t, IsServerError(nil))
+	})
+
+	t.Run("generic error", func(t *testing.T) {
+		assert.False(t, IsServerError(errors.New("generic")))
+	})
+
+	t.Run("github 500", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusInternalServerError},
+		}
+		assert.True(t, IsServerError(err))
+	})
+
+	t.Run("github 502", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusBadGateway},
+		}
+		assert.True(t, IsServerError(err))
+	})
+
+	t.Run("github 422 not server error", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusUnprocessableEntity},
+		}
+		assert.False(t, IsServerError(err))
+	})
+
+	t.Run("wrapped server error", func(t *testing.T) {
+		inner := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusInternalServerError},
+		}
+		err := fmt.Errorf("listing pr comments: %w", inner)
+		assert.True(t, IsServerError(err))
 	})
 }
 
