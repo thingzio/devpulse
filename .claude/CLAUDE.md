@@ -175,6 +175,10 @@ Tenant isolation layers:
 - `ANTHROPIC_API_KEY` — optional, enables LLM insights generation
 - `ANTHROPIC_MODEL` — optional, defaults to `claude-haiku-4-5-20251001`
 - `BACKFILL_MAX_DAYS` — max age in days for PR size backfill (default: 90)
+- `IMPORT_FRESH_DAYS` — fresh pass lookback window in days (default: 21)
+- `IMPORT_BACKFILL_CHUNK_DAYS` — backfill chunk size in days (default: 7)
+- `IMPORT_DB_BATCH_SIZE` — events per DB transaction during flush (default: 100)
+- `DEEPREP_IMPORT_LIMIT` — max developers for deep rep scoring per repo (default: 100)
 
 ## CI/CD
 

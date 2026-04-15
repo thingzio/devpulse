@@ -227,19 +227,23 @@ Each tenant's GitHub App installation gets its own **5,000 requests/hour** budge
 
 ### API Calls Per Repo Import
 
-Each repo runs 7 import phases:
+Each repo runs up to 9 import phases (progressive backfill model):
 
 | Phase | Incremental | First import | Notes |
 |-------|------------:|-------------:|-------|
 | Metadata | 2 | 2 | `Repositories.Get` + `GetCommunityHealthMetrics` |
-| Events (5 concurrent) | 10-30 | 50-200+ | PRs, reviews, issues, comments, forks (100/page) |
-| PR size backfill | 0-20 | 50-200 | `PullRequests.Get` per new PR (capped to last 90 days, configurable via `BACKFILL_MAX_DAYS`; exits early on rate limit) |
+| Fresh events (5 concurrent) | 5-20 | 30-100+ | 21-day window (configurable via `IMPORT_FRESH_DAYS`), 100/page |
 | Releases | 1-3 | 1-5 | `ListReleases` paginated |
 | Metric history | 3-10 | 5-15 | Stars + forks pagination |
 | Containers | 0-5 | 2-10 | Packages + versions |
-| Reputation | 5-10/dev | 5-10/dev | User profile + org membership + search |
+| Reputation | 0-5 | 5-20 | Basic scoring from event data |
+| Insights | 1 | 1 | Anthropic API call (not GitHub) |
+| Backfill events | 5-15 | 20-80 | 7-day chunk (configurable via `IMPORT_BACKFILL_CHUNK_DAYS`) |
+| Deep reputation | 5-10/dev | 5-10/dev | Capped at `DEEPREP_IMPORT_LIMIT` (default 100) devs, runs last |
 
-Typical totals: **~60-100 calls/repo** incremental, **~150-300** first import. The free tier (1 repo) and starter tier (5 repos) are well within the 5,000/hr budget.
+DB writes use sub-batches of `IMPORT_DB_BATCH_SIZE` (default 100) events per transaction, keeping write times flat (~1-3s) regardless of repo size.
+
+Typical totals: **~40-80 calls/repo** incremental, **~100-250** first import. The free tier (1 repo) and starter tier (5 repos) are well within the 5,000/hr budget.
 
 ### Throughput Per Tenant
 
@@ -250,7 +254,7 @@ Typical totals: **~60-100 calls/repo** incremental, **~150-300** first import. T
 | High activity (incremental) | ~12-25 |
 | First import (moderate) | ~15-30 |
 
-First imports of large repos may span multiple import cycles — the importer resumes from saved page state automatically.
+First imports fetch 21 days of events in a single run. Historical data fills in via progressive backfill — one 7-day chunk per run until reaching 90-day coverage (~10 runs, ~20 hours). Repos with pending backfill bypass the skip-unchanged check.
 
 ### Rate Limit Handling
 
