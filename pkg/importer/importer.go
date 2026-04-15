@@ -315,6 +315,17 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 	}
 
 	if shouldSkipUnchangedRepo(pushedAt, maxEventTime) {
+		// Don't skip if backfill hasn't reached target depth.
+		targetDate := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
+		backfillUntil, bErr := store.GetBackfillUntil(ctx, org, repo)
+		if bErr == nil && backfillUntil != nil && backfillUntil.After(targetDate) {
+			slog.Info("repo unchanged but backfill pending, continuing",
+				"org", org, "repo", repo,
+				"backfill_days", int(time.Since(*backfillUntil).Hours()/24),
+				"target_days", data.EventAgeDaysDefault)
+			return true, false
+		}
+
 		slog.Info("repo unchanged, skipping",
 			"org", org,
 			"repo", repo,
