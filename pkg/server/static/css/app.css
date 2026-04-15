@@ -398,6 +398,27 @@ fieldset {
   font-size: 1.2rem;
 }
 
+/* Top navigation bar */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 30px;
+  background: var(--page-content-bgColor);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.top-nav-brand {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--page-content-txtColor);
+  text-decoration: none;
+}
+
+.top-nav-brand:hover {
+  color: var(--accent);
+}
+
 .page-content {
   position: relative;
   width: 100%;
@@ -1791,22 +1812,44 @@ a.link {
 
 /* Spotlight add-repo panel when tenant has no repos */
 #add-repo-panel.spotlight {
-  order: -1;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60vw;
+  max-width: 800px;
+  min-width: 400px;
+  z-index: 10;
 }
 #add-repo-panel.spotlight .tbl {
-  border: 2px solid var(--accent);
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
 }
 #add-repo-panel.spotlight .content-header {
   color: var(--accent);
 }
+#add-repo-panel.spotlight .tbl-content {
+  padding: 16px 24px 24px !important;
+}
+#add-repo-panel.spotlight .contributor-search {
+  font-size: 1.1em;
+  padding: 14px 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+#add-repo-panel.spotlight .tbl-content > div {
+  max-width: 100%;
+}
+#add-repo-panel.spotlight .tbl-content > div > div {
+  max-width: 100% !important;
+}
 #add-repo-panel.spotlight .tbl-content::after {
   content: "Add your first repository to get started";
   display: block;
-  text-align: center;
+  text-align: left;
   color: var(--gray);
-  font-size: 0.9em;
-  padding: 0 15px 12px;
+  font-size: 0.95em;
+  padding: 12px 0 0;
 }
 
 /* Health Scorecard */

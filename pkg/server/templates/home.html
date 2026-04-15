@@ -16,11 +16,6 @@
     {{ end }}
 
     <section class="search-and-user">
-        <a href="#" id="logo-home" class="logo-link" aria-label="Go to default view">
-            <svg class="logo-img" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                <circle cx="12" cy="12" r="4"/><line x1="1.05" x2="7" y1="12" y2="12"/><line x1="17.01" x2="22.96" y1="12" y2="12"/>
-            </svg>
-        </a>
         <form id="home-search-form">
             <input type="search" placeholder="Search orgs and repos (or org:name, repo:name)" id="search-bar" autocomplete="off">
             <button type="submit" aria-label="submit form">
@@ -58,19 +53,6 @@
             <span class="pdf-label">PDF</span>
         </button>
         {{ end }}
-        <div class="user-menu-wrap">
-            <button class="user-avatar-btn" id="user-menu-toggle" aria-label="User menu">
-                <img src="{{ .avatar_url }}" alt="{{ .username }}" class="user-avatar" />
-            </button>
-            <div class="user-menu" id="user-menu" style="display:none;">
-                <div class="user-menu-header">{{ .username }}</div>
-                {{ if .name }}<div class="user-menu-name">{{ .name }}</div>{{ end }}
-                <div class="user-menu-divider"></div>
-                <a href="/settings" class="user-menu-item">Settings</a>
-                <div class="user-menu-divider"></div>
-                <a href="/auth/reset" class="user-menu-item user-menu-signout">Sign out</a>
-            </div>
-        </div>
     </section>
     <b class="header-term" style="display:none;">All imported events</b>
 
@@ -128,8 +110,8 @@
                     <div class="content-header">Add Repository</div>
                     <div class="tbl-content" style="padding:12px 15px;overflow:visible">
                         <div style="display:flex;align-items:center;gap:12px">
-                            <div style="position:relative;max-width:500px;flex:1 1 auto;min-width:0;width:100%">
-                                <input type="text" id="repo-search" class="contributor-search" placeholder="Search repos (e.g. kubernetes, thingzio/devpulse)..." autocomplete="off">
+                            <div style="position:relative;flex:1 1 auto;min-width:0;width:100%">
+                                <input type="text" id="repo-search" class="contributor-search" placeholder="Search repos (e.g. org/repo)..." autocomplete="off">
                                 <ul id="repo-search-results" class="contributor-suggestions" style="position:absolute;z-index:999;max-height:300px"></ul>
                             </div>
                             <p id="repo-search-status" style="color:var(--gray);font-size:0.85em;margin:0"></p>

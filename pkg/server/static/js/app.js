@@ -285,7 +285,7 @@ $(function () {
         submitSearch();
     });
 
-    $("#logo-home").click(function (e) {
+    $("#nav-home").click(function (e) {
         e.preventDefault();
         $("#search-bar").val("");
         resetSearch();
@@ -1789,10 +1789,18 @@ function loadRepoOverview(url) {
         var $tbody = $("#repo-overview-table tbody");
         $tbody.empty();
         if (!data || data.length === 0) {
-            $tbody.append('<tr><td colspan="12" style="text-align:center">No repository data available yet.</td></tr>');
-            $("#add-repo-panel").addClass("spotlight");
+            $(".search-and-user").hide();
+            $(".header-term").hide();
+            $("#portfolio-summary-panel").hide();
+            $("#repo-overview-panel").hide();
+            $("#portfolio-view").css("min-height", "80vh");
+            $("#add-repo-panel").addClass("spotlight").show();
             return;
         }
+        $(".search-and-user").show();
+        $("#portfolio-view").css("min-height", "");
+        $("#portfolio-summary-panel").show();
+        $("#repo-overview-panel").show();
         $("#add-repo-panel").removeClass("spotlight");
         $.each(data, function (i, r) {
             var name = r.org + '/' + r.repo;
