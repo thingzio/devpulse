@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -178,4 +180,90 @@ func TestIsEventBatchValidAge(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestFlushSubBatching(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	origBatchSize := dbBatchSize
+	dbBatchSize = 100
+	t.Cleanup(func() { dbBatchSize = origBatchSize })
+
+	const (
+		numEvents = 300
+		numUsers  = 50
+		org       = "testorg"
+		repo      = "testrepo"
+	)
+
+	users := make(map[string]*github.User, numUsers)
+	for i := range numUsers {
+		login := fmt.Sprintf("user-%03d", i)
+		users[login] = &github.User{
+			Login:   github.Ptr(login),
+			Name:    github.Ptr("User " + login),
+			HTMLURL: github.Ptr("https://github.com/" + login),
+		}
+	}
+
+	events := make([]*data.Event, numEvents)
+	baseTime := time.Now().UTC().Add(-time.Duration(numEvents) * time.Hour)
+	for i := range numEvents {
+		username := fmt.Sprintf("user-%03d", i%numUsers)
+		evDate := baseTime.Add(time.Duration(i) * time.Hour)
+		events[i] = &data.Event{
+			Org:      org,
+			Repo:     repo,
+			Username: username,
+			Type:     data.EventTypePR,
+			Date:     evDate.Format("2006-01-02T15:04:05Z"),
+			URL:      fmt.Sprintf("https://github.com/%s/%s/pull/%d", org, repo, i+1),
+			Title:    fmt.Sprintf("PR #%d", i+1),
+		}
+	}
+
+	since := baseTime.Add(-24 * time.Hour)
+	state := map[string]*data.State{
+		data.EventTypePR: {
+			Since: since,
+			Page:  1,
+		},
+	}
+
+	imp := &eventImporter{
+		store:  store,
+		owner:  org,
+		repo:   repo,
+		list:   events,
+		users:  users,
+		state:  state,
+		counts: make(map[string]int),
+	}
+
+	require.NoError(t, imp.flush(ctx))
+
+	var eventCount int
+	err := store.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM devpulse_event WHERE org = $1 AND repo = $2",
+		org, repo).Scan(&eventCount)
+	require.NoError(t, err)
+	assert.Equal(t, numEvents, eventCount)
+
+	var devCount int
+	err = store.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM devpulse_developer WHERE username LIKE $1",
+		"user-%").Scan(&devCount)
+	require.NoError(t, err)
+	assert.Equal(t, numUsers, devCount)
+
+	var stateCount int
+	err = store.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM devpulse_state WHERE org = $1 AND repo = $2",
+		org, repo).Scan(&stateCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stateCount, "expected one state row for event type pr")
+
+	assert.Equal(t, numEvents, imp.flushed)
+	assert.Empty(t, imp.list, "event list should be empty after flush")
 }
