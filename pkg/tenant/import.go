@@ -37,12 +37,35 @@ func ResetImportErrors(ctx context.Context, db *sql.DB, id string) error {
 	return nil
 }
 
-// ResetImportErrorsByRepo clears the error counter for a specific org/repo across all tenants.
+// ResetImportErrorsByRepo clears the error counter, import state, and repo
+// metadata for a specific org/repo across all tenants. Clearing state and
+// metadata forces a full reimport on the next scheduled run.
 func ResetImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo string) (int64, error) {
-	res, err := db.ExecContext(ctx, resetImportErrorsByRepoSQL, org, repo)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
+		return 0, fmt.Errorf("starting transaction: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, resetImportErrorsByRepoSQL, org, repo)
+	if err != nil {
+		_ = tx.Rollback()
 		return 0, fmt.Errorf("resetting import errors for %s/%s: %w", org, repo, err)
 	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM devpulse_state WHERE org = $1 AND repo = $2", org, repo); err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("clearing state for %s/%s: %w", org, repo, err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM devpulse_repo_meta WHERE org = $1 AND repo = $2", org, repo); err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("clearing repo meta for %s/%s: %w", org, repo, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("committing reset for %s/%s: %w", org, repo, err)
+	}
+
 	return res.RowsAffected()
 }
 

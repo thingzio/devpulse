@@ -10,8 +10,8 @@ usage() {
     echo "Usage: $0 <org> <repo>"
     echo "       $0 --all <username>"
     echo ""
-    echo "Resets the import error counter for the specified repo (or all repos"
-    echo "for a tenant), allowing paused imports to resume on the next scheduled run."
+    echo "Fully resets a repo for reimport: clears error counter, import state,"
+    echo "and repo metadata. The next scheduled run will reimport from scratch."
     exit 1
 }
 
