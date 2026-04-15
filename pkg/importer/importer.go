@@ -460,7 +460,7 @@ func runEnrichmentPhases(
 		var res *data.DeepReputationResult
 		if err := retryRL(func() error {
 			var drErr error
-			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, deepReputationDefaultLimit, 0, &org, &repo)
+			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, config.DeepRepImportLimit(), 0, &org, &repo)
 			return drErr
 		}); err != nil {
 			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
@@ -567,10 +567,9 @@ func newRetryRL(ctx context.Context) func(func() error) error {
 }
 
 const (
-	insightsPeriodWeeks        = 9
-	insightsMinAgeDays         = 7
-	insightsEventDeltaPct      = 0.10
-	deepReputationDefaultLimit = 100
+	insightsPeriodWeeks   = 9
+	insightsMinAgeDays    = 7
+	insightsEventDeltaPct = 0.10
 )
 
 // checkInsightStaleness determines whether insights should be regenerated

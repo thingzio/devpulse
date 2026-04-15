@@ -75,6 +75,10 @@ func ImportBackfillChunkDays() int { return GetEnvAsInt("IMPORT_BACKFILL_CHUNK_D
 // Deep Reputation
 // ---------------------------------------------------------------------------
 
+// DeepRepImportLimit returns the max developers scored per repo during import.
+// Dedicated deep reputation worker handles the full set. Override: DEEPREP_IMPORT_LIMIT (default 100).
+func DeepRepImportLimit() int { return GetEnvAsInt("DEEPREP_IMPORT_LIMIT", 100) }
+
 // DeepRepLowScoreStaleHours returns the rescore interval for contributors
 // with reputation below the score threshold. Override: DEEPREP_LOW_STALE_HOURS (default 168 = 7 days).
 func DeepRepLowScoreStaleHours() int { return GetEnvAsInt("DEEPREP_LOW_STALE_HOURS", 168) }
