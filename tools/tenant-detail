@@ -62,7 +62,7 @@ echo "${BODY}" | jq -r '
     if (.repos | length) == 0 then "  (none)"
     else
         .max_events_per_week as $max |
-        ["  NAME", "EVENTS", "WEEKLY", "CONTRIBS", "SCORED-DEEP", "PRS-BACKFILL", "LAST-IMPORT"],
+        ["  NAME", "EVENTS", "WEEKLY", "CONTRIBS", "SCORED-DEEP", "PRS-BACKFILL", "BACKFILL", "LAST-IMPORT"],
         (.repos[] | [
             "  \(.name)",
             (.events | tostring),
@@ -70,6 +70,7 @@ echo "${BODY}" | jq -r '
             (.contributors | tostring),
             (if .contributors == 0 then "-" elif .deep_scored == .contributors then "done" else "\(.deep_scored)(\(.deep_scored * 100 / .contributors | round)%)" end),
             (if .pr_total == 0 then "-" elif .pr_missing_size == 0 then "done" else "\(.pr_total)(\((.pr_total - .pr_missing_size) * 100 / .pr_total | round)%)" end),
+            (if .backfill_days == 0 then "-" elif .backfill_days >= .backfill_target then "done" else "\(.backfill_days)/\(.backfill_target)d" end),
             (if .last_import == "" then "never" else .last_import end)
         ]) | @tsv
     end' | column -t

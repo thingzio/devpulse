@@ -207,6 +207,8 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 				Scored:         rd.Scored,
 				DeepScored:     rd.DeepScored,
 				NeverDeepScore: rd.NeverDeepScore,
+				BackfillDays:   rd.BackfillDays,
+				BackfillTarget: rd.BackfillTarget,
 			}
 			if out.MaxEventsPerWeek > 0 {
 				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100

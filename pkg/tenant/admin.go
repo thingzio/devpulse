@@ -50,6 +50,8 @@ type RepoDetail struct {
 	Scored         int
 	DeepScored     int
 	NeverDeepScore int
+	BackfillDays   int // days of backfill coverage (0 = not started)
+	BackfillTarget int // target days (EventAgeDaysDefault)
 }
 
 const (
@@ -210,10 +212,29 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 		); err != nil {
 			return nil, fmt.Errorf("scanning repo detail: %w", err)
 		}
+		rd.BackfillTarget = data.EventAgeDaysDefault
 		repos = append(repos, rd)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating repo details: %w", err)
 	}
+
+	// Populate backfill coverage from state table.
+	for i := range repos {
+		var backfillUnix sql.NullInt64
+		err := db.QueryRowContext(ctx,
+			`SELECT MIN(backfill_until) FROM devpulse_state
+			 WHERE org = $1 AND repo = $2 AND backfill_until IS NOT NULL`,
+			repos[i].Org, repos[i].Repo).Scan(&backfillUnix)
+		if err != nil || !backfillUnix.Valid {
+			continue
+		}
+		backfillTime := time.Unix(backfillUnix.Int64, 0).UTC()
+		repos[i].BackfillDays = int(time.Since(backfillTime).Hours() / 24)
+		if repos[i].BackfillDays > repos[i].BackfillTarget {
+			repos[i].BackfillDays = repos[i].BackfillTarget
+		}
+	}
+
 	return repos, nil
 }
