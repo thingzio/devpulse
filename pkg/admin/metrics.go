@@ -41,7 +41,6 @@ type metricsConfig struct {
 	model        string
 	service      string
 	job          string
-	admin        string
 	dbID         string
 }
 
@@ -54,7 +53,6 @@ func newMetricsConfig() *metricsConfig {
 		model:        config.AnthropicModel(defaultInsightsModel),
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
-		admin:        prefix + "-admin",
 		dbID:         project + ":" + config.DBInstanceID(),
 	}
 }
@@ -307,17 +305,6 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 				cfg.service),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
-		// --- Admin ---
-		{
-			label:  "Admin: Request Count",
-			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_count"`, cfg.admin),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_RATE&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.response_code_class",
-		},
-		{
-			label:  "Admin: Request Latency p99 (ms)",
-			filter: fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name="%s" AND metric.type="run.googleapis.com/request_latencies"`, cfg.admin),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_PERCENTILE_99&aggregation.crossSeriesReducer=REDUCE_MEAN",
-		},
 	}
 }
 
@@ -485,7 +472,6 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 - **Import job** (devpulse-saas-import): Batch worker, runs every 2 hours via Cloud Scheduler.
   Each execution uses 3 tasks × 2 goroutine workers. Imports events, runs deep reputation
   analysis inline, then generates LLM insights per repo.
-- **Admin service** (devpulse-saas-admin): IAM-gated, scale-to-zero, writeTimeout=90s.
 - **Shared token pool**: Import mints GitHub installation tokens from ALL active installations
   across ALL tenants, deduplicates by installation ID, round-robin with pre-flight quota check
   (skips tokens with <100 remaining). Tokens auto-skip when exhausted via Exhaust()/ActiveCount().
@@ -493,10 +479,9 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
   normal when all recent PRs already have size data — this is NOT a stall.
 
 ## Known Baselines & Thresholds
-- DB connection pools: serve=17max/5idle, import=5max/2idle, admin=3max/1idle.
+- DB connection pools: serve=17max/5idle, import=5max/2idle.
 - Alert thresholds: p99 latency >1s for 600s, 5xx >5/min for 5min, DB CPU >80% for 5min,
-  DB connections >80 for 5min, cold-start latency >3s.
-- Admin writeTimeout is 90s — responses up to ~85s are allowed but concerning.
+  DB connections >80 for 5min.
 - GitHub rate limit: per-installation, 60-min sliding window (NOT top-of-hour reset).
 
 ## User Engagement Metrics Context
@@ -505,34 +490,39 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
 - "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
 - "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
 
-## Known Conditions (suppress — do NOT report these)
-The following are acknowledged, expected, or deprioritized. Do NOT mention them in
-observations, risks, or actions unless they represent a NEW change from their known state:
-- Admin service high p99 latency: Single-user internal tool, latency is not a concern.
-  Only flag if the service is returning errors or timing out (>90s).
-- Alternating high/low p99 daily pattern on serve service: Known periodic behavior,
-  likely import-correlated. Only flag if the daily max exceeds 15s or the pattern changes.
-- Weekend/Monday sign-in and traffic dips: Normal usage pattern. Only flag if weekday
-  traffic also declines for 3+ consecutive days.
-- Cold-start latency ~2s: Well within the 3s threshold. Only flag if it exceeds 2.5s.
-- Disk utilization flat at ~2%: Not a concern. Only flag if growth trend appears.
-- DB connections well below threshold: Only flag if daily max exceeds 40.
+## Suppression Rules (STRICT — do NOT mention these unless the override condition is met)
+The following are acknowledged steady-state behaviors. You MUST suppress them entirely —
+do not mention them in observations, risks, or actions. The ONLY exception is if the
+override condition fires, in which case report the deviation, not the baseline.
+
+| Signal | Steady State | Override (report ONLY if this fires) |
+|--------|-------------|--------------------------------------|
+| Cold-start latency | ~2s | 7-day average exceeds 2.5s |
+| Serve p99 daily high/low alternation | Import-correlated pattern | Daily max exceeds 15s or pattern changes shape |
+| Weekend/Monday traffic dips | Normal usage cycle | Weekday traffic declines 3+ consecutive days |
+| Disk utilization | Flat ~2% | Growth trend visible over 7-day window |
+| DB connections | Well below threshold | Daily max exceeds 40 |
+| PR Backfill updated = 0 | All recent PRs already have size data | Non-zero AND errors present |
+| DB transactions/sec steady range | ~8-11 tx/s | Sustained >20 tx/s for 3+ hours |
 
 ## Analysis Instructions
-Provide a brief, actionable analysis in three sections:
+Provide a brief, actionable analysis. Bias HARD toward brevity — a quiet day should
+produce a short report, not padding. Apply the Suppression Rules strictly.
 
-1. Key Observations — Only anomalies, threshold breaches, or notable trends.
+1. Key Observations — Only anomalies, threshold breaches, or multi-day trends.
    One bullet per finding. Correlate across categories (e.g. latency + import timing).
-   Skip anything that looks normal or is listed in Known Conditions above.
+   Skip ANYTHING that matches steady-state behavior in the Suppression Rules table.
+   Do NOT narrate normal operations — if a metric is within its baseline, omit it entirely.
 2. Risks — Rate each: 🔴 critical, 🟠 warning, 🟡 watch.
-   Only flag metrics abnormal relative to the baselines above. If none, say "No risks identified."
+   Only include risks that are actionable. If none, say "No risks identified."
 3. Actions — Concrete next steps only if risks were found. One line each.
    Do NOT recommend features that already exist (token pool retry, connection pool bounds, backfill limits).
 
 If a "7-Day Trend Baseline" section is present, compare today's metrics against the trailing
-7-day pattern. Flag regressions and improvements inline within Key Observations.
+7-day pattern. Only flag regressions that exceed normal variance.
 
-Target length: 10-15 bullet points total. If everything looks healthy, say so in 2-3 sentences.`
+Target: 3-8 bullet points on a normal day. Up to 15 only during incidents.
+If everything looks healthy, say so in 1-2 sentences and stop.`
 
 const analysisHTMLSuffix = `
 

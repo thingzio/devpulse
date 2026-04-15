@@ -56,7 +56,6 @@ func TestNewMetricsConfig_Defaults(t *testing.T) {
 	assert.Equal(t, defaultInsightsModel, cfg.model)
 	assert.Equal(t, "devpulse-saas-serve", cfg.service)
 	assert.Equal(t, "devpulse-saas-import", cfg.job)
-	assert.Equal(t, "devpulse-saas-admin", cfg.admin)
 	assert.Equal(t, "thingzio:thingzio-pg", cfg.dbID)
 }
 
