@@ -329,8 +329,6 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (error, bool) {
 	start := time.Now()
 
-	// tokenForPhase returns the current pool token, rotating on rate limit.
-	// Each phase gets a potentially fresh token if the previous one was exhausted.
 	tokenForPhase := func() string {
 		if pool == nil {
 			return ""
@@ -344,6 +342,7 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 
 	token := tokenForPhase()
 
+	// Phase 1: Metadata + skip check (unchanged)
 	slog.Info("phase: metadata", "org", org, "repo", repo)
 	metaOK, skip := importMetaAndCheckSkip(ctx, store, retryRL, token, org, repo)
 	if !metaOK {
@@ -353,8 +352,16 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		return nil, true
 	}
 
+	// Phase 2: Fresh pass — recent events
+	freshDays := config.ImportFreshDays()
+	freshStart := time.Now().AddDate(0, 0, -freshDays).UTC()
+	freshEnd := time.Now().UTC()
+
 	token = tokenForPhase()
-	slog.Info("phase: events", "org", org, "repo", repo)
+	slog.Info("phase: events (fresh)", "org", org, "repo", repo,
+		"window_start", freshStart.Format("2006-01-02"),
+		"window_end", freshEnd.Format("2006-01-02"))
+
 	var eventTokenFn data.TokenFunc
 	var eventExhaustFn data.ExhaustFunc
 	if pool != nil {
@@ -363,18 +370,33 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	} else {
 		eventTokenFn = func() string { return token }
 	}
+
 	if err := retryRL(func() error {
-		windowStart := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
-		windowEnd := time.Now().UTC()
-		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, windowStart, windowEnd)
+		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, freshStart, freshEnd)
 		if importErr != nil {
-			return fmt.Errorf("importing events: %w", importErr)
+			return fmt.Errorf("importing events (fresh): %w", importErr)
 		}
 		return nil
 	}); err != nil {
-		slog.Error("importing events", "org", org, "repo", repo, "error", err)
+		slog.Error("importing events (fresh)", "org", org, "repo", repo, "error", err)
 		errs++
 	}
+
+	// Set backfill_until on first import (when NULL).
+	backfillUntil, err := store.GetBackfillUntil(ctx, org, repo)
+	if err != nil {
+		slog.Warn("checking backfill state", "org", org, "repo", repo, "error", err)
+	}
+	if backfillUntil == nil {
+		if err := store.SaveBackfillUntil(ctx, org, repo, freshStart); err != nil {
+			slog.Warn("setting initial backfill_until", "org", org, "repo", repo, "error", err)
+		}
+		t := freshStart
+		backfillUntil = &t
+	}
+
+	// Phases 3-8: Non-event phases run after fresh pass so the dashboard
+	// has complete data for the recent window before backfill starts.
 
 	token = tokenForPhase()
 	slog.Info("phase: releases", "org", org, "repo", repo)
@@ -424,7 +446,6 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		slog.Debug("skipping deep reputation, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
-	// Generate LLM insights (skipped if ANTHROPIC_API_KEY not set)
 	if llmCfg != nil && limits.AILevel > 0 {
 		slog.Info("phase: insights", "org", org, "repo", repo)
 		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
@@ -433,6 +454,59 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		}
 	} else if llmCfg != nil {
 		slog.Debug("skipping insights, not included in plan", "org", org, "repo", repo, "plan", planName)
+	}
+
+	// Phase 9: Backfill pass — extend historical coverage
+	targetDate := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
+	chunkDays := config.ImportBackfillChunkDays()
+
+	if backfillUntil != nil && backfillUntil.After(targetDate) {
+		chunkStart := backfillUntil.AddDate(0, 0, -chunkDays).UTC()
+		if chunkStart.Before(targetDate) {
+			chunkStart = targetDate
+		}
+		chunkEnd := *backfillUntil
+
+		slog.Info("phase: events (backfill)", "org", org, "repo", repo,
+			"chunk_start", chunkStart.Format("2006-01-02"),
+			"chunk_end", chunkEnd.Format("2006-01-02"),
+			"coverage_days", int(time.Since(chunkEnd).Hours()/24),
+			"target_days", data.EventAgeDaysDefault)
+
+		token = tokenForPhase()
+		if pool != nil {
+			eventTokenFn = func() string { return pool.Token() }
+		} else {
+			eventTokenFn = func() string { return token }
+		}
+
+		if err := retryRL(func() error {
+			_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, chunkStart, chunkEnd)
+			if importErr != nil {
+				return fmt.Errorf("importing events (backfill): %w", importErr)
+			}
+			return nil
+		}); err != nil {
+			slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", err)
+			errs++
+		} else {
+			// Advance backfill_until on success
+			if err := store.SaveBackfillUntil(ctx, org, repo, chunkStart); err != nil {
+				slog.Warn("advancing backfill_until", "org", org, "repo", repo, "error", err)
+			}
+			coverageDays := int(time.Since(chunkStart).Hours() / 24)
+			slog.Info("backfill pass complete", "org", org, "repo", repo,
+				"chunk_start", chunkStart.Format("2006-01-02"),
+				"chunk_end", chunkEnd.Format("2006-01-02"),
+				"coverage_days", coverageDays,
+				"target_days", data.EventAgeDaysDefault)
+			if coverageDays >= data.EventAgeDaysDefault {
+				slog.Info("backfill complete", "org", org, "repo", repo,
+					"coverage_days", coverageDays)
+			}
+		}
+	} else {
+		slog.Debug("backfill complete, skipping", "org", org, "repo", repo)
 	}
 
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
