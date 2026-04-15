@@ -115,33 +115,21 @@ The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (e
 
 Unchanged repos (no pushes since last import) are skipped automatically to save API quota. On-demand import is triggered via Cloud Run Jobs API when a user adds a new repo (`pkg/server/import_trigger.go`).
 
-### Progressive Backfill (Proposed)
+### Progressive Backfill
 
-The current import design fetches all events from `since` (up to 90 days back) starting at page 1 on every run. For massive repos (e.g. kubernetes/kubernetes — 35k+ events, 13k+ developers), a single run can't finish within the 55-minute job timeout, and re-fetching already-imported pages wastes time on subsequent runs.
+Event import uses a two-pass model to prioritize fresh data:
 
-**Proposed two-pass approach:**
+1. **Fresh pass** — fetches events from the most recent `IMPORT_FRESH_DAYS` (default 21 days), newest-first. All 5 event types run concurrently. Completes quickly even for the largest repos.
+2. **Non-event phases** — releases, metrics, containers, reputation, deep reputation, insights all run after the fresh pass, ensuring the dashboard has complete data for the recent window.
+3. **Backfill pass** — extends historical coverage by `IMPORT_BACKFILL_CHUNK_DAYS` (default 7 days) per run, marching backward until reaching `EventAgeDaysDefault` (90 days). Runs last as best effort.
 
-1. **Fresh pass** — fetch recent events (last 3 weeks), newest-first. Completes quickly, user sees current data immediately.
-2. **Backfill pass** — extend the `since` window backward by ~3 weeks each run until reaching `EventAgeDaysDefault` (90 days). Each run picks up where the previous left off.
+**State:** `backfill_until` column in `devpulse_state` tracks the oldest date covered. NULL means fresh repo. Updated only on successful chunk completion — killed runs retry the same chunk.
 
-**State changes:**
-- Track `backfill_since` separately from the fresh-data `since` in `devpulse_state`
-- Fresh pass always uses a narrow window (e.g. 21 days) from page 1
-- Backfill pass resumes from stored page/since, extending the window each run
-- Cap at `EventAgeDaysDefault` — once full coverage is reached, backfill stops
+**DB writes:** API fetches 500-event batches, but flushes to PostgreSQL in sub-batches of `IMPORT_DB_BATCH_SIZE` (default 100). Each sub-batch is a separate transaction, keeping developer upsert conflict sets small and write times flat (~1-3s regardless of import progress).
 
-**Benefits:**
-- Small repos reach full 90-day coverage in one run (no behavior change)
-- Large repos get fresh data on first import, historical data fills in over subsequent runs
-- Each run fits within the job timeout
-- No re-processing of already-imported events
-- Self-adapting — window extension rate could be tuned per-repo based on event density
+**Self-healing:** Killed jobs resume cleanly — flushed sub-batches are persisted via idempotent upserts, and `backfill_until` only advances on chunk completion. GitHub API 500s on one event type don't block backfill progress — the failing window ages out.
 
-**Design considerations:**
-- Upserts (`ON CONFLICT DO UPDATE`) make overlapping windows safe
-- GitHub API returns events newest-first, so fresh pass and backfill pass may overlap at the boundary — this is harmless
-- DB contention during large upsert batches impacts serve latency — consider throttling batch size or adding delays between flushes
-- GitHub API 500s on comment endpoints for very large repos even with 90-day windows — may need per-endpoint window caps
+**Configuration:** `IMPORT_FRESH_DAYS` (default 21), `IMPORT_BACKFILL_CHUNK_DAYS` (default 7), `IMPORT_DB_BATCH_SIZE` (default 100). All optional with sensible defaults.
 
 **Token pool:** The import job collects installation tokens from all active GitHub App installations across all tenants, deduplicates by installation ID, and rotates via round-robin (`pkg/data/ghutil/tokenpool.go`). Tokens with < 100 remaining quota are skipped. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 
