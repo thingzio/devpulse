@@ -52,6 +52,7 @@ func Run(ctx context.Context) error {
 	mux.HandleFunc("POST /upgrade", handleUpgrade(db))
 	mux.HandleFunc("POST /invite", handleInvite(db))
 	mux.HandleFunc("POST /reset-errors", handleResetErrors(db))
+	mux.HandleFunc("POST /hard-reset", handleHardReset(db))
 	mux.HandleFunc("GET /summary", handleSummary(db))
 	mux.HandleFunc("GET /metrics", handleMetricsReview(mcfg))
 	mux.HandleFunc("POST /report", handleReport(db, mcfg, rcfg))
@@ -332,7 +333,17 @@ func handleInvite(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+type resetFunc func(ctx context.Context, db *sql.DB, org, repo string) (int64, error)
+
 func handleResetErrors(db *sql.DB) http.HandlerFunc {
+	return handleRepoReset(db, "reset errors", tenant.ResetImportErrorsByRepo)
+}
+
+func handleHardReset(db *sql.DB) http.HandlerFunc {
+	return handleRepoReset(db, "hard reset", tenant.HardResetRepo)
+}
+
+func handleRepoReset(db *sql.DB, label string, fn resetFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyLen)
 		var req resetErrorsRequest
@@ -346,14 +357,14 @@ func handleResetErrors(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		count, err := tenant.ResetImportErrorsByRepo(r.Context(), db, req.Org, req.Repo)
+		count, err := fn(r.Context(), db, req.Org, req.Repo)
 		if err != nil {
-			slog.Error("resetting import errors", "org", req.Org, "repo", req.Repo, "error", err)
-			http.Error(w, "error resetting import errors", http.StatusInternalServerError)
+			slog.Error(label, "org", req.Org, "repo", req.Repo, "error", err)
+			http.Error(w, fmt.Sprintf("error: %s", label), http.StatusInternalServerError)
 			return
 		}
 
-		slog.Info("import errors reset", "org", req.Org, "repo", req.Repo, "rows", count)
+		slog.Info(label, "org", req.Org, "repo", req.Repo, "rows", count)
 
 		writeJSON(w, http.StatusOK, resetErrorsResponse{
 			Org:   req.Org,

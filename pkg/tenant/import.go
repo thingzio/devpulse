@@ -37,10 +37,18 @@ func ResetImportErrors(ctx context.Context, db *sql.DB, id string) error {
 	return nil
 }
 
-// ResetImportErrorsByRepo clears the error counter, import state, and repo
-// metadata for a specific org/repo across all tenants. Clearing state and
-// metadata forces a full reimport on the next scheduled run.
+// ResetImportErrorsByRepo clears the error counter for a specific org/repo across all tenants.
 func ResetImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo string) (int64, error) {
+	res, err := db.ExecContext(ctx, resetImportErrorsByRepoSQL, org, repo)
+	if err != nil {
+		return 0, fmt.Errorf("resetting import errors for %s/%s: %w", org, repo, err)
+	}
+	return res.RowsAffected()
+}
+
+// HardResetRepo clears error counter, import state, and repo metadata for a
+// specific org/repo. Forces a full reimport on the next scheduled run.
+func HardResetRepo(ctx context.Context, db *sql.DB, org, repo string) (int64, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("starting transaction: %w", err)
@@ -63,7 +71,7 @@ func ResetImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo string) 
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("committing reset for %s/%s: %w", org, repo, err)
+		return 0, fmt.Errorf("committing hard reset for %s/%s: %w", org, repo, err)
 	}
 
 	return res.RowsAffected()

@@ -7,11 +7,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 has_tools gcloud terraform curl jq
 
 usage() {
-    echo "Usage: $0 <org> <repo>"
-    echo "       $0 --all <username>"
+    echo "Usage: $0 <org> <repo>          # reset error counter only"
+    echo "       $0 <org> <repo> hard      # full reset: errors + state + metadata"
+    echo "       $0 --all <username>        # reset errors for all repos of a tenant"
     echo ""
-    echo "Fully resets a repo for reimport: clears error counter, import state,"
-    echo "and repo metadata. The next scheduled run will reimport from scratch."
+    echo "Default resets the import error counter so paused imports resume."
+    echo "With 'hard', also clears import state and repo metadata, forcing"
+    echo "a full reimport from scratch on the next scheduled run."
     exit 1
 }
 
@@ -26,18 +28,23 @@ TOKEN="$(gcloud auth print-identity-token 2>/dev/null)" \
     || err "Failed to get identity token. Run 'gcloud auth login' first."
 
 reset_repo() {
-    local org="$1" repo="$2"
+    local org="$1" repo="$2" mode="${3:-soft}"
+    local endpoint="reset-errors"
+    if [[ "${mode}" == "hard" ]]; then
+        endpoint="hard-reset"
+    fi
+
     RESPONSE="$(curl -s -w "\n%{http_code}" \
         -H "Authorization: Bearer ${TOKEN}" \
         -H "Content-Type: application/json" \
         -d "{\"org\":\"${org}\",\"repo\":\"${repo}\"}" \
-        "${ADMIN_URL}/reset-errors")"
+        "${ADMIN_URL}/${endpoint}")"
 
     HTTP_CODE="$(echo "${RESPONSE}" | tail -1)"
     BODY="$(echo "${RESPONSE}" | head -1)"
 
     if [[ "${HTTP_CODE}" == "200" ]]; then
-        msg "Reset ${org}/${repo}: ${BODY}"
+        msg "${mode} reset ${org}/${repo}: ${BODY}"
     else
         echo "[WARN] Failed ${org}/${repo} (HTTP ${HTTP_CODE}): ${BODY}" >&2
     fi
@@ -75,6 +82,6 @@ if [[ "$1" == "--all" ]]; then
 
     msg "Reset ${COUNT} repos for ${USERNAME}"
 else
-    [[ $# -ne 2 ]] && usage
-    reset_repo "$1" "$2"
+    [[ $# -lt 2 || $# -gt 3 ]] && usage
+    reset_repo "$1" "$2" "${3:-soft}"
 fi
