@@ -122,7 +122,7 @@ func (m *mockStore) GetEventTypeSeries(ctx context.Context, org, repo, entity *s
 }
 
 // --- EventStore ---
-func (m *mockStore) ImportEvents(_ context.Context, _ data.TokenFunc, _ data.ExhaustFunc, _, _ string, _ int) (map[string]int, *data.ImportSummary, error) {
+func (m *mockStore) ImportEvents(_ context.Context, _ data.TokenFunc, _ data.ExhaustFunc, _, _ string, _, _ time.Time) (map[string]int, *data.ImportSummary, error) {
 	return nil, nil, nil
 }
 func (m *mockStore) UpdateEvents(_ context.Context, _ string, _ int) (map[string]int, error) {

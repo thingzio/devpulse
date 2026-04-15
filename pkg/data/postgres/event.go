@@ -128,7 +128,9 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 		org, repo := r.Org, r.Repo
 		g.Go(func() error {
 			staticToken := func() string { return token }
-			m, _, importErr := s.ImportEvents(ctx, staticToken, nil, org, repo, data.EventAgeDaysDefault)
+			windowStart := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
+			windowEnd := time.Now().UTC()
+			m, _, importErr := s.ImportEvents(ctx, staticToken, nil, org, repo, windowStart, windowEnd)
 			if importErr != nil {
 				slog.Error("error importing events", "org", org, "repo", repo, "error", importErr)
 				return nil // log and continue, don't abort other repos
@@ -151,13 +153,16 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	return results, nil
 }
 
-func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc, owner, repo string, days int) (map[string]int, *data.ImportSummary, error) {
+func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc, owner, repo string, windowStart, windowEnd time.Time) (map[string]int, *data.ImportSummary, error) {
 	if tokenFn == nil || owner == "" || repo == "" {
 		return nil, nil, errors.New("tokenFn, owner, and repo are required")
 	}
 
-	if days < 1 {
-		days = data.EventAgeDaysDefault
+	if windowStart.IsZero() {
+		windowStart = time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
+	}
+	if windowEnd.IsZero() {
+		windowEnd = time.Now().UTC()
 	}
 
 	token := tokenFn()
@@ -178,7 +183,7 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 		counts:       make(map[string]int),
 		users:        make(map[string]*github.User),
 		state:        make(map[string]*data.State),
-		minEventTime: time.Now().AddDate(0, 0, -days).UTC(),
+		minEventTime: windowStart,
 	}
 
 	importers := []importerFunc{
@@ -248,7 +253,7 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 
 	summary := &data.ImportSummary{
 		Repo:       owner + "/" + repo,
-		Since:      earliest.Format("2006-01-02"),
+		Since:      windowStart.Format("2006-01-02"),
 		Events:     total,
 		Developers: len(imp.users),
 	}

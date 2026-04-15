@@ -364,7 +364,9 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		eventTokenFn = func() string { return token }
 	}
 	if err := retryRL(func() error {
-		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, data.EventAgeDaysDefault)
+		windowStart := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
+		windowEnd := time.Now().UTC()
+		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, windowStart, windowEnd)
 		if importErr != nil {
 			return fmt.Errorf("importing events: %w", importErr)
 		}
