@@ -115,6 +115,34 @@ The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (e
 
 Unchanged repos (no pushes since last import) are skipped automatically to save API quota. On-demand import is triggered via Cloud Run Jobs API when a user adds a new repo (`pkg/server/import_trigger.go`).
 
+### Progressive Backfill (Proposed)
+
+The current import design fetches all events from `since` (up to 90 days back) starting at page 1 on every run. For massive repos (e.g. kubernetes/kubernetes — 35k+ events, 13k+ developers), a single run can't finish within the 55-minute job timeout, and re-fetching already-imported pages wastes time on subsequent runs.
+
+**Proposed two-pass approach:**
+
+1. **Fresh pass** — fetch recent events (last 3 weeks), newest-first. Completes quickly, user sees current data immediately.
+2. **Backfill pass** — extend the `since` window backward by ~3 weeks each run until reaching `EventAgeDaysDefault` (90 days). Each run picks up where the previous left off.
+
+**State changes:**
+- Track `backfill_since` separately from the fresh-data `since` in `devpulse_state`
+- Fresh pass always uses a narrow window (e.g. 21 days) from page 1
+- Backfill pass resumes from stored page/since, extending the window each run
+- Cap at `EventAgeDaysDefault` — once full coverage is reached, backfill stops
+
+**Benefits:**
+- Small repos reach full 90-day coverage in one run (no behavior change)
+- Large repos get fresh data on first import, historical data fills in over subsequent runs
+- Each run fits within the job timeout
+- No re-processing of already-imported events
+- Self-adapting — window extension rate could be tuned per-repo based on event density
+
+**Design considerations:**
+- Upserts (`ON CONFLICT DO UPDATE`) make overlapping windows safe
+- GitHub API returns events newest-first, so fresh pass and backfill pass may overlap at the boundary — this is harmless
+- DB contention during large upsert batches impacts serve latency — consider throttling batch size or adding delays between flushes
+- GitHub API 500s on comment endpoints for very large repos even with 90-day windows — may need per-endpoint window caps
+
 **Token pool:** The import job collects installation tokens from all active GitHub App installations across all tenants, deduplicates by installation ID, and rotates via round-robin (`pkg/data/ghutil/tokenpool.go`). Tokens with < 100 remaining quota are skipped. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 
 ## Dashboard
