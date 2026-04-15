@@ -153,7 +153,10 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 	return results, nil
 }
 
-func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc, owner, repo string, windowStart, windowEnd time.Time) (map[string]int, *data.ImportSummary, error) {
+func (s *Store) ImportEvents(
+	ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc,
+	owner, repo string, windowStart, windowEnd time.Time,
+) (map[string]int, *data.ImportSummary, error) {
 	if tokenFn == nil || owner == "" || repo == "" {
 		return nil, nil, errors.New("tokenFn, owner, and repo are required")
 	}
@@ -161,9 +164,8 @@ func (s *Store) ImportEvents(ctx context.Context, tokenFn data.TokenFunc, exhaus
 	if windowStart.IsZero() {
 		windowStart = time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
 	}
-	if windowEnd.IsZero() {
-		windowEnd = time.Now().UTC()
-	}
+	// windowEnd reserved for future use (e.g. bounded backfill windows).
+	_ = windowEnd
 
 	token := tokenFn()
 	if token == "" {
@@ -497,7 +499,8 @@ func (e *eventImporter) flush(ctx context.Context) error {
 			return strings.Compare(a.Username, b.Username)
 		})
 
-		tx, err := db.BeginTx(ctx, nil)
+		var tx *sql.Tx
+		tx, err = db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("failed to begin transaction: %w", err)
 		}

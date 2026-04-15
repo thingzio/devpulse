@@ -397,8 +397,34 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 
 	// Phases 3-8: Non-event phases run after fresh pass so the dashboard
 	// has complete data for the recent window before backfill starts.
+	errs += runEnrichmentPhases(ctx, store, retryRL, pool, tokenForPhase, org, repo, planName, llmCfg)
 
-	token = tokenForPhase()
+	// Phase 9: Backfill pass — extend historical coverage
+	if backfillErr := runBackfillPass(ctx, store, retryRL, eventTokenFn, eventExhaustFn, pool, tokenForPhase, org, repo, backfillUntil); backfillErr != nil {
+		slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", backfillErr)
+		errs++
+	}
+
+	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
+
+	if errs > 0 {
+		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo), false
+	}
+	return nil, false
+}
+
+// runEnrichmentPhases runs the non-event import phases: releases, metrics,
+// containers, reputation, deep reputation, and insights. Returns the number
+// of phases that failed.
+func runEnrichmentPhases(
+	ctx context.Context, store data.Store,
+	retryRL func(func() error) error,
+	pool *ghutil.TokenPool, tokenForPhase func() string,
+	org, repo, planName string, llmCfg *data.LLMConfig,
+) int {
+	var errs int
+
+	token := tokenForPhase()
 	slog.Info("phase: releases", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportReleases(ctx, token, org, repo) }); err != nil {
 		slog.Error("importing releases", "org", org, "repo", repo, "error", err)
@@ -456,65 +482,70 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		slog.Debug("skipping insights, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
-	// Phase 9: Backfill pass — extend historical coverage
+	return errs
+}
+
+// runBackfillPass extends historical event coverage by one chunk. Returns nil
+// if backfill is already at target depth or if the chunk completes successfully.
+func runBackfillPass(
+	ctx context.Context, store data.Store,
+	retryRL func(func() error) error,
+	eventTokenFn data.TokenFunc, eventExhaustFn data.ExhaustFunc,
+	pool *ghutil.TokenPool, tokenForPhase func() string,
+	org, repo string, backfillUntil *time.Time,
+) error {
 	targetDate := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
 	chunkDays := config.ImportBackfillChunkDays()
 
-	if backfillUntil != nil && backfillUntil.After(targetDate) {
-		chunkStart := backfillUntil.AddDate(0, 0, -chunkDays).UTC()
-		if chunkStart.Before(targetDate) {
-			chunkStart = targetDate
-		}
-		chunkEnd := *backfillUntil
-
-		slog.Info("phase: events (backfill)", "org", org, "repo", repo,
-			"chunk_start", chunkStart.Format("2006-01-02"),
-			"chunk_end", chunkEnd.Format("2006-01-02"),
-			"coverage_days", int(time.Since(chunkEnd).Hours()/24),
-			"target_days", data.EventAgeDaysDefault)
-
-		token = tokenForPhase()
-		if pool != nil {
-			eventTokenFn = func() string { return pool.Token() }
-		} else {
-			eventTokenFn = func() string { return token }
-		}
-
-		if err := retryRL(func() error {
-			_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, chunkStart, chunkEnd)
-			if importErr != nil {
-				return fmt.Errorf("importing events (backfill): %w", importErr)
-			}
-			return nil
-		}); err != nil {
-			slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", err)
-			errs++
-		} else {
-			// Advance backfill_until on success
-			if err := store.SaveBackfillUntil(ctx, org, repo, chunkStart); err != nil {
-				slog.Warn("advancing backfill_until", "org", org, "repo", repo, "error", err)
-			}
-			coverageDays := int(time.Since(chunkStart).Hours() / 24)
-			slog.Info("backfill pass complete", "org", org, "repo", repo,
-				"chunk_start", chunkStart.Format("2006-01-02"),
-				"chunk_end", chunkEnd.Format("2006-01-02"),
-				"coverage_days", coverageDays,
-				"target_days", data.EventAgeDaysDefault)
-			if coverageDays >= data.EventAgeDaysDefault {
-				slog.Info("backfill complete", "org", org, "repo", repo,
-					"coverage_days", coverageDays)
-			}
-		}
-	} else {
+	if backfillUntil == nil || !backfillUntil.After(targetDate) {
 		slog.Debug("backfill complete, skipping", "org", org, "repo", repo)
+		return nil
 	}
 
-	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
-
-	if errs > 0 {
-		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo), false
+	chunkStart := backfillUntil.AddDate(0, 0, -chunkDays).UTC()
+	if chunkStart.Before(targetDate) {
+		chunkStart = targetDate
 	}
-	return nil, false
+	chunkEnd := *backfillUntil
+
+	slog.Info("phase: events (backfill)", "org", org, "repo", repo,
+		"chunk_start", chunkStart.Format("2006-01-02"),
+		"chunk_end", chunkEnd.Format("2006-01-02"),
+		"coverage_days", int(time.Since(chunkEnd).Hours()/24),
+		"target_days", data.EventAgeDaysDefault)
+
+	token := tokenForPhase()
+	if pool != nil {
+		eventTokenFn = func() string { return pool.Token() }
+	} else {
+		eventTokenFn = func() string { return token }
+	}
+
+	if err := retryRL(func() error {
+		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, chunkStart, chunkEnd)
+		if importErr != nil {
+			return fmt.Errorf("importing events (backfill): %w", importErr)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// Advance backfill_until on success.
+	if err := store.SaveBackfillUntil(ctx, org, repo, chunkStart); err != nil {
+		slog.Warn("advancing backfill_until", "org", org, "repo", repo, "error", err)
+	}
+	coverageDays := int(time.Since(chunkStart).Hours() / 24)
+	slog.Info("backfill pass complete", "org", org, "repo", repo,
+		"chunk_start", chunkStart.Format("2006-01-02"),
+		"chunk_end", chunkEnd.Format("2006-01-02"),
+		"coverage_days", coverageDays,
+		"target_days", data.EventAgeDaysDefault)
+	if coverageDays >= data.EventAgeDaysDefault {
+		slog.Info("backfill complete", "org", org, "repo", repo,
+			"coverage_days", coverageDays)
+	}
+	return nil
 }
 
 // newRetryRL returns a function that calls fn and, if it fails with a GitHub
