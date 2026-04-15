@@ -7,7 +7,35 @@ import (
 	"github.com/google/go-github/v83/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/data"
 )
+
+func TestSplitBatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		total    int
+		batchSz  int
+		expected int
+	}{
+		{"exact", 100, 100, 1},
+		{"remainder", 150, 100, 2},
+		{"smaller", 50, 100, 1},
+		{"zero", 0, 100, 0},
+		{"large", 500, 100, 5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			events := make([]*data.Event, tt.total)
+			batches := splitIntoBatches(events, tt.batchSz)
+			assert.Equal(t, tt.expected, len(batches))
+			total := 0
+			for _, b := range batches {
+				total += len(b)
+			}
+			assert.Equal(t, tt.total, total)
+		})
+	}
+}
 
 func TestParseIssueNumberFromURL(t *testing.T) {
 	tests := []struct {

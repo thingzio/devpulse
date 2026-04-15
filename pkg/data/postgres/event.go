@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -88,6 +89,10 @@ const (
 			title = $31
 	`
 )
+
+// dbBatchSize is the number of events per DB transaction during flush.
+// Initialized from IMPORT_DB_BATCH_SIZE env var (default 100).
+var dbBatchSize = config.ImportDBBatchSize()
 
 var EventTypes = []string{
 	data.EventTypePR,
@@ -407,6 +412,23 @@ func (e *eventImporter) loadState(ctx context.Context) error {
 	return nil
 }
 
+func splitIntoBatches[T any](items []T, size int) [][]T {
+	if len(items) == 0 || size < 1 {
+		return nil
+	}
+
+	batches := make([][]T, 0, (len(items)+size-1)/size)
+	for i := 0; i < len(items); i += size {
+		end := i + size
+		if end > len(items) {
+			end = len(items)
+		}
+		batches = append(batches, items[i:end])
+	}
+
+	return batches
+}
+
 func (e *eventImporter) flush(ctx context.Context) error {
 	if len(e.list) == 0 {
 		return nil
@@ -434,17 +456,10 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 	e.mu.Unlock()
 
-	devs := make([]*data.Developer, 0, len(users))
-	for _, v := range users {
-		devs = append(devs, ghutil.MapUserToDeveloper(v))
-	}
-	slices.SortFunc(devs, func(a, b *data.Developer) int {
-		return strings.Compare(a.Username, b.Username)
-	})
-
 	slices.SortFunc(events, compareEventsByPK)
 
-	slog.Debug("flushing events and developers to db", "events", len(events), "developers", len(devs))
+	slog.Debug("flushing events and developers to db",
+		"events", len(events), "developers", len(users), "db_batch_size", dbBatchSize)
 
 	db := e.store.db
 
@@ -460,64 +475,80 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	}
 	defer devStmt.Close()
 
+	batches := splitIntoBatches(events, dbBatchSize)
+
+	for _, batch := range batches {
+		seen := make(map[string]struct{}, len(batch))
+		for _, ev := range batch {
+			seen[ev.Username] = struct{}{}
+		}
+		batchDevs := make([]*data.Developer, 0, len(seen))
+		for username := range seen {
+			if u, ok := users[username]; ok {
+				batchDevs = append(batchDevs, ghutil.MapUserToDeveloper(u))
+			}
+		}
+		slices.SortFunc(batchDevs, func(a, b *data.Developer) int {
+			return strings.Compare(a.Username, b.Username)
+		})
+
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer rollbackTransaction(tx)
+
+		txDevStmt := tx.Stmt(devStmt)
+		defer txDevStmt.Close()
+		for i, u := range batchDevs {
+			if _, err = txDevStmt.ExecContext(ctx, u.Username,
+				u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
+				u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
+				return fmt.Errorf("error inserting developer[%d]: %s: %w", i, u.Username, err)
+			}
+		}
+
+		txEventStmt := tx.Stmt(eventStmt)
+		defer txEventStmt.Close()
+		for i, ev := range batch {
+			_, err = txEventStmt.ExecContext(ctx,
+				ev.Org, ev.Repo, ev.Username, ev.Type, ev.Date,
+				ev.URL, ev.Mentions, ev.Labels,
+				ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
+				ev.ChangedFiles, ev.Commits, ev.Title,
+				ev.URL, ev.Mentions, ev.Labels,
+				ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
+				ev.ChangedFiles, ev.Commits, ev.Title,
+			)
+			if err != nil {
+				return fmt.Errorf("error inserting event[%d]: %s/%s: %w", i, ev.Org, ev.Repo, err)
+			}
+		}
+
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+	}
+
+	// Save state once after all sub-batches complete.
 	stateStmt, err := db.PrepareContext(ctx, insertStateSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare state insert statement: %w", err)
 	}
 	defer stateStmt.Close()
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer rollbackTransaction(tx)
-
-	// Sort developers by username to ensure consistent lock ordering
-	// across concurrent import transactions, preventing deadlocks.
-	slices.SortFunc(devs, func(a, b *data.Developer) int {
-		return strings.Compare(a.Username, b.Username)
-	})
-
-	txDevStmt := tx.Stmt(devStmt)
-	defer txDevStmt.Close()
-	for i, u := range devs {
-		if _, err = txDevStmt.ExecContext(ctx, u.Username,
-			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
-			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
-			return fmt.Errorf("error inserting developer[%d]: %s: %w", i, u.Username, err)
-		}
-	}
-
-	txEventStmt := tx.Stmt(eventStmt)
-	defer txEventStmt.Close()
-	for i, ev := range events {
-		_, err = txEventStmt.ExecContext(ctx,
-			ev.Org, ev.Repo, ev.Username, ev.Type, ev.Date,
-			ev.URL, ev.Mentions, ev.Labels,
-			ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
-			ev.ChangedFiles, ev.Commits, ev.Title,
-			ev.URL, ev.Mentions, ev.Labels,
-			ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
-			ev.ChangedFiles, ev.Commits, ev.Title,
-		)
-		if err != nil {
-			return fmt.Errorf("error inserting event[%d]: %s/%s: %w", i, ev.Org, ev.Repo, err)
-		}
-	}
-
-	txStateStmt := tx.Stmt(stateStmt)
-	defer txStateStmt.Close()
 	for t, p := range state {
 		since := p.Since.Unix()
-		_, err = txStateStmt.ExecContext(ctx, t, e.owner, e.repo, p.Page, since, p.Page, since)
+		var backfillUnix sql.NullInt64
+		if p.BackfillUntil != nil {
+			backfillUnix = sql.NullInt64{Int64: p.BackfillUntil.Unix(), Valid: true}
+		}
+		_, err = stateStmt.ExecContext(ctx, t, e.owner, e.repo, p.Page, since, backfillUnix,
+			p.Page, since, backfillUnix)
 		if err != nil {
 			return fmt.Errorf("error inserting state[%s]: %s/%s with page:%d and since:%s: %w",
 				t, e.owner, e.repo, p.Page, p.Since.Format("2006-01-02"), err)
 		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	e.mu.Lock()
