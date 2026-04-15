@@ -408,12 +408,33 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 
 	// Phases 3-8: Non-event phases run after fresh pass so the dashboard
 	// has complete data for the recent window before backfill starts.
-	errs += runEnrichmentPhases(ctx, store, retryRL, pool, tokenForPhase, org, repo, planName, llmCfg)
+	errs += runEnrichmentPhases(ctx, store, retryRL, tokenForPhase, org, repo, planName, llmCfg)
 
 	// Phase 9: Backfill pass — extend historical coverage
 	if backfillErr := runBackfillPass(ctx, store, retryRL, eventTokenFn, eventExhaustFn, pool, tokenForPhase, org, repo, backfillUntil); backfillErr != nil {
 		slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", backfillErr)
 		errs++
+	}
+
+	// Phase 10: Deep reputation — best effort, runs last with remaining time.
+	limits, _ := plan.Get(planName)
+	token = tokenForPhase()
+	if token != "" && limits.DeepReputation && pool != nil {
+		slog.Info("phase: deep reputation", "org", org, "repo", repo)
+		tokenFn := func() string { return pool.Token() }
+		var res *data.DeepReputationResult
+		if err := retryRL(func() error {
+			var drErr error
+			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, config.DeepRepImportLimit(), 0, &org, &repo)
+			return drErr
+		}); err != nil {
+			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
+			errs++
+		} else {
+			slog.Info("deep reputation complete", "org", org, "repo", repo, "scored", res.Scored, "errors", res.Errors)
+		}
+	} else if token != "" {
+		slog.Debug("skipping deep reputation, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
@@ -425,12 +446,12 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 }
 
 // runEnrichmentPhases runs the non-event import phases: releases, metrics,
-// containers, reputation, deep reputation, and insights. Returns the number
-// of phases that failed.
+// containers, reputation, and insights. Returns the number of phases that
+// failed. Deep reputation runs separately after the backfill pass.
 func runEnrichmentPhases(
 	ctx context.Context, store data.Store,
 	retryRL func(func() error) error,
-	pool *ghutil.TokenPool, tokenForPhase func() string,
+	tokenForPhase func() string,
 	org, repo, planName string, llmCfg *data.LLMConfig,
 ) int {
 	var errs int
@@ -462,26 +483,7 @@ func runEnrichmentPhases(
 		errs++
 	}
 
-	token = tokenForPhase()
 	limits, _ := plan.Get(planName)
-
-	if token != "" && limits.DeepReputation {
-		slog.Info("phase: deep reputation", "org", org, "repo", repo)
-		tokenFn := func() string { return pool.Token() }
-		var res *data.DeepReputationResult
-		if err := retryRL(func() error {
-			var drErr error
-			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, config.DeepRepImportLimit(), 0, &org, &repo)
-			return drErr
-		}); err != nil {
-			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
-			errs++
-		} else {
-			slog.Info("deep reputation complete", "org", org, "repo", repo, "scored", res.Scored, "errors", res.Errors)
-		}
-	} else if token != "" {
-		slog.Debug("skipping deep reputation, not included in plan", "org", org, "repo", repo, "plan", planName)
-	}
 
 	if llmCfg != nil && limits.AILevel > 0 {
 		slog.Info("phase: insights", "org", org, "repo", repo)
