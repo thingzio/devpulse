@@ -17,6 +17,7 @@ type ExhaustFunc func(token string)
 // StateStore manages import state tracking.
 type StateStore interface {
 	GetState(ctx context.Context, query, org, repo string, min time.Time) (*State, error)
+	HasState(ctx context.Context, org, repo string) (bool, error)
 	SaveState(ctx context.Context, query, org, repo string, state *State) error
 	ClearState(ctx context.Context, org, repo string) error
 	GetDataState(ctx context.Context) (map[string]int64, error)

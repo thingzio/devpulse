@@ -30,6 +30,7 @@ func (m *mockStore) GetState(_ context.Context, _, _, _ string, _ time.Time) (*d
 	return nil, nil
 }
 func (m *mockStore) SaveState(_ context.Context, _, _, _ string, _ *data.State) error { return nil }
+func (m *mockStore) HasState(_ context.Context, _, _ string) (bool, error)            { return true, nil }
 func (m *mockStore) ClearState(_ context.Context, _, _ string) error                  { return nil }
 func (m *mockStore) GetDataState(_ context.Context) (map[string]int64, error)         { return nil, nil }
 

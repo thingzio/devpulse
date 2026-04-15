@@ -82,6 +82,22 @@ func (s *Store) SaveState(ctx context.Context, query, org, repo string, state *d
 	return nil
 }
 
+func (s *Store) HasState(ctx context.Context, org, repo string) (bool, error) {
+	if s.db == nil {
+		return false, data.ErrDBNotInitialized
+	}
+
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM devpulse_state WHERE org = $1 AND repo = $2",
+		org, repo).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("checking state for %s/%s: %w", org, repo, err)
+	}
+
+	return count > 0, nil
+}
+
 func (s *Store) ClearState(ctx context.Context, org, repo string) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized

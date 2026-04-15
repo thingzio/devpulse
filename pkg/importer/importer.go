@@ -299,6 +299,15 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 		return true, false
 	}
 
+	hasState, err := store.HasState(ctx, org, repo)
+	if err != nil {
+		slog.Warn("checking state", "org", org, "repo", repo, "error", err)
+		return true, false
+	}
+	if !hasState {
+		return true, false // no state rows — fresh or hard-reset, always import
+	}
+
 	maxEventTime, err := store.GetMaxEventTime(ctx, org, repo)
 	if err != nil {
 		slog.Warn("checking max event time", "org", org, "repo", repo, "error", err)
