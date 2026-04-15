@@ -32,7 +32,14 @@ func ScopedStoreMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 				http.Error(w, "internal error", http.StatusInternalServerError)
 				return
 			}
-			defer conn.Close()
+			defer func() {
+				// Reset tenant scope before returning connection to pool.
+				// set_config with false is session-level; without this reset,
+				// the connection would retain a stale app.tenant_id, causing
+				// RLS violations for subsequent unscoped queries (e.g. session creation).
+				_, _ = conn.ExecContext(context.Background(), "SELECT set_config('app.tenant_id', '', false)")
+				conn.Close()
+			}()
 
 			if _, err := conn.ExecContext(r.Context(),
 				"SELECT set_config('app.tenant_id', $1, false)", tn.ID); err != nil {
