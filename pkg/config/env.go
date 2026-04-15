@@ -59,6 +59,18 @@ func GetEnvAsFloat(key string, defaultValue float64) float64 {
 // Override: BACKFILL_MAX_DAYS (default 90).
 func BackfillMaxDays() int { return GetEnvAsInt("BACKFILL_MAX_DAYS", 90) }
 
+// ImportDBBatchSize returns the number of events per DB transaction during flush.
+// Override: IMPORT_DB_BATCH_SIZE (default 100).
+func ImportDBBatchSize() int { return GetEnvAsInt("IMPORT_DB_BATCH_SIZE", 100) }
+
+// ImportFreshDays returns the fresh pass lookback window in days.
+// Override: IMPORT_FRESH_DAYS (default 21).
+func ImportFreshDays() int { return GetEnvAsInt("IMPORT_FRESH_DAYS", 21) }
+
+// ImportBackfillChunkDays returns the backfill chunk size in days.
+// Override: IMPORT_BACKFILL_CHUNK_DAYS (default 7).
+func ImportBackfillChunkDays() int { return GetEnvAsInt("IMPORT_BACKFILL_CHUNK_DAYS", 7) }
+
 // ---------------------------------------------------------------------------
 // Deep Reputation
 // ---------------------------------------------------------------------------
