@@ -570,7 +570,7 @@ const (
 	insightsPeriodWeeks        = 9
 	insightsMinAgeDays         = 7
 	insightsEventDeltaPct      = 0.10
-	deepReputationDefaultLimit = 1000
+	deepReputationDefaultLimit = 100
 )
 
 // checkInsightStaleness determines whether insights should be regenerated
