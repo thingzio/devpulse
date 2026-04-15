@@ -32,6 +32,7 @@ func TestSaveAndGetState(t *testing.T) {
 	got, err := store.GetState(ctx, "pr", "testorg", "testrepo", min)
 	require.NoError(t, err)
 	assert.Equal(t, 5, got.Page)
+	assert.Nil(t, got.BackfillUntil)
 }
 
 func TestSaveState_NilState(t *testing.T) {
@@ -82,5 +83,61 @@ func TestSaveState_NilDB(t *testing.T) {
 	s := &Store{db: nil}
 	st := &data.State{Page: 1, Since: time.Now()}
 	err := s.SaveState(ctx, "pr", "org", "repo", st)
+	assert.Error(t, err)
+}
+
+func TestSaveAndGetState_WithBackfillUntil(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+	min := time.Now().AddDate(0, -6, 0).UTC()
+	since := time.Now().AddDate(0, -3, 0).UTC()
+	backfill := time.Now().AddDate(0, 0, -21).UTC()
+
+	s := &data.State{Page: 1, Since: since, BackfillUntil: &backfill}
+	require.NoError(t, store.SaveState(ctx, "pr", "testorg", "testrepo", s))
+
+	got, err := store.GetState(ctx, "pr", "testorg", "testrepo", min)
+	require.NoError(t, err)
+	require.NotNil(t, got.BackfillUntil)
+	assert.WithinDuration(t, backfill, *got.BackfillUntil, time.Second)
+}
+
+func TestGetBackfillUntil_NoState(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+	got, err := store.GetBackfillUntil(ctx, "testorg", "testrepo")
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+func TestGetBackfillUntil_NilDB(t *testing.T) {
+	ctx := context.Background()
+	s := &Store{db: nil}
+	_, err := s.GetBackfillUntil(ctx, "org", "repo")
+	assert.Error(t, err)
+}
+
+func TestSaveBackfillUntil(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+	since := time.Now().AddDate(0, -3, 0).UTC()
+
+	s := &data.State{Page: 1, Since: since}
+	require.NoError(t, store.SaveState(ctx, "pr", "testorg", "testrepo", s))
+	require.NoError(t, store.SaveState(ctx, "issue", "testorg", "testrepo", s))
+
+	until := time.Now().AddDate(0, 0, -28).UTC()
+	require.NoError(t, store.SaveBackfillUntil(ctx, "testorg", "testrepo", until))
+
+	got, err := store.GetBackfillUntil(ctx, "testorg", "testrepo")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.WithinDuration(t, until, *got, time.Second)
+}
+
+func TestSaveBackfillUntil_NilDB(t *testing.T) {
+	ctx := context.Background()
+	s := &Store{db: nil}
+	err := s.SaveBackfillUntil(ctx, "org", "repo", time.Now())
 	assert.Error(t, err)
 }

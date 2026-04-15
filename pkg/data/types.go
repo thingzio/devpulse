@@ -29,8 +29,9 @@ var UpdatableProperties = []string{
 // ---------------------------------------------------------------------------
 
 type State struct {
-	Since time.Time `json:"since" yaml:"since"`
-	Page  int       `json:"page" yaml:"page"`
+	Since         time.Time  `json:"since" yaml:"since"`
+	Page          int        `json:"page" yaml:"page"`
+	BackfillUntil *time.Time `json:"backfill_until,omitempty" yaml:"backfill_until,omitempty"`
 }
 
 type DeleteResult struct {

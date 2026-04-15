@@ -21,6 +21,8 @@ type StateStore interface {
 	SaveState(ctx context.Context, query, org, repo string, state *State) error
 	ClearState(ctx context.Context, org, repo string) error
 	GetDataState(ctx context.Context) (map[string]int64, error)
+	GetBackfillUntil(ctx context.Context, org, repo string) (*time.Time, error)
+	SaveBackfillUntil(ctx context.Context, org, repo string, until time.Time) error
 }
 
 // DeleteStore manages data deletion.

@@ -33,6 +33,12 @@ func (m *mockStore) SaveState(_ context.Context, _, _, _ string, _ *data.State) 
 func (m *mockStore) HasState(_ context.Context, _, _ string) (bool, error)            { return true, nil }
 func (m *mockStore) ClearState(_ context.Context, _, _ string) error                  { return nil }
 func (m *mockStore) GetDataState(_ context.Context) (map[string]int64, error)         { return nil, nil }
+func (m *mockStore) GetBackfillUntil(_ context.Context, _, _ string) (*time.Time, error) {
+	return nil, nil
+}
+func (m *mockStore) SaveBackfillUntil(_ context.Context, _, _ string, _ time.Time) error {
+	return nil
+}
 
 // --- DeleteStore ---
 func (m *mockStore) DeleteRepoData(_ context.Context, _, _ string) (*data.DeleteResult, error) {
