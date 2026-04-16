@@ -1,0 +1,145 @@
+#!/bin/bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools docker
+
+CONTAINER_NAME="devpulse-local-pg"
+DB_NAME="thingz"
+DB_USER="devpulse"
+DB_PASS="devpulse"
+DB_PORT="5433"
+PG_IMAGE="postgres:17-alpine"
+
+usage() {
+    echo "Usage: $0 <path-to-sql-dump>"
+    echo ""
+    echo "Loads a Cloud SQL dump into a local Docker Postgres instance."
+    echo "Accepts .sql or .sql.gz files from /Users/mchmarny/dev/thingz/db/"
+    echo ""
+    echo "After loading, connect with:"
+    echo "  DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:${DB_PORT}/${DB_NAME}?sslmode=disable"
+    echo ""
+    echo "To run the dev server against it:"
+    echo "  DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:${DB_PORT}/${DB_NAME}?sslmode=disable make server"
+    echo ""
+    echo "To stop: $0 stop"
+    echo "To get a psql shell: $0 psql"
+    exit 1
+}
+
+stop_container() {
+    if docker ps -q --filter "name=${CONTAINER_NAME}" | grep -q .; then
+        msg "Stopping ${CONTAINER_NAME}..."
+        docker stop "${CONTAINER_NAME}" >/dev/null
+    fi
+    if docker ps -aq --filter "name=${CONTAINER_NAME}" | grep -q .; then
+        msg "Removing ${CONTAINER_NAME}..."
+        docker rm "${CONTAINER_NAME}" >/dev/null
+    fi
+}
+
+start_container() {
+    if docker ps -q --filter "name=${CONTAINER_NAME}" | grep -q .; then
+        msg "Container ${CONTAINER_NAME} already running"
+        return
+    fi
+
+    stop_container
+
+    msg "Starting ${CONTAINER_NAME} (port ${DB_PORT})..."
+    docker run -d \
+        --name "${CONTAINER_NAME}" \
+        -e POSTGRES_DB="${DB_NAME}" \
+        -e POSTGRES_USER="${DB_USER}" \
+        -e POSTGRES_PASSWORD="${DB_PASS}" \
+        -p "${DB_PORT}:5432" \
+        "${PG_IMAGE}" \
+        postgres -c shared_buffers=256MB -c work_mem=64MB >/dev/null
+
+    msg "Waiting for Postgres to be ready..."
+    for i in $(seq 1 30); do
+        if docker exec "${CONTAINER_NAME}" pg_isready -U "${DB_USER}" -d "${DB_NAME}" &>/dev/null; then
+            msg "Postgres ready"
+            return
+        fi
+        sleep 1
+    done
+    err "Postgres did not become ready in 30s"
+}
+
+load_dump() {
+    local dump_file="$1"
+
+    [[ -f "${dump_file}" ]] || err "File not found: ${dump_file}"
+
+    local ext="${dump_file##*.}"
+
+    msg "Loading ${dump_file} into ${DB_NAME}..."
+
+    # Cloud SQL dumps contain references to roles that don't exist locally.
+    # Strip those lines so they don't cause errors.
+    strip_cloudsql() {
+        sed \
+            -e '/cloudsqlsuperuser/d' \
+            -e '/cloudsqladmin/d' \
+            -e '/cloudsqlreplica/d' \
+            -e '/cloudsqliamuser/d' \
+            -e '/cloudsqliamserviceaccount/d' \
+            -e '/OWNER TO/d' \
+            -e '/^ALTER .* OWNER /d'
+    }
+
+    case "${ext}" in
+        gz)
+            gunzip -c "${dump_file}" | strip_cloudsql | docker exec -i "${CONTAINER_NAME}" \
+                psql -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=0 -q
+            ;;
+        sql)
+            strip_cloudsql < "${dump_file}" | docker exec -i "${CONTAINER_NAME}" \
+                psql -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=0 -q
+            ;;
+        *)
+            err "Unsupported file type: .${ext} (expected .sql or .sql.gz)"
+            ;;
+    esac
+
+    msg "Dump loaded successfully"
+
+    # Analyze so pg_stat has accurate row counts, then show them.
+    msg "Running ANALYZE..."
+    docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -c "ANALYZE;" -q
+
+    msg "Table row counts:"
+    docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -c "
+        SELECT relname AS table, n_live_tup AS rows
+        FROM pg_stat_user_tables
+        WHERE schemaname = 'public'
+        ORDER BY n_live_tup DESC;" 2>/dev/null || true
+}
+
+# --- main ---
+
+[[ $# -lt 1 ]] && usage
+
+case "$1" in
+    stop)
+        stop_container
+        msg "Done"
+        ;;
+    psql)
+        exec docker exec -it "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}"
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        start_container
+        load_dump "$1"
+        echo ""
+        msg "Connect with:"
+        echo "  DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:${DB_PORT}/${DB_NAME}?sslmode=disable"
+        ;;
+esac
