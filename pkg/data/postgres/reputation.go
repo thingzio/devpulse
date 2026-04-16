@@ -59,33 +59,27 @@ const (
 
 	// selectContributorCompositionSQL: $1=org, $2=repo, $3=entity, $4=since
 	selectContributorCompositionSQL = `
+WITH contributor_roles AS (
+    SELECT e.username,
+        bool_or(e.type = 'pr_review') AS is_reviewer,
+        bool_or(e.type = 'pr') AS is_author,
+        bool_or(e.type = 'issue_comment') AS is_commenter
+    FROM devpulse_event e
+    WHERE e.org = COALESCE($1, e.org)
+      AND e.repo = COALESCE($2, e.repo)
+      AND ($3::text IS NULL OR e.username IN (
+        SELECT username FROM devpulse_developer WHERE entity = $3))
+      AND e.date >= $4
+      AND e.username NOT LIKE '%[bot]'
+      AND e.type != 'fork'
+    GROUP BY e.username
+)
 SELECT
-  COUNT(DISTINCT CASE WHEN e.type = 'pr_review' THEN e.username END),
-  COUNT(DISTINCT CASE WHEN e.type = 'pr'
-    AND e.username NOT IN (
-      SELECT DISTINCT e2.username FROM devpulse_event e2
-      WHERE e2.type = 'pr_review'
-        AND e2.org = COALESCE($1, e2.org) AND e2.repo = COALESCE($2, e2.repo)
-        AND e2.date >= $4
-        AND e2.username NOT LIKE '%[bot]' AND e2.type != 'fork')
-    THEN e.username END),
-  COUNT(DISTINCT CASE WHEN e.type = 'issue_comment'
-    AND e.username NOT IN (
-      SELECT DISTINCT e2.username FROM devpulse_event e2
-      WHERE e2.type IN ('pr', 'pr_review')
-        AND e2.org = COALESCE($1, e2.org) AND e2.repo = COALESCE($2, e2.repo)
-        AND e2.date >= $4
-        AND e2.username NOT LIKE '%[bot]' AND e2.type != 'fork')
-    THEN e.username END),
-  COUNT(DISTINCT e.username)
-FROM devpulse_event e
-WHERE e.org = COALESCE($1, e.org)
-  AND e.repo = COALESCE($2, e.repo)
-  AND ($3::text IS NULL OR e.username IN (
-    SELECT username FROM devpulse_developer WHERE entity = $3))
-  AND e.date >= $4
-  AND e.username NOT LIKE '%[bot]'
-  AND e.type != 'fork'`
+    COUNT(*) FILTER (WHERE is_reviewer),
+    COUNT(*) FILTER (WHERE NOT is_reviewer AND is_author),
+    COUNT(*) FILTER (WHERE NOT is_reviewer AND NOT is_author AND is_commenter),
+    COUNT(*)
+FROM contributor_roles`
 )
 
 type globalStats struct {

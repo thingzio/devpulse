@@ -127,7 +127,7 @@ const (
 		  AND EXISTS (
 		      SELECT 1 FROM devpulse_release r
 		      WHERE r.org = e.org AND r.repo = e.repo
-		        AND EXTRACT(EPOCH FROM (e.created_at::timestamp - r.published_at::timestamp)) / 86400.0 BETWEEN 0 AND 7
+		        AND r.published_at::timestamp BETWEEN e.created_at::timestamp - INTERVAL '7 days' AND e.created_at::timestamp
 		  )
 		  AND e.org = COALESCE($1, e.org)
 		  AND e.repo = COALESCE($2, e.repo)
@@ -206,7 +206,7 @@ const (
 	     AND EXISTS (
 	        SELECT 1 FROM devpulse_release r
 	        WHERE r.org = e.org AND r.repo = e.repo
-	          AND EXTRACT(EPOCH FROM (e.created_at::timestamp - r.published_at::timestamp)) / 86400.0 BETWEEN 0 AND 7
+	          AND r.published_at::timestamp BETWEEN e.created_at::timestamp - INTERVAL '7 days' AND e.created_at::timestamp
 	     ))
 	    OR
 	    (e.type = 'pr' AND LOWER(e.title) LIKE '%%revert%%')
@@ -318,7 +318,6 @@ const (
 	// %[2]s = GroupExpr(gran, "f.first_comment")
 	// %[3]s = GroupExpr(gran, "f.first_pr")
 	// %[4]s = GroupExpr(gran, "f.first_merge")
-	// %[5]s = GroupExpr(gran, "COALESCE(f.first_comment, f.first_pr, f.first_merge)")
 	selectContributorFunnelTpl = `WITH firsts AS (
 		SELECT
 			e.username,
@@ -338,16 +337,16 @@ const (
 	)
 	SELECT
 		p.period,
-		SUM(CASE WHEN f.first_comment IS NOT NULL AND %[2]s = p.period THEN 1 ELSE 0 END) AS fc,
-		SUM(CASE WHEN f.first_pr IS NOT NULL AND %[3]s = p.period THEN 1 ELSE 0 END) AS fp,
-		SUM(CASE WHEN f.first_merge IS NOT NULL AND %[4]s = p.period THEN 1 ELSE 0 END) AS fm
+		(SELECT COUNT(*) FROM firsts f WHERE f.first_comment IS NOT NULL AND %[2]s = p.period),
+		(SELECT COUNT(*) FROM firsts f WHERE f.first_pr IS NOT NULL AND %[3]s = p.period),
+		(SELECT COUNT(*) FROM firsts f WHERE f.first_merge IS NOT NULL AND %[4]s = p.period)
 	FROM periods p
-	CROSS JOIN firsts f
-	WHERE %[5]s >= (SELECT MIN(period) FROM periods)
-	GROUP BY p.period
-	HAVING SUM(CASE WHEN f.first_comment IS NOT NULL AND %[2]s = p.period THEN 1 ELSE 0 END) > 0
-	    OR SUM(CASE WHEN f.first_pr IS NOT NULL AND %[3]s = p.period THEN 1 ELSE 0 END) > 0
-	    OR SUM(CASE WHEN f.first_merge IS NOT NULL AND %[4]s = p.period THEN 1 ELSE 0 END) > 0
+	WHERE EXISTS (
+		SELECT 1 FROM firsts f WHERE
+			(f.first_comment IS NOT NULL AND %[2]s = p.period) OR
+			(f.first_pr IS NOT NULL AND %[3]s = p.period) OR
+			(f.first_merge IS NOT NULL AND %[4]s = p.period)
+	)
 	ORDER BY p.period
 	`
 
@@ -425,9 +424,10 @@ const (
 		COALESCE((SELECT MAX(rm.last_import_at) FROM devpulse_repo_meta rm
 			WHERE rm.org = COALESCE($1, rm.org) AND rm.repo = COALESCE($2, rm.repo)), '')
 	FROM devpulse_event e
+	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.org = COALESCE($1, e.org)
 	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE((SELECT d.entity FROM devpulse_developer d WHERE d.username = e.username), '') = COALESCE($3, COALESCE((SELECT d.entity FROM devpulse_developer d WHERE d.username = e.username), ''))
+	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
 	  AND e.date >= $4
 	  ` + botExcludeSQL + `
 	  ` + forkExcludeSQL + `
@@ -1145,7 +1145,6 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 		GroupExpr(gran, "f.first_comment"),
 		GroupExpr(gran, "f.first_pr"),
 		GroupExpr(gran, "f.first_merge"),
-		GroupExpr(gran, "COALESCE(f.first_comment, f.first_pr, f.first_merge)"),
 	)
 	since := sinceDate(days)
 

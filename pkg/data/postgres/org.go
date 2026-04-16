@@ -60,7 +60,7 @@ const (
 		LIMIT $2
 	`
 
-	selectAllOrgReposSQL = `SELECT DISTINCT org, repo FROM devpulse_event ORDER BY 1, 2`
+	selectAllOrgReposSQL = `SELECT org, repo FROM devpulse_repo_meta ORDER BY org, repo`
 
 	selectDeveloperSearchSQL = `SELECT DISTINCT d.username
 		FROM devpulse_developer d
@@ -81,15 +81,9 @@ func (s *Store) GetAllOrgRepos(ctx context.Context) ([]*data.OrgRepoItem, error)
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, selectAllOrgReposSQL)
+	rows, err := s.db.QueryContext(ctx, selectAllOrgReposSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare developer percentages statement: %w", err)
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.QueryContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute select statement: %w", err)
+		return nil, fmt.Errorf("failed to query org repos: %w", err)
 	}
 	defer rows.Close()
 

@@ -8,13 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetAllOrgRepos(t *testing.T) {
+func TestGetAllOrgRepos_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	seedTestData(t, store)
-	repos, err := store.GetAllOrgRepos(ctx)
+
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived)
+		VALUES ('org1', 'repo1', 10, 5, 1, 'Go', 'MIT', 0),
+		       ('org1', 'repo2', 20, 3, 0, 'Rust', 'Apache-2.0', 0),
+		       ('org2', 'repo3', 5, 1, 2, 'Python', 'BSD', 0)`)
 	require.NoError(t, err)
-	assert.NotEmpty(t, repos)
+
+	list, err := store.GetAllOrgRepos(ctx)
+	require.NoError(t, err)
+	assert.Len(t, list, 3)
+	assert.Equal(t, "org1", list[0].Org)
+	assert.Equal(t, "repo1", list[0].Repo)
+	assert.Equal(t, "org2", list[2].Org)
 }
 
 func TestGetAllOrgRepos_NilDB(t *testing.T) {
