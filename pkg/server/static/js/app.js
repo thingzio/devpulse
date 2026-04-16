@@ -2404,8 +2404,14 @@ function loadContributorFunnelChart(url) {
 function loadContributorProfileChart(url) {
     $.get(url, function (data) {
         if (contributorProfileChart) contributorProfileChart.destroy();
-        if (data && data.reputation != null) {
-            $("#contributor-score").text('Reputation Score: ' + data.reputation.toFixed(2));
+        var params = new URLSearchParams(url.split('?')[1] || '');
+        var dtUser = params.get('u') || '';
+        var dtOrg = params.get('o') || '';
+        var dtRepo = params.get('r') || '';
+        if (dtUser && dtOrg && dtRepo) {
+            var dtURL = 'https://devtrace.thingz.io/score/' + encodeURIComponent(dtUser) +
+                '?repo=' + encodeURIComponent(dtOrg + '/' + dtRepo);
+            $("#contributor-score").html('<a href="' + dtURL + '" target="_blank" rel="noopener">Check reputation in devtrace.thingz.io</a>');
         } else {
             $("#contributor-score").text('');
         }
