@@ -30,9 +30,6 @@ pkg/config/config.yaml
 
 .claude/settings.local.json
 
-# Worktrees
-.worktrees
-
 
 # =============================================================================
 # Terraform
@@ -51,3 +48,4 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+.claude/worktrees/
