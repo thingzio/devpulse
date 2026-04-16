@@ -645,7 +645,7 @@ func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *strin
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	wc := qb.whereClause()
 	baseArgs := append([]any{since}, qb.args...)
 
@@ -678,7 +678,7 @@ func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string,
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectDailyActivityTpl, qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -716,7 +716,7 @@ func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl strin
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 
 	fmtArgs := make([]any, len(cols)+1)
 	for i, col := range cols {
@@ -772,7 +772,7 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	qb := newQueryBuilder(4)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"), qb.whereClause())
 	args := append([]any{data.EventTypePR, data.EventTypePRReview, since}, qb.args...)
 
@@ -831,7 +831,7 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	failQB := newQueryBuilder(2)
 	failQB.addOptional("e.org", org)
 	failQB.addOptional("e.repo", repo)
-	failQB.addEntityFilter("d.entity", entity)
+	failQB.addOptional("d.entity", entity)
 	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"), failQB.whereClause())
 	failArgs := append([]any{since}, failQB.args...)
 
@@ -937,7 +937,7 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 	qb := newQueryBuilder(2)
 	qb.addOptional("pr.org", org)
 	qb.addOptional("pr.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectReviewLatencyTpl, GroupExpr(gran, "date"), GroupExpr(gran, "pr.created_at"), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -987,7 +987,7 @@ func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(queryTpl, GroupExpr(gran, col), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1049,7 +1049,7 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1104,7 +1104,7 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1153,7 +1153,7 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectContributorFunnelTpl,
 		GroupExpr(gran, "date"),
 		GroupExpr(gran, "f.first_comment"),
@@ -1211,7 +1211,7 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectContributorMomentumTpl, GroupExpr(gran, "date"), MomentumInterval(gran), MomentumFormat(gran), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1269,7 +1269,7 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	qb := newQueryBuilder(3)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectContributorProfileTpl, qb.whereClause())
 	args := append([]any{username, since}, qb.args...)
 
@@ -1320,7 +1320,7 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, days
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectAgingPRsTpl, qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1360,7 +1360,7 @@ func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectUnansweredRateTpl, qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
@@ -1391,7 +1391,7 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, d
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 	query := fmt.Sprintf(selectResponseSLOTpl, qb.whereClause())
 	args := append([]any{since}, qb.args...)
 

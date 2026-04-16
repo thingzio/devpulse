@@ -236,7 +236,8 @@ func (s *Store) getStaleReputationUsernames(ctx context.Context, org, repo *stri
 
 	query := fmt.Sprintf(selectStaleReputationUsernamesTpl, qb.whereClause())
 
-	args := []any{threshold}
+	args := make([]any, 0, 1+len(qb.args))
+	args = append(args, threshold)
 	args = append(args, qb.args...)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)

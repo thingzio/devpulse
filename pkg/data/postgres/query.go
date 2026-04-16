@@ -161,7 +161,7 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	qb := newQueryBuilder(8)
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
-	qb.addEntityFilter("d.entity", entity)
+	qb.addOptional("d.entity", entity)
 
 	query := fmt.Sprintf(selectEventTypesSinceTpl, GroupExpr(gran, "dates.d::text"), qb.whereClause())
 
@@ -174,8 +174,9 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	since := sinceDate(days)
 	to := time.Now().UTC().Format("2006-01-02")
 
-	args := []any{since, to,
-		data.EventTypePR, data.EventTypePRReview, data.EventTypeIssue, data.EventTypeIssueComment, data.EventTypeFork}
+	args := make([]any, 0, 7+len(qb.args))
+	args = append(args, since, to,
+		data.EventTypePR, data.EventTypePRReview, data.EventTypeIssue, data.EventTypeIssueComment, data.EventTypeFork)
 	args = append(args, qb.args...)
 
 	rows, err := stmt.QueryContext(ctx, args...)

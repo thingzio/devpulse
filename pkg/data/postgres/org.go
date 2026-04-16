@@ -183,7 +183,8 @@ func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org,
 
 	sqlStr := fmt.Sprintf(selectDeveloperSearchTpl, qb.whereClause())
 
-	args := []any{pattern, since, limit}
+	args := make([]any, 0, 3+len(qb.args))
+	args = append(args, pattern, since, limit)
 	args = append(args, qb.args...)
 
 	rows, err := s.db.QueryContext(ctx, sqlStr, args...)

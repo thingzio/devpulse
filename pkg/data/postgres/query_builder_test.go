@@ -39,7 +39,7 @@ func TestQueryBuilder_Mixed(t *testing.T) {
 func TestQueryBuilder_EntityFilter(t *testing.T) {
 	entity := "GOOGLE"
 	qb := newQueryBuilder(1)
-	qb.addEntityFilter("d.entity", &entity)
+	qb.addOptional("d.entity", &entity)
 	assert.Len(t, qb.clauses, 1)
 	assert.Equal(t, "d.entity = $1", qb.clauses[0])
 	assert.Equal(t, []any{"GOOGLE"}, qb.args)
@@ -47,7 +47,7 @@ func TestQueryBuilder_EntityFilter(t *testing.T) {
 
 func TestQueryBuilder_EntityNil(t *testing.T) {
 	qb := newQueryBuilder(1)
-	qb.addEntityFilter("d.entity", nil)
+	qb.addOptional("d.entity", nil)
 	assert.Empty(t, qb.clauses)
 }
 
@@ -79,7 +79,7 @@ func TestQueryBuilder_WhereClauseMultiple(t *testing.T) {
 	qb := newQueryBuilder(2)
 	qb.addOptional("e.org", &org)
 	qb.addOptional("e.repo", &repo)
-	qb.addEntityFilter("d.entity", &entity)
+	qb.addOptional("d.entity", &entity)
 	assert.Equal(t, " AND e.org = $2 AND e.repo = $3 AND d.entity = $4", qb.whereClause())
 	assert.Equal(t, []any{"org1", "repo1", "ACME"}, qb.args)
 	assert.Equal(t, 5, qb.nextParam())
