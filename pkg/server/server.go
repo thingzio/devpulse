@@ -250,7 +250,7 @@ func makeRouter(
 	mux.Handle("GET /data/insights/release-downloads", scopedWrap(insightsReleaseDownloadsAPIHandler(store)))
 	mux.Handle("GET /data/insights/release-downloads-by-tag", scopedWrap(insightsReleaseDownloadsByTagAPIHandler(store)))
 	mux.Handle("GET /data/insights/container-activity", scopedWrap(insightsContainerActivityAPIHandler(store)))
-	mux.Handle("GET /data/insights/reputation", scopedWrap(insightsContributorCompositionAPIHandler(store)))
+	mux.Handle("GET /data/insights/contributor-composition", scopedWrap(insightsContributorCompositionAPIHandler(store)))
 	mux.Handle("GET /data/insights/issue-ratio", scopedWrap(insightsIssueRatioAPIHandler(store)))
 	mux.Handle("GET /data/insights/time-to-first-response", scopedWrap(insightsTimeToFirstResponseAPIHandler(store)))
 	mux.Handle("GET /data/insights/health-scorecard", scopedWrap(insightsHealthScorecardHandler(store)))
