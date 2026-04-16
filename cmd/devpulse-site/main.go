@@ -18,10 +18,9 @@ var (
 )
 
 func main() {
-	logging.SetupLogger()
+	logging.SetupLogger(version)
 
 	slog.Info("starting devpulse-site",
-		"version", version,
 		"commit", commit,
 		"date", date,
 	)

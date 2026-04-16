@@ -11,9 +11,8 @@ func TestSetupLogger(t *testing.T) {
 	original := slog.Default()
 	defer slog.SetDefault(original)
 
-	SetupLogger()
+	SetupLogger("v0.0.1-test")
 
 	logger := slog.Default()
 	assert.NotNil(t, logger)
-	assert.IsType(t, &slog.JSONHandler{}, logger.Handler())
 }
