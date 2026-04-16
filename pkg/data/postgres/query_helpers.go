@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
@@ -334,4 +335,56 @@ func rollbackTransaction(tx *sql.Tx) {
 	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
 		slog.Error("error rolling back transaction", "error", err)
 	}
+}
+
+// queryBuilder constructs optional WHERE clauses for non-nil parameters.
+// This replaces the COALESCE($1, e.col) anti-pattern which prevents
+// the planner from using indexes.
+type queryBuilder struct {
+	paramIdx int
+	clauses  []string
+	args     []any
+}
+
+func newQueryBuilder(startParam int) *queryBuilder {
+	return &queryBuilder{paramIdx: startParam}
+}
+
+// addOptional appends "col = $N" only when val is non-nil.
+func (qb *queryBuilder) addOptional(col string, val *string) {
+	if val == nil {
+		return
+	}
+	qb.clauses = append(qb.clauses, fmt.Sprintf("%s = $%d", col, qb.paramIdx))
+	qb.args = append(qb.args, *val)
+	qb.paramIdx++
+}
+
+// addEntityFilter appends "col = $N" for non-nil entity.
+// Replaces the COALESCE(d.entity, '') = COALESCE($N, COALESCE(d.entity, '')) pattern.
+func (qb *queryBuilder) addEntityFilter(col string, val *string) {
+	if val == nil {
+		return
+	}
+	qb.clauses = append(qb.clauses, fmt.Sprintf("%s = $%d", col, qb.paramIdx))
+	qb.args = append(qb.args, *val)
+	qb.paramIdx++
+}
+
+// whereClause returns all clauses as " AND col = $N AND col2 = $M" or "" if empty.
+func (qb *queryBuilder) whereClause() string {
+	if len(qb.clauses) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, c := range qb.clauses {
+		sb.WriteString(" AND ")
+		sb.WriteString(c)
+	}
+	return sb.String()
+}
+
+// nextParam returns the next available parameter index.
+func (qb *queryBuilder) nextParam() int {
+	return qb.paramIdx
 }
