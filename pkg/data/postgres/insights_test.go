@@ -687,6 +687,76 @@ func TestGetSignals_NilDB(t *testing.T) {
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
+func TestGetInsightsSummary_Filtered(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_repo_meta(org, repo, stars, forks, open_issues, language, license, archived, last_import_at)
+		VALUES ('org1', 'repo1', 10, 5, 1, 'Go', 'MIT', 0, '2025-01-31T12:00:00Z'),
+		       ('org2', 'repo2', 20, 3, 0, 'Rust', 'Apache-2.0', 0, '2025-02-15T12:00:00Z')`)
+	require.NoError(t, err)
+
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name, entity) VALUES
+		('alice', 'Alice', 'ACME'), ('bob', 'Bob', 'BETA')`)
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+			VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://a', '', '')
+			ON CONFLICT DO NOTHING`, "2025-01-"+padDay(i))
+		require.NoError(t, err)
+	}
+	for i := 0; i < 5; i++ {
+		_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+			VALUES ('org2', 'repo2', 'bob', 'issue', $1, 'http://b', '', '')
+			ON CONFLICT DO NOTHING`, "2025-01-"+padDay(i))
+		require.NoError(t, err)
+	}
+
+	// Unfiltered: all events
+	all, err := store.GetInsightsSummary(ctx, nil, nil, nil, 730)
+	require.NoError(t, err)
+	assert.Equal(t, 15, all.Events)
+	assert.Equal(t, 2, all.Contributors)
+
+	// Filtered by org1/repo1
+	org := "org1"
+	repo := "repo1"
+	filtered, err := store.GetInsightsSummary(ctx, &org, &repo, nil, 730)
+	require.NoError(t, err)
+	assert.Equal(t, 10, filtered.Events)
+	assert.Equal(t, 1, filtered.Contributors)
+
+	// Filtered by entity
+	entity := "ACME"
+	byEntity, err := store.GetInsightsSummary(ctx, nil, nil, &entity, 730)
+	require.NoError(t, err)
+	assert.Equal(t, 10, byEntity.Events)
+}
+
+func TestGetDailyActivity_Filtered(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-10', 'http://a', '', ''),
+		       ('org2', 'repo2', 'alice', 'issue', '2025-01-10', 'http://b', '', '')`)
+	require.NoError(t, err)
+
+	// Filtered by org1
+	org := "org1"
+	series, err := store.GetDailyActivity(ctx, &org, nil, nil, 730)
+	require.NoError(t, err)
+	total := 0
+	for _, c := range series.Counts {
+		total += c
+	}
+	assert.Equal(t, 1, total)
+}
+
 func padDay(i int) string {
 	return fmt.Sprintf("%02d", (i%28)+1)
 }

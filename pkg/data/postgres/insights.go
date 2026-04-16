@@ -11,17 +11,15 @@ import (
 )
 
 const (
-	// selectBusFactorSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectBusFactorSQL = `WITH dev_counts AS (
+	// selectBusFactorTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectBusFactorTpl = `WITH dev_counts AS (
 			SELECT e.username, COUNT(*) AS cnt
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.org = COALESCE($1, e.org)
-			  AND e.repo = COALESCE($2, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-			  AND e.date >= $4
-			  ` + botExcludeSQL + `
+			WHERE e.date >= $1
+			  ` + botExcludeTpl + `
 			  ` + forkExcludeSQL + `
+			  %s
 			GROUP BY e.username
 			ORDER BY cnt DESC
 		),
@@ -34,17 +32,15 @@ const (
 		SELECT COUNT(*) FROM running WHERE cumsum - cnt < total * 0.5
 	`
 
-	// selectPonyFactorSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectPonyFactorSQL = `WITH ent_counts AS (
+	// selectPonyFactorTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectPonyFactorTpl = `WITH ent_counts AS (
 			SELECT d.entity, COUNT(*) AS cnt
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.org = COALESCE($1, e.org)
-			  AND e.repo = COALESCE($2, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-			  AND e.date >= $4
+			WHERE e.date >= $1
 			  AND d.entity IS NOT NULL AND d.entity != ''
 			  ` + forkExcludeSQL + `
+			  %s
 			GROUP BY d.entity
 			ORDER BY cnt DESC
 		),
@@ -415,22 +411,20 @@ const (
 	FROM user_counts u, avg_counts a
 	`
 
-	// selectBannerStatsSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectBannerStatsSQL = `SELECT
+	// selectBannerStatsTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectBannerStatsTpl = `SELECT
 		COUNT(DISTINCT e.org),
 		COUNT(DISTINCT e.org || '/' || e.repo),
 		COUNT(*),
 		COUNT(DISTINCT e.username),
-		COALESCE((SELECT MAX(rm.last_import_at) FROM devpulse_repo_meta rm
-			WHERE rm.org = COALESCE($1, rm.org) AND rm.repo = COALESCE($2, rm.repo)), '')
+		COALESCE(MAX(rm.last_import_at), '')
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
-	WHERE e.org = COALESCE($1, e.org)
-	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-	  AND e.date >= $4
-	  ` + botExcludeSQL + `
+	LEFT JOIN devpulse_repo_meta rm ON rm.org = e.org AND rm.repo = e.repo
+	WHERE e.date >= $1
+	  ` + botExcludeTpl + `
 	  ` + forkExcludeSQL + `
+	  %s
 	`
 
 	// selectIssueOpenCloseRatioTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
@@ -516,8 +510,8 @@ const (
 	ORDER BY period
 `
 
-	// selectAgingPRsSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectAgingPRsSQL = `SELECT
+	// selectAgingPRsTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectAgingPRsTpl = `SELECT
 		COUNT(*) AS total_open,
 		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END), 0) AS over_30,
 		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END), 0) AS over_90
@@ -526,15 +520,13 @@ const (
 	WHERE e.type = 'pr'
 	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
 	  AND e.created_at IS NOT NULL
-	  AND e.org = COALESCE($1, e.org)
-	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-	  AND e.created_at >= $4
-	  ` + botExcludeSQL + `
+	  AND e.created_at >= $1
+	  ` + botExcludeTpl + `
+	  %s
 	`
 
-	// selectUnansweredRateSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectUnansweredRateSQL = `WITH items AS (
+	// selectUnansweredRateTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectUnansweredRateTpl = `WITH items AS (
     SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
     FROM devpulse_event e
     JOIN devpulse_developer d ON e.username = d.username
@@ -542,11 +534,9 @@ const (
       AND e.number IS NOT NULL
       AND e.created_at IS NOT NULL
       AND EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 7
-      AND e.org = COALESCE($1, e.org)
-      AND e.repo = COALESCE($2, e.repo)
-      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-      AND e.created_at >= $4
-      ` + botExcludeSQL + `
+      AND e.created_at >= $1
+      ` + botExcludeTpl + `
+      %s
 ),
 responded AS (
     SELECT DISTINCT i.org, i.repo, i.number
@@ -563,8 +553,8 @@ SELECT
     ) AS unanswered
 `
 
-	// selectResponseSLOSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectResponseSLOSQL = `WITH first_response AS (
+	// selectResponseSLOTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectResponseSLOTpl = `WITH first_response AS (
     SELECT e.org, e.repo, e.number,
         MIN(EXTRACT(EPOCH FROM (r.created_at::timestamp - e.created_at::timestamp)) / 3600.0) AS hours
     FROM devpulse_event e
@@ -576,11 +566,9 @@ SELECT
     WHERE e.type IN ('issue', 'pr')
       AND e.number IS NOT NULL
       AND e.created_at IS NOT NULL
-      AND e.org = COALESCE($1, e.org)
-      AND e.repo = COALESCE($2, e.repo)
-      AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-      AND e.created_at >= $4
-      ` + botExcludeSQL + `
+      AND e.created_at >= $1
+      ` + botExcludeTpl + `
+      %s
     GROUP BY e.org, e.repo, e.number
 )
 SELECT
@@ -668,16 +656,14 @@ ORDER BY ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) DESC
 LIMIT $4
 `
 
-	// selectDailyActivitySQL: $1=org, $2=repo, $3=entity, $4=since
-	selectDailyActivitySQL = `SELECT e.date, COUNT(*) AS cnt
+	// selectDailyActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	selectDailyActivityTpl = `SELECT e.date, COUNT(*) AS cnt
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
-		WHERE e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.date >= $4
-		  ` + botExcludeSQL + `
+		WHERE e.date >= $1
+		  ` + botExcludeTpl + `
 		  ` + forkExcludeSQL + `
+		  %s
 		GROUP BY e.date
 		ORDER BY e.date
 	`
@@ -691,15 +677,25 @@ func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *strin
 	since := sinceDate(days)
 	summary := &data.InsightsSummary{}
 
-	if err := s.db.QueryRowContext(ctx, selectBusFactorSQL, org, repo, entity, since).Scan(&summary.BusFactor); err != nil {
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	wc := qb.whereClause()
+	baseArgs := append([]any{since}, qb.args...)
+
+	busQuery := fmt.Sprintf(selectBusFactorTpl, wc)
+	if err := s.db.QueryRowContext(ctx, busQuery, baseArgs...).Scan(&summary.BusFactor); err != nil {
 		return nil, fmt.Errorf("failed to query bus factor: %w", err)
 	}
 
-	if err := s.db.QueryRowContext(ctx, selectPonyFactorSQL, org, repo, entity, since).Scan(&summary.PonyFactor); err != nil {
+	ponyQuery := fmt.Sprintf(selectPonyFactorTpl, wc)
+	if err := s.db.QueryRowContext(ctx, ponyQuery, baseArgs...).Scan(&summary.PonyFactor); err != nil {
 		return nil, fmt.Errorf("failed to query pony factor: %w", err)
 	}
 
-	if err := s.db.QueryRowContext(ctx, selectBannerStatsSQL, org, repo, entity, since).Scan(
+	bannerQuery := fmt.Sprintf(selectBannerStatsTpl, wc)
+	if err := s.db.QueryRowContext(ctx, bannerQuery, baseArgs...).Scan(
 		&summary.Orgs, &summary.Repos, &summary.Events, &summary.Contributors, &summary.LastImport,
 	); err != nil {
 		return nil, fmt.Errorf("failed to query banner stats: %w", err)
@@ -714,8 +710,14 @@ func (s *Store) GetDailyActivity(ctx context.Context, org, repo, entity *string,
 	}
 
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectDailyActivityTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, selectDailyActivitySQL, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query daily activity: %w", err)
 	}
@@ -1294,9 +1296,16 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, days
 	}
 
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectAgingPRsTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
+
 	var total, over30, over90 int
 
-	if err := s.db.QueryRowContext(ctx, selectAgingPRsSQL, org, repo, entity, since).Scan(&total, &over30, &over90); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&total, &over30, &over90); err != nil {
 		return nil, fmt.Errorf("failed to query aging PRs: %w", err)
 	}
 
@@ -1327,9 +1336,16 @@ func (s *Store) GetUnansweredRate(ctx context.Context, org, repo, entity *string
 	}
 
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectUnansweredRateTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
+
 	var total, unanswered int
 
-	if err := s.db.QueryRowContext(ctx, selectUnansweredRateSQL, org, repo, entity, since).Scan(&total, &unanswered); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&total, &unanswered); err != nil {
 		return nil, fmt.Errorf("failed to query unanswered rate: %w", err)
 	}
 
@@ -1351,9 +1367,16 @@ func (s *Store) GetResponseSLO(ctx context.Context, org, repo, entity *string, d
 	}
 
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectResponseSLOTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
+
 	var total, withinSLO int
 
-	if err := s.db.QueryRowContext(ctx, selectResponseSLOSQL, org, repo, entity, since).Scan(&total, &withinSLO); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&total, &withinSLO); err != nil {
 		return nil, fmt.Errorf("failed to query response SLO: %w", err)
 	}
 
