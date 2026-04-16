@@ -83,12 +83,12 @@ WHERE username = 'their-github-username';
 
 Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 
-| Plan | Repos | Events/Week | Data Retention | AI Level | Deep Rep | Exports |
-|------|-------|-------------|----------------|----------|----------|---------|
-| free | 1 | 500 | 3 months | none | no | none |
-| starter | 5 | 2,500 | 6 months | basic | no | PDF |
-| pro | 25 | 15,000 | 12 months | full | yes | PDF+CSV |
-| enterprise | unlimited | unlimited | unlimited | full | yes | PDF+CSV |
+| Plan | Repos | Events/Week | Data Retention | AI Level | Exports |
+|------|-------|-------------|----------------|----------|---------|
+| free | 1 | 500 | 3 months | none | none |
+| starter | 5 | 2,500 | 6 months | basic | PDF |
+| pro | 25 | 15,000 | 12 months | full | PDF+CSV |
+| enterprise | unlimited | unlimited | unlimited | full | PDF+CSV |
 
 ## Monitoring
 

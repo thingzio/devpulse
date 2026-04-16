@@ -89,7 +89,7 @@ make down           # stop Postgres (data preserved)
 
 `make server` runs `devpulse-site` (HTTP server on :8080). `make import` runs `devpulse-import` (batch worker, exits when done). `devpulse-admin` is an IAM-protected admin service for tenant management — see [ADMIN.md](ADMIN.md).
 
-The import binary runs the full pipeline: events, deep reputation, and LLM insights in a single pass. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+The import binary runs the full pipeline: events, reputation, and LLM insights in a single pass. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 

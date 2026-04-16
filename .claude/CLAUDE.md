@@ -178,7 +178,6 @@ Tenant isolation layers:
 - `IMPORT_FRESH_DAYS` — fresh pass lookback window in days (default: 21)
 - `IMPORT_BACKFILL_CHUNK_DAYS` — backfill chunk size in days (default: 7)
 - `IMPORT_DB_BATCH_SIZE` — events per DB transaction during flush (default: 100)
-- `DEEPREP_IMPORT_LIMIT` — max developers for deep rep scoring per repo (default: 100)
 
 ## CI/CD
 

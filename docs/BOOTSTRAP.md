@@ -188,7 +188,7 @@ open https://$DOMAIN
 
 # Trigger manual import (after signing in, installing app, and adding repos)
 gcloud run jobs execute devpulse-saas-import --region=$REGION --project=$PROJECT_ID
-# Import runs every 2h: fresh events → enrichment → backfill chunk → deep rep
+# Import runs every 2h: fresh events → enrichment → backfill chunk
 
 # Check logs
 gcloud logging read 'resource.type="cloud_run_revision"' \

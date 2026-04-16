@@ -112,7 +112,6 @@ The `devpulse-import` binary runs the full pipeline in a single Cloud Run job (e
 6. **Reputation** — basic reputation scoring from event data
 7. **Insights** — LLM-generated observations (optional, requires `ANTHROPIC_API_KEY`)
 8. **Backfill events** — extends historical coverage by one chunk (default 7 days) per run
-9. **Deep reputation** — GitHub API-based scoring, capped at `DEEPREP_IMPORT_LIMIT` (default 100) developers per repo, runs last as best effort
 
 Unchanged repos (no pushes since last import) are skipped automatically to save API quota, unless backfill is still pending (hasn't reached 90-day coverage). On-demand import is triggered via Cloud Run Jobs API when a user adds a new repo (`pkg/server/import_trigger.go`).
 
@@ -123,7 +122,6 @@ Event import uses a two-pass model to prioritize fresh data:
 1. **Fresh pass** — fetches events from the most recent `IMPORT_FRESH_DAYS` (default 21 days), newest-first. All 5 event types run concurrently. Completes quickly even for the largest repos.
 2. **Enrichment phases** — releases, metrics, containers, reputation, and insights run after the fresh pass, ensuring the dashboard has complete data for the recent window.
 3. **Backfill pass** — extends historical coverage by `IMPORT_BACKFILL_CHUNK_DAYS` (default 7 days) per run, marching backward until reaching `EventAgeDaysDefault` (90 days).
-4. **Deep reputation** — runs last as best effort with remaining time. Capped at `DEEPREP_IMPORT_LIMIT` (default 100) developers per repo.
 
 **State:** `backfill_until` column in `devpulse_state` tracks the oldest date covered. NULL means fresh repo. Updated only on successful chunk completion — killed runs retry the same chunk.
 
@@ -131,7 +129,7 @@ Event import uses a two-pass model to prioritize fresh data:
 
 **Self-healing:** Killed jobs resume cleanly — flushed sub-batches are persisted via idempotent upserts, and `backfill_until` only advances on chunk completion. GitHub API 500s on one event type don't block backfill progress — the failing window ages out. Repos with pending backfill bypass the skip-unchanged check to ensure historical coverage progresses even on quiet repos.
 
-**Configuration:** `IMPORT_FRESH_DAYS` (default 21), `IMPORT_BACKFILL_CHUNK_DAYS` (default 7), `IMPORT_DB_BATCH_SIZE` (default 100), `DEEPREP_IMPORT_LIMIT` (default 100). All optional with sensible defaults.
+**Configuration:** `IMPORT_FRESH_DAYS` (default 21), `IMPORT_BACKFILL_CHUNK_DAYS` (default 7), `IMPORT_DB_BATCH_SIZE` (default 100). All optional with sensible defaults.
 
 **Token pool:** The import job collects installation tokens from all active GitHub App installations across all tenants, deduplicates by installation ID, and rotates via round-robin (`pkg/data/ghutil/tokenpool.go`). Tokens with < 100 remaining quota are skipped. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for throughput analysis and scaling guidance.
 

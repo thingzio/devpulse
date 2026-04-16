@@ -15,7 +15,6 @@ Internet
    |
    +-- Cloud Run job (import, every 2 hours)
    |     +-- Per-tenant repo import via GitHub API
-   |     +-- Deep reputation scoring (round-robin token pool)
    |     +-- LLM insights generation (Claude Haiku 4.5)
    |
    +-- Cloud Run service (admin, IAM-gated)
@@ -227,7 +226,7 @@ Each tenant's GitHub App installation gets its own **5,000 requests/hour** budge
 
 ### API Calls Per Repo Import
 
-Each repo runs up to 9 import phases (progressive backfill model):
+Each repo runs up to 8 import phases (progressive backfill model):
 
 | Phase | Incremental | First import | Notes |
 |-------|------------:|-------------:|-------|
@@ -239,7 +238,6 @@ Each repo runs up to 9 import phases (progressive backfill model):
 | Reputation | 0-5 | 5-20 | Basic scoring from event data |
 | Insights | 1 | 1 | Anthropic API call (not GitHub) |
 | Backfill events | 5-15 | 20-80 | 7-day chunk (configurable via `IMPORT_BACKFILL_CHUNK_DAYS`) |
-| Deep reputation | 5-10/dev | 5-10/dev | Capped at `DEEPREP_IMPORT_LIMIT` (default 100) devs, runs last |
 
 DB writes use sub-batches of `IMPORT_DB_BATCH_SIZE` (default 100) events per transaction, keeping write times flat (~1-3s) regardless of repo size.
 
