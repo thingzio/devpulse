@@ -53,30 +53,26 @@ const (
 		SELECT COUNT(*) FROM running WHERE cumsum - cnt < total * 0.5
 	`
 
-	// selectRetentionTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	// %[1]s = GroupExpr(gran, "e.date")
+	// selectRetentionTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
 	selectRetentionTpl = `WITH first_seen AS (
 			SELECT e.username, MIN(%[1]s) AS first_period
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.org = COALESCE($1, e.org)
-			  AND e.repo = COALESCE($2, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-			  AND e.date >= $4
+			WHERE e.date >= $1
 			  ` + botExcludeTpl + `
 			  ` + forkExcludeSQL + `
+			  %[2]s
 			GROUP BY e.username
 		),
 		periods AS (
 			SELECT DISTINCT e.username, %[1]s AS period
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.org = COALESCE($5, e.org)
-			  AND e.repo = COALESCE($6, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
-			  AND e.date >= $8
+			WHERE e.date >= $1
 			  ` + botExcludeTpl + `
 			  ` + forkExcludeSQL + `
+			  %[2]s
 		)
 		SELECT p.period,
 			SUM(CASE WHEN f.first_period = p.period THEN 1 ELSE 0 END) AS new_contributors,
@@ -87,10 +83,10 @@ const (
 		ORDER BY p.period
 	`
 
-	// selectTimeToMergeTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.created_at")
+	// selectTimeToMergeTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToMergeTpl = `SELECT
-			%s AS period,
+			%[1]s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
@@ -98,19 +94,17 @@ const (
 		WHERE e.type = 'pr'
 		  AND e.merged_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.created_at >= $4
+		  AND e.created_at >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectTimeToRestoreBugsTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.created_at")
+	// selectTimeToRestoreBugsTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToRestoreBugsTpl = `SELECT
-			%s AS period,
+			%[1]s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
@@ -125,19 +119,17 @@ const (
 		      WHERE r.org = e.org AND r.repo = e.repo
 		        AND r.published_at::timestamp BETWEEN e.created_at::timestamp - INTERVAL '7 days' AND e.created_at::timestamp
 		  )
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.created_at >= $4
+		  AND e.created_at >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectTimeToCloseTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.created_at")
+	// selectTimeToCloseTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToCloseTpl = `SELECT
-			%s AS period,
+			%[1]s AS period,
 			COUNT(*) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
@@ -146,54 +138,48 @@ const (
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.created_at >= $4
+		  AND e.created_at >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectForksAndActivityTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.date")
+	// selectForksAndActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
 	selectForksAndActivityTpl = `SELECT
-			%s AS period,
+			%[1]s AS period,
 			SUM(CASE WHEN e.type = 'fork' THEN 1 ELSE 0 END) AS forks,
 			COUNT(*) AS events
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
-		WHERE e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.date >= $4
+		WHERE e.date >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectPRReviewRatioTpl: $1=pr_type, $2=review_type, $3=org, $4=repo, $5=entity, $6=since, $7=pr_type, $8=review_type
-	// %s = GroupExpr(gran, "e.date")
+	// selectPRReviewRatioTpl: $1=pr_type, $2=review_type, $3=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
 	selectPRReviewRatioTpl = `SELECT
-			%s AS period,
+			%[1]s AS period,
 			SUM(CASE WHEN e.type = $1 THEN 1 ELSE 0 END) AS prs,
 			SUM(CASE WHEN e.type = $2 THEN 1 ELSE 0 END) AS reviews
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
-		WHERE e.org = COALESCE($3, e.org)
-		  AND e.repo = COALESCE($4, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($5, COALESCE(d.entity, ''))
-		  AND e.date >= $6
-		  AND e.type IN ($7, $8)
+		WHERE e.type IN ($1, $2)
+		  AND e.date >= $3
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectChangeFailuresTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.created_at")
+	// selectChangeFailuresTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectChangeFailuresTpl = `SELECT
-		%s AS period,
+		%[1]s AS period,
 		COUNT(*) AS failures
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
@@ -207,30 +193,27 @@ const (
 	    OR
 	    (e.type = 'pr' AND LOWER(e.title) LIKE '%%revert%%')
 	)
-	  AND e.org = COALESCE($1, e.org)
-	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-	  AND e.created_at >= $4
+	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
+	  %[2]s
 	GROUP BY period
 	ORDER BY period
 	`
 
-	// selectDeploymentCountTpl: $1=org, $2=repo, $3=since
-	// %s = GroupExpr(gran, "published_at")
+	// selectDeploymentCountTpl: $1=since, dynamic org/repo via queryBuilder (no entity — no developer join)
+	// %[1]s = GroupExpr(gran, "published_at"), %[2]s = whereClause
 	selectDeploymentCountTpl = `SELECT
-		%s AS period,
+		%[1]s AS period,
 		COUNT(*) AS cnt
 	FROM devpulse_release
-	WHERE org = COALESCE($1, org)
-	  AND repo = COALESCE($2, repo)
-	  AND published_at >= $3
+	WHERE published_at >= $1
+	  %[2]s
 	GROUP BY period
 	ORDER BY period
 	`
 
-	// selectReviewLatencyTpl: $1=since, $2=org, $3=repo, $4=entity, $5=since
-	// %[1]s = GroupExpr(gran, "date"), %[2]s = GroupExpr(gran, "pr.created_at")
+	// selectReviewLatencyTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "date"), %[2]s = GroupExpr(gran, "pr.created_at"), %[3]s = whereClause
 	selectReviewLatencyTpl = `WITH periods AS (
 		SELECT DISTINCT %[1]s AS period
 		FROM devpulse_event
@@ -248,11 +231,9 @@ const (
 		  AND pr.number IS NOT NULL
 		  AND pr.created_at IS NOT NULL
 		  AND rev.created_at IS NOT NULL
-		  AND pr.org = COALESCE($2, pr.org)
-		  AND pr.repo = COALESCE($3, pr.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
-		  AND pr.created_at >= $5
+		  AND pr.created_at >= $1
 		  ` + botExcludePrTpl + `
+		  %[3]s
 		GROUP BY pr.org, pr.repo, pr.number, pr.created_at
 	)
 	SELECT
@@ -265,10 +246,10 @@ const (
 	ORDER BY p.period
 	`
 
-	// selectPRSizeDistributionTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.created_at")
+	// selectPRSizeDistributionTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectPRSizeDistributionTpl = `SELECT
-		%s AS period,
+		%[1]s AS period,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS small,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS medium,
 		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS large,
@@ -277,17 +258,15 @@ const (
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
 	  AND e.created_at IS NOT NULL
-	  AND e.org = COALESCE($1, e.org)
-	  AND e.repo = COALESCE($2, e.repo)
-	  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-	  AND e.created_at >= $4
+	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
+	  %[2]s
 	GROUP BY period
 	ORDER BY period
 	`
 
-	// selectContributorMomentumTpl: $1=since, $2=org, $3=repo, $4=entity
-	// %[1]s = GroupExpr(gran, "date"), %[2]s = MomentumInterval(gran), %[3]s = MomentumFormat(gran)
+	// selectContributorMomentumTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "date"), %[2]s = MomentumInterval(gran), %[3]s = MomentumFormat(gran), %[4]s = whereClause
 	selectContributorMomentumTpl = `WITH periods AS (
 		SELECT DISTINCT %[1]s AS period
 		FROM devpulse_event
@@ -300,20 +279,20 @@ const (
 	JOIN devpulse_event e ON %[1]s >= TO_CHAR(((CASE WHEN length(p.period) = 7 THEN p.period || '-01' ELSE p.period END)::date - INTERVAL '%[2]s'), %[3]s)
 		AND %[1]s <= p.period
 	JOIN devpulse_developer d ON e.username = d.username
-	WHERE e.org = COALESCE($2, e.org)
-	  AND e.repo = COALESCE($3, e.repo)
-	  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
+	WHERE 1=1
 	  ` + botExcludeTpl + `
 	  ` + forkExcludeSQL + `
+	  %[4]s
 	GROUP BY p.period
 	ORDER BY p.period
 	`
 
-	// selectContributorFunnelTpl: $1=org, $2=repo, $3=entity, $4=since
+	// selectContributorFunnelTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "date")
 	// %[2]s = GroupExpr(gran, "f.first_comment")
 	// %[3]s = GroupExpr(gran, "f.first_pr")
 	// %[4]s = GroupExpr(gran, "f.first_merge")
+	// %[5]s = whereClause
 	selectContributorFunnelTpl = `WITH firsts AS (
 		SELECT
 			e.username,
@@ -322,14 +301,13 @@ const (
 			MIN(CASE WHEN e.type = 'pr' AND e.state = 'merged' THEN e.date END) AS first_merge
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
-		WHERE e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
+		WHERE 1=1
 		  ` + botExcludeTpl + `
+		  %[5]s
 		GROUP BY e.username
 	),
 	periods AS (
-		SELECT DISTINCT %[1]s AS period FROM devpulse_event WHERE date >= $4
+		SELECT DISTINCT %[1]s AS period FROM devpulse_event WHERE date >= $1
 	)
 	SELECT
 		p.period,
@@ -346,10 +324,9 @@ const (
 	ORDER BY p.period
 	`
 
-	// selectContributorProfileSQL:
-	// user_counts: $1=username, $2=org, $3=repo, $4=entity, $5=since
-	// avg_counts:  $6=org, $7=repo, $8=entity, $9=since
-	selectContributorProfileSQL = `WITH user_counts AS (
+	// selectContributorProfileTpl: $1=username, $2=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = whereClause
+	selectContributorProfileTpl = `WITH user_counts AS (
 		SELECT
 			SUM(CASE WHEN e.type = 'pr' THEN 1 ELSE 0 END) AS prs_opened,
 			SUM(CASE WHEN e.type = 'pr' AND e.state = 'merged' THEN 1 ELSE 0 END) AS prs_merged,
@@ -363,10 +340,8 @@ const (
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.username = $1
-		  AND e.org = COALESCE($2, e.org)
-		  AND e.repo = COALESCE($3, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($4, COALESCE(d.entity, ''))
-		  AND e.date >= $5
+		  AND e.date >= $2
+		  %[1]s
 	),
 	avg_counts AS (
 		SELECT
@@ -393,11 +368,9 @@ const (
 				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS pr_xlarge
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.org = COALESCE($6, e.org)
-			  AND e.repo = COALESCE($7, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($8, COALESCE(d.entity, ''))
-			  AND e.date >= $9
-			  ` + botExcludeSQL + `
+			WHERE e.date >= $2
+			  ` + botExcludeTpl + `
+			  %[1]s
 			GROUP BY e.username
 		) sub
 	)
@@ -427,8 +400,8 @@ const (
 	  %s
 	`
 
-	// selectIssueOpenCloseRatioTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = GroupExpr(gran, "e.closed_at")
+	// selectIssueOpenCloseRatioTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = GroupExpr(gran, "e.closed_at"), %[3]s = whereClause
 	selectIssueOpenCloseRatioTpl = `SELECT period, SUM(opened) AS opened, SUM(closed) AS closed
 		FROM (
 			SELECT %[1]s AS period, 1 AS opened, 0 AS closed
@@ -436,29 +409,25 @@ const (
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
 			  AND e.created_at IS NOT NULL
-			  AND e.org = COALESCE($1, e.org)
-			  AND e.repo = COALESCE($2, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-			  AND e.created_at >= $4
+			  AND e.created_at >= $1
 			  ` + botExcludeTpl + `
+			  %[3]s
 			UNION ALL
 			SELECT %[2]s AS period, 0 AS opened, 1 AS closed
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
 			  AND e.closed_at IS NOT NULL
-			  AND e.org = COALESCE($5, e.org)
-			  AND e.repo = COALESCE($6, e.repo)
-			  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
-			  AND e.closed_at >= $8
+			  AND e.closed_at >= $1
 			  ` + botExcludeTpl + `
+			  %[3]s
 		) sub
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectTimeToFirstResponseTpl: $1=org, $2=repo, $3=entity, $4=since, $5=org, $6=repo, $7=entity, $8=since
-	// %[1]s = GroupExpr(gran, "e.created_at")
+	// selectTimeToFirstResponseTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToFirstResponseTpl = `WITH issue_first AS (
 		SELECT
 			e.org, e.repo, e.number,
@@ -473,11 +442,9 @@ const (
 		WHERE e.type = 'issue'
 		  AND e.created_at IS NOT NULL
 		  AND e.number IS NOT NULL
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.created_at >= $4
+		  AND e.created_at >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY e.org, e.repo, e.number, period
 	), pr_first AS (
 		SELECT
@@ -493,11 +460,9 @@ const (
 		WHERE e.type = 'pr'
 		  AND e.created_at IS NOT NULL
 		  AND e.number IS NOT NULL
-		  AND e.org = COALESCE($5, e.org)
-		  AND e.repo = COALESCE($6, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($7, COALESCE(d.entity, ''))
-		  AND e.created_at >= $8
+		  AND e.created_at >= $1
 		  ` + botExcludeTpl + `
+		  %[2]s
 		GROUP BY e.org, e.repo, e.number, period
 	)
 	SELECT
@@ -747,14 +712,21 @@ func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl strin
 	}
 
 	gran := AutoGranularity(days)
-	fmtArgs := make([]any, len(cols))
+	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+
+	fmtArgs := make([]any, len(cols)+1)
 	for i, col := range cols {
 		fmtArgs[i] = GroupExpr(gran, col)
 	}
+	fmtArgs[len(cols)] = qb.whereClause()
 	query := fmt.Sprintf(queryTpl, fmtArgs...)
-	since := sinceDate(days)
+	args := append([]any{since}, qb.args...)
 
-	rows, err := db.QueryContext(ctx, query, org, repo, entity, since, org, repo, entity, since)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to query dual series: %w", err)
 	}
@@ -796,13 +768,15 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"))
 	since := sinceDate(days)
+	qb := newQueryBuilder(4)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"), qb.whereClause())
+	args := append([]any{data.EventTypePR, data.EventTypePRReview, since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query,
-		data.EventTypePR, data.EventTypePRReview,
-		org, repo, entity, since,
-		data.EventTypePR, data.EventTypePRReview)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query PR review ratio: %w", err)
 	}
@@ -851,13 +825,19 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	}
 
 	gran := AutoGranularity(days)
-	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"))
-	deployQuery := fmt.Sprintf(selectDeploymentCountTpl, GroupExpr(gran, "published_at"))
 	since := sinceDate(days)
+
+	// Failures query — uses e.org/e.repo/d.entity
+	failQB := newQueryBuilder(2)
+	failQB.addOptional("e.org", org)
+	failQB.addOptional("e.repo", repo)
+	failQB.addEntityFilter("d.entity", entity)
+	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"), failQB.whereClause())
+	failArgs := append([]any{since}, failQB.args...)
 
 	failureMap := make(map[string]int)
 
-	rows, err := s.db.QueryContext(ctx, failQuery, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, failQuery, failArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query change failures: %w", err)
 	}
@@ -876,9 +856,16 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
+	// Deployment query — uses org/repo (no developer join, no entity)
+	deployQB := newQueryBuilder(2)
+	deployQB.addOptional("org", org)
+	deployQB.addOptional("repo", repo)
+	deployQuery := fmt.Sprintf(selectDeploymentCountTpl, GroupExpr(gran, "published_at"), deployQB.whereClause())
+	deployArgs := append([]any{since}, deployQB.args...)
+
 	deployMap := make(map[string]int)
 
-	dRows, err := s.db.QueryContext(ctx, deployQuery, org, repo, since)
+	dRows, err := s.db.QueryContext(ctx, deployQuery, deployArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deployment count: %w", err)
 	}
@@ -946,10 +933,15 @@ func (s *Store) GetReviewLatency(ctx context.Context, org, repo, entity *string,
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectReviewLatencyTpl, GroupExpr(gran, "date"), GroupExpr(gran, "pr.created_at"))
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("pr.org", org)
+	qb.addOptional("pr.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectReviewLatencyTpl, GroupExpr(gran, "date"), GroupExpr(gran, "pr.created_at"), qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query review latency: %w", err)
 	}
@@ -991,10 +983,15 @@ func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(queryTpl, GroupExpr(gran, col))
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(queryTpl, GroupExpr(gran, col), qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query velocity series: %w", err)
 	}
@@ -1048,10 +1045,15 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"))
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"), qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query PR size distribution: %w", err)
 	}
@@ -1098,10 +1100,15 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"))
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"), qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query forks and activity: %w", err)
 	}
@@ -1142,15 +1149,21 @@ func (s *Store) GetContributorFunnel(ctx context.Context, org, repo, entity *str
 	}
 
 	gran := AutoGranularity(days)
+	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
 	query := fmt.Sprintf(selectContributorFunnelTpl,
 		GroupExpr(gran, "date"),
 		GroupExpr(gran, "f.first_comment"),
 		GroupExpr(gran, "f.first_pr"),
 		GroupExpr(gran, "f.first_merge"),
+		qb.whereClause(),
 	)
-	since := sinceDate(days)
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, entity, since)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor funnel: %w", err)
 	}
@@ -1194,10 +1207,15 @@ func (s *Store) GetContributorMomentum(ctx context.Context, org, repo, entity *s
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectContributorMomentumTpl, GroupExpr(gran, "date"), MomentumInterval(gran), MomentumFormat(gran))
 	since := sinceDate(days)
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectContributorMomentumTpl, GroupExpr(gran, "date"), MomentumInterval(gran), MomentumFormat(gran), qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := s.db.QueryContext(ctx, query, since, org, repo, entity)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor momentum: %w", err)
 	}
@@ -1248,16 +1266,19 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	}
 
 	since := sinceDate(days)
+	qb := newQueryBuilder(3)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+	query := fmt.Sprintf(selectContributorProfileTpl, qb.whereClause())
+	args := append([]any{username, since}, qb.args...)
 
 	var prs, prsMerged, reviews, issues, comments int
 	var prSmall, prMedium, prLarge, prXLarge int
 	var avgPrs, avgMerged, avgReviews, avgIssues, avgComments float64
 	var avgSmall, avgMedium, avgLarge, avgXLarge float64
 
-	err := s.db.QueryRowContext(ctx, selectContributorProfileSQL,
-		username, org, repo, entity, since,
-		org, repo, entity, since,
-	).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&prs, &prsMerged, &reviews, &issues, &comments,
 		&prSmall, &prMedium, &prLarge, &prXLarge,
 		&avgPrs, &avgMerged, &avgReviews, &avgIssues, &avgComments,
