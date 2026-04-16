@@ -194,7 +194,7 @@ let timeToCloseChart;
 let releaseCadenceChart;
 let releaseDownloadsChart;
 let releaseDownloadsByTagChart;
-let reputationChart;
+let compositionChart;
 let forksAndActivityChart;
 let issueRatioChart;
 let timeToFirstResponseChart;
@@ -455,7 +455,7 @@ function loadTabCharts(tab, months, org, repo, entity) {
             loadPRRatioChart('/data/insights/pr-ratio?' + q);
             loadReviewLatencyChart('/data/insights/review-latency?' + q);
             loadTimeToCloseChart('/data/insights/time-to-close?' + q, '/data/insights/time-to-restore?' + q);
-            loadReputationChart('/data/insights/reputation?' + q);
+            loadContributorCompositionChart('/data/insights/contributor-composition?' + q);
             break;
         case 'community':
             loadRetentionChart('/data/insights/retention?' + q);
@@ -728,7 +728,7 @@ function resetSearch() {
     $("#pony-factor-val").text("—");
     $("#repo-meta-container").empty().html('<span class="insight-label">No metadata imported yet</span>');
     $("#entity-popover").removeClass("open");
-    $("#reputation-popover").removeClass("open");
+    $("#composition-counts").text('');
 }
 
 function resetCharts() {
@@ -765,8 +765,8 @@ function resetCharts() {
     if (containerActivityChart) {
         containerActivityChart.destroy();
     }
-    if (reputationChart) {
-        reputationChart.destroy();
+    if (compositionChart) {
+        compositionChart.destroy();
     }
     if (forksAndActivityChart) {
         forksAndActivityChart.destroy();
@@ -2025,31 +2025,23 @@ function loadContainerActivityChart(url) {
     });
 }
 
-function loadReputationChart(url) {
+function loadContributorCompositionChart(url) {
     $.get(url, function (data) {
         if (data.total > 0) {
-            $("#reputation-counts").text('Scored: ' + data.scored + ' / Total: ' + data.total);
+            $("#composition-counts").text(data.total + ' contributors');
         } else {
-            $("#reputation-counts").text('');
+            $("#composition-counts").text('');
         }
-        if (reputationChart) reputationChart.destroy();
-        if (!data.scored) {
-            $("#reputation-depth").text('');
-            return;
-        }
+        if (compositionChart) compositionChart.destroy();
+        if (!data.total) return;
 
-        var shallow = data.scored - data.deep;
-        var shallowPct = Math.round((shallow / data.scored) * 100);
-        var deepPct = 100 - shallowPct;
-        $("#reputation-depth").text('Shallow: ' + shallowPct + '% \u00b7 Deep: ' + deepPct + '%');
-
-        reputationChart = new Chart($("#reputation-chart")[0].getContext("2d"), {
+        compositionChart = new Chart($("#composition-chart")[0].getContext("2d"), {
             type: 'doughnut',
             data: {
-                labels: ['Alert (< 0.3)', 'Standard (0.3\u20130.7)', 'High Confidence (\u2265 0.7)'],
+                labels: ['Reviewers', 'Authors', 'Commenters', 'Observers'],
                 datasets: [{
-                    data: [data.alert, data.standard, data.high_confidence],
-                    backgroundColor: ['#cf222e', '#bf8700', '#2da44e'],
+                    data: [data.reviewers, data.authors, data.commenters, data.observers],
+                    backgroundColor: ['#2da44e', '#0969da', '#bf8700', '#656d76'],
                     borderWidth: 0
                 }]
             },
@@ -2065,7 +2057,7 @@ function loadReputationChart(url) {
                     tooltip: {
                         callbacks: {
                             label: function (ctx) {
-                                var pct = data.scored > 0 ? Math.round((ctx.raw / data.scored) * 100) : 0;
+                                var pct = data.total > 0 ? Math.round((ctx.raw / data.total) * 100) : 0;
                                 return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
                             }
                         }
@@ -2083,7 +2075,7 @@ function loadReputationChart(url) {
                     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#333';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(data.scored, cx, cy);
+                    ctx.fillText(data.total, cx, cy);
                     ctx.restore();
                 }
             }]

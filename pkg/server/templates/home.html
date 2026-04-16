@@ -426,14 +426,16 @@
             <article>
                 <div class="tbl" style="position:relative;">
                     <div class="content-header">
-                        Reputation Composition
+                        Contributor Composition
                     </div>
-                    <div class="reputation-counts" id="reputation-counts" style="padding:0.25rem 1rem;font-size:0.85rem;color:var(--fg-muted);"></div>
+                    <div id="composition-counts" style="padding:0.25rem 1rem;font-size:0.85rem;color:var(--fg-muted);"></div>
                     <div class="tbl-chart tbl-home" style="display:flex;align-items:center;justify-content:center;">
-                        <canvas class="chart" id="reputation-chart"></canvas>
+                        <canvas class="chart" id="composition-chart"></canvas>
                     </div>
-                    <div id="reputation-depth" style="text-align:center;font-size:0.85rem;color:var(--fg-muted);padding:0.25rem 0;"></div>
-                    <span class="insight-desc">Contributor reputation score distribution. Excludes bots and fork-only contributors.</span>
+                    <div id="composition-link" style="text-align:center;font-size:0.85rem;padding:0.25rem 0;">
+                        <a href="https://devtrace.thingz.io/" target="_blank" rel="noopener" style="color:var(--fg-muted);">Deeper analysis at devtrace.thingz.io</a>
+                    </div>
+                    <span class="insight-desc">Contributors by highest engagement level. Excludes bots and fork-only activity.</span>
                 </div>
             </article>
         </section>
