@@ -416,27 +416,6 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		errs++
 	}
 
-	// Phase 10: Deep reputation — best effort, runs last with remaining time.
-	limits, _ := plan.Get(planName)
-	token = tokenForPhase()
-	if token != "" && limits.DeepReputation && pool != nil {
-		slog.Info("phase: deep reputation", "org", org, "repo", repo)
-		tokenFn := func() string { return pool.Token() }
-		var res *data.DeepReputationResult
-		if err := retryRL(func() error {
-			var drErr error
-			res, drErr = store.ImportDeepReputation(ctx, tokenFn, nil, config.DeepRepImportLimit(), 0, &org, &repo)
-			return drErr
-		}); err != nil {
-			slog.Error("importing deep reputation", "org", org, "repo", repo, "error", err)
-			errs++
-		} else {
-			slog.Info("deep reputation complete", "org", org, "repo", repo, "scored", res.Scored, "errors", res.Errors)
-		}
-	} else if token != "" {
-		slog.Debug("skipping deep reputation, not included in plan", "org", org, "repo", repo, "plan", planName)
-	}
-
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
 
 	if errs > 0 {

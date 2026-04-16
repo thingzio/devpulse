@@ -11,23 +11,22 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
-func TestGetReputationComposition_NilDB(t *testing.T) {
+func TestGetContributorComposition_NilDB(t *testing.T) {
 	ctx := context.Background()
 	s := &Store{db: nil}
-	_, err := s.GetReputationComposition(ctx, nil, nil, nil, 180)
+	_, err := s.GetContributorComposition(ctx, nil, nil, nil, 180)
 	assert.Error(t, err)
 }
 
-func TestGetReputationComposition_EmptyDB(t *testing.T) {
+func TestGetContributorComposition_EmptyDB(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
-	comp, err := store.GetReputationComposition(ctx, nil, nil, nil, 180)
+	comp, err := store.GetContributorComposition(ctx, nil, nil, nil, 180)
 	require.NoError(t, err)
-	assert.Equal(t, 0, comp.Alert)
-	assert.Equal(t, 0, comp.Standard)
-	assert.Equal(t, 0, comp.HighConfidence)
-	assert.Equal(t, 0, comp.Deep)
-	assert.Equal(t, 0, comp.Scored)
+	assert.Equal(t, 0, comp.Reviewers)
+	assert.Equal(t, 0, comp.Authors)
+	assert.Equal(t, 0, comp.Commenters)
+	assert.Equal(t, 0, comp.Observers)
 	assert.Equal(t, 0, comp.Total)
 }
 
@@ -38,22 +37,16 @@ func TestUpdateReputation(t *testing.T) {
 	devs := []*data.Developer{{Username: "repuser", FullName: "Rep User", Entity: "CORP"}}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	require.NoError(t, store.updateReputation(ctx, "repuser", 0.85, "2025-01-15T10:00:00Z", true, nil))
+	_, err := store.db.ExecContext(ctx, updateReputationSQL, 0.85, "2025-01-15T10:00:00Z", "repuser")
+	require.NoError(t, err)
 
 	var rep float64
 	var updatedAt string
-	err := store.db.QueryRowContext(ctx, "SELECT reputation, reputation_updated_at FROM devpulse_developer WHERE username = $1", "repuser").
+	err = store.db.QueryRowContext(ctx, "SELECT reputation, reputation_updated_at FROM devpulse_developer WHERE username = $1", "repuser").
 		Scan(&rep, &updatedAt)
 	require.NoError(t, err)
 	assert.InDelta(t, 0.85, rep, 0.001)
 	assert.Equal(t, "2025-01-15T10:00:00Z", updatedAt)
-}
-
-func TestUpdateReputation_NilDB(t *testing.T) {
-	ctx := context.Background()
-	s := &Store{db: nil}
-	err := s.updateReputation(ctx, "test", 0.5, "2025-01-01T00:00:00Z", false, nil)
-	assert.Error(t, err)
 }
 
 func TestGetStaleReputationUsernames_NullReputation(t *testing.T) {
@@ -86,7 +79,8 @@ func TestGetStaleReputationUsernames_FreshReputation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set fresh reputation
-	require.NoError(t, store.updateReputation(ctx, "freshuser", 0.9, "2025-02-01T00:00:00Z", false, nil))
+	_, err = store.db.ExecContext(ctx, updateReputationSQL, 0.9, "2025-02-01T00:00:00Z", "freshuser")
+	require.NoError(t, err)
 
 	// Threshold before the update -- user should NOT appear
 	usernames, err := store.getStaleReputationUsernames(ctx, nil, nil, "2025-01-15T00:00:00Z")
@@ -150,55 +144,33 @@ func TestGetDistinctOrgs_NilDB(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGetReputationComposition_WithData(t *testing.T) {
+func TestGetContributorComposition_WithData(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)
 
 	devs := []*data.Developer{
-		{Username: "alert-user", FullName: "Alert User"},
-		{Username: "boundary-low", FullName: "Boundary Low"},
-		{Username: "standard-user", FullName: "Standard User"},
-		{Username: "boundary-high", FullName: "Boundary High"},
-		{Username: "high-user", FullName: "High User"},
-		{Username: "unscored-user", FullName: "Unscored User"},
+		{Username: "reviewer1", FullName: "Reviewer One"},
+		{Username: "author1", FullName: "Author One"},
+		{Username: "commenter1", FullName: "Commenter One"},
+		{Username: "observer1", FullName: "Observer One"},
 	}
 	require.NoError(t, store.SaveDevelopers(ctx, devs))
 
-	// Alert: < 0.3
-	require.NoError(t, store.updateReputation(ctx, "alert-user", 0.29, "2025-01-15T00:00:00Z", false, nil))
-	// Standard boundary: exactly 0.3
-	require.NoError(t, store.updateReputation(ctx, "boundary-low", 0.30, "2025-01-15T00:00:00Z", false, nil))
-	// Standard mid-range
-	require.NoError(t, store.updateReputation(ctx, "standard-user", 0.50, "2025-01-15T00:00:00Z", true, nil))
-	// Standard upper boundary: 0.69
-	require.NoError(t, store.updateReputation(ctx, "boundary-high", 0.69, "2025-01-15T00:00:00Z", false, nil))
-	// High confidence: >= 0.7 (use 0.75 to avoid float4 precision loss at exact boundary)
-	require.NoError(t, store.updateReputation(ctx, "high-user", 0.75, "2025-01-15T00:00:00Z", true, nil))
-	// unscored-user has no reputation set
-
 	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels) VALUES
-		('org1', 'repo1', 'alert-user',    'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'boundary-low',  'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'standard-user', 'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'boundary-high', 'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'high-user',     'pr', '2025-01-10', 'http://example.com', '', ''),
-		('org1', 'repo1', 'unscored-user', 'pr', '2025-01-10', 'http://example.com', '', '')`)
+		('org1', 'repo1', 'reviewer1',  'pr_review',     '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'author1',    'pr',            '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'commenter1', 'issue_comment', '2025-01-10', 'http://example.com', '', ''),
+		('org1', 'repo1', 'observer1',  'issue',         '2025-01-10', 'http://example.com', '', '')`)
 	require.NoError(t, err)
 
-	comp, err := store.GetReputationComposition(ctx, nil, nil, nil, 730)
+	comp, err := store.GetContributorComposition(ctx, nil, nil, nil, 730)
 	require.NoError(t, err)
 
-	// Bucket counts
-	assert.Equal(t, 1, comp.Alert, "alert: scores < 0.3")
-	assert.Equal(t, 3, comp.Standard, "standard: scores 0.3-0.69")
-	assert.Equal(t, 1, comp.HighConfidence, "high confidence: scores >= 0.7")
-
-	// Depth counts
-	assert.Equal(t, 2, comp.Deep, "deep-scored contributors")
-
-	// Totals
-	assert.Equal(t, 5, comp.Scored, "scored contributors")
-	assert.Equal(t, 6, comp.Total, "total contributors including unscored")
+	assert.Equal(t, 1, comp.Reviewers, "reviewers")
+	assert.Equal(t, 1, comp.Authors, "authors (PR-only, not also reviewer)")
+	assert.Equal(t, 1, comp.Commenters, "commenters (comment-only, not PR/review)")
+	assert.Equal(t, 4, comp.Total, "total unique contributors")
+	assert.Equal(t, 1, comp.Observers, "observers (total - reviewers - authors - commenters)")
 }
 
 func TestImportReputation_NilDB(t *testing.T) {
@@ -238,143 +210,6 @@ func TestImportReputation_ComputesShallowScores(t *testing.T) {
 	scanErr := store.db.QueryRowContext(ctx, "SELECT reputation FROM devpulse_developer WHERE username = 'alice'").Scan(&rep)
 	require.NoError(t, scanErr)
 	assert.True(t, rep.Valid)
-}
-
-func TestGetTieredReputationUsernames_NilDB(t *testing.T) {
-	ctx := context.Background()
-	s := &Store{db: nil}
-	_, err := s.getTieredReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 0.5, 5)
-	assert.Error(t, err)
-}
-
-func TestGetTieredReputationUsernames_EmptyDB(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, "2025-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 0.5, 5)
-	require.NoError(t, err)
-	assert.Empty(t, usernames)
-}
-
-func TestGetTieredReputationUsernames_LowScoreStaleFirst(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-
-	devs := []*data.Developer{
-		{Username: "low1", FullName: "Low One"},
-		{Username: "low2", FullName: "Low Two"},
-		{Username: "high1", FullName: "High One"},
-	}
-	require.NoError(t, store.SaveDevelopers(ctx, devs))
-
-	// Set scores: low1=0.2, low2=0.3 (below 0.5), high1=0.8 (above 0.5)
-	// All deep-scored 10 days ago
-	tenDaysAgo := time.Now().UTC().Add(-10 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "low1", 0.2, tenDaysAgo, true, nil))
-	require.NoError(t, store.updateReputation(ctx, "low2", 0.3, tenDaysAgo, true, nil))
-	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, tenDaysAgo, true, nil))
-
-	for _, u := range []string{"low1", "low2", "high1"} {
-		_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
-			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
-		require.NoError(t, err)
-	}
-
-	// lowThreshold = 7 days ago (low-score users updated 10 days ago ARE stale)
-	// highThreshold = 30 days ago (high-score users updated 10 days ago are NOT stale)
-	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-
-	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
-	require.NoError(t, err)
-	// low1 and low2 are stale (updated 10d ago > 7d threshold), high1 is NOT stale (10d < 30d threshold)
-	assert.Contains(t, usernames, "low1")
-	assert.Contains(t, usernames, "low2")
-	assert.NotContains(t, usernames, "high1")
-}
-
-func TestGetTieredReputationUsernames_HighScoreStaleAfterLongerPeriod(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-
-	devs := []*data.Developer{
-		{Username: "high1", FullName: "High One"},
-	}
-	require.NoError(t, store.SaveDevelopers(ctx, devs))
-
-	// Deep-scored 35 days ago — beyond the 30-day high threshold
-	oldUpdate := time.Now().UTC().Add(-35 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "high1", 0.8, oldUpdate, true, nil))
-
-	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
-		VALUES ('org1', 'repo1', 'high1', 'pr', '2025-01-10', 'http://example.com', '', '')`)
-	require.NoError(t, err)
-
-	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-
-	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
-	require.NoError(t, err)
-	// high1 IS stale now (35d > 30d threshold)
-	assert.Contains(t, usernames, "high1")
-}
-
-func TestGetTieredReputationUsernames_SkipsBots(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-
-	devs := []*data.Developer{
-		{Username: "realuser", FullName: "Real"},
-		{Username: "mybot[bot]", FullName: ""},
-	}
-	require.NoError(t, store.SaveDevelopers(ctx, devs))
-
-	now := time.Now().UTC().Add(-10 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	require.NoError(t, store.updateReputation(ctx, "realuser", 0.10, now, false, nil))
-	require.NoError(t, store.updateReputation(ctx, "mybot[bot]", 0.05, now, false, nil))
-
-	for _, u := range []string{"realuser", "mybot[bot]"} {
-		_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels)
-			VALUES ('org1', 'repo1', $1, 'pr', '2025-01-10', 'http://example.com', '', '')`, u)
-		require.NoError(t, err)
-	}
-
-	lowThreshold := time.Now().UTC().Add(-7 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-	highThreshold := time.Now().UTC().Add(-30 * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
-
-	usernames, err := store.getTieredReputationUsernames(ctx, nil, nil, lowThreshold, highThreshold, 0.5, 10)
-	require.NoError(t, err)
-	assert.Contains(t, usernames, "realuser")
-	assert.NotContains(t, usernames, "mybot[bot]")
-}
-
-func TestImportDeepReputation_NilDB(t *testing.T) {
-	ctx := context.Background()
-	s := &Store{db: nil}
-	_, err := s.ImportDeepReputation(ctx, func() string { return "token" }, nil, 5, 0, nil, nil)
-	assert.Error(t, err)
-}
-
-func TestImportDeepReputation_EmptyToken(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-	_, err := store.ImportDeepReputation(ctx, nil, nil, 5, 0, nil, nil)
-	assert.Error(t, err)
-}
-
-func TestImportDeepReputation_ZeroLimit(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, nil, 0, 0, nil, nil)
-	require.NoError(t, err)
-	assert.Equal(t, 0, res.Scored)
-}
-
-func TestImportDeepReputation_NoCandidates(t *testing.T) {
-	ctx := context.Background()
-	store := setupTestDB(t)
-	res, err := store.ImportDeepReputation(ctx, func() string { return "token" }, nil, 5, 0, nil, nil)
-	require.NoError(t, err)
-	assert.Equal(t, 0, res.Scored)
 }
 
 func TestGetStaleReputationUsernames_FilterByOrg(t *testing.T) {

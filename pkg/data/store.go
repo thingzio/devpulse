@@ -143,10 +143,7 @@ type MetricHistoryStore interface {
 // ReputationStore manages reputation scoring.
 type ReputationStore interface {
 	ImportReputation(ctx context.Context, org, repo *string) (*ReputationResult, error)
-	ImportDeepReputation(ctx context.Context, tokenFn TokenFunc, exhaustFn ExhaustFunc, limit, staleHours int, org, repo *string) (*DeepReputationResult, error)
-	GetOrComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
-	ComputeDeepReputation(ctx context.Context, token, username string) (*UserReputation, error)
-	GetReputationComposition(ctx context.Context, org, repo, entity *string, days int) (*ReputationComposition, error)
+	GetContributorComposition(ctx context.Context, org, repo, entity *string, days int) (*ContributorComposition, error)
 }
 
 // InsightsGenerationStore manages LLM-generated repo insights.

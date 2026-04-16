@@ -89,7 +89,7 @@ func exportRepoCSVs(ctx context.Context, zw *zip.Writer, s data.Store, org, repo
 	exportEventsCSV(ctx, zw, s, o, r, days, prefix)
 	exportDevelopersCSV(ctx, zw, s, o, r, days, prefix)
 	exportInsightsCSV(ctx, zw, s, o, r, prefix)
-	exportReputationCSV(ctx, zw, s, o, r, days, prefix)
+	exportContributorCompositionCSV(ctx, zw, s, o, r, days, prefix)
 }
 
 func exportSummaryCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
@@ -166,18 +166,19 @@ func exportInsightsCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *
 	}
 }
 
-func exportReputationCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
-	rep, err := s.GetReputationComposition(ctx, o, r, nil, days)
-	if err != nil || rep == nil || rep.Scored == 0 {
+func exportContributorCompositionCSV(ctx context.Context, zw *zip.Writer, s data.Store, o, r *string, days int, prefix string) {
+	comp, err := s.GetContributorComposition(ctx, o, r, nil, days)
+	if err != nil || comp == nil || comp.Total == 0 {
 		return
 	}
 	rows := [][]string{
-		{"bucket", "count"},
-		{"alert", fmt.Sprintf("%d", rep.Alert)},
-		{"standard", fmt.Sprintf("%d", rep.Standard)},
-		{"high_confidence", fmt.Sprintf("%d", rep.HighConfidence)},
+		{"role", "count"},
+		{"reviewers", fmt.Sprintf("%d", comp.Reviewers)},
+		{"authors", fmt.Sprintf("%d", comp.Authors)},
+		{"commenters", fmt.Sprintf("%d", comp.Commenters)},
+		{"observers", fmt.Sprintf("%d", comp.Observers)},
 	}
-	writeCSVFile(zw, prefix+"reputation.csv", rows)
+	writeCSVFile(zw, prefix+"contributor_composition.csv", rows)
 }
 
 func writeCSVFile(zw *zip.Writer, name string, rows [][]string) {

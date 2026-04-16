@@ -395,16 +395,7 @@ func (m *backfillMockStore) GetRepoMetricHistory(_ context.Context, _, _ *string
 func (m *backfillMockStore) ImportReputation(_ context.Context, _, _ *string) (*data.ReputationResult, error) {
 	return nil, nil
 }
-func (m *backfillMockStore) ImportDeepReputation(_ context.Context, _ data.TokenFunc, _ data.ExhaustFunc, _, _ int, _, _ *string) (*data.DeepReputationResult, error) {
-	return nil, nil
-}
-func (m *backfillMockStore) GetOrComputeDeepReputation(_ context.Context, _, _ string) (*data.UserReputation, error) {
-	return nil, nil
-}
-func (m *backfillMockStore) ComputeDeepReputation(_ context.Context, _, _ string) (*data.UserReputation, error) {
-	return nil, nil
-}
-func (m *backfillMockStore) GetReputationComposition(_ context.Context, _, _, _ *string, _ int) (*data.ReputationComposition, error) {
+func (m *backfillMockStore) GetContributorComposition(_ context.Context, _, _, _ *string, _ int) (*data.ContributorComposition, error) {
 	return nil, nil
 }
 
