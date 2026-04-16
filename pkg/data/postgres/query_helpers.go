@@ -27,6 +27,10 @@ const (
 	botExcludeTpl = `AND e.username NOT LIKE '%%[bot]'
 		AND LOWER(e.username) NOT IN (` + data.BotNames + `)`
 
+	// botExcludeDTpl is botExcludeDSQL with % escaped for use in fmt.Sprintf templates.
+	botExcludeDTpl = `AND d.username NOT LIKE '%%[bot]'
+		AND LOWER(d.username) NOT IN (` + data.BotNames + `)`
+
 	// botExcludePrTpl is botExcludePrSQL with % escaped for fmt.Sprintf templates.
 	botExcludePrTpl = `AND pr.username NOT LIKE '%%[bot]'
 		AND LOWER(pr.username) NOT IN (` + data.BotNames + `)`
@@ -361,7 +365,7 @@ func (qb *queryBuilder) addOptional(col string, val *string) {
 }
 
 // addEntityFilter appends "col = $N" for non-nil entity.
-// Replaces the COALESCE(d.entity, '') = COALESCE($N, COALESCE(d.entity, '')) pattern.
+// Replaces the COALESCE(d.entity, ”) = COALESCE($N, COALESCE(d.entity, ”)) pattern.
 func (qb *queryBuilder) addEntityFilter(col string, val *string) {
 	if val == nil {
 		return

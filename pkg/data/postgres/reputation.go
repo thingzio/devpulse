@@ -15,18 +15,17 @@ import (
 const (
 	reputationStaleHours = 24
 
-	// selectStaleReputationUsernamesSQL: $1=org, $2=repo, $3=threshold
-	selectStaleReputationUsernamesSQL = `SELECT DISTINCT d.username
+	// selectStaleReputationUsernamesTpl: $1=threshold, %s=queryBuilder whereClause
+	selectStaleReputationUsernamesTpl = `SELECT DISTINCT d.username
 		FROM devpulse_developer d
 		JOIN devpulse_event e ON d.username = e.username
 		WHERE 1=1
-		  ` + botExcludeDSQL + `
+		  ` + botExcludeDTpl + `
 		  ` + forkExcludeSQL + `
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
 		  AND (d.reputation IS NULL
 		   OR d.reputation_updated_at IS NULL
-		   OR d.reputation_updated_at < $3)
+		   OR d.reputation_updated_at < $1)
+		  %s
 	`
 
 	// updateReputationSQL: $1=reputation, $2=updated_at, $3=username
@@ -230,7 +229,17 @@ func (s *Store) getStaleReputationUsernames(ctx context.Context, org, repo *stri
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(ctx, selectStaleReputationUsernamesSQL, org, repo, threshold)
+	// $1=threshold is fixed. queryBuilder starts at $2 for org/repo.
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+
+	query := fmt.Sprintf(selectStaleReputationUsernamesTpl, qb.whereClause())
+
+	args := []any{threshold}
+	args = append(args, qb.args...)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stale reputation usernames: %w", err)
 	}

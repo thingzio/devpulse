@@ -62,17 +62,17 @@ const (
 
 	selectAllOrgReposSQL = `SELECT org, repo FROM devpulse_repo_meta ORDER BY org, repo`
 
-	selectDeveloperSearchSQL = `SELECT DISTINCT d.username
+	// selectDeveloperSearchTpl: $1=pattern, $2=since, $3=limit, %s=queryBuilder whereClause
+	selectDeveloperSearchTpl = `SELECT DISTINCT d.username
 		FROM devpulse_developer d
 		JOIN devpulse_event e ON d.username = e.username
 		WHERE d.username ILIKE $1
-		  AND e.org = COALESCE($2, e.org)
-		  AND e.repo = COALESCE($3, e.repo)
-		  ` + botExcludeDSQL + `
-		  AND e.date >= $4
+		  ` + botExcludeDTpl + `
+		  AND e.date >= $2
 		  ` + forkExcludeSQL + `
+		  %s
 		ORDER BY d.username
-		LIMIT $5
+		LIMIT $3
 	`
 )
 
@@ -176,7 +176,17 @@ func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org,
 	since := sinceDate(days)
 	pattern := fmt.Sprintf("%%%s%%", query)
 
-	rows, err := s.db.QueryContext(ctx, selectDeveloperSearchSQL, pattern, org, repo, since, limit)
+	// Fixed params: $1=pattern, $2=since, $3=limit. queryBuilder starts at $4.
+	qb := newQueryBuilder(4)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+
+	sqlStr := fmt.Sprintf(selectDeveloperSearchTpl, qb.whereClause())
+
+	args := []any{pattern, since, limit}
+	args = append(args, qb.args...)
+
+	rows, err := s.db.QueryContext(ctx, sqlStr, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search developers: %w", err)
 	}

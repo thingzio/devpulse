@@ -9,13 +9,12 @@ import (
 )
 
 const (
-	selectMinEventDateSQL = `SELECT COALESCE(MIN(date), '') FROM devpulse_event
-		WHERE org = COALESCE($1, org)
-		  AND repo = COALESCE($2, repo)
+	selectMinEventDateTpl = `SELECT COALESCE(MIN(date), '') FROM devpulse_event
+		WHERE 1=1%s
 	`
 
 	// selectEventTypesSinceTpl: Postgres version with generate_series.
-	// %s = GroupExpr(gran, "dates.d::text")
+	// %[1]s = GroupExpr(gran, "dates.d::text"), %[2]s = queryBuilder whereClause
 	selectEventTypesSinceTpl = `SELECT
 			date,
 			SUM(prs) as prs,
@@ -25,7 +24,7 @@ const (
 			SUM(forks) as forks
 		FROM (
 			SELECT
-				%s as date,
+				%[1]s as date,
 				CASE WHEN e.type = $3 THEN 1 ELSE 0 END as prs,
 				CASE WHEN e.type = $4 THEN 1 ELSE 0 END as pr_review,
 				CASE WHEN e.type = $5 THEN 1 ELSE 0 END as issues,
@@ -34,9 +33,7 @@ const (
 			FROM generate_series($1::date, $2::date, '1 day'::interval) AS dates(d)
 			LEFT JOIN devpulse_event e ON dates.d::date = e.date::date
 			JOIN devpulse_developer d ON e.username = d.username
-			AND e.org = COALESCE($8, e.org)
-			AND e.repo = COALESCE($9, e.repo)
-			AND d.entity = COALESCE($10, d.entity)
+			%[2]s
 			` + botExcludeTpl + `
 		) dt
 		GROUP BY date
@@ -139,8 +136,14 @@ func (s *Store) GetMinEventDate(ctx context.Context, org, repo *string) (string,
 		return "", data.ErrDBNotInitialized
 	}
 
+	qb := newQueryBuilder(1)
+	qb.addOptional("org", org)
+	qb.addOptional("repo", repo)
+
+	query := fmt.Sprintf(selectMinEventDateTpl, qb.whereClause())
+
 	var minDate string
-	if err := s.db.QueryRowContext(ctx, selectMinEventDateSQL, org, repo).Scan(&minDate); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, qb.args...).Scan(&minDate); err != nil {
 		return "", fmt.Errorf("failed to query min event date: %w", err)
 	}
 
@@ -153,7 +156,14 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectEventTypesSinceTpl, GroupExpr(gran, "dates.d::text"))
+
+	// Fixed params: $1=since, $2=to, $3-$7=event types. queryBuilder starts at $8.
+	qb := newQueryBuilder(8)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	qb.addEntityFilter("d.entity", entity)
+
+	query := fmt.Sprintf(selectEventTypesSinceTpl, GroupExpr(gran, "dates.d::text"), qb.whereClause())
 
 	stmt, err := s.db.PrepareContext(ctx, query)
 	if err != nil {
@@ -164,9 +174,11 @@ func (s *Store) GetEventTypeSeries(ctx context.Context, org, repo, entity *strin
 	since := sinceDate(days)
 	to := time.Now().UTC().Format("2006-01-02")
 
-	rows, err := stmt.QueryContext(ctx, since, to,
-		data.EventTypePR, data.EventTypePRReview, data.EventTypeIssue, data.EventTypeIssueComment, data.EventTypeFork,
-		org, repo, entity)
+	args := []any{since, to,
+		data.EventTypePR, data.EventTypePRReview, data.EventTypeIssue, data.EventTypeIssueComment, data.EventTypeFork}
+	args = append(args, qb.args...)
+
+	rows, err := stmt.QueryContext(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute series select statement: %w", err)
 	}
