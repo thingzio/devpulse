@@ -48,8 +48,6 @@ type repoDetail struct {
 	PRMissingSize  int     `json:"pr_missing_size"`
 	Contributors   int     `json:"contributors"`
 	Scored         int     `json:"scored"`
-	DeepScored     int     `json:"deep_scored"`
-	NeverDeepScore int     `json:"never_deep_score"`
 	BackfillDays   int     `json:"backfill_days"`
 	BackfillTarget int     `json:"backfill_target"`
 }

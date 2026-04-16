@@ -9,8 +9,6 @@ CREATE TABLE IF NOT EXISTS devpulse_developer (
     entity TEXT,
     reputation REAL,
     reputation_updated_at TEXT,
-    reputation_deep INTEGER DEFAULT 0,
-    reputation_signals TEXT,
     PRIMARY KEY (username)
 );
 

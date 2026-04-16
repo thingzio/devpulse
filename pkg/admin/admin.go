@@ -205,8 +205,6 @@ func handleGetTenant(db *sql.DB) http.HandlerFunc {
 				PRMissingSize:  rd.PRMissingSize,
 				Contributors:   rd.Contributors,
 				Scored:         rd.Scored,
-				DeepScored:     rd.DeepScored,
-				NeverDeepScore: rd.NeverDeepScore,
 				BackfillDays:   rd.BackfillDays,
 				BackfillTarget: rd.BackfillTarget,
 			}

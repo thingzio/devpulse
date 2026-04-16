@@ -48,8 +48,6 @@ type RepoDetail struct {
 	PRMissingSize  int
 	Contributors   int
 	Scored         int
-	DeepScored     int
-	NeverDeepScore int
 	BackfillDays   int // days of backfill coverage (0 = not started)
 	BackfillTarget int // target days (EventAgeDaysDefault)
 }
@@ -99,11 +97,7 @@ const (
 		                   AND (e.additions IS NULL OR e.changed_files IS NULL) THEN 1 END),
 		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
 		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
-		                   AND d.reputation IS NOT NULL THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
-		                   AND d.reputation_deep = 1 THEN e.username END),
-		       COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
-		                   AND (d.reputation IS NULL OR d.reputation_deep IS NULL OR d.reputation_deep = 0) THEN e.username END)
+		                   AND d.reputation IS NOT NULL THEN e.username END)
 		FROM devpulse_tenant_repo tr
 		LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 		LEFT JOIN devpulse_event e ON tr.org = e.org AND tr.repo = e.repo
@@ -208,7 +202,7 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 		if err := rows.Scan(
 			&rd.Org, &rd.Repo, &rd.Events, &rd.WeeklyEvents, &rd.LastImport,
 			&rd.PRTotal, &rd.PRMissingSize,
-			&rd.Contributors, &rd.Scored, &rd.DeepScored, &rd.NeverDeepScore,
+			&rd.Contributors, &rd.Scored,
 		); err != nil {
 			return nil, fmt.Errorf("scanning repo detail: %w", err)
 		}
