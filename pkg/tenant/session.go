@@ -28,15 +28,58 @@ const destroySessionSQL = `DELETE FROM devpulse_session WHERE id = $1`
 
 const cleanExpiredSessionsSQL = `DELETE FROM devpulse_session WHERE expires_at <= NOW()`
 
-// CreateSession generates a random 256-bit token, stores its SHA-256 hash
-// in the database, and returns the raw token for the cookie.
-//
-// The INSERT runs inside a transaction that clears app.tenant_id
-// (transaction-local) so the RLS bypass policy on devpulse_session allows
-// the write. Without this, a pooled connection carrying a stale
-// app.tenant_id from a previous scoped request would cause the INSERT to
-// be rejected by RLS (surfaced as an FK-constraint error).
+// AuthenticateUser upserts the tenant and creates a session on a single
+// dedicated connection with cleared app.tenant_id. Running both operations
+// on the same connection eliminates cross-connection visibility issues and
+// stale RLS scope that caused FK-constraint errors (23503) on pooled
+// connections.
+func AuthenticateUser(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string, ttl time.Duration) (*Tenant, string, error) {
+	conn, connErr := db.Conn(ctx)
+	if connErr != nil {
+		return nil, "", fmt.Errorf("acquiring auth connection: %w", connErr)
+	}
+	defer conn.Close()
+
+	// Clear any stale RLS scope at SESSION level on this dedicated connection.
+	if _, err := conn.ExecContext(ctx,
+		"SELECT set_config('app.tenant_id', '', false)"); err != nil {
+		return nil, "", fmt.Errorf("clearing tenant scope for auth: %w", err)
+	}
+
+	t, err := scanTenant(conn.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
+	if err != nil {
+		return nil, "", fmt.Errorf("upserting tenant: %w", err)
+	}
+
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, "", fmt.Errorf("generating session token: %w", err)
+	}
+	rawToken := hex.EncodeToString(raw)
+	hashed := HashToken(rawToken)
+
+	if _, err := conn.ExecContext(ctx, createSessionSQL, hashed, t.ID, ttl.String()); err != nil {
+		return nil, "", fmt.Errorf("creating session: %w", err)
+	}
+
+	return t, rawToken, nil
+}
+
+// CreateSession generates a session token for an existing tenant. Uses a
+// dedicated connection with cleared app.tenant_id so the RLS bypass policy
+// allows the INSERT regardless of stale connection state.
 func CreateSession(ctx context.Context, db *sql.DB, tenantID string, ttl time.Duration) (string, error) {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return "", fmt.Errorf("acquiring session connection: %w", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx,
+		"SELECT set_config('app.tenant_id', '', false)"); err != nil {
+		return "", fmt.Errorf("clearing tenant scope for session: %w", err)
+	}
+
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("generating session token: %w", err)
@@ -44,24 +87,10 @@ func CreateSession(ctx context.Context, db *sql.DB, tenantID string, ttl time.Du
 	rawToken := hex.EncodeToString(raw)
 	hashed := HashToken(rawToken)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("beginning session tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
-
-	if _, err := tx.ExecContext(ctx,
-		"SELECT set_config('app.tenant_id', '', true)"); err != nil {
-		return "", fmt.Errorf("clearing tenant scope for session: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, createSessionSQL, hashed, tenantID, ttl.String()); err != nil {
+	if _, err := conn.ExecContext(ctx, createSessionSQL, hashed, tenantID, ttl.String()); err != nil {
 		return "", fmt.Errorf("creating session: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("committing session: %w", err)
-	}
 	return rawToken, nil
 }
 

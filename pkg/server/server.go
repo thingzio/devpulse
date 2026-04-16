@@ -485,21 +485,14 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 			return
 		}
 
-		tn, err := tenant.UpsertTenant(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL, user.Name, user.Company, user.Location, user.Bio)
+		tn, sessionToken, err := tenant.AuthenticateUser(r.Context(), db, user.ID, user.Login, user.Email, user.AvatarURL, user.Name, user.Company, user.Location, user.Bio, sessionTTL)
 		if err != nil {
-			slog.Error("upserting tenant", "error", err)
+			slog.Error("authenticating user", "error", err)
 			clearAndRedirect(w, r, "auth_failed")
 			return
 		}
 
 		slog.Info("user signed in", "username", tn.Username, "tenant_id", tn.ID)
-
-		sessionToken, err := tenant.CreateSession(r.Context(), db, tn.ID, sessionTTL)
-		if err != nil {
-			slog.Error("creating session", "error", err)
-			clearAndRedirect(w, r, "auth_failed")
-			return
-		}
 
 		middleware.SetSessionCookie(w, sessionToken, int(sessionTTL.Seconds()))
 
