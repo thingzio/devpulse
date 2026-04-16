@@ -48,7 +48,7 @@ func CreateSession(ctx context.Context, db *sql.DB, tenantID string, ttl time.Du
 	if err != nil {
 		return "", fmt.Errorf("beginning session tx: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
 
 	if _, err := tx.ExecContext(ctx,
 		"SELECT set_config('app.tenant_id', '', true)"); err != nil {
@@ -100,7 +100,7 @@ func DestroySession(ctx context.Context, db *sql.DB, rawToken string) error {
 	if err != nil {
 		return fmt.Errorf("beginning destroy session tx: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
 
 	if _, err := tx.ExecContext(ctx,
 		"SELECT set_config('app.tenant_id', '', true)"); err != nil {
@@ -149,11 +149,11 @@ func CleanExpiredSessions(ctx context.Context, db *sql.DB) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("beginning clean sessions tx: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
 
-	if _, err := tx.ExecContext(ctx,
-		"SELECT set_config('app.tenant_id', '', true)"); err != nil {
-		return 0, fmt.Errorf("clearing tenant scope for session cleanup: %w", err)
+	if _, clearErr := tx.ExecContext(ctx,
+		"SELECT set_config('app.tenant_id', '', true)"); clearErr != nil {
+		return 0, fmt.Errorf("clearing tenant scope for session cleanup: %w", clearErr)
 	}
 
 	res, err := tx.ExecContext(ctx, cleanExpiredSessionsSQL)
