@@ -11,48 +11,6 @@ import (
 )
 
 const (
-	// selectBusFactorTpl: $1=since, dynamic org/repo/entity via queryBuilder
-	selectBusFactorTpl = `WITH dev_counts AS (
-			SELECT e.username, COUNT(*) AS cnt
-			FROM devpulse_event e
-			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.date >= $1
-			  ` + botExcludeTpl + `
-			  ` + forkExcludeSQL + `
-			  %s
-			GROUP BY e.username
-			ORDER BY cnt DESC
-		),
-		running AS (
-			SELECT username, cnt,
-				SUM(cnt) OVER (ORDER BY cnt DESC) AS cumsum,
-				SUM(cnt) OVER () AS total
-			FROM dev_counts
-		)
-		SELECT COUNT(*) FROM running WHERE cumsum - cnt < total * 0.5
-	`
-
-	// selectPonyFactorTpl: $1=since, dynamic org/repo/entity via queryBuilder
-	selectPonyFactorTpl = `WITH ent_counts AS (
-			SELECT d.entity, COUNT(*) AS cnt
-			FROM devpulse_event e
-			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.date >= $1
-			  AND d.entity IS NOT NULL AND d.entity != ''
-			  ` + forkExcludeSQL + `
-			  %s
-			GROUP BY d.entity
-			ORDER BY cnt DESC
-		),
-		running AS (
-			SELECT entity, cnt,
-				SUM(cnt) OVER (ORDER BY cnt DESC) AS cumsum,
-				SUM(cnt) OVER () AS total
-			FROM ent_counts
-		)
-		SELECT COUNT(*) FROM running WHERE cumsum - cnt < total * 0.5
-	`
-
 	// selectRetentionTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
 	selectRetentionTpl = `WITH first_seen AS (
@@ -384,20 +342,52 @@ const (
 	FROM user_counts u, avg_counts a
 	`
 
-	// selectBannerStatsTpl: $1=since, dynamic org/repo/entity via queryBuilder
-	selectBannerStatsTpl = `SELECT
-		COUNT(DISTINCT e.org),
-		COUNT(DISTINCT e.org || '/' || e.repo),
+	// selectInsightsSummaryTpl combines bus factor, pony factor, and banner stats
+	// into a single CTE to avoid scanning devpulse_event+devpulse_developer 3 times.
+	// $1=since, dynamic org/repo/entity via queryBuilder
+	selectInsightsSummaryTpl = `WITH base AS (
+		SELECT e.org, e.repo, e.username, d.entity
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
+		WHERE e.date >= $1
+		  ` + botExcludeTpl + `
+		  ` + forkExcludeSQL + `
+		  %s
+	),
+	dev_counts AS (
+		SELECT username, COUNT(*) AS cnt
+		FROM base
+		GROUP BY username
+		ORDER BY cnt DESC
+	),
+	dev_running AS (
+		SELECT cnt,
+			SUM(cnt) OVER (ORDER BY cnt DESC) AS cumsum,
+			SUM(cnt) OVER () AS total
+		FROM dev_counts
+	),
+	ent_counts AS (
+		SELECT entity, COUNT(*) AS cnt
+		FROM base
+		WHERE entity IS NOT NULL AND entity != ''
+		GROUP BY entity
+		ORDER BY cnt DESC
+	),
+	ent_running AS (
+		SELECT cnt,
+			SUM(cnt) OVER (ORDER BY cnt DESC) AS cumsum,
+			SUM(cnt) OVER () AS total
+		FROM ent_counts
+	)
+	SELECT
+		COALESCE((SELECT COUNT(*) FROM dev_running WHERE cumsum - cnt < total * 0.5), 0),
+		COALESCE((SELECT COUNT(*) FROM ent_running WHERE cumsum - cnt < total * 0.5), 0),
+		COUNT(DISTINCT org),
+		COUNT(DISTINCT org || '/' || repo),
 		COUNT(*),
-		COUNT(DISTINCT e.username),
-		COALESCE(MAX(rm.last_import_at), '')
-	FROM devpulse_event e
-	JOIN devpulse_developer d ON e.username = d.username
-	LEFT JOIN devpulse_repo_meta rm ON rm.org = e.org AND rm.repo = e.repo
-	WHERE e.date >= $1
-	  ` + botExcludeTpl + `
-	  ` + forkExcludeSQL + `
-	  %s
+		COUNT(DISTINCT username),
+		COALESCE((SELECT MAX(last_import_at) FROM devpulse_repo_meta), '')
+	FROM base
 	`
 
 	// selectIssueOpenCloseRatioTpl: $1=since, dynamic org/repo/entity via queryBuilder
@@ -646,24 +636,15 @@ func (s *Store) GetInsightsSummary(ctx context.Context, org, repo, entity *strin
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
 	qb.addOptional("d.entity", entity)
-	wc := qb.whereClause()
-	baseArgs := append([]any{since}, qb.args...)
+	query := fmt.Sprintf(selectInsightsSummaryTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	busQuery := fmt.Sprintf(selectBusFactorTpl, wc)
-	if err := s.db.QueryRowContext(ctx, busQuery, baseArgs...).Scan(&summary.BusFactor); err != nil {
-		return nil, fmt.Errorf("failed to query bus factor: %w", err)
-	}
-
-	ponyQuery := fmt.Sprintf(selectPonyFactorTpl, wc)
-	if err := s.db.QueryRowContext(ctx, ponyQuery, baseArgs...).Scan(&summary.PonyFactor); err != nil {
-		return nil, fmt.Errorf("failed to query pony factor: %w", err)
-	}
-
-	bannerQuery := fmt.Sprintf(selectBannerStatsTpl, wc)
-	if err := s.db.QueryRowContext(ctx, bannerQuery, baseArgs...).Scan(
-		&summary.Orgs, &summary.Repos, &summary.Events, &summary.Contributors, &summary.LastImport,
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(
+		&summary.BusFactor, &summary.PonyFactor,
+		&summary.Orgs, &summary.Repos, &summary.Events, &summary.Contributors,
+		&summary.LastImport,
 	); err != nil {
-		return nil, fmt.Errorf("failed to query banner stats: %w", err)
+		return nil, fmt.Errorf("failed to query insights summary: %w", err)
 	}
 
 	return summary, nil
