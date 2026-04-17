@@ -73,17 +73,6 @@ func ImportPoolConfig() PoolConfig {
 	}
 }
 
-// AdminPoolConfig returns minimal pool settings for the admin service.
-func AdminPoolConfig() PoolConfig {
-	return PoolConfig{
-		AppName:         "devpulse-admin",
-		MaxOpenConns:    3,
-		MaxIdleConns:    1,
-		ConnMaxLifetime: defaultConnMaxLifetime,
-		ConnMaxIdleTime: defaultConnMaxIdleTime,
-	}
-}
-
 // applyEnvOverrides lets DB_MAX_OPEN_CONNS and DB_MAX_IDLE_CONNS override code defaults.
 func (c *PoolConfig) applyEnvOverrides() {
 	c.MaxOpenConns = config.DBMaxOpenConns(c.MaxOpenConns)

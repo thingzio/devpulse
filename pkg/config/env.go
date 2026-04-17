@@ -155,21 +155,6 @@ func GCPProjectID() string { return GetEnv("GCP_PROJECT_ID", "thingzio") }
 func DBInstanceID() string { return GetEnv("DB_INSTANCE_ID", "thingzio-pg") }
 
 // ---------------------------------------------------------------------------
-// Admin
-// ---------------------------------------------------------------------------
-
-// AdminRequireIAM returns true if the admin server should verify Cloud Run
-// IAM auth headers are present on every request (defense-in-depth).
-// Override: ADMIN_REQUIRE_IAM (default true). Set to "false" for local dev.
-func AdminRequireIAM() bool {
-	v := strings.ToLower(os.Getenv("ADMIN_REQUIRE_IAM"))
-	if v == "false" || v == "0" {
-		return false
-	}
-	return true // default: require IAM
-}
-
-// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
