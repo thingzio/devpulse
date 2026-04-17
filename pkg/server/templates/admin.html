@@ -1,0 +1,121 @@
+{{define "content"}}
+<div style="max-width:1100px;margin:20px auto;padding:0 16px">
+  <nav style="display:flex;gap:16px;margin-bottom:24px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:8px">
+    <a href="/admin" style="font-weight:bold">Summary</a>
+    <a href="/admin/tenants">Tenants</a>
+    <a href="/admin/tokens">Tokens</a>
+    <a href="/admin/metrics">Metrics</a>
+  </nav>
+
+  <h2 style="margin-bottom:16px">Platform Summary</h2>
+  <p style="color:var(--text-muted,#666);margin-bottom:16px;font-size:0.9em">{{.Summary.Date}} &mdash; updated {{.Summary.UpdatedAt}}</p>
+
+  <table class="tbl-home" style="width:100%;margin-bottom:24px">
+    <thead>
+      <tr>
+        <th style="text-align:left">Metric</th>
+        <th style="text-align:right">Current</th>
+        <th style="text-align:right">DoD</th>
+        <th style="text-align:right">WoW</th>
+        <th style="text-align:right">MoM</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tenants</td>
+        <td style="text-align:right">{{.Summary.Current.Tenants}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.DoD "Tenants"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.WoW "Tenants"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.MoM "Tenants"}}</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px">Free</td>
+        <td style="text-align:right">{{.Summary.Current.TenantsFree}}</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px">Starter</td>
+        <td style="text-align:right">{{.Summary.Current.TenantsStarter}}</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px">Pro</td>
+        <td style="text-align:right">{{.Summary.Current.TenantsPro}}</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+      </tr>
+      <tr>
+        <td style="padding-left:24px">Enterprise</td>
+        <td style="text-align:right">{{.Summary.Current.TenantsEnterprise}}</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+        <td style="text-align:right">&mdash;</td>
+      </tr>
+      <tr>
+        <td>Repos</td>
+        <td style="text-align:right">{{.Summary.Current.Repos}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.DoD "Repos"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.WoW "Repos"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.MoM "Repos"}}</td>
+      </tr>
+      <tr>
+        <td>Events</td>
+        <td style="text-align:right">{{.Summary.Current.Events}}</td>
+        <td style="text-align:right">{{deltaInt64 .Summary.DoD "Events"}}</td>
+        <td style="text-align:right">{{deltaInt64 .Summary.WoW "Events"}}</td>
+        <td style="text-align:right">{{deltaInt64 .Summary.MoM "Events"}}</td>
+      </tr>
+      <tr>
+        <td>Contributors</td>
+        <td style="text-align:right">{{.Summary.Current.Contributors}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.DoD "Contributors"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.WoW "Contributors"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.MoM "Contributors"}}</td>
+      </tr>
+      <tr>
+        <td>Installations</td>
+        <td style="text-align:right">{{.Summary.Current.Installations}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.DoD "Installations"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.WoW "Installations"}}</td>
+        <td style="text-align:right">{{deltaInt .Summary.MoM "Installations"}}</td>
+      </tr>
+      <tr>
+        <td>Repos w/ Errors</td>
+        <td style="text-align:right">{{.Summary.Current.ReposWithErrors}}</td>
+        <td style="text-align:right">{{deltaIntInv .Summary.DoD "ReposWithErrors"}}</td>
+        <td style="text-align:right">{{deltaIntInv .Summary.WoW "ReposWithErrors"}}</td>
+        <td style="text-align:right">{{deltaIntInv .Summary.MoM "ReposWithErrors"}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {{if .Summary.ErrorRepos}}
+  <h3 style="margin-bottom:12px">Repos with Import Errors</h3>
+  <table class="tbl-home" style="width:100%">
+    <thead>
+      <tr>
+        <th style="text-align:left">Org</th>
+        <th style="text-align:left">Repo</th>
+        <th style="text-align:right">Errors</th>
+        <th style="text-align:left">Last Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Summary.ErrorRepos}}
+      <tr>
+        <td>{{.Org}}</td>
+        <td>{{.Repo}}</td>
+        <td style="text-align:right">{{.Errors}}</td>
+        <td>{{.LastError}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+</div>
+{{end}}

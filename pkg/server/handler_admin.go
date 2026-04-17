@@ -44,10 +44,11 @@ type adminTokensData struct {
 }
 
 type adminMetricsData struct {
-	Title    string
-	Days     int
-	Metrics  string
-	Analysis string
+	Title      string
+	Days       int
+	DayOptions []int
+	Metrics    string
+	Analysis   string
 }
 
 // GET /admin — dashboard with platform summary.
@@ -301,18 +302,20 @@ func adminMetricsHandler(mcfg *metricsConfig) http.HandlerFunc {
 			slog.Error("failed to analyze metrics", "error", err)
 			// Render with metrics but empty analysis on failure.
 			renderTemplate(w, "admin_metrics.html", adminMetricsData{
-				Title:   "Metrics Review",
-				Days:    days,
-				Metrics: metrics,
+				Title:      "Metrics Review",
+				Days:       days,
+				DayOptions: metricsDayOptions,
+				Metrics:    metrics,
 			})
 			return
 		}
 
 		renderTemplate(w, "admin_metrics.html", adminMetricsData{
-			Title:    "Metrics Review",
-			Days:     days,
-			Metrics:  metrics,
-			Analysis: analysis,
+			Title:      "Metrics Review",
+			Days:       days,
+			DayOptions: metricsDayOptions,
+			Metrics:    metrics,
+			Analysis:   analysis,
 		})
 	}
 }
