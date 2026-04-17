@@ -697,6 +697,15 @@ func isPublicRepo(ctx context.Context, org, repo string) bool {
 
 func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		key := dataCacheKey(r)
+		if cached, ok := apiCache.get(key); ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			return
+		}
+
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -709,7 +718,17 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, overview)
+
+		b, marshalErr := json.Marshal(overview)
+		if marshalErr != nil {
+			writeJSON(w, http.StatusOK, overview)
+			return
+		}
+		apiCache.set(key, b)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
 	}
 }
 
