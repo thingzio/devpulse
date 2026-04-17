@@ -490,14 +490,14 @@ func adminRepoActionHandler(db *sql.DB, action string, fn func(ctx context.Conte
 
 // resolveGitHubUserID resolves a GitHub username to their numeric user ID.
 func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("https://api.github.com/users/%s", url.PathEscape(username)), nil)
+	apiURL := "https://api.github.com/users/" + url.PathEscape(username)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil) //nolint:gosec // trusted GitHub API URL
 	if err != nil {
 		return 0, fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Accept", net.GitHubAccept)
 
-	resp, err := net.GitHubClient.Do(req)
+	resp, err := net.GitHubClient.Do(req) //nolint:gosec // trusted GitHub API URL
 	if err != nil {
 		return 0, fmt.Errorf("calling GitHub API: %w", err)
 	}

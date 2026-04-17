@@ -1,17 +1,5 @@
 package server
 
-type upgradeRequest struct {
-	Username string `json:"username"`
-	Plan     string `json:"plan"`
-}
-
-type upgradeResponse struct {
-	Username         string `json:"username"`
-	Plan             string `json:"plan"`
-	MaxRepos         int    `json:"max_repos"`
-	MaxEventsPerWeek int    `json:"max_events_per_week"`
-}
-
 type tenantSummary struct {
 	Username         string `json:"username"`
 	Email            string `json:"email"`
@@ -50,30 +38,6 @@ type repoDetail struct {
 	Scored         int     `json:"scored"`
 	BackfillDays   int     `json:"backfill_days"`
 	BackfillTarget int     `json:"backfill_target"`
-}
-
-type resetErrorsRequest struct {
-	Org  string `json:"org"`
-	Repo string `json:"repo"`
-}
-
-type resetErrorsResponse struct {
-	Org   string `json:"org"`
-	Repo  string `json:"repo"`
-	Reset int64  `json:"reset"`
-}
-
-type inviteRequest struct {
-	Username string `json:"username"`
-	Plan     string `json:"plan"`
-}
-
-type inviteResponse struct {
-	Username         string `json:"username"`
-	GitHubID         int64  `json:"github_id"`
-	Plan             string `json:"plan"`
-	MaxRepos         int    `json:"max_repos"`
-	MaxEventsPerWeek int    `json:"max_events_per_week"`
 }
 
 type tokenStatus struct {

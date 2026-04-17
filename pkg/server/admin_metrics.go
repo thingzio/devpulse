@@ -29,8 +29,8 @@ const (
 )
 
 var (
-	metricsClient    = &http.Client{Timeout: metricsHTTPTimeout}
-	analysisClient   = &http.Client{Timeout: analysisHTTPTimeout}
+	metricsClient     = &http.Client{Timeout: metricsHTTPTimeout}
+	analysisClient    = &http.Client{Timeout: analysisHTTPTimeout}
 	metricsDayOptions = []int{1, 2, 7, 14, 30}
 )
 

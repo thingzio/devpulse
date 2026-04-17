@@ -57,9 +57,7 @@ var templateFuncs = template.FuncMap{
 		return formatDeltaInt(d, field, true)
 	},
 	// deltaInt64 formats a statsDelta int64 field with color.
-	"deltaInt64": func(d *statsDelta, field string) template.HTML {
-		return formatDeltaInt64(d, field)
-	},
+	"deltaInt64": formatDeltaInt64,
 	// splitOrgRepo splits "org/repo" into [org, repo].
 	"splitOrgRepo": func(s string) [2]string {
 		if org, repo, ok := strings.Cut(s, "/"); ok {
@@ -69,11 +67,18 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
+const (
+	deltaEmDash    = "&mdash;"
+	deltaColorNone = "inherit"
+	deltaColorGood = "green"
+	deltaColorBad  = "red"
+)
+
 // formatDeltaInt formats an int delta field from statsDelta with colored HTML.
 // When invert is true, positive values are red (used for error-type metrics).
 func formatDeltaInt(d *statsDelta, field string, invert bool) template.HTML {
 	if d == nil {
-		return "&mdash;"
+		return deltaEmDash
 	}
 
 	var val *int
@@ -91,26 +96,27 @@ func formatDeltaInt(d *statsDelta, field string, invert bool) template.HTML {
 	case "ReposWithErrors":
 		val, pct = d.ReposWithErrors, d.ErrorsPct
 	default:
-		return "&mdash;"
+		return deltaEmDash
 	}
 
+	return formatIntDelta(val, pct, invert)
+}
+
+// formatDeltaInt64 formats an int64 delta field from statsDelta with colored HTML.
+func formatDeltaInt64(d *statsDelta, _ string) template.HTML {
+	if d == nil || d.Events == nil {
+		return deltaEmDash
+	}
+	return formatInt64Delta(*d.Events, d.EventsPct)
+}
+
+func formatIntDelta(val *int, pct *float64, invert bool) template.HTML {
 	if val == nil {
-		return "&mdash;"
+		return deltaEmDash
 	}
 
 	v := *val
-	color := "inherit"
-	if v > 0 {
-		color = "green"
-		if invert {
-			color = "red"
-		}
-	} else if v < 0 {
-		color = "red"
-		if invert {
-			color = "green"
-		}
-	}
+	color := deltaColor(int64(v), invert)
 
 	sign := ""
 	if v > 0 {
@@ -122,22 +128,11 @@ func formatDeltaInt(d *statsDelta, field string, invert bool) template.HTML {
 		s += fmt.Sprintf(" (%.1f%%)", *pct)
 	}
 
-	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s))
+	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s)) //nolint:gosec // computed values only, no user input
 }
 
-// formatDeltaInt64 formats an int64 delta field from statsDelta with colored HTML.
-func formatDeltaInt64(d *statsDelta, _ string) template.HTML {
-	if d == nil || d.Events == nil {
-		return "&mdash;"
-	}
-
-	v := *d.Events
-	color := "inherit"
-	if v > 0 {
-		color = "green"
-	} else if v < 0 {
-		color = "red"
-	}
+func formatInt64Delta(v int64, pct *float64) template.HTML {
+	color := deltaColor(v, false)
 
 	sign := ""
 	if v > 0 {
@@ -145,11 +140,22 @@ func formatDeltaInt64(d *statsDelta, _ string) template.HTML {
 	}
 
 	s := fmt.Sprintf("%s%d", sign, v)
-	if d.EventsPct != nil {
-		s += fmt.Sprintf(" (%.1f%%)", *d.EventsPct)
+	if pct != nil {
+		s += fmt.Sprintf(" (%.1f%%)", *pct)
 	}
 
-	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s))
+	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s)) //nolint:gosec // computed values only, no user input
+}
+
+func deltaColor(v int64, invert bool) string {
+	switch {
+	case v > 0 && !invert, v < 0 && invert:
+		return deltaColorGood
+	case v < 0 && !invert, v > 0 && invert:
+		return deltaColorBad
+	default:
+		return deltaColorNone
+	}
 }
 
 func init() {
@@ -375,23 +381,27 @@ func makeRouter(
 		return tenant.ListTenantRepos(ctx, db, tenantID)
 	})))
 
-	// Admin routes (session auth + username whitelist, full SSR)
+	registerAdminRoutes(mux, db)
+
+	return mux
+}
+
+// registerAdminRoutes adds admin pages (session auth + username whitelist, full SSR).
+func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	requireAdmin := middleware.RequireAdmin(db)
-	adminWrap := func(h http.HandlerFunc) http.Handler {
+	wrap := func(h http.HandlerFunc) http.Handler {
 		return requireAdmin(h)
 	}
 	mcfg := newMetricsConfig()
-	mux.Handle("GET /admin", adminWrap(adminDashboardHandler(db)))
-	mux.Handle("GET /admin/tenants", adminWrap(adminTenantsHandler(db)))
-	mux.Handle("GET /admin/tenant/{username}", adminWrap(adminTenantDetailHandler(db)))
-	mux.Handle("POST /admin/tenant/{username}/plan", adminWrap(adminUpdatePlanHandler(db)))
-	mux.Handle("POST /admin/tenant/{username}/invite", adminWrap(adminInviteHandler(db)))
-	mux.Handle("POST /admin/tenant/{username}/reset", adminWrap(adminResetErrorsHandler(db)))
-	mux.Handle("POST /admin/tenant/{username}/hard-reset", adminWrap(adminHardResetHandler(db)))
-	mux.Handle("GET /admin/tokens", adminWrap(adminTokensHandler(db)))
-	mux.Handle("GET /admin/metrics", adminWrap(adminMetricsHandler(mcfg)))
-
-	return mux
+	mux.Handle("GET /admin", wrap(adminDashboardHandler(db)))
+	mux.Handle("GET /admin/tenants", wrap(adminTenantsHandler(db)))
+	mux.Handle("GET /admin/tenant/{username}", wrap(adminTenantDetailHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/plan", wrap(adminUpdatePlanHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/invite", wrap(adminInviteHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/reset", wrap(adminResetErrorsHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/hard-reset", wrap(adminHardResetHandler(db)))
+	mux.Handle("GET /admin/tokens", wrap(adminTokensHandler(db)))
+	mux.Handle("GET /admin/metrics", wrap(adminMetricsHandler(mcfg)))
 }
 
 func securityHeaders(next http.Handler) http.Handler {
