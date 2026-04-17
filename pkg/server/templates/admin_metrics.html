@@ -22,19 +22,19 @@
 
   {{if .Analysis}}
   <h3 style="margin-bottom:8px">Analysis</h3>
-  <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--bg-muted,#f6f6f6);padding:16px;border-radius:6px;margin-bottom:24px;font-size:0.9em;line-height:1.5">{{.Analysis}}</pre>
+  <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--page-content-blockColor);padding:16px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:24px;font-size:0.9em;line-height:1.5;color:var(--page-content-txtColor)">{{.Analysis}}</pre>
   {{end}}
 
   {{if .Metrics}}
   <h3 style="margin-bottom:8px">Raw Metrics</h3>
   <details>
     <summary style="cursor:pointer;margin-bottom:8px">Show raw metrics data</summary>
-    <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--bg-muted,#f6f6f6);padding:16px;border-radius:6px;font-size:0.85em;line-height:1.4">{{.Metrics}}</pre>
+    <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--page-content-blockColor);padding:16px;border:1px solid var(--border-color);border-radius:6px;font-size:0.85em;line-height:1.4;color:var(--page-content-txtColor)">{{.Metrics}}</pre>
   </details>
   {{end}}
 
   {{if not .Analysis}}{{if not .Metrics}}
-  <p style="color:var(--text-muted,#666)">No metrics data available. Ensure GCP credentials and Anthropic API key are configured.</p>
+  <p style="color:var(--gray)">No metrics data available. Ensure GCP credentials are configured.</p>
   {{end}}{{end}}
 </div>
 {{end}}

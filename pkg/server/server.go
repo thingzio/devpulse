@@ -35,7 +35,13 @@ var staticFS embed.FS
 
 var pageTemplates map[string]*template.Template
 
+// serverOpts holds version info set at Run() time, read by template funcs.
+var serverOpts Options
+
 var templateFuncs = template.FuncMap{
+	"appVersion":   func() string { return serverOpts.Version },
+	"appCommit":    func() string { return serverOpts.Commit },
+	"appBuildDate": func() string { return serverOpts.Date },
 	"comma": func(n int) string {
 		if n == 0 {
 			return "Unlimited"
@@ -200,6 +206,8 @@ type Options struct {
 
 // Run starts the HTTP server. It blocks until the context is canceled.
 func Run(ctx context.Context, opts Options) error {
+	serverOpts = opts
+
 	store, err := postgres.NewFromEnv()
 	if err != nil {
 		return fmt.Errorf("opening store: %w", err)
@@ -397,7 +405,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	mux.Handle("GET /admin/tenants", wrap(adminTenantsHandler(db)))
 	mux.Handle("GET /admin/tenant/{username}", wrap(adminTenantDetailHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/plan", wrap(adminUpdatePlanHandler(db)))
-	mux.Handle("POST /admin/tenant/{username}/invite", wrap(adminInviteHandler(db)))
+	mux.Handle("POST /admin/invite", wrap(adminInviteHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/reset", wrap(adminResetErrorsHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/hard-reset", wrap(adminHardResetHandler(db)))
 	mux.Handle("GET /admin/tokens", wrap(adminTokensHandler(db)))

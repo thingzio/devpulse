@@ -9,90 +9,109 @@
 
   <h2 style="margin-bottom:16px">{{.Detail.Username}}</h2>
 
-  <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:24px;max-width:500px">
-    <strong>Name</strong><span>{{if .Detail.Name}}{{.Detail.Name}}{{else}}&mdash;{{end}}</span>
-    <strong>Email</strong><span>{{if .Detail.Email}}{{.Detail.Email}}{{else}}&mdash;{{end}}</span>
-    <strong>Company</strong><span>{{if .Detail.Company}}{{.Detail.Company}}{{else}}&mdash;{{end}}</span>
-    <strong>Location</strong><span>{{if .Detail.Location}}{{.Detail.Location}}{{else}}&mdash;{{end}}</span>
-    <strong>Bio</strong><span>{{if .Detail.Bio}}{{.Detail.Bio}}{{else}}&mdash;{{end}}</span>
-    <strong>Plan</strong><span style="text-transform:capitalize">{{.Detail.Plan}}</span>
-    <strong>Max Repos</strong><span>{{comma .Detail.MaxRepos}}</span>
-    <strong>Events/Wk</strong><span>{{comma .Detail.MaxEventsPerWeek}}</span>
-    <strong>Created</strong><span>{{.Detail.CreatedAt}}</span>
-    <strong>Last Sign-in</strong><span>{{if .Detail.LastSignIn}}{{.Detail.LastSignIn}}{{else}}&mdash;{{end}}</span>
-  </div>
+  <table style="border-collapse:collapse;border:1px solid var(--border-color);margin-bottom:24px;max-width:500px">
+    <tbody>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Name</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.Name}}{{.Detail.Name}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Email</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.Email}}{{.Detail.Email}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Company</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.Company}}{{.Detail.Company}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Location</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.Location}}{{.Detail.Location}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Bio</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.Bio}}{{.Detail.Bio}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Plan</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);text-transform:capitalize">{{.Detail.Plan}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Max Repos</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .Detail.MaxRepos}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Events/Wk</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .Detail.MaxEventsPerWeek}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Created</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Detail.CreatedAt}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;font-weight:bold">Last Sign-in</td>
+        <td style="padding:8px 12px">{{if .Detail.LastSignIn}}{{.Detail.LastSignIn}}{{else}}&mdash;{{end}}</td>
+      </tr>
+    </tbody>
+  </table>
 
   <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:32px">
     <form method="POST" action="/admin/tenant/{{.Detail.Username}}/plan" style="display:flex;gap:8px;align-items:center">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
       <label><strong>Change Plan:</strong></label>
-      <select name="plan" style="padding:4px 8px">
+      <select name="plan" style="padding:6px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--page-content-bgColor);color:var(--page-content-txtColor);font-size:13px">
         {{range $name, $limits := .Plans}}
         <option value="{{$name}}"{{if eq $name $.Detail.Plan}} selected{{end}}>{{$name}}</option>
         {{end}}
       </select>
-      <button type="submit" style="padding:4px 12px;cursor:pointer">Update</button>
+      <button type="submit" style="padding:8px 14px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:#22c55e;color:#fff;transition:background 0.2s ease" onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">Update</button>
     </form>
   </div>
 
-  <h3 style="margin-bottom:12px">Invite New Tenant</h3>
-  <form method="POST" action="/admin/invite" style="display:flex;gap:8px;align-items:center;margin-bottom:32px">
-    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-    <input type="text" name="username" placeholder="GitHub username" required
-      style="padding:4px 8px;border:1px solid var(--border-color,#ccc);border-radius:4px">
-    <select name="plan" style="padding:4px 8px">
-      {{range $name, $limits := .Plans}}
-      <option value="{{$name}}">{{$name}}</option>
-      {{end}}
-    </select>
-    <button type="submit" style="padding:4px 12px;cursor:pointer">Invite</button>
-  </form>
-
   {{if .Detail.Repos}}
   <h3 style="margin-bottom:12px">Repos ({{len .Detail.Repos}})</h3>
-  <table class="tbl-home" style="width:100%">
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
     <thead>
-      <tr>
-        <th style="text-align:left">Repository</th>
-        <th style="text-align:right">Events</th>
-        <th style="text-align:right">Weekly</th>
-        <th style="text-align:right">Wk %</th>
-        <th style="text-align:right">PRs</th>
-        <th style="text-align:right">Missing</th>
-        <th style="text-align:right">Contribs</th>
-        <th style="text-align:right">Scored</th>
-        <th style="text-align:left">Last Import</th>
-        <th style="text-align:left">Backfill</th>
-        <th>Actions</th>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Repository</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Events</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Weekly</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Wk %</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">PRs</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Missing</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Contribs</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Scored</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Last Import</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Backfill</th>
+        <th style="padding:10px 12px;border-bottom:1px solid var(--border-color)">Actions</th>
       </tr>
     </thead>
     <tbody>
       {{range .Detail.Repos}}
       {{$parts := splitOrgRepo .Name}}
       <tr>
-        <td>{{.Name}}</td>
-        <td style="text-align:right">{{.Events}}</td>
-        <td style="text-align:right">{{.WeeklyEvents}}</td>
-        <td style="text-align:right">{{printf "%.0f" .WeeklyPct}}%</td>
-        <td style="text-align:right">{{.PRTotal}}</td>
-        <td style="text-align:right">{{.PRMissingSize}}</td>
-        <td style="text-align:right">{{.Contributors}}</td>
-        <td style="text-align:right">{{.Scored}}</td>
-        <td>{{if .LastImport}}{{.LastImport}}{{else}}&mdash;{{end}}</td>
-        <td>{{if gt .BackfillTarget 0}}{{.BackfillDays}}/{{.BackfillTarget}}d{{else}}&mdash;{{end}}</td>
-        <td style="white-space:nowrap">
-          <form method="POST" action="/admin/tenant/{{$.Detail.Username}}/reset-errors" style="display:inline">
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Name}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Events}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.WeeklyEvents}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{printf "%.0f" .WeeklyPct}}%</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.PRTotal}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.PRMissingSize}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Contributors}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Scored}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .LastImport}}{{.LastImport}}{{else}}&mdash;{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if gt .BackfillTarget 0}}{{.BackfillDays}}/{{.BackfillTarget}}d{{else}}&mdash;{{end}}</td>
+        <td style="white-space:nowrap;padding:8px 12px;border-bottom:1px solid var(--border-color)">
+          <form method="POST" action="/admin/tenant/{{$.Detail.Username}}/reset" style="display:inline">
             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
             <input type="hidden" name="org" value="{{index $parts 0}}">
             <input type="hidden" name="repo" value="{{index $parts 1}}">
-            <button type="submit" style="padding:2px 8px;cursor:pointer;font-size:0.85em">Reset Errors</button>
+            <button type="submit" style="padding:4px 10px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:var(--border-color);color:var(--page-content-txtColor);transition:background 0.2s ease">Reset Errors</button>
           </form>
           <form method="POST" action="/admin/tenant/{{$.Detail.Username}}/hard-reset" style="display:inline"
             onsubmit="return confirm('Hard reset {{.Name}}? This deletes all events.')">
             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
             <input type="hidden" name="org" value="{{index $parts 0}}">
             <input type="hidden" name="repo" value="{{index $parts 1}}">
-            <button type="submit" style="padding:2px 8px;cursor:pointer;font-size:0.85em;color:red">Hard Reset</button>
+            <button type="submit" style="padding:4px 10px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:#ef4444;color:#fff;transition:background 0.2s ease" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">Hard Reset</button>
           </form>
         </td>
       </tr>
@@ -100,7 +119,7 @@
     </tbody>
   </table>
   {{else}}
-  <p style="color:var(--text-muted,#666)">No repos configured.</p>
+  <p style="color:var(--gray)">No repos configured.</p>
   {{end}}
 </div>
 {{end}}

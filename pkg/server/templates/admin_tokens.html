@@ -10,38 +10,38 @@
   <h2 style="margin-bottom:16px">Token Pool Status ({{len .Tokens}})</h2>
 
   {{if .Tokens}}
-  <table class="tbl-home" style="width:100%">
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
     <thead>
-      <tr>
-        <th style="text-align:left">Login</th>
-        <th style="text-align:right">Installation ID</th>
-        <th style="text-align:right">Limit</th>
-        <th style="text-align:right">Used</th>
-        <th style="text-align:right">Remaining</th>
-        <th style="text-align:left">Reset At</th>
-        <th style="text-align:left">Status</th>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Login</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Installation ID</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Limit</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Used</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Remaining</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Reset At</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Status</th>
       </tr>
     </thead>
     <tbody>
       {{range .Tokens}}
       <tr>
-        <td>{{.Login}}</td>
-        <td style="text-align:right">{{.InstallationID}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Login}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.InstallationID}}</td>
         {{if .Error}}
-        <td colspan="4" style="color:red">{{.Error}}</td>
+        <td colspan="4" style="padding:8px 12px;border-bottom:1px solid var(--border-color);color:#ef4444">{{.Error}}</td>
         {{else}}
-        <td style="text-align:right">{{.Limit}}</td>
-        <td style="text-align:right">{{.Used}}</td>
-        <td style="text-align:right">{{.Remaining}}</td>
-        <td>{{.ResetAt}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Limit}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Used}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Remaining}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.ResetAt}}</td>
         {{end}}
-        <td>{{if .Error}}Error{{else if lt .Remaining 100}}<span style="color:orange">Low</span>{{else}}<span style="color:green">OK</span>{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Error}}<span style="color:#ef4444">Error</span>{{else if lt .Remaining 100}}<span style="color:#eab308">Low</span>{{else}}<span style="color:#22c55e">OK</span>{{end}}</td>
       </tr>
       {{end}}
     </tbody>
   </table>
   {{else}}
-  <p style="color:var(--text-muted,#666)">No installations found.</p>
+  <p style="color:var(--gray)">No installations found.</p>
   {{end}}
 </div>
 {{end}}

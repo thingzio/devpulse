@@ -9,35 +9,52 @@
 
   <h2 style="margin-bottom:16px">Tenants ({{len .Tenants}})</h2>
 
-  <input type="text" id="tenant-filter" placeholder="Filter by username or name..."
-    style="width:100%;max-width:400px;padding:6px 10px;margin-bottom:16px;border:1px solid var(--border-color,#ccc);border-radius:4px">
+  <input type="search" id="tenant-filter" autocomplete="off" placeholder="Filter by username or name..."
+    style="width:100%;max-width:400px;padding:9px 14px;margin-bottom:16px;font-size:13px;border:1px solid var(--border-color);border-radius:6px;background:var(--page-content-bgColor);color:var(--page-content-txtColor);outline:none"
+    onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--focus-ring)'"
+    onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">
 
-  <table class="tbl-home" style="width:100%">
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
     <thead>
-      <tr>
-        <th style="text-align:left">Username</th>
-        <th style="text-align:left">Name</th>
-        <th style="text-align:left">Plan</th>
-        <th style="text-align:right">Max Repos</th>
-        <th style="text-align:right">Events/Wk</th>
-        <th style="text-align:left">Last Sign-in</th>
-        <th style="text-align:left">Created</th>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Username</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Name</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Plan</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Max Repos</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Events/Wk</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Last Sign-in</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Created</th>
       </tr>
     </thead>
     <tbody id="tenant-tbody">
       {{range .Tenants}}
       <tr>
-        <td><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
-        <td>{{if .Name}}{{.Name}}{{else}}&mdash;{{end}}</td>
-        <td style="text-transform:capitalize">{{.Plan}}</td>
-        <td style="text-align:right">{{comma .MaxRepos}}</td>
-        <td style="text-align:right">{{comma .MaxEventsPerWeek}}</td>
-        <td>{{if .LastSignIn}}{{.LastSignIn}}{{else}}&mdash;{{end}}</td>
-        <td>{{.CreatedAt}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Name}}{{.Name}}{{else}}&mdash;{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);text-transform:capitalize">{{.Plan}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .MaxRepos}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .MaxEventsPerWeek}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .LastSignIn}}{{.LastSignIn}}{{else}}&mdash;{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.CreatedAt}}</td>
       </tr>
       {{end}}
     </tbody>
   </table>
+
+  <h3 style="margin-top:32px;margin-bottom:12px">Invite New Tenant</h3>
+  <form method="POST" action="/admin/invite" style="display:flex;gap:8px;align-items:center;margin-bottom:24px">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <input type="text" name="username" placeholder="GitHub username" required
+      style="padding:9px 14px;font-size:13px;border:1px solid var(--border-color);border-radius:6px;background:var(--page-content-bgColor);color:var(--page-content-txtColor);outline:none"
+      onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--focus-ring)'"
+      onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">
+    <select name="plan" style="padding:9px 14px;font-size:13px;border:1px solid var(--border-color);border-radius:6px;background:var(--page-content-bgColor);color:var(--page-content-txtColor)">
+      {{range $name, $limits := .Plans}}
+      <option value="{{$name}}">{{$name}}</option>
+      {{end}}
+    </select>
+    <button type="submit" style="padding:8px 14px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:#22c55e;color:#fff;transition:background 0.2s ease" onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">Invite</button>
+  </form>
 </div>
 
 <script>
@@ -45,7 +62,7 @@
   var input = document.getElementById('tenant-filter');
   var tbody = document.getElementById('tenant-tbody');
   if (!input || !tbody) return;
-  input.addEventListener('keyup', function() {
+  input.addEventListener('input', function() {
     var q = this.value.toLowerCase();
     var rows = tbody.getElementsByTagName('tr');
     for (var i = 0; i < rows.length; i++) {

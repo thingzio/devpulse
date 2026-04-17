@@ -27,8 +27,10 @@ type adminDashboardData struct {
 }
 
 type adminTenantsData struct {
-	Title   string
-	Tenants []tenantSummary
+	Title     string
+	Tenants   []tenantSummary
+	Plans     map[string]plan.Limits
+	CSRFToken string
 }
 
 type adminTenantDetailData struct {
@@ -96,8 +98,10 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		renderTemplate(w, "admin_tenants.html", adminTenantsData{
-			Title:   "Tenants",
-			Tenants: out,
+			Title:     "Tenants",
+			Tenants:   out,
+			Plans:     plan.All,
+			CSRFToken: middleware.GenerateCSRFToken(),
 		})
 	}
 }
@@ -276,11 +280,6 @@ func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
 // GET /admin/metrics — GCP metrics review with AI analysis.
 func adminMetricsHandler(mcfg *metricsConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if mcfg.anthropicKey == "" {
-			http.Error(w, "anthropic API key not configured", http.StatusServiceUnavailable)
-			return
-		}
-
 		days := defaultDays
 		if d := r.URL.Query().Get("days"); d != "" {
 			if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= maxDays {
@@ -297,17 +296,13 @@ func adminMetricsHandler(mcfg *metricsConfig) http.HandlerFunc {
 
 		metrics := collectAllMetrics(r.Context(), mcfg, token, days)
 
-		analysis, err := analyzeMetrics(r.Context(), mcfg, metrics, formatText)
-		if err != nil {
-			slog.Error("failed to analyze metrics", "error", err)
-			// Render with metrics but empty analysis on failure.
-			renderTemplate(w, "admin_metrics.html", adminMetricsData{
-				Title:      "Metrics Review",
-				Days:       days,
-				DayOptions: metricsDayOptions,
-				Metrics:    metrics,
-			})
-			return
+		var analysis string
+		if mcfg.anthropicKey != "" {
+			var err2 error
+			analysis, err2 = analyzeMetrics(r.Context(), mcfg, metrics, formatText)
+			if err2 != nil {
+				slog.Error("failed to analyze metrics", "error", err2)
+			}
 		}
 
 		renderTemplate(w, "admin_metrics.html", adminMetricsData{

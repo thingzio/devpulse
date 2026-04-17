@@ -49,12 +49,29 @@ func TestAdminTenantsData(t *testing.T) {
 			{Username: "alice", Plan: "pro", MaxRepos: 25},
 			{Username: "bob", Plan: "free", MaxRepos: 1},
 		},
+		Plans:     plan.All,
+		CSRFToken: "csrf-123",
 	}
 
 	assert.Equal(t, "Tenants", data.Title)
 	assert.Len(t, data.Tenants, 2)
 	assert.Equal(t, "alice", data.Tenants[0].Username)
 	assert.Equal(t, "free", data.Tenants[1].Plan)
+	assert.NotEmpty(t, data.Plans)
+	assert.Equal(t, "csrf-123", data.CSRFToken)
+}
+
+func TestAppVersionTemplateFuncs(t *testing.T) {
+	serverOpts = Options{Version: "1.2.3", Commit: "abc", Date: "2026-01-01"}
+
+	fn := templateFuncs["appVersion"].(func() string)
+	assert.Equal(t, "1.2.3", fn())
+
+	fn = templateFuncs["appCommit"].(func() string)
+	assert.Equal(t, "abc", fn())
+
+	fn = templateFuncs["appBuildDate"].(func() string)
+	assert.Equal(t, "2026-01-01", fn())
 }
 
 func TestAdminTenantDetailData(t *testing.T) {
