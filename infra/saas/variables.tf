@@ -46,10 +46,10 @@ variable "notification_email" {
   default     = "devpulse@thingz.io"
 }
 
-variable "admin_invoker_emails" {
-  description = "GCP identities allowed to invoke the admin service"
-  type        = list(string)
-  default     = ["mark@chmarny.com"]
+variable "admin_users" {
+  description = "Comma-separated GitHub usernames allowed admin access"
+  type        = string
+  default     = "mchmarny"
 }
 
 variable "import_parallelism" {
@@ -68,18 +68,6 @@ variable "import_task_timeout" {
   description = "Per-task timeout in minutes for import jobs"
   type        = number
   default     = 55
-}
-
-variable "report_to_email" {
-  description = "Daily report recipient email"
-  type        = string
-  default     = "mark@chmarny.com"
-}
-
-variable "report_from_email" {
-  description = "Daily report sender email (must be verified in SendGrid)"
-  type        = string
-  default     = "devpulse@thingz.io"
 }
 
 variable "support_email" {

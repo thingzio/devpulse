@@ -15,22 +15,3 @@ resource "google_cloud_scheduler_job" "import" {
 
   depends_on = [google_project_service.default]
 }
-
-resource "google_cloud_scheduler_job" "daily_report" {
-  name      = "${var.prefix}-daily-report"
-  schedule  = "0 17 * * *"
-  time_zone = "America/Los_Angeles"
-  project   = var.project_id
-  region    = var.region
-
-  http_target {
-    http_method = "POST"
-    uri         = "${google_cloud_run_v2_service.admin.uri}/report"
-
-    oidc_token {
-      service_account_email = google_service_account.deployer.email
-    }
-  }
-
-  depends_on = [google_project_service.default]
-}
