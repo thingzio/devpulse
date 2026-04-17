@@ -28,11 +28,9 @@ const destroySessionSQL = `DELETE FROM devpulse_session WHERE id = $1`
 
 const cleanExpiredSessionsSQL = `DELETE FROM devpulse_session WHERE expires_at <= NOW()`
 
-// AuthenticateUser upserts the tenant and creates a session inside a single
-// explicit transaction on a dedicated connection. The transaction guarantees
-// the tenant row written by the upsert is visible to the session INSERT's
-// FK check — auto-committed statements had a visibility gap that caused
-// FK-constraint errors (23503).
+// AuthenticateUser upserts the tenant and creates a session on a single
+// dedicated connection with cleared app.tenant_id so the RLS bypass policy
+// allows the session INSERT.
 func AuthenticateUser(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string, ttl time.Duration) (*Tenant, string, error) {
 	conn, connErr := db.Conn(ctx)
 	if connErr != nil {
@@ -40,27 +38,15 @@ func AuthenticateUser(ctx context.Context, db *sql.DB, githubID int64, username,
 	}
 	defer conn.Close()
 
-	// Clear any stale RLS scope at SESSION level before starting the tx.
+	// Clear any stale RLS scope at SESSION level on this dedicated connection.
 	if _, err := conn.ExecContext(ctx,
 		"SELECT set_config('app.tenant_id', '', false)"); err != nil {
 		return nil, "", fmt.Errorf("clearing tenant scope for auth: %w", err)
 	}
 
-	tx, err := conn.BeginTx(ctx, nil)
+	t, err := scanTenant(conn.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
 	if err != nil {
-		return nil, "", fmt.Errorf("beginning auth transaction: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck // rollback after commit is harmless
-
-	// Transaction-local RLS bypass so both statements see the bypass policy.
-	if _, err := tx.ExecContext(ctx,
-		"SELECT set_config('app.tenant_id', '', true)"); err != nil {
-		return nil, "", fmt.Errorf("clearing tenant scope in auth tx: %w", err)
-	}
-
-	t, scanErr := scanTenant(tx.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
-	if scanErr != nil {
-		return nil, "", fmt.Errorf("upserting tenant: %w", scanErr)
+		return nil, "", fmt.Errorf("upserting tenant: %w", err)
 	}
 
 	raw := make([]byte, 32)
@@ -70,12 +56,8 @@ func AuthenticateUser(ctx context.Context, db *sql.DB, githubID int64, username,
 	rawToken := hex.EncodeToString(raw)
 	hashed := HashToken(rawToken)
 
-	if _, err := tx.ExecContext(ctx, createSessionSQL, hashed, t.ID, ttl.String()); err != nil {
+	if _, err := conn.ExecContext(ctx, createSessionSQL, hashed, t.ID, ttl.String()); err != nil {
 		return nil, "", fmt.Errorf("creating session: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, "", fmt.Errorf("committing auth: %w", err)
 	}
 
 	return t, rawToken, nil
