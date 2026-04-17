@@ -1,16 +1,4 @@
-package admin
-
-type upgradeRequest struct {
-	Username string `json:"username"`
-	Plan     string `json:"plan"`
-}
-
-type upgradeResponse struct {
-	Username         string `json:"username"`
-	Plan             string `json:"plan"`
-	MaxRepos         int    `json:"max_repos"`
-	MaxEventsPerWeek int    `json:"max_events_per_week"`
-}
+package server
 
 type tenantSummary struct {
 	Username         string `json:"username"`
@@ -52,22 +40,6 @@ type repoDetail struct {
 	BackfillTarget int     `json:"backfill_target"`
 }
 
-type resetErrorsRequest struct {
-	Org  string `json:"org"`
-	Repo string `json:"repo"`
-}
-
-type resetErrorsResponse struct {
-	Org   string `json:"org"`
-	Repo  string `json:"repo"`
-	Reset int64  `json:"reset"`
-}
-
-type inviteRequest struct {
-	Username string `json:"username"`
-	Plan     string `json:"plan"`
-}
-
 type tokenStatus struct {
 	Login          string `json:"login"`
 	InstallationID int64  `json:"installation_id"`
@@ -76,14 +48,6 @@ type tokenStatus struct {
 	Remaining      int    `json:"remaining"`
 	ResetAt        string `json:"reset_at,omitempty"`
 	Error          string `json:"error,omitempty"`
-}
-
-type inviteResponse struct {
-	Username         string `json:"username"`
-	GitHubID         int64  `json:"github_id"`
-	Plan             string `json:"plan"`
-	MaxRepos         int    `json:"max_repos"`
-	MaxEventsPerWeek int    `json:"max_events_per_week"`
 }
 
 type platformStats struct {
@@ -129,16 +93,4 @@ type summaryResponse struct {
 	MoM        *statsDelta   `json:"mom,omitempty"`
 	ErrorRepos []errorRepo   `json:"error_repos"`
 	UpdatedAt  string        `json:"updated_at"`
-}
-
-type reportResponse struct {
-	Sent  bool   `json:"sent"`
-	Error string `json:"error,omitempty"`
-}
-
-type reportConfig struct {
-	SendAPIKey    string
-	ToEmail       string
-	FromEmail     string
-	SubjectPrefix string
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Three binaries: `devpulse-site` (HTTP server), `devpulse-import` (batch worker), and `devpulse-admin` (IAM-protected admin service). PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
+`devpulse` is a multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-site` (HTTP server + integrated admin dashboard), `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation. Deployed to Cloud Run.
 
 ## Build & Test
 
@@ -136,7 +136,7 @@ When choosing between approaches, prioritize in this order:
 ```
 cmd/devpulse-site/     HTTP server entrypoint (dashboard, OAuth, webhooks, data API)
 cmd/devpulse-import/   Batch import worker entrypoint (events, reputation, insights)
-cmd/devpulse-admin/    IAM-protected admin service (tenant plan management)
+pkg/middleware/admin.go RequireAdmin middleware (session auth + DEVPULSE_ADMIN_USERS whitelist)
 pkg/server/             HTTP server, handlers, scoped.go (RLS middleware), data.go (chart API)
 pkg/server/static/      Frontend: CSS, JS, images (embedded via go:embed)
 pkg/server/templates/   HTML templates: header, home, footer, landing, tos, help
@@ -153,7 +153,7 @@ infra/saas/             Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 
-Three separate binaries with independent lifecycles. `devpulse-site` serves HTTP, `devpulse-import` runs batch imports, `devpulse-admin` provides IAM-protected tenant management. Each creates its own store via `postgres.NewFromEnv()`.
+Two binaries with independent lifecycles. `devpulse-site` serves HTTP and includes an integrated admin dashboard at `/admin` (session auth + username whitelist). `devpulse-import` runs batch imports. Each creates its own store via `postgres.NewFromEnv()`.
 
 Data flow: GitHub App webhook → tenant_repo → scheduled import worker → PostgreSQL (RLS-scoped) → dashboard
 
@@ -195,7 +195,7 @@ GitHub Actions workflows in `.github/workflows/`:
 Releases are triggered by version tags. Use `make bump-patch`, `make bump-minor`, or `make bump-major` to tag and push.
 
 - **Build**: goreleaser v2 compiles linux/amd64+arm64, ko builds container images
-- **Images**: `devpulse-site`, `devpulse-import`, `devpulse-admin` pushed to Artifact Registry (`devpulse-saas-images`)
+- **Images**: `devpulse-site`, `devpulse-import` pushed to Artifact Registry (`devpulse-saas-images`)
 - **Deploy**: Cloud Run service + job (import) + admin updated via `deploy-saas.yaml` or `release-on-tag.yaml`
 
 ## Changelog Updates

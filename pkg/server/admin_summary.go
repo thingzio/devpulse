@@ -1,11 +1,9 @@
-package admin
+package server
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"time"
 )
 
@@ -186,16 +184,4 @@ func collectSummary(ctx context.Context, db *sql.DB) (summaryResponse, error) {
 		ErrorRepos: repos,
 		UpdatedAt:  time.Now().UTC().Format(time.RFC3339),
 	}, nil
-}
-
-func handleSummary(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		resp, err := collectSummary(r.Context(), db)
-		if err != nil {
-			slog.Error("collecting summary", "error", err)
-			http.Error(w, "error collecting summary", http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, http.StatusOK, resp)
-	}
 }

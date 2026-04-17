@@ -1,0 +1,47 @@
+{{define "content"}}
+<div style="max-width:1100px;margin:20px auto;padding:0 16px">
+  <nav style="display:flex;gap:16px;margin-bottom:24px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:8px">
+    <a href="/admin">Summary</a>
+    <a href="/admin/tenants">Tenants</a>
+    <a href="/admin/tokens" style="font-weight:bold">Tokens</a>
+    <a href="/admin/metrics">Metrics</a>
+  </nav>
+
+  <h2 style="margin-bottom:16px">Token Pool Status ({{len .Tokens}})</h2>
+
+  {{if .Tokens}}
+  <table class="tbl-home" style="width:100%">
+    <thead>
+      <tr>
+        <th style="text-align:left">Login</th>
+        <th style="text-align:right">Installation ID</th>
+        <th style="text-align:right">Limit</th>
+        <th style="text-align:right">Used</th>
+        <th style="text-align:right">Remaining</th>
+        <th style="text-align:left">Reset At</th>
+        <th style="text-align:left">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Tokens}}
+      <tr>
+        <td>{{.Login}}</td>
+        <td style="text-align:right">{{.InstallationID}}</td>
+        {{if .Error}}
+        <td colspan="4" style="color:red">{{.Error}}</td>
+        {{else}}
+        <td style="text-align:right">{{.Limit}}</td>
+        <td style="text-align:right">{{.Used}}</td>
+        <td style="text-align:right">{{.Remaining}}</td>
+        <td>{{.ResetAt}}</td>
+        {{end}}
+        <td>{{if .Error}}Error{{else if lt .Remaining 100}}<span style="color:orange">Low</span>{{else}}<span style="color:green">OK</span>{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p style="color:var(--text-muted,#666)">No installations found.</p>
+  {{end}}
+</div>
+{{end}}

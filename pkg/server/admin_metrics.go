@@ -1,4 +1,4 @@
-package admin
+package server
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -30,8 +29,9 @@ const (
 )
 
 var (
-	metricsClient  = &http.Client{Timeout: metricsHTTPTimeout}
-	analysisClient = &http.Client{Timeout: analysisHTTPTimeout}
+	metricsClient     = &http.Client{Timeout: metricsHTTPTimeout}
+	analysisClient    = &http.Client{Timeout: analysisHTTPTimeout}
+	metricsDayOptions = []int{1, 2, 7, 14, 30}
 )
 
 // metricsConfig holds config loaded once at handler creation.
@@ -54,46 +54,6 @@ func newMetricsConfig() *metricsConfig {
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
 		dbID:         project + ":" + config.DBInstanceID(),
-	}
-}
-
-func handleMetricsReview(cfg *metricsConfig) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if cfg.anthropicKey == "" {
-			http.Error(w, "anthropic API key not configured", http.StatusServiceUnavailable)
-			return
-		}
-
-		days := defaultDays
-		if d := r.URL.Query().Get("days"); d != "" {
-			if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= maxDays {
-				days = v
-			}
-		}
-
-		token, err := gcpAccessToken(r.Context())
-		if err != nil {
-			slog.Error("failed to get GCP credentials", "error", err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		metrics := collectAllMetrics(r.Context(), cfg, token, days)
-
-		format := formatText
-		if r.URL.Query().Get("format") == "html" {
-			format = formatHTML
-		}
-
-		analysis, err := analyzeMetrics(r.Context(), cfg, metrics, format)
-		if err != nil {
-			slog.Error("failed to analyze metrics", "error", err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		fmt.Fprint(w, analysis)
 	}
 }
 

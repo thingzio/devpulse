@@ -36,24 +36,6 @@ func TestImportAdoptTimeout(t *testing.T) {
 	})
 }
 
-func TestAdminRequireIAM(t *testing.T) {
-	t.Run("default true", func(t *testing.T) {
-		assert.True(t, AdminRequireIAM())
-	})
-	t.Run("false", func(t *testing.T) {
-		t.Setenv("ADMIN_REQUIRE_IAM", "false")
-		assert.False(t, AdminRequireIAM())
-	})
-	t.Run("zero", func(t *testing.T) {
-		t.Setenv("ADMIN_REQUIRE_IAM", "0")
-		assert.False(t, AdminRequireIAM())
-	})
-	t.Run("true", func(t *testing.T) {
-		t.Setenv("ADMIN_REQUIRE_IAM", "true")
-		assert.True(t, AdminRequireIAM())
-	})
-}
-
 func TestServerConfig(t *testing.T) {
 	t.Run("shutdown timeout default", func(t *testing.T) {
 		assert.Equal(t, 5, ServerShutdownTimeout())

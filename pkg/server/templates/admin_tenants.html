@@ -1,0 +1,60 @@
+{{define "content"}}
+<div style="max-width:1100px;margin:20px auto;padding:0 16px">
+  <nav style="display:flex;gap:16px;margin-bottom:24px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:8px">
+    <a href="/admin">Summary</a>
+    <a href="/admin/tenants" style="font-weight:bold">Tenants</a>
+    <a href="/admin/tokens">Tokens</a>
+    <a href="/admin/metrics">Metrics</a>
+  </nav>
+
+  <h2 style="margin-bottom:16px">Tenants ({{len .Tenants}})</h2>
+
+  <input type="text" id="tenant-filter" placeholder="Filter by username or name..."
+    style="width:100%;max-width:400px;padding:6px 10px;margin-bottom:16px;border:1px solid var(--border-color,#ccc);border-radius:4px">
+
+  <table class="tbl-home" style="width:100%">
+    <thead>
+      <tr>
+        <th style="text-align:left">Username</th>
+        <th style="text-align:left">Name</th>
+        <th style="text-align:left">Plan</th>
+        <th style="text-align:right">Max Repos</th>
+        <th style="text-align:right">Events/Wk</th>
+        <th style="text-align:left">Last Sign-in</th>
+        <th style="text-align:left">Created</th>
+      </tr>
+    </thead>
+    <tbody id="tenant-tbody">
+      {{range .Tenants}}
+      <tr>
+        <td><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
+        <td>{{if .Name}}{{.Name}}{{else}}&mdash;{{end}}</td>
+        <td style="text-transform:capitalize">{{.Plan}}</td>
+        <td style="text-align:right">{{comma .MaxRepos}}</td>
+        <td style="text-align:right">{{comma .MaxEventsPerWeek}}</td>
+        <td>{{if .LastSignIn}}{{.LastSignIn}}{{else}}&mdash;{{end}}</td>
+        <td>{{.CreatedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function() {
+  var input = document.getElementById('tenant-filter');
+  var tbody = document.getElementById('tenant-tbody');
+  if (!input || !tbody) return;
+  input.addEventListener('keyup', function() {
+    var q = this.value.toLowerCase();
+    var rows = tbody.getElementsByTagName('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i].getElementsByTagName('td');
+      var username = cells[0] ? cells[0].textContent.toLowerCase() : '';
+      var name = cells[1] ? cells[1].textContent.toLowerCase() : '';
+      rows[i].style.display = (username.indexOf(q) >= 0 || name.indexOf(q) >= 0) ? '' : 'none';
+    }
+  });
+})();
+</script>
+{{end}}

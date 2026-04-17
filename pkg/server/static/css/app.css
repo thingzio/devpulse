@@ -438,13 +438,10 @@ fieldset {
 }
 
 .cache-warning {
-  background: var(--attention-subtle-bgColor, #fff8c5);
-  color: var(--fgColor-default, #1f2328);
-  border: 1px solid var(--attention-borderColor, #d4a72c);
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 13px;
-  margin-bottom: 12px;
+  color: var(--fgColor-muted, #656d76);
+  padding: 4px 14px;
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 
 .period-wrap {

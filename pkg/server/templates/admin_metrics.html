@@ -1,0 +1,40 @@
+{{define "content"}}
+<div style="max-width:1100px;margin:20px auto;padding:0 16px">
+  <nav style="display:flex;gap:16px;margin-bottom:24px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:8px">
+    <a href="/admin">Summary</a>
+    <a href="/admin/tenants">Tenants</a>
+    <a href="/admin/tokens">Tokens</a>
+    <a href="/admin/metrics" style="font-weight:bold">Metrics</a>
+  </nav>
+
+  <h2 style="margin-bottom:16px">Infrastructure Metrics Review</h2>
+
+  <div style="margin-bottom:20px">
+    <strong>Period:</strong>
+    {{range $d := .DayOptions}}
+      {{if eq $d $.Days}}
+        <span style="font-weight:bold;margin:0 6px">{{$d}}d</span>
+      {{else}}
+        <a href="/admin/metrics?days={{$d}}" style="margin:0 6px">{{$d}}d</a>
+      {{end}}
+    {{end}}
+  </div>
+
+  {{if .Analysis}}
+  <h3 style="margin-bottom:8px">Analysis</h3>
+  <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--bg-muted,#f6f6f6);padding:16px;border-radius:6px;margin-bottom:24px;font-size:0.9em;line-height:1.5">{{.Analysis}}</pre>
+  {{end}}
+
+  {{if .Metrics}}
+  <h3 style="margin-bottom:8px">Raw Metrics</h3>
+  <details>
+    <summary style="cursor:pointer;margin-bottom:8px">Show raw metrics data</summary>
+    <pre style="white-space:pre-wrap;word-wrap:break-word;background:var(--bg-muted,#f6f6f6);padding:16px;border-radius:6px;font-size:0.85em;line-height:1.4">{{.Metrics}}</pre>
+  </details>
+  {{end}}
+
+  {{if not .Analysis}}{{if not .Metrics}}
+  <p style="color:var(--text-muted,#666)">No metrics data available. Ensure GCP credentials and Anthropic API key are configured.</p>
+  {{end}}{{end}}
+</div>
+{{end}}

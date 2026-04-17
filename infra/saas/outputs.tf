@@ -18,11 +18,6 @@ output "notification_email" {
   value       = var.notification_email
 }
 
-output "admin_url" {
-  description = "Admin service URL (IAM-protected)"
-  value       = google_cloud_run_v2_service.admin.uri
-}
-
 output "project_id" {
   description = "GCP project ID"
   value       = var.project_id
