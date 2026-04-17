@@ -375,6 +375,22 @@ func makeRouter(
 		return tenant.ListTenantRepos(ctx, db, tenantID)
 	})))
 
+	// Admin routes (session auth + username whitelist, full SSR)
+	requireAdmin := middleware.RequireAdmin(db)
+	adminWrap := func(h http.HandlerFunc) http.Handler {
+		return requireAdmin(h)
+	}
+	mcfg := newMetricsConfig()
+	mux.Handle("GET /admin", adminWrap(adminDashboardHandler(db)))
+	mux.Handle("GET /admin/tenants", adminWrap(adminTenantsHandler(db)))
+	mux.Handle("GET /admin/tenant/{username}", adminWrap(adminTenantDetailHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/plan", adminWrap(adminUpdatePlanHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/invite", adminWrap(adminInviteHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/reset", adminWrap(adminResetErrorsHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/hard-reset", adminWrap(adminHardResetHandler(db)))
+	mux.Handle("GET /admin/tokens", adminWrap(adminTokensHandler(db)))
+	mux.Handle("GET /admin/metrics", adminWrap(adminMetricsHandler(mcfg)))
+
 	return mux
 }
 
