@@ -97,6 +97,21 @@ resource "google_cloud_run_v2_service" "serve" {
         value = var.admin_users
       }
 
+      env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "ANTHROPIC_MODEL"
+        value = "claude-sonnet-4-6"
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
