@@ -48,11 +48,117 @@ var templateFuncs = template.FuncMap{
 		}
 		return fmt.Sprintf("%d,%03d,%03d", n/1000000, (n/1000)%1000, n%1000)
 	},
+	// deltaInt formats a statsDelta int field with color. Positive = green.
+	"deltaInt": func(d *statsDelta, field string) template.HTML {
+		return formatDeltaInt(d, field, false)
+	},
+	// deltaIntInv is like deltaInt but inverts color (positive = red, for error counts).
+	"deltaIntInv": func(d *statsDelta, field string) template.HTML {
+		return formatDeltaInt(d, field, true)
+	},
+	// deltaInt64 formats a statsDelta int64 field with color.
+	"deltaInt64": func(d *statsDelta, field string) template.HTML {
+		return formatDeltaInt64(d, field)
+	},
+	// splitOrgRepo splits "org/repo" into [org, repo].
+	"splitOrgRepo": func(s string) [2]string {
+		if org, repo, ok := strings.Cut(s, "/"); ok {
+			return [2]string{org, repo}
+		}
+		return [2]string{s, ""}
+	},
+}
+
+// formatDeltaInt formats an int delta field from statsDelta with colored HTML.
+// When invert is true, positive values are red (used for error-type metrics).
+func formatDeltaInt(d *statsDelta, field string, invert bool) template.HTML {
+	if d == nil {
+		return "&mdash;"
+	}
+
+	var val *int
+	var pct *float64
+
+	switch field {
+	case "Tenants":
+		val, pct = d.Tenants, d.TenantsPct
+	case "Repos":
+		val, pct = d.Repos, d.ReposPct
+	case "Contributors":
+		val, pct = d.Contributors, d.ContribPct
+	case "Installations":
+		val, pct = d.Installations, d.InstallPct
+	case "ReposWithErrors":
+		val, pct = d.ReposWithErrors, d.ErrorsPct
+	default:
+		return "&mdash;"
+	}
+
+	if val == nil {
+		return "&mdash;"
+	}
+
+	v := *val
+	color := "inherit"
+	if v > 0 {
+		color = "green"
+		if invert {
+			color = "red"
+		}
+	} else if v < 0 {
+		color = "red"
+		if invert {
+			color = "green"
+		}
+	}
+
+	sign := ""
+	if v > 0 {
+		sign = "+"
+	}
+
+	s := fmt.Sprintf("%s%d", sign, v)
+	if pct != nil {
+		s += fmt.Sprintf(" (%.1f%%)", *pct)
+	}
+
+	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s))
+}
+
+// formatDeltaInt64 formats an int64 delta field from statsDelta with colored HTML.
+func formatDeltaInt64(d *statsDelta, _ string) template.HTML {
+	if d == nil || d.Events == nil {
+		return "&mdash;"
+	}
+
+	v := *d.Events
+	color := "inherit"
+	if v > 0 {
+		color = "green"
+	} else if v < 0 {
+		color = "red"
+	}
+
+	sign := ""
+	if v > 0 {
+		sign = "+"
+	}
+
+	s := fmt.Sprintf("%s%d", sign, v)
+	if d.EventsPct != nil {
+		s += fmt.Sprintf(" (%.1f%%)", *d.EventsPct)
+	}
+
+	return template.HTML(fmt.Sprintf(`<span style="color:%s">%s</span>`, color, s))
 }
 
 func init() {
 	// Simple pages using layout.html
-	simplePages := []string{"landing.html", "tos.html", "help.html", "settings.html", "changelog.html"}
+	simplePages := []string{
+		"landing.html", "tos.html", "help.html", "settings.html", "changelog.html",
+		"admin.html", "admin_tenants.html", "admin_tenant.html",
+		"admin_tokens.html", "admin_metrics.html",
+	}
 	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
 	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
