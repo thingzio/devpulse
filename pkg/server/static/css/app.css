@@ -1,5 +1,4 @@
 /* RESET RULES */
-@import url("https://fonts.googleapis.com/css?family=Lato:400,700&display=swap");
 
 :root {
   --page-header-bgColor: #f6f8fa;
@@ -35,60 +34,60 @@
 /* Dark theme variables */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --page-header-bgColor: #161b22;
-    --page-header-bgColor-hover: #1f2937;
-    --page-header-txtColor: #e6edf3;
-    --page-header-headingColor: #8b949e;
-    --page-content-bgColor: #0d1117;
-    --page-content-txtColor: #e6edf3;
-    --page-content-blockColor: #161b22;
-    --white: #161b22;
-    --black: #e6edf3;
-    --gray: #8b949e;
-    --blue: #58a6ff;
-    --red: #f85149;
-    --dark-color: #e6edf3;
-    --medium-color: #8b949e;
-    --light-color: #161b22;
-    --border-color: #30363d;
-    --box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);
-    --table-header: #161b22;
-    --table-row-odd: #0d1117;
-    --link-color: #58a6ff;
-    --accent: #58a6ff;
-    --focus-ring: 0 0 0 3px rgba(88,166,255,0.3);
-    --chart-text: #e6edf3;
-    --chart-grid: rgba(230,237,243,0.1);
+    --page-header-bgColor: #171a22;
+    --page-header-bgColor-hover: #1f2330;
+    --page-header-txtColor: #f0f0f0;
+    --page-header-headingColor: #999999;
+    --page-content-bgColor: #0c1017;
+    --page-content-txtColor: #f0f0f0;
+    --page-content-blockColor: #171a22;
+    --white: #171a22;
+    --black: #f0f0f0;
+    --gray: #999999;
+    --blue: #4a9eff;
+    --red: #ef4444;
+    --dark-color: #f0f0f0;
+    --medium-color: #999999;
+    --light-color: #171a22;
+    --border-color: #242836;
+    --box-shadow: none;
+    --table-header: #171a22;
+    --table-row-odd: #0c1017;
+    --link-color: #4a9eff;
+    --accent: #4a9eff;
+    --focus-ring: 0 0 0 3px rgba(74,158,255,0.22);
+    --chart-text: #f0f0f0;
+    --chart-grid: rgba(240,240,240,0.1);
     --overlay-bg: rgba(0,0,0,0.6);
     --logo-filter: invert(1);
   }
 }
 
 [data-theme="dark"] {
-  --page-header-bgColor: #161b22;
-  --page-header-bgColor-hover: #1f2937;
-  --page-header-txtColor: #e6edf3;
-  --page-header-headingColor: #8b949e;
-  --page-content-bgColor: #0d1117;
-  --page-content-txtColor: #e6edf3;
-  --page-content-blockColor: #161b22;
-  --white: #161b22;
-  --black: #e6edf3;
-  --gray: #8b949e;
-  --blue: #58a6ff;
-  --red: #f85149;
-  --dark-color: #e6edf3;
-  --medium-color: #8b949e;
-  --light-color: #161b22;
-  --border-color: #30363d;
-  --box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);
-  --table-header: #161b22;
-  --table-row-odd: #0d1117;
-  --link-color: #58a6ff;
-  --accent: #58a6ff;
-  --focus-ring: 0 0 0 3px rgba(88,166,255,0.3);
-  --chart-text: #e6edf3;
-  --chart-grid: rgba(230,237,243,0.1);
+  --page-header-bgColor: #171a22;
+  --page-header-bgColor-hover: #1f2330;
+  --page-header-txtColor: #f0f0f0;
+  --page-header-headingColor: #999999;
+  --page-content-bgColor: #0c1017;
+  --page-content-txtColor: #f0f0f0;
+  --page-content-blockColor: #171a22;
+  --white: #171a22;
+  --black: #f0f0f0;
+  --gray: #999999;
+  --blue: #4a9eff;
+  --red: #ef4444;
+  --dark-color: #f0f0f0;
+  --medium-color: #999999;
+  --light-color: #171a22;
+  --border-color: #242836;
+  --box-shadow: none;
+  --table-header: #171a22;
+  --table-row-odd: #0c1017;
+  --link-color: #4a9eff;
+  --accent: #4a9eff;
+  --focus-ring: 0 0 0 3px rgba(74,158,255,0.22);
+  --chart-text: #f0f0f0;
+  --chart-grid: rgba(240,240,240,0.1);
   --overlay-bg: rgba(0,0,0,0.6);
   --logo-filter: invert(1);
 }
@@ -150,7 +149,8 @@ svg {
 }
 
 body {
-  font: 16px/1.5 "Lato", sans-serif;
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
   color: var(--page-content-txtColor);
   background: var(--page-content-bgColor);
 }
@@ -238,7 +238,7 @@ fieldset {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s ease;
 }
 
 .user-avatar-btn:hover {
@@ -463,7 +463,7 @@ fieldset {
     color: var(--text);
     cursor: pointer;
     font-size: 0.8em;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s ease;
 }
 .pdf-btn:disabled {
     opacity: 0.3;
@@ -527,7 +527,7 @@ fieldset {
   align-items: center;
   flex-shrink: 0;
   color: var(--accent);
-  transition: color 0.15s;
+  transition: color 0.2s ease;
 }
 
 .logo-link:hover {
@@ -554,7 +554,7 @@ fieldset {
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   box-shadow: var(--box-shadow);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-and-user [type="search"]:focus {
@@ -641,7 +641,7 @@ fieldset {
   cursor: pointer;
   margin-bottom: 0;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.2s ease, background 0.2s ease;
   font-family: inherit;
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
@@ -1561,7 +1561,7 @@ a.link {
     color: var(--dark-color);
     font-size: 0.9rem;
     box-sizing: border-box;
-    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .contributor-search::placeholder {
@@ -1671,7 +1671,7 @@ a.link {
   font-size: 1.1em;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.15s;
+  transition: background 0.2s ease;
 }
 
 .landing-hero .cta-btn:hover {
