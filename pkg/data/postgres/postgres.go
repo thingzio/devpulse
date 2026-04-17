@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -38,6 +39,7 @@ type Store struct {
 
 // PoolConfig controls database connection pool sizing.
 type PoolConfig struct {
+	AppName         string
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
@@ -52,6 +54,7 @@ const (
 // DefaultPoolConfig returns pool settings suitable for the site service.
 func DefaultPoolConfig() PoolConfig {
 	return PoolConfig{
+		AppName:         "devpulse-site",
 		MaxOpenConns:    17,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: defaultConnMaxLifetime,
@@ -62,6 +65,7 @@ func DefaultPoolConfig() PoolConfig {
 // ImportPoolConfig returns smaller pool settings suitable for batch import workers.
 func ImportPoolConfig() PoolConfig {
 	return PoolConfig{
+		AppName:         "devpulse-import",
 		MaxOpenConns:    5,
 		MaxIdleConns:    2,
 		ConnMaxLifetime: defaultConnMaxLifetime,
@@ -72,6 +76,7 @@ func ImportPoolConfig() PoolConfig {
 // AdminPoolConfig returns minimal pool settings for the admin service.
 func AdminPoolConfig() PoolConfig {
 	return PoolConfig{
+		AppName:         "devpulse-admin",
 		MaxOpenConns:    3,
 		MaxIdleConns:    1,
 		ConnMaxLifetime: defaultConnMaxLifetime,
@@ -83,6 +88,21 @@ func AdminPoolConfig() PoolConfig {
 func (c *PoolConfig) applyEnvOverrides() {
 	c.MaxOpenConns = config.DBMaxOpenConns(c.MaxOpenConns)
 	c.MaxIdleConns = config.DBMaxIdleConns(c.MaxIdleConns)
+}
+
+// applyAppName appends application_name to a DSN if AppName is set and not
+// already present. Supports both URI and keyword/value connection strings.
+func applyAppName(dsn, appName string) string {
+	if appName == "" || strings.Contains(dsn, "application_name") {
+		return dsn
+	}
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if strings.Contains(dsn, "?") {
+			return dsn + "&application_name=" + appName
+		}
+		return dsn + "?application_name=" + appName
+	}
+	return dsn + " application_name=" + appName
 }
 
 // New creates a new PostgreSQL Store, running migrations automatically.
@@ -99,7 +119,7 @@ func New(dsn string, cfgs ...PoolConfig) (*Store, error) {
 	}
 	cfg.applyEnvOverrides()
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("postgres", applyAppName(dsn, cfg.AppName))
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

@@ -128,6 +128,27 @@ func TestNew_ConnectsAndMigrates(t *testing.T) {
 	assert.Greater(t, version, 0)
 }
 
+func TestApplyAppName(t *testing.T) {
+	tests := []struct {
+		name    string
+		dsn     string
+		appName string
+		want    string
+	}{
+		{"empty app name", "postgres://host/db", "", "postgres://host/db"},
+		{"already set", "postgres://host/db?application_name=foo", "bar", "postgres://host/db?application_name=foo"},
+		{"uri no params", "postgres://host/db", "devpulse-site", "postgres://host/db?application_name=devpulse-site"},
+		{"uri with params", "postgres://host/db?sslmode=disable", "devpulse-import", "postgres://host/db?sslmode=disable&application_name=devpulse-import"},
+		{"postgresql scheme", "postgresql://host/db", "devpulse-admin", "postgresql://host/db?application_name=devpulse-admin"},
+		{"keyword format", "host=localhost dbname=thingz", "devtrace-site", "host=localhost dbname=thingz application_name=devtrace-site"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, applyAppName(tc.dsn, tc.appName))
+		})
+	}
+}
+
 func TestNew_EmptyDSN(t *testing.T) {
 	_, err := New("")
 	assert.Error(t, err)
