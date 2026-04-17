@@ -101,9 +101,8 @@ function applyChartDefaults() {
 
 function initTheme() {
     const saved = localStorage.getItem('theme');
-    if (saved) {
-        document.documentElement.setAttribute('data-theme', saved);
-    }
+    // Default to dark; users can switch to light in settings.
+    document.documentElement.setAttribute('data-theme', saved || 'dark');
     applyChartDefaults();
 }
 
