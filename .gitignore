@@ -16,7 +16,6 @@ dist
 /devpulse-site
 /devpulse-import
 /devpulse-cloud
-/devpulse-admin
 
 # Keys
 *.pem

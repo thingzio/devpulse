@@ -43,6 +43,3 @@ jobs:
           gcloud run jobs update ${{ vars.JOB_NAME }} \
             --region=${{ vars.REGION }} \
             --image="${AR}/devpulse-import:${TAG}"
-          gcloud run services update ${{ vars.ADMIN_SERVICE_NAME }} \
-            --region=${{ vars.REGION }} \
-            --image="${AR}/devpulse-admin:${TAG}"

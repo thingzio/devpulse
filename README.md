@@ -6,7 +6,7 @@
 
 Multi-tenant SaaS for GitHub project health analytics. Users sign in with GitHub OAuth, install a GitHub App on their repos, and get a hosted dashboard at [devpulse.thingz.io](https://devpulse.thingz.io).
 
-Three separate binaries: `devpulse-site` (HTTP server), `devpulse-import` (batch worker), `devpulse-admin` (tenant management). PostgreSQL with Row-Level Security for tenant isolation.
+Two binaries: `devpulse-site` (HTTP server + integrated admin dashboard), `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation.
 
 ## Development
 

@@ -37,7 +37,7 @@ Cloudflare DNS  -> devpulse.thingz.io
 
 ## Compute
 
-Three container images: `devpulse-site` (Cloud Run service), `devpulse-import` (Cloud Run job), `devpulse-admin` (Cloud Run service, IAM-protected).
+Two container images: `devpulse-site` (Cloud Run service, includes admin dashboard), `devpulse-import` (Cloud Run job).
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|

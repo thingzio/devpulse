@@ -78,7 +78,6 @@ AR_REGISTRY=us-west1-docker.pkg.dev/thingzio/devpulse-saas-images
 # Build and push
 KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-site ko build ./cmd/devpulse-site/ --bare --tags latest
 KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-import ko build ./cmd/devpulse-import/ --bare --tags latest
-KO_DOCKER_REPO=${AR_REGISTRY}/devpulse-admin ko build ./cmd/devpulse-admin/ --bare --tags latest
 ```
 
 ## 6. Store Secrets
@@ -166,7 +165,7 @@ make bump-minor
 
 This triggers the release pipeline:
 1. Tests (unit, lint, tfsec, e2e)
-2. Builds `devpulse-site`, `devpulse-import`, and `devpulse-admin` images via goreleaser + ko
+2. Builds `devpulse-site` and `devpulse-import` images via goreleaser + ko
 3. Pushes directly to Artifact Registry (`us-west1-docker.pkg.dev/thingzio/devpulse-saas-images`)
 4. Deploys to Cloud Run
 5. Publishes GitHub release
