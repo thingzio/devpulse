@@ -3,5 +3,5 @@
 -- with WHERE date >= $1 across all repos. Existing indexes start with
 -- (org, repo, ...) and require a full seq scan for date-only filters.
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_devpulse_event_date
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_date
     ON devpulse_event (date);
