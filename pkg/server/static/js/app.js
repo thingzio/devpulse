@@ -3042,7 +3042,7 @@ function generatePDF() {
         fetchJSON('/data/insights/time-to-merge?' + q),
         fetchJSON('/data/insights/change-failure-rate?' + q),
         fetchJSON('/data/insights/release-cadence?' + q),
-        fetchJSON('/data/insights/release-downloads?d=' + months + '&o=' + org + '&r=' + repo),
+        fetchJSON('/data/insights/release-downloads?d=' + days + '&o=' + org + '&r=' + repo),
         fetchJSON('/data/insights/pr-ratio?' + q),
         fetchJSON('/data/insights/review-latency?' + q),
         fetchJSON('/data/insights/time-to-close?' + q),
