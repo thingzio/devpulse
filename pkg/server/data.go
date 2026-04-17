@@ -77,12 +77,16 @@ func (c *responseCache) set(key string, val []byte) {
 }
 
 // dataCacheKey builds a cache key from tenant ID, path, and query string.
+// Strips jQuery's cache-buster parameter (_=timestamp) so repeat requests
+// from $.ajaxSetup({cache:false}) still hit the server-side cache.
 func dataCacheKey(r *http.Request) string {
 	tid := ""
 	if tn := middleware.TenantFromContext(r.Context()); tn != nil {
 		tid = tn.ID
 	}
-	return tid + "|" + r.URL.Path + "?" + r.URL.RawQuery
+	q := r.URL.Query()
+	q.Del("_")
+	return tid + "|" + r.URL.Path + "?" + q.Encode()
 }
 
 const (
