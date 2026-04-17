@@ -20,6 +20,7 @@
         <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Username</th>
         <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Name</th>
         <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Plan</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Status</th>
         <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Max Repos</th>
         <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Events/Wk</th>
         <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Last Sign-in</th>
@@ -32,6 +33,7 @@
         <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
         <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Name}}{{.Name}}{{else}}&mdash;{{end}}</td>
         <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);text-transform:capitalize">{{.Plan}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if eq .Status "active"}}<span style="color:#22c55e">active</span>{{else}}<span style="color:#ef4444">{{.Status}}</span>{{end}}</td>
         <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .MaxRepos}}</td>
         <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{comma .MaxEventsPerWeek}}</td>
         <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .LastSignIn}}{{.LastSignIn}}{{else}}&mdash;{{end}}</td>

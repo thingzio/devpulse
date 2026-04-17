@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// Tenant status values.
+const (
+	StatusActive    = "active"
+	StatusSuspended = "suspended"
+)
+
 // Tenant represents a registered SaaS tenant.
 type Tenant struct {
 	ID                 string
@@ -22,6 +28,7 @@ type Tenant struct {
 	MaxRepos           int
 	MaxEventsPerWeek   int
 	Plan               string
+	Status             string
 	ToSAcceptedAt      *time.Time
 	UpgradeRequestedAt *time.Time
 	CreatedAt          time.Time
@@ -42,26 +49,28 @@ const upsertTenantSQL = `
 		updated_at = NOW()
 	RETURNING id, github_id, username, email, avatar_url,
 		          COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	          max_repos, max_events_per_week, plan,
+	          max_repos, max_events_per_week, plan, status,
 	          tos_accepted_at, upgrade_requested_at, created_at, updated_at`
 
 const getTenantByGitHubIDSQL = `
 	SELECT id, github_id, username, email, avatar_url,
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	       max_repos, max_events_per_week, plan,
+	       max_repos, max_events_per_week, plan, status,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM devpulse_tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
 	SELECT id, github_id, username, email, avatar_url,
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	       max_repos, max_events_per_week, plan,
+	       max_repos, max_events_per_week, plan, status,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM devpulse_tenant WHERE id = $1`
 
 const acceptToSSQL = `UPDATE devpulse_tenant SET tos_accepted_at = NOW(), updated_at = NOW() WHERE id = $1`
 
 const updatePlanSQL = `UPDATE devpulse_tenant SET plan = $2, max_repos = $3, max_events_per_week = $4, updated_at = NOW() WHERE id = $1`
+
+const updateStatusSQL = `UPDATE devpulse_tenant SET status = $2, updated_at = NOW() WHERE id = $1`
 
 const requestUpgradeSQL = `
 	UPDATE devpulse_tenant SET upgrade_requested_at = NOW(), updated_at = NOW()
@@ -73,7 +82,7 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	err := row.Scan(
 		&t.ID, &t.GitHubID, &t.Username, &t.Email, &t.AvatarURL,
 		&t.Name, &t.Company, &t.Location, &t.Bio,
-		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
+		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.Status, &t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scanning tenant: %w", err)
@@ -122,6 +131,15 @@ func UpdatePlan(ctx context.Context, db *sql.DB, tenantID, plan string, maxRepos
 	_, err := db.ExecContext(ctx, updatePlanSQL, tenantID, plan, maxRepos, maxEventsPerWeek)
 	if err != nil {
 		return fmt.Errorf("updating plan: %w", err)
+	}
+	return nil
+}
+
+// UpdateStatus sets the tenant status (e.g. "active", "suspended").
+func UpdateStatus(ctx context.Context, db *sql.DB, tenantID, status string) error {
+	_, err := db.ExecContext(ctx, updateStatusSQL, tenantID, status)
+	if err != nil {
+		return fmt.Errorf("updating status: %w", err)
 	}
 	return nil
 }

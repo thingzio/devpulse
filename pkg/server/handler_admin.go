@@ -88,6 +88,7 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 				Email:            t.Email,
 				Name:             t.Name,
 				Plan:             t.Plan,
+				Status:           t.Status,
 				MaxRepos:         t.MaxRepos,
 				MaxEventsPerWeek: t.MaxEventsPerWeek,
 				CreatedAt:        t.CreatedAt.Format("2006-01-02"),
@@ -133,6 +134,7 @@ func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
 			Location:         td.Location,
 			Bio:              td.Bio,
 			Plan:             td.Plan,
+			Status:           td.Status,
 			MaxRepos:         td.MaxRepos,
 			MaxEventsPerWeek: td.MaxEventsPerWeek,
 			CreatedAt:        td.CreatedAt.Format("2006-01-02"),
@@ -365,6 +367,48 @@ func adminUpdatePlanHandler(db *sql.DB) http.HandlerFunc {
 		middleware.AdminAuditLog(ctx, "update_plan",
 			r.URL.Path, r.RemoteAddr,
 			fmt.Sprintf("username=%s plan=%s", username, planName))
+
+		http.Redirect(w, r, "/admin/tenant/"+url.PathEscape(username), http.StatusSeeOther)
+	}
+}
+
+// POST /admin/tenant/{username}/status — change tenant status.
+func adminUpdateStatusHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := r.PathValue("username")
+		if username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		status := r.FormValue("status")
+		if status != tenant.StatusActive && status != tenant.StatusSuspended {
+			http.Error(w, fmt.Sprintf("invalid status: %s", status), http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		tenantID, err := tenant.GetTenantIDByUsername(ctx, db, username)
+		if err != nil {
+			http.Error(w, "tenant not found", http.StatusNotFound)
+			return
+		}
+
+		if err := tenant.UpdateStatus(ctx, db, tenantID, status); err != nil {
+			slog.Error("updating status", "error", err)
+			http.Error(w, "error updating status", http.StatusInternalServerError)
+			return
+		}
+
+		middleware.AdminAuditLog(ctx, "update_status",
+			r.URL.Path, r.RemoteAddr,
+			fmt.Sprintf("username=%s status=%s", username, status))
 
 		http.Redirect(w, r, "/admin/tenant/"+url.PathEscape(username), http.StatusSeeOther)
 	}

@@ -15,6 +15,7 @@ type TenantSummary struct {
 	Email            string
 	Name             string
 	Plan             string
+	Status           string
 	MaxRepos         int
 	MaxEventsPerWeek int
 	CreatedAt        time.Time
@@ -31,6 +32,7 @@ type TenantDetail struct {
 	Location         string
 	Bio              string
 	Plan             string
+	Status           string
 	MaxRepos         int
 	MaxEventsPerWeek int
 	CreatedAt        time.Time
@@ -67,7 +69,7 @@ const (
 
 	listTenantSummariesSQL = `
 		SELECT t.username, COALESCE(t.email, ''), COALESCE(t.name, ''),
-		       t.plan, t.max_repos, t.max_events_per_week,
+		       t.plan, t.status, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
 		FROM devpulse_tenant t
 		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
@@ -77,7 +79,7 @@ const (
 	getTenantDetailByUsernameSQL = `
 		SELECT t.id, t.username, t.email,
 		       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
-		       t.plan, t.max_repos, t.max_events_per_week,
+		       t.plan, t.status, t.max_repos, t.max_events_per_week,
 		       t.created_at, MAX(s.created_at) AS last_sign_in
 		FROM devpulse_tenant t
 		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
@@ -148,7 +150,7 @@ func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, erro
 		var lastSignIn sql.NullTime
 		if err := rows.Scan(
 			&t.Username, &t.Email, &t.Name,
-			&t.Plan, &t.MaxRepos, &t.MaxEventsPerWeek,
+			&t.Plan, &t.Status, &t.MaxRepos, &t.MaxEventsPerWeek,
 			&t.CreatedAt, &lastSignIn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning tenant summary: %w", err)
@@ -172,7 +174,7 @@ func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string)
 	err := db.QueryRowContext(ctx, getTenantDetailByUsernameSQL, username).Scan(
 		&td.ID, &td.Username, &email,
 		&td.Name, &td.Company, &td.Location, &td.Bio,
-		&td.Plan, &td.MaxRepos, &td.MaxEventsPerWeek,
+		&td.Plan, &td.Status, &td.MaxRepos, &td.MaxEventsPerWeek,
 		&td.CreatedAt, &lastSignIn,
 	)
 	if err != nil {

@@ -42,6 +42,12 @@ var templateFuncs = template.FuncMap{
 	"appVersion":   func() string { return serverOpts.Version },
 	"appCommit":    func() string { return serverOpts.Commit },
 	"appBuildDate": func() string { return serverOpts.Date },
+	"pctOf": func(part, total int) string {
+		if total == 0 {
+			return "0%"
+		}
+		return fmt.Sprintf("%d%%", part*100/total)
+	},
 	"comma": func(n int) string {
 		if n == 0 {
 			return "Unlimited"
@@ -168,6 +174,7 @@ func init() {
 	// Simple pages using layout.html
 	simplePages := []string{
 		"landing.html", "tos.html", "help.html", "settings.html", "changelog.html",
+		"suspended.html",
 		"admin.html", "admin_tenants.html", "admin_tenant.html",
 		"admin_tokens.html", "admin_metrics.html",
 	}
@@ -310,6 +317,9 @@ func makeRouter(
 	mux.HandleFunc("GET /changelog", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "changelog.html", pageData{Title: "Changelog"})
 	})
+	mux.HandleFunc("GET /suspended", func(w http.ResponseWriter, _ *http.Request) {
+		renderTemplate(w, "suspended.html", pageData{Title: "Account Suspended"})
+	})
 	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
 		middleware.ClearSessionCookie(w)
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -405,6 +415,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	mux.Handle("GET /admin/tenants", wrap(adminTenantsHandler(db)))
 	mux.Handle("GET /admin/tenant/{username}", wrap(adminTenantDetailHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/plan", wrap(adminUpdatePlanHandler(db)))
+	mux.Handle("POST /admin/tenant/{username}/status", wrap(adminUpdateStatusHandler(db)))
 	mux.Handle("POST /admin/invite", wrap(adminInviteHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/reset", wrap(adminResetErrorsHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/hard-reset", wrap(adminHardResetHandler(db)))
@@ -637,6 +648,12 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 		if err != nil {
 			slog.Error("authenticating user", "error", err)
 			clearAndRedirect(w, r, "auth_failed")
+			return
+		}
+
+		if tn.Status != tenant.StatusActive {
+			slog.Warn("suspended user login attempt", "username", tn.Username)
+			http.Redirect(w, r, "/suspended", http.StatusFound)
 			return
 		}
 

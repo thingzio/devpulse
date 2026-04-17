@@ -5,6 +5,7 @@ type tenantSummary struct {
 	Email            string `json:"email"`
 	Name             string `json:"name"`
 	Plan             string `json:"plan"`
+	Status           string `json:"status"`
 	MaxRepos         int    `json:"max_repos"`
 	MaxEventsPerWeek int    `json:"max_events_per_week"`
 	CreatedAt        string `json:"created_at"`
@@ -19,6 +20,7 @@ type tenantDetail struct {
 	Location         string       `json:"location"`
 	Bio              string       `json:"bio"`
 	Plan             string       `json:"plan"`
+	Status           string       `json:"status"`
 	MaxRepos         int          `json:"max_repos"`
 	MaxEventsPerWeek int          `json:"max_events_per_week"`
 	CreatedAt        string       `json:"created_at"`

@@ -14,12 +14,15 @@ import (
 // ErrSessionInvalid is returned when a session is expired or not found.
 var ErrSessionInvalid = errors.New("session expired or not found")
 
+// ErrAccountSuspended is returned when a tenant's status is not active.
+var ErrAccountSuspended = errors.New("account suspended")
+
 const createSessionSQL = `INSERT INTO devpulse_session (id, tenant_id, expires_at) VALUES ($1, $2, NOW() + $3::interval)`
 
 const validateSessionSQL = `
 	SELECT t.id, t.github_id, t.username, t.email, t.avatar_url,
 	       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
-	       t.max_repos, t.max_events_per_week, t.plan, t.tos_accepted_at, t.upgrade_requested_at, t.created_at, t.updated_at
+	       t.max_repos, t.max_events_per_week, t.plan, t.status, t.tos_accepted_at, t.upgrade_requested_at, t.created_at, t.updated_at
 	FROM devpulse_session s
 	JOIN devpulse_tenant t ON t.id = s.tenant_id
 	WHERE s.id = $1 AND s.expires_at > NOW()`
@@ -115,6 +118,9 @@ func ValidateSession(ctx context.Context, db *sql.DB, rawToken string) (*Tenant,
 	}
 	if scanErr != nil {
 		return nil, fmt.Errorf("validating session: %w", scanErr)
+	}
+	if t.Status != StatusActive {
+		return nil, ErrAccountSuspended
 	}
 	return t, nil
 }

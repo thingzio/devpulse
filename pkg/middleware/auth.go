@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -51,8 +52,12 @@ func RequireAuth(db *sql.DB, loginURL string) func(http.Handler) http.Handler {
 
 			tn, err := tenant.ValidateSession(r.Context(), db, cookie.Value)
 			if err != nil {
-				slog.Debug("invalid session", "error", err)
 				ClearSessionCookie(w)
+				if errors.Is(err, tenant.ErrAccountSuspended) {
+					http.Redirect(w, r, "/suspended", http.StatusFound)
+					return
+				}
+				slog.Debug("invalid session", "error", err)
 				http.Redirect(w, r, loginURL, http.StatusFound)
 				return
 			}
