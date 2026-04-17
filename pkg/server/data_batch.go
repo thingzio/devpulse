@@ -103,7 +103,7 @@ func batchHealthHandler(defaultStore data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error encoding batch health")
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
@@ -160,7 +160,7 @@ func batchActivityHandler(defaultStore data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error encoding batch activity")
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
@@ -235,7 +235,7 @@ func batchVelocityHandler(defaultStore data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error encoding batch velocity")
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
@@ -298,7 +298,7 @@ func batchQualityHandler(defaultStore data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error encoding batch quality")
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
@@ -367,7 +367,7 @@ func batchCommunityHandler(defaultStore data.Store) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "error encoding batch community")
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)

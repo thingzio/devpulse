@@ -724,7 +724,7 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			writeJSON(w, http.StatusOK, overview)
 			return
 		}
-		apiCache.set(key, b)
+		apiCache.setWithTTL(key, b, requestCacheTTL(r))
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 		w.WriteHeader(http.StatusOK)

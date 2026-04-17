@@ -224,6 +224,33 @@ function parseSearchInput(raw) {
     return { scope: 'all', query: raw };
 }
 
+// Adaptive cache: large tenants get longer server-side TTL + warning banner.
+var adaptiveCacheTTL = 300; // default 5min (seconds)
+var CACHE_TIER_THRESHOLD = 10000; // events above this = large tenant
+var CACHE_TIER_LARGE_TTL = 900;   // 15min for large tenants
+
+function setAdaptiveCacheTier(events) {
+    if (events > CACHE_TIER_THRESHOLD) {
+        adaptiveCacheTTL = CACHE_TIER_LARGE_TTL;
+        var mins = Math.round(adaptiveCacheTTL / 60);
+        if (!$("#cache-warning").length) {
+            $(".search-and-user").after(
+                '<div id="cache-warning" class="cache-warning">' +
+                'Large dataset (' + events.toLocaleString() + ' events) — ' +
+                'initial panel loads may be slower. Data cached for ' + mins + ' min.' +
+                '</div>'
+            );
+        }
+    } else {
+        adaptiveCacheTTL = 300;
+        $("#cache-warning").remove();
+    }
+}
+
+function appendCacheTTL(q) {
+    return q + '&ttl=' + adaptiveCacheTTL;
+}
+
 $(function () {
     // Disable AJAX caching globally so browsers always fetch fresh data.
     $.ajaxSetup({ cache: false });
@@ -410,6 +437,7 @@ function activateTab(tab) {
 
 function loadSummaryBanner(months, org, repo, entity) {
     $.get('/data/insights/summary?d=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity, function (data) {
+        setAdaptiveCacheTier(data.events || 0);
         $("#banner-orgs").text(data.orgs.toLocaleString());
         $("#banner-repos").text(data.repos.toLocaleString());
         $("#banner-events").text(data.events.toLocaleString());
@@ -425,7 +453,7 @@ function loadSummaryBanner(months, org, repo, entity) {
 }
 
 function loadTabCharts(tab, months, org, repo, entity) {
-    var q = 'd=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
+    var q = appendCacheTTL('d=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity);
     switch (tab) {
         case 'health':
             $.get('/data/batch/health?' + q, function(b) {
@@ -510,6 +538,7 @@ function loadPortfolioView(days, org, entity) {
     // Summary stats (orgs, repos, events, contributors, last import)
     $.get('/data/insights/summary?d=' + days + '&o=' + org + '&e=' + (entity || ''), function (s) {
         if (!s) return;
+        setAdaptiveCacheTier(s.events || 0);
         $("#ps-orgs").text(s.orgs ? s.orgs.toLocaleString() : '0');
         $("#ps-repos").text(s.repos ? s.repos.toLocaleString() : '0');
         $("#ps-events").text(s.events ? s.events.toLocaleString() : '0');

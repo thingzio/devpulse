@@ -76,9 +76,39 @@ func (c *responseCache) set(key string, val []byte) {
 	})
 }
 
+func (c *responseCache) setWithTTL(key string, val []byte, ttl time.Duration) {
+	c.entries.Store(key, &cacheEntry{
+		data:    val,
+		expires: time.Now().Add(ttl),
+	})
+}
+
+const maxCacheTTL = 30 * time.Minute
+
+// requestCacheTTL returns the cache TTL from the ttl query param (seconds),
+// clamped between serverCacheTTL and maxCacheTTL. Falls back to serverCacheTTL.
+func requestCacheTTL(r *http.Request) time.Duration {
+	v := r.URL.Query().Get("ttl")
+	if v == "" {
+		return serverCacheTTL
+	}
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs <= 0 {
+		return serverCacheTTL
+	}
+	ttl := time.Duration(secs) * time.Second
+	if ttl < serverCacheTTL {
+		return serverCacheTTL
+	}
+	if ttl > maxCacheTTL {
+		return maxCacheTTL
+	}
+	return ttl
+}
+
 // dataCacheKey builds a cache key from tenant ID, path, and query string.
-// Strips jQuery's cache-buster parameter (_=timestamp) so repeat requests
-// from $.ajaxSetup({cache:false}) still hit the server-side cache.
+// Strips jQuery's cache-buster (_=timestamp) and ttl param so repeat requests
+// with different cache hints still hit the same cache entry.
 func dataCacheKey(r *http.Request) string {
 	tid := ""
 	if tn := middleware.TenantFromContext(r.Context()); tn != nil {
@@ -86,6 +116,7 @@ func dataCacheKey(r *http.Request) string {
 	}
 	q := r.URL.Query()
 	q.Del("_")
+	q.Del("ttl")
 	return tid + "|" + r.URL.Path + "?" + q.Encode()
 }
 
