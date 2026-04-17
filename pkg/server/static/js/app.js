@@ -428,55 +428,53 @@ function loadTabCharts(tab, months, org, repo, entity) {
     var q = 'd=' + months + '&o=' + org + '&r=' + repo + '&e=' + entity;
     switch (tab) {
         case 'health':
-            loadHealthActivitySparkline('/data/insights/daily-activity?' + q);
-            loadRepoMeta('/data/insights/repo-meta?o=' + org + '&r=' + repo);
-            loadHealthScorecard('/data/insights/health-scorecard?' + q);
-            $("#stars-trend-panel").show();
-            $("#forks-trend-panel").show();
-            loadStarsTrendChart('/data/insights/repo-metric-history?' + q);
-            loadForksTrendChart('/data/insights/repo-metric-history?' + q);
+            $.get('/data/batch/health?' + q, function(b) {
+                if (b.daily_activity) { renderHealthActivitySparklineData(b.daily_activity); }
+                if (b.repo_meta) { renderRepoMetaData(b.repo_meta, org, repo, months); }
+                if (b.health_scorecard) { renderHealthScorecardData(b.health_scorecard); }
+                if (b.repo_metric_history) {
+                    $("#stars-trend-panel").show();
+                    $("#forks-trend-panel").show();
+                    renderStarsTrendData(b.repo_metric_history);
+                    renderForksTrendData(b.repo_metric_history);
+                }
+            });
             break;
         case 'activity':
-            loadTimeSeriesChart('/data/type?' + q, onTimeSeriesChartSelect);
-            loadPRSizeChart('/data/insights/pr-size?' + q);
-            loadForksAndActivityChart('/data/insights/forks-and-activity?' + q);
-            loadIssueRatioChart('/data/insights/issue-ratio?' + q);
+            $.get('/data/batch/activity?' + q, function(b) {
+                if (b.event_types) { renderTimeSeriesData(b.event_types, onTimeSeriesChartSelect); }
+                if (b.pr_size) { renderPRSizeData(b.pr_size); }
+                if (b.forks_and_activity) { renderForksAndActivityData(b.forks_and_activity); }
+                if (b.issue_ratio) { renderIssueRatioData(b.issue_ratio); }
+            });
             break;
         case 'velocity':
-            loadTimeToFirstResponseChart('/data/insights/time-to-first-response?' + q);
-            loadVelocityChart('/data/insights/time-to-merge?' + q, 'time-to-merge-chart', 'timeToMerge');
-            loadChangeFailureRateChart('/data/insights/change-failure-rate?' + q);
-            loadReleaseCadenceChart('/data/insights/release-cadence?' + q);
-            loadReleaseDownloadsChart('/data/insights/release-downloads?d=' + months + '&o=' + org + '&r=' + repo);
-            loadReleaseDownloadsByTagChart('/data/insights/release-downloads-by-tag?d=' + months + '&o=' + org + '&r=' + repo);
-            loadContainerActivityChart('/data/insights/container-activity?' + q);
+            $.get('/data/batch/velocity?' + q, function(b) {
+                if (b.time_to_first_response) { renderTimeToFirstResponseData(b.time_to_first_response); }
+                if (b.time_to_merge) { renderVelocityData(b.time_to_merge, 'time-to-merge-chart', 'timeToMerge'); }
+                if (b.change_failure_rate) { renderChangeFailureRateData(b.change_failure_rate); }
+                if (b.release_cadence) { renderReleaseCadenceData(b.release_cadence); }
+                if (b.release_downloads) { renderReleaseDownloadsData(b.release_downloads); }
+                if (b.release_downloads_by_tag) { renderReleaseDownloadsByTagData(b.release_downloads_by_tag); }
+                if (b.container_activity) { renderContainerActivityData(b.container_activity); }
+            });
             break;
         case 'quality':
-            loadPRRatioChart('/data/insights/pr-ratio?' + q);
-            loadReviewLatencyChart('/data/insights/review-latency?' + q);
-            loadTimeToCloseChart('/data/insights/time-to-close?' + q, '/data/insights/time-to-restore?' + q);
-            loadContributorCompositionChart('/data/insights/contributor-composition?' + q);
+            $.get('/data/batch/quality?' + q, function(b) {
+                if (b.pr_ratio) { renderPRRatioData(b.pr_ratio); }
+                if (b.review_latency) { renderReviewLatencyData(b.review_latency); }
+                if (b.time_to_close && b.time_to_restore) { renderTimeToCloseData(b.time_to_close, b.time_to_restore); }
+                if (b.contributor_composition) { renderContributorCompositionData(b.contributor_composition); }
+            });
             break;
         case 'community':
-            loadRetentionChart('/data/insights/retention?' + q);
-            loadContributorMomentumChart('/data/insights/contributor-momentum?' + q);
-            loadContributorFunnelChart('/data/insights/contributor-funnel?' + q);
-            (function() {
-                var onLeftExclude = function () {
-                    leftChart.destroy();
-                    var x = leftChartExcludes.join("|");
-                    loadLeftChart('/data/entity?' + q + '&x=' + x, onLeftChartSelect, onLeftExclude);
-                };
-                loadLeftChart('/data/entity?' + q, onLeftChartSelect, onLeftExclude);
-            })();
-            (function() {
-                var onRightExclude = function () {
-                    rightChart.destroy();
-                    var x = rightChartExcludes.join("|");
-                    loadRightChart('/data/developer?' + q + '&x=' + x, onRightChartSelect, onRightExclude);
-                };
-                loadRightChart('/data/developer?' + q, onRightChartSelect, onRightExclude);
-            })();
+            $.get('/data/batch/community?' + q, function(b) {
+                if (b.retention) { renderRetentionData(b.retention); }
+                if (b.contributor_momentum) { renderContributorMomentumData(b.contributor_momentum); }
+                if (b.contributor_funnel) { renderContributorFunnelData(b.contributor_funnel); }
+                if (b.entity_percentages) { renderLeftChartData(b.entity_percentages, q, onLeftChartSelect); }
+                if (b.developer_percentages) { renderRightChartData(b.developer_percentages, q, onRightChartSelect); }
+            });
             initContributorSearch(q);
             break;
         case 'insights':
@@ -918,6 +916,668 @@ function showErrorModal(message) {
     $("#error-modal-body p").html(message);
     $("#error-modal").addClass("open");
 }
+
+// --- Render-only functions for batch endpoints ---
+
+function renderTimeSeriesData(data, fn) {
+    if (timeEventsChart) timeEventsChart.destroy();
+    var rawDates = data.dates;
+    timeEventsChart = new Chart($("#time-series-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.dates),
+            datasets: [{
+                label: 'PR', data: data.pr, backgroundColor: colors[0], borderWidth: 1, order: 2
+            }, {
+                label: 'PR-Review', data: data.pr_review, backgroundColor: colors[1], borderWidth: 1, order: 3
+            }, {
+                label: 'Issue', data: data.issue, backgroundColor: colors[2], borderWidth: 1, order: 4
+            }, {
+                label: 'Issue-Comment', data: data.issue_comment, backgroundColor: colors[3], borderWidth: 1, order: 5
+            }, {
+                label: 'Fork', data: data.fork, backgroundColor: colors[4], borderWidth: 1, order: 6
+            }, {
+                label: 'Total', type: 'line', fill: false, data: data.total, borderColor: colors[5], order: 1, borderWidth: 2, pointRadius: 3, tension: 0.2
+            }, {
+                label: 'Trend', type: 'line', fill: false, data: data.trend, borderColor: colors[3], borderDash: [6, 3], order: 0, borderWidth: 3, pointRadius: 0, tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 14 } } },
+                x: { ticks: { font: { size: 14 } } }
+            },
+            animations: { tension: { duration: 1000, easing: 'linear', from: 1, to: 0, loop: false } },
+            onClick: (evt, item) => {
+                if (item.length) {
+                    const label = rawDates[item[0].index];
+                    const val = timeEventsChart.data.datasets[item[0].datasetIndex].label;
+                    if (fn) { fn(label, val); }
+                }
+                return false;
+            }
+        }
+    });
+}
+
+function renderHealthActivitySparklineData(data) {
+    if (!data || !data.dates || data.dates.length === 0) return;
+    if (healthActivitySparkline) healthActivitySparkline.destroy();
+    healthActivitySparkline = new Chart($("#health-activity-sparkline")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(data.dates),
+            datasets: [{
+                label: 'Events', data: data.counts, borderColor: colors[0],
+                backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { display: false }, y: { display: false } }
+        }
+    });
+}
+
+function renderHealthScorecardData(data) {
+    if (!data || !data.overall) {
+        $('#health-scorecard-panel').hide(); $('#overall-health-card').hide();
+        return;
+    }
+    $('#health-scorecard-panel').show();
+    $('#overall-health-card').show();
+    $('#sc-overall-grade').text(data.overall).attr('class', 'insight-val grade-' + data.overall.toLowerCase());
+    renderScorecardCategory('demand', data.demand);
+    renderScorecardCategory('throughput', data.throughput);
+    renderScorecardCategory('responsiveness', data.responsiveness);
+}
+
+function renderRepoMetaData(data, org, repo, months) {
+    const container = $("#repo-meta-container");
+    container.empty();
+    container.siblings(".community-badges").remove();
+    if (!data || data.length === 0) {
+        container.html('<span class="insight-label">No metadata imported yet</span>');
+        return;
+    }
+    let stars = 0, forks = 0, issues = 0, archived = 0;
+    let langs = {}, licenses = {};
+    $.each(data, function (i, m) {
+        stars += m.stars; forks += m.forks; issues += m.open_issues;
+        if (m.archived) { archived++; }
+        if (m.language) { langs[m.language] = (langs[m.language] || 0) + 1; }
+        if (m.license) { licenses[m.license] = (licenses[m.license] || 0) + 1; }
+    });
+    const topLang = Object.keys(langs).sort((a, b) => langs[b] - langs[a])[0] || '\u2014';
+    const topLicense = Object.keys(licenses).sort((a, b) => licenses[b] - licenses[a])[0] || '\u2014';
+    const items = [
+        { label: 'Stars', val: stars.toLocaleString() },
+        { label: 'Forks', val: forks.toLocaleString() },
+        { label: 'Issues', val: issues.toLocaleString() },
+        { label: 'Language', val: topLang },
+        { label: 'License', val: topLicense },
+        { label: 'Repos', val: data.length + (archived > 0 ? ` (${archived} archived)` : '') }
+    ];
+    var communityFiles = [
+        { key: 'has_readme', label: 'README' },
+        { key: 'has_contributing', label: 'Contributing' },
+        { key: 'has_coc', label: 'Code of Conduct' },
+        { key: 'has_issue_template', label: 'Issue Template' },
+        { key: 'has_pr_template', label: 'PR Template' }
+    ];
+    var hasProfile = data.some(function(m) { return m.community_health_pct > 0; });
+    if (hasProfile) {
+        var avgHealth = Math.round(data.reduce(function(s, m) { return s + m.community_health_pct; }, 0) / data.length);
+        items.push({ label: 'Health', val: avgHealth + '%' });
+    }
+    $.each(items, function (i, item) {
+        $('<div class="insight-card">')
+            .append(`<span class="insight-label">${item.label}</span>`)
+            .append(`<span class="insight-val">${item.val}</span>`)
+            .appendTo(container);
+    });
+    if (hasProfile) {
+        var badgeHtml = '<div class="community-badges">';
+        $.each(communityFiles, function (j, f) {
+            var count = data.filter(function(m) { return m[f.key]; }).length;
+            var icon = count === data.length ? '&#10003;' : (count > 0 ? '~' : '&#10007;');
+            var cls = count === data.length ? 'badge-ok' : (count > 0 ? 'badge-partial' : 'badge-missing');
+            badgeHtml += '<span class="community-badge ' + cls + '">' + icon + ' ' + f.label + '</span>';
+        });
+        badgeHtml += '</div>';
+        container.after(badgeHtml);
+    }
+    // Sparkline for stars/forks trend (uses repo-metric-history already in batch).
+    // When called from batch, the sparkline is rendered from repo_metric_history
+    // data in the caller, so we skip the nested $.get here.
+}
+
+function renderStarsTrendData(data) {
+    if (!data || data.length === 0) {
+        $("#stars-trend-desc").text("No star history available. Data appears after the next import.");
+        return;
+    }
+    var labels = [], stars = [];
+    $.each(data, function (i, d) { labels.push(d.date); stars.push(d.stars); });
+    $("#stars-trend-desc").text("Daily star count from " + formatLabel(labels[0]) + " to " + formatLabel(labels[labels.length - 1]) + ".");
+    if (starsTrendChart) starsTrendChart.destroy();
+    starsTrendChart = new Chart($("#stars-trend-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(labels),
+            datasets: [{ label: 'Stars', data: stars, borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 2 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+function renderForksTrendData(data) {
+    if (!data || data.length === 0) {
+        $("#forks-trend-desc").text("No fork history available. Data appears after the next import.");
+        return;
+    }
+    var labels = [], forks = [];
+    $.each(data, function (i, d) { labels.push(d.date); forks.push(d.forks); });
+    $("#forks-trend-desc").text("Daily fork count from " + formatLabel(labels[0]) + " to " + formatLabel(labels[labels.length - 1]) + ".");
+    if (forksTrendChart) forksTrendChart.destroy();
+    forksTrendChart = new Chart($("#forks-trend-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(labels),
+            datasets: [{ label: 'Forks', data: forks, borderColor: colors[1], backgroundColor: colors[1] + '33', fill: true, tension: 0.3, pointRadius: 2 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false, ticks: { precision: 0 } } }
+        }
+    });
+}
+
+function renderRetentionData(data) {
+    if (retentionChart) retentionChart.destroy();
+    retentionChart = new Chart($("#retention-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'New', data: data.new, backgroundColor: colors[1], borderWidth: 1
+            }, {
+                label: 'Returning', data: data.returning, backgroundColor: colors[0], borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { stacked: true, ticks: { font: { size: 14 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderPRRatioData(data) {
+    if (prRatioChart) prRatioChart.destroy();
+    prRatioChart = new Chart($("#pr-ratio-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'PRs', data: data.prs, backgroundColor: colors[0], borderWidth: 1, yAxisID: 'y', order: 2
+            }, {
+                label: 'Reviews', data: data.reviews, backgroundColor: colors[1], borderWidth: 1, yAxisID: 'y', order: 3
+            }, {
+                label: 'Ratio', type: 'line', data: data.ratio, borderColor: colors[3], borderWidth: 3, fill: false, yAxisID: 'y1', order: 1, tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, position: 'left', ticks: { precision: 0, font: { size: 14 } } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderTimeToCloseData(close, restore) {
+    if (timeToCloseChart) timeToCloseChart.destroy();
+    timeToCloseChart = new Chart($("#time-to-close-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(close.labels),
+            datasets: [{
+                label: 'All Issues', data: close.avg_days, backgroundColor: colors[2], borderWidth: 1, order: 2
+            }, {
+                label: 'Bug (near release)', data: restore.avg_days, backgroundColor: colors[3], borderWidth: 1, order: 1
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { font: { size: 14 } }, title: { display: true, text: 'Avg Days' } }
+            }
+        }
+    });
+}
+
+function renderVelocityData(data, canvasId, key) {
+    if (timeToMergeChart) timeToMergeChart.destroy();
+    const chart = new Chart($(`#${canvasId}`)[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Avg Days', data: data.avg_days, backgroundColor: colors[2], borderWidth: 1, yAxisID: 'y', order: 2
+            }, {
+                label: 'Count', type: 'line', data: data.count, borderColor: colors[5], borderWidth: 3, fill: false, yAxisID: 'y1', order: 1, tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, position: 'left', ticks: { font: { size: 14 } }, title: { display: true, text: 'Avg Days' } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Count' } }
+            }
+        }
+    });
+    if (key === 'timeToMerge') { timeToMergeChart = chart; }
+    if (key === 'timeToClose') { timeToCloseChart = chart; }
+}
+
+function renderForksAndActivityData(data) {
+    if (forksAndActivityChart) forksAndActivityChart.destroy();
+    forksAndActivityChart = new Chart($("#forks-activity-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Forks', data: data.forks, borderColor: colors[0], backgroundColor: colors[0] + '20', borderWidth: 3, fill: true, yAxisID: 'y', tension: 0.3
+            }, {
+                label: 'Events', data: data.events, borderColor: colors[3], borderWidth: 3, fill: false, yAxisID: 'y1', tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, position: 'left', ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Forks' } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Events' } }
+            }
+        }
+    });
+}
+
+function renderIssueRatioData(data) {
+    if (issueRatioChart) issueRatioChart.destroy();
+    issueRatioChart = new Chart($("#issue-ratio-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Opened', data: data.opened, backgroundColor: colors[3], borderWidth: 1, order: 2
+            }, {
+                label: 'Closed', data: data.closed, backgroundColor: colors[2], borderWidth: 1, order: 1
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { stacked: true, ticks: { font: { size: 14 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { font: { size: 14 } }, title: { display: true, text: 'Issues' } }
+            }
+        }
+    });
+}
+
+function renderTimeToFirstResponseData(data) {
+    if (timeToFirstResponseChart) timeToFirstResponseChart.destroy();
+    timeToFirstResponseChart = new Chart($("#time-to-first-response-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Issues (avg hrs)', data: data.issue_avg, backgroundColor: colors[3], borderWidth: 1, order: 2
+            }, {
+                label: 'PRs (avg hrs)', data: data.pr_avg, backgroundColor: colors[2], borderWidth: 1, order: 1
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { font: { size: 14 } }, title: { display: true, text: 'Avg Hours' } }
+            }
+        }
+    });
+}
+
+function renderChangeFailureRateData(data) {
+    if (changeFailureRateChart) changeFailureRateChart.destroy();
+    changeFailureRateChart = new Chart($("#change-failure-rate-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Failure Rate %', data: data.rate, borderColor: colors[3], backgroundColor: colors[3] + '33', fill: true, tension: 0.3, pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { font: { size: 14 }, callback: function(v) { return v + '%'; } }, title: { display: true, text: 'Failure Rate' } }
+            }
+        }
+    });
+}
+
+function renderReleaseCadenceData(data) {
+    if (!data.labels || data.labels.length === 0) {
+        $("#release-cadence-chart").closest(".tbl").find(".insight-desc").text("No GitHub releases published for this scope.");
+        return;
+    }
+    if (releaseCadenceChart) releaseCadenceChart.destroy();
+    releaseCadenceChart = new Chart($("#release-cadence-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Total', data: data.total, backgroundColor: colors[4], borderWidth: 1
+            }, {
+                label: 'Stable', data: data.stable, backgroundColor: colors[1], borderWidth: 1
+            }, {
+                label: 'Deployments', type: 'line', data: data.deployments, borderColor: colors[3], borderWidth: 3, borderDash: [5, 5], fill: false, tension: 0.3, order: 0
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderReleaseDownloadsData(data) {
+    if (!data.labels || data.labels.length === 0) {
+        $("#release-downloads-chart").closest(".tbl").find(".insight-desc").text("No download data. Requires binary assets attached to GitHub releases.");
+        return;
+    }
+    if (releaseDownloadsChart) releaseDownloadsChart.destroy();
+    releaseDownloadsChart = new Chart($("#release-downloads-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{ label: 'Downloads', data: data.downloads, borderColor: colors[0], backgroundColor: colors[0] + '20', borderWidth: 3, fill: true, tension: 0.3 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Downloads' } }
+            }
+        }
+    });
+}
+
+function renderReleaseDownloadsByTagData(data) {
+    if (!data.tags || data.tags.length === 0) {
+        $("#release-downloads-by-tag-chart").closest(".tbl").find(".insight-desc").text("No release download data for this scope.");
+        return;
+    }
+    if (releaseDownloadsByTagChart) releaseDownloadsByTagChart.destroy();
+    releaseDownloadsByTagChart = new Chart($("#release-downloads-by-tag-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: data.tags,
+            datasets: [{ label: 'Downloads', data: data.downloads, backgroundColor: colors[0] + '80', borderColor: colors[0], borderWidth: 1 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Downloads' } },
+                y: { ticks: { font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderContainerActivityData(data) {
+    if (!data.labels || data.labels.length === 0) {
+        $("#container-activity-chart").closest(".tbl").find(".insight-desc").text("No container images published via GitHub Packages (ghcr.io) for this scope.");
+        return;
+    }
+    if (containerActivityChart) containerActivityChart.destroy();
+    containerActivityChart = new Chart($("#container-activity-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{ label: 'Versions Published', data: data.versions, backgroundColor: colors[4] + '80', borderColor: colors[4], borderWidth: 1 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Versions' } } }
+        }
+    });
+}
+
+function renderReviewLatencyData(data) {
+    if (reviewLatencyChart) reviewLatencyChart.destroy();
+    reviewLatencyChart = new Chart($("#review-latency-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Avg Hours', data: data.avg_hours, backgroundColor: colors[2], borderWidth: 1, yAxisID: 'y', order: 2
+            }, {
+                label: 'Count', type: 'line', data: data.count, borderColor: colors[5], borderWidth: 3, fill: false, yAxisID: 'y1', order: 1, tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, position: 'left', ticks: { font: { size: 14 } }, title: { display: true, text: 'Avg Hours' } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Count' } }
+            }
+        }
+    });
+}
+
+function renderPRSizeData(data) {
+    if (!data.labels || data.labels.length === 0) return;
+    if (prSizeChart) prSizeChart.destroy();
+    prSizeChart = new Chart($("#pr-size-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [
+                { label: 'S (<50)', data: data.small, backgroundColor: colors[1] },
+                { label: 'M (50-250)', data: data.medium, backgroundColor: colors[0] },
+                { label: 'L (250-1K)', data: data.large, backgroundColor: colors[2] },
+                { label: 'XL (>1K)', data: data.xlarge, backgroundColor: colors[3] }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { stacked: true, ticks: { font: { size: 14 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderContributorCompositionData(data) {
+    if (data.total > 0) {
+        $("#composition-counts").text(data.total + ' contributors');
+    } else {
+        $("#composition-counts").text('');
+    }
+    if (compositionChart) compositionChart.destroy();
+    if (!data.total) return;
+    compositionChart = new Chart($("#composition-chart")[0].getContext("2d"), {
+        type: 'doughnut',
+        data: {
+            labels: ['Reviewers', 'Authors', 'Commenters', 'Observers'],
+            datasets: [{ data: [data.reviewers, data.authors, data.commenters, data.observers], backgroundColor: ['#2da44e', '#0969da', '#bf8700', '#656d76'], borderWidth: 0 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12 } },
+                tooltip: { callbacks: { label: function (ctx) { var pct = data.total > 0 ? Math.round((ctx.raw / data.total) * 100) : 0; return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)'; } } }
+            }
+        },
+        plugins: [{
+            id: 'centerText',
+            afterDraw: function (chart) {
+                var ctx = chart.ctx;
+                var cx = (chart.chartArea.left + chart.chartArea.right) / 2;
+                var cy = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+                ctx.save();
+                ctx.font = 'bold 1.5rem sans-serif';
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#333';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(data.total, cx, cy);
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+function renderContributorMomentumData(data) {
+    if (contributorMomentumChart) contributorMomentumChart.destroy();
+    contributorMomentumChart = new Chart($("#contributor-momentum-chart")[0].getContext("2d"), {
+        type: 'line',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{
+                label: 'Active (rolling)', data: data.active, borderColor: colors[0], backgroundColor: colors[0] + '33', fill: true, tension: 0.3, pointRadius: 3
+            }, {
+                label: 'Delta', type: 'bar', data: data.delta, backgroundColor: data.delta.map(d => d >= 0 ? colors[1] + '88' : colors[3] + '88'), borderWidth: 0, yAxisID: 'y1', order: 2
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, position: 'left', ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Active Contributors' } },
+                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0, font: { size: 14 } }, title: { display: true, text: 'Delta' } }
+            }
+        }
+    });
+}
+
+function renderContributorFunnelData(data) {
+    if (contributorFunnelChart) contributorFunnelChart.destroy();
+    contributorFunnelChart = new Chart($("#contributor-funnel-chart")[0].getContext("2d"), {
+        type: 'bar',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [
+                { label: 'First Comment', data: data.first_comment, backgroundColor: colors[0] },
+                { label: 'First PR', data: data.first_pr, backgroundColor: colors[1] },
+                { label: 'First Merge', data: data.first_merge, backgroundColor: colors[4] }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { ticks: { font: { size: 14 } } },
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 14 } } }
+            }
+        }
+    });
+}
+
+function renderLeftChartData(data, q, fn) {
+    var onLeftExclude = function () {
+        leftChart.destroy();
+        var x = leftChartExcludes.join("|");
+        loadLeftChart('/data/entity?' + q + '&x=' + x, fn, onLeftExclude);
+    };
+    var onLickHandler = function(e, legendItem) {
+        leftChartExcludes.push(legendItem.text);
+        onLeftExclude();
+    };
+    if (leftChart) leftChart.destroy();
+    leftChart = new Chart($("#left-chart")[0].getContext("2d"), {
+        type: 'polarArea',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{ label: 'Entities', data: data.data, backgroundColor: colors, hoverOffset: 4 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', onClick: onLickHandler } },
+            animations: { tension: { duration: 1000, easing: 'linear', from: 1, to: 0, loop: false } },
+            onClick: (evt, item) => {
+                if (item.length) { const label = leftChart.data.labels[item[0].index]; if (fn) { fn(label); } return false; }
+                return false;
+            }
+        }
+    });
+}
+
+function renderRightChartData(data, q, fn) {
+    var onRightExclude = function () {
+        rightChart.destroy();
+        var x = rightChartExcludes.join("|");
+        loadRightChart('/data/developer?' + q + '&x=' + x, fn, onRightExclude);
+    };
+    var onRightHandler = function(e, legendItem) {
+        rightChartExcludes.push(legendItem.text);
+        onRightExclude();
+    };
+    if (rightChart) rightChart.destroy();
+    rightChart = new Chart($("#right-chart")[0].getContext("2d"), {
+        type: 'pie',
+        data: {
+            labels: formatLabels(data.labels),
+            datasets: [{ label: 'Repositories', data: data.data, backgroundColor: colors, hoverOffset: 4 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'right', onClick: onRightHandler } },
+            animations: { tension: { duration: 1000, easing: 'linear', from: 1, to: 0, loop: false } },
+            onHover: (evt, item) => { evt.native.target.style.cursor = item.length ? 'pointer' : 'default'; },
+            onClick: (evt, item) => {
+                if (item.length) { const label = rightChart.data.labels[item[0].index]; if (fn) { fn(label); } }
+            }
+        }
+    });
+}
+
+// --- Original load functions (kept for PDF export and individual use) ---
 
 function loadTimeSeriesChart(url, fn) {
     $.get(url, function (data) {
