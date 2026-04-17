@@ -1,0 +1,515 @@
+package server
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+
+	"github.com/thingzio/devpulse/pkg/config"
+	"github.com/thingzio/devpulse/pkg/middleware"
+	"github.com/thingzio/devpulse/pkg/net"
+	"github.com/thingzio/devpulse/pkg/plan"
+	"github.com/thingzio/devpulse/pkg/tenant"
+)
+
+// Template data structs for admin pages.
+
+type adminDashboardData struct {
+	Title     string
+	Summary   summaryResponse
+	CSRFToken string
+}
+
+type adminTenantsData struct {
+	Title   string
+	Tenants []tenantSummary
+}
+
+type adminTenantDetailData struct {
+	Title     string
+	Detail    tenantDetail
+	Plans     map[string]plan.Limits
+	CSRFToken string
+}
+
+type adminTokensData struct {
+	Title  string
+	Tokens []tokenStatus
+}
+
+type adminMetricsData struct {
+	Title    string
+	Days     int
+	Metrics  string
+	Analysis string
+}
+
+// GET /admin — dashboard with platform summary.
+func adminDashboardHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		summary, err := collectSummary(r.Context(), db)
+		if err != nil {
+			slog.Error("collecting admin summary", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		renderTemplate(w, "admin.html", adminDashboardData{
+			Title:     "Admin",
+			Summary:   summary,
+			CSRFToken: middleware.GenerateCSRFToken(),
+		})
+	}
+}
+
+// GET /admin/tenants — list all tenants.
+func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenants, err := tenant.ListTenantSummaries(r.Context(), db)
+		if err != nil {
+			slog.Error("listing tenants", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		out := make([]tenantSummary, len(tenants))
+		for i, t := range tenants {
+			out[i] = tenantSummary{
+				Username:         t.Username,
+				Email:            t.Email,
+				Name:             t.Name,
+				Plan:             t.Plan,
+				MaxRepos:         t.MaxRepos,
+				MaxEventsPerWeek: t.MaxEventsPerWeek,
+				CreatedAt:        t.CreatedAt.Format("2006-01-02"),
+			}
+			if t.LastSignIn != nil {
+				out[i].LastSignIn = t.LastSignIn.Format("2006-01-02")
+			}
+		}
+
+		renderTemplate(w, "admin_tenants.html", adminTenantsData{
+			Title:   "Tenants",
+			Tenants: out,
+		})
+	}
+}
+
+// GET /admin/tenant/{username} — tenant detail with repos.
+func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := r.PathValue("username")
+		if username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		qctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		td, err := tenant.GetTenantDetailByUsername(qctx, db, username)
+		if err != nil {
+			slog.Debug("tenant not found", "username", username, "error", err)
+			http.Error(w, "tenant not found", http.StatusNotFound)
+			return
+		}
+
+		out := tenantDetail{
+			Username:         td.Username,
+			Email:            td.Email,
+			Name:             td.Name,
+			Company:          td.Company,
+			Location:         td.Location,
+			Bio:              td.Bio,
+			Plan:             td.Plan,
+			MaxRepos:         td.MaxRepos,
+			MaxEventsPerWeek: td.MaxEventsPerWeek,
+			CreatedAt:        td.CreatedAt.Format("2006-01-02"),
+		}
+		if td.LastSignIn != nil {
+			out.LastSignIn = td.LastSignIn.Format("2006-01-02")
+		}
+
+		since := time.Now().UTC().AddDate(0, 0, -180).Format("2006-01-02")
+		weekStart := tenant.StartOfWeek().Format("2006-01-02")
+		backfillSince := time.Now().UTC().AddDate(0, 0, -config.BackfillMaxDays()).Format("2006-01-02")
+
+		repos, err := tenant.GetTenantRepoDetails(qctx, db, td.ID, since, weekStart, backfillSince)
+		if err != nil {
+			slog.Error("querying tenant repos", "error", err)
+			http.Error(w, "error querying repos", http.StatusInternalServerError)
+			return
+		}
+
+		for _, rd := range repos {
+			d := repoDetail{
+				Name:           rd.Org + "/" + rd.Repo,
+				Events:         rd.Events,
+				WeeklyEvents:   rd.WeeklyEvents,
+				LastImport:     rd.LastImport,
+				PRTotal:        rd.PRTotal,
+				PRMissingSize:  rd.PRMissingSize,
+				Contributors:   rd.Contributors,
+				Scored:         rd.Scored,
+				BackfillDays:   rd.BackfillDays,
+				BackfillTarget: rd.BackfillTarget,
+			}
+			if out.MaxEventsPerWeek > 0 {
+				d.WeeklyPct = float64(rd.WeeklyEvents) / float64(out.MaxEventsPerWeek) * 100
+			}
+			out.Repos = append(out.Repos, d)
+		}
+
+		renderTemplate(w, "admin_tenant.html", adminTenantDetailData{
+			Title:     "Tenant: " + username,
+			Detail:    out,
+			Plans:     plan.All,
+			CSRFToken: middleware.GenerateCSRFToken(),
+		})
+	}
+}
+
+// GET /admin/tokens — GitHub App installation token status.
+func adminTokensHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ghAppConfig, err := tenant.LoadGitHubAppConfig()
+		if err != nil {
+			slog.Error("loading github app config", "error", err)
+			http.Error(w, "github app config not available", http.StatusInternalServerError)
+			return
+		}
+
+		tenants, err := tenant.GetActiveTenants(r.Context(), db)
+		if err != nil {
+			slog.Error("getting tenants for token status", "error", err)
+			http.Error(w, "error listing tenants", http.StatusInternalServerError)
+			return
+		}
+
+		seen := make(map[int64]bool)
+		var results []tokenStatus
+
+		for _, tn := range tenants {
+			installs, instErr := tenant.GetActiveInstallations(r.Context(), db, tn.ID, ghAppConfig.AppID)
+			if instErr != nil || len(installs) == 0 {
+				continue
+			}
+			for _, inst := range installs {
+				if seen[inst.ID] {
+					continue
+				}
+				seen[inst.ID] = true
+
+				tok, mintErr := tenant.MintInstallationToken(r.Context(), ghAppConfig, inst.ID)
+				if mintErr != nil {
+					results = append(results, tokenStatus{
+						Login:          inst.Login,
+						InstallationID: inst.ID,
+						Error:          mintErr.Error(),
+					})
+					continue
+				}
+
+				ts := checkGitHubRateLimit(r.Context(), tok.Token)
+				ts.Login = inst.Login
+				ts.InstallationID = inst.ID
+				results = append(results, ts)
+			}
+		}
+
+		renderTemplate(w, "admin_tokens.html", adminTokensData{
+			Title:  "Token Status",
+			Tokens: results,
+		})
+	}
+}
+
+// checkGitHubRateLimit calls the GitHub rate_limit API and returns a tokenStatus.
+func checkGitHubRateLimit(ctx context.Context, token string) tokenStatus {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		slog.Error("creating rate limit request", "error", err)
+		return tokenStatus{Error: "request error"}
+	}
+	net.SetGitHubHeaders(req, token)
+
+	resp, err := net.GitHubClient.Do(req)
+	if err != nil {
+		slog.Error("calling rate limit API", "error", err)
+		return tokenStatus{Error: "rate limit check failed"}
+	}
+	defer resp.Body.Close()
+
+	var rl struct {
+		Resources struct {
+			Core struct {
+				Limit     int   `json:"limit"`
+				Remaining int   `json:"remaining"`
+				Reset     int64 `json:"reset"`
+			} `json:"core"`
+		} `json:"resources"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rl); err != nil {
+		slog.Error("decoding rate limit response", "error", err)
+		return tokenStatus{Error: "response decode error"}
+	}
+
+	core := rl.Resources.Core
+	used := core.Limit - core.Remaining
+	resetAt := time.Unix(core.Reset, 0).UTC().Format(time.RFC3339)
+
+	return tokenStatus{
+		Limit:     core.Limit,
+		Used:      used,
+		Remaining: core.Remaining,
+		ResetAt:   resetAt,
+	}
+}
+
+// GET /admin/metrics — GCP metrics review with AI analysis.
+func adminMetricsHandler(mcfg *metricsConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if mcfg.anthropicKey == "" {
+			http.Error(w, "anthropic API key not configured", http.StatusServiceUnavailable)
+			return
+		}
+
+		days := defaultDays
+		if d := r.URL.Query().Get("days"); d != "" {
+			if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= maxDays {
+				days = v
+			}
+		}
+
+		token, err := gcpAccessToken(r.Context())
+		if err != nil {
+			slog.Error("failed to get GCP credentials", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		metrics := collectAllMetrics(r.Context(), mcfg, token, days)
+
+		analysis, err := analyzeMetrics(r.Context(), mcfg, metrics, formatText)
+		if err != nil {
+			slog.Error("failed to analyze metrics", "error", err)
+			// Render with metrics but empty analysis on failure.
+			renderTemplate(w, "admin_metrics.html", adminMetricsData{
+				Title:   "Metrics Review",
+				Days:    days,
+				Metrics: metrics,
+			})
+			return
+		}
+
+		renderTemplate(w, "admin_metrics.html", adminMetricsData{
+			Title:    "Metrics Review",
+			Days:     days,
+			Metrics:  metrics,
+			Analysis: analysis,
+		})
+	}
+}
+
+// POST /admin/tenant/{username}/plan — update tenant plan.
+func adminUpdatePlanHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+		username := r.PathValue("username")
+		if username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		csrfToken := r.FormValue("csrf_token")
+		if csrfToken == "" {
+			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+			return
+		}
+
+		planName := r.FormValue("plan")
+		limits, ok := plan.Get(planName)
+		if !ok {
+			http.Error(w, fmt.Sprintf("invalid plan: %s", planName), http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		tenantID, err := tenant.GetTenantIDByUsername(ctx, db, username)
+		if err != nil {
+			slog.Debug("tenant not found for upgrade", "username", username, "error", err)
+			http.Error(w, "tenant not found", http.StatusNotFound)
+			return
+		}
+
+		if err := tenant.UpdatePlan(ctx, db, tenantID, planName, limits.MaxRepos, limits.MaxEventsPerWeek); err != nil {
+			slog.Error("updating plan", "error", err)
+			http.Error(w, "error updating plan", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tenant.ClearUpgradeRequest(ctx, db, tenantID); err != nil {
+			slog.Warn("clearing upgrade request", "error", err)
+		}
+
+		middleware.AdminAuditLog(ctx, "update_plan",
+			r.URL.Path, r.RemoteAddr,
+			fmt.Sprintf("username=%s plan=%s", username, planName))
+
+		http.Redirect(w, r, "/admin/tenant/"+url.PathEscape(username), http.StatusSeeOther)
+	}
+}
+
+// POST /admin/invite — invite a new tenant.
+func adminInviteHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		csrfToken := r.FormValue("csrf_token")
+		if csrfToken == "" {
+			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+			return
+		}
+
+		username := r.FormValue("username")
+		if username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		planName := r.FormValue("plan")
+		limits, ok := plan.Get(planName)
+		if !ok {
+			http.Error(w, fmt.Sprintf("invalid plan: %s", planName), http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		ghID, err := resolveGitHubUserID(ctx, username)
+		if err != nil {
+			slog.Error("resolving GitHub user", "username", username, "error", err)
+			http.Error(w, "GitHub user not found", http.StatusNotFound)
+			return
+		}
+
+		tenantID, err := tenant.InsertMinimalTenant(ctx, db, ghID, username)
+		if err != nil {
+			slog.Error("inserting tenant", "error", err)
+			http.Error(w, "error creating tenant", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tenant.UpdatePlan(ctx, db, tenantID, planName, limits.MaxRepos, limits.MaxEventsPerWeek); err != nil {
+			slog.Error("setting plan", "error", err)
+			http.Error(w, "error setting plan", http.StatusInternalServerError)
+			return
+		}
+
+		middleware.AdminAuditLog(ctx, "invite_tenant",
+			r.URL.Path, r.RemoteAddr,
+			fmt.Sprintf("username=%s github_id=%d plan=%s", username, ghID, planName))
+
+		http.Redirect(w, r, "/admin/tenants", http.StatusSeeOther)
+	}
+}
+
+// POST /admin/tenant/{username}/reset-errors — reset import errors for a repo.
+func adminResetErrorsHandler(db *sql.DB) http.HandlerFunc {
+	return adminRepoActionHandler(db, "reset_errors", tenant.ResetImportErrorsByRepo)
+}
+
+// POST /admin/tenant/{username}/hard-reset — hard reset a repo.
+func adminHardResetHandler(db *sql.DB) http.HandlerFunc {
+	return adminRepoActionHandler(db, "hard_reset", tenant.HardResetRepo)
+}
+
+// adminRepoActionHandler is a shared handler for repo-level admin actions (reset errors, hard reset).
+func adminRepoActionHandler(db *sql.DB, action string, fn func(ctx context.Context, db *sql.DB, org, repo string) (int64, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+		username := r.PathValue("username")
+		if username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		csrfToken := r.FormValue("csrf_token")
+		if csrfToken == "" {
+			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+			return
+		}
+
+		org := r.FormValue("org")
+		repo := r.FormValue("repo")
+		if org == "" || repo == "" {
+			http.Error(w, "org and repo required", http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		count, err := fn(ctx, db, org, repo)
+		if err != nil {
+			slog.Error("admin repo action", "action", action, "org", org, "repo", repo, "error", err)
+			http.Error(w, fmt.Sprintf("error: %s", action), http.StatusInternalServerError)
+			return
+		}
+
+		middleware.AdminAuditLog(ctx, action,
+			r.URL.Path, r.RemoteAddr,
+			fmt.Sprintf("org=%s repo=%s rows=%d", org, repo, count))
+
+		http.Redirect(w, r, "/admin/tenant/"+url.PathEscape(username), http.StatusSeeOther)
+	}
+}
+
+// resolveGitHubUserID resolves a GitHub username to their numeric user ID.
+func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("https://api.github.com/users/%s", url.PathEscape(username)), nil)
+	if err != nil {
+		return 0, fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Accept", net.GitHubAccept)
+
+	resp, err := net.GitHubClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("calling GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+	}
+
+	var ghUser struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ghUser); err != nil {
+		return 0, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return ghUser.ID, nil
+}
