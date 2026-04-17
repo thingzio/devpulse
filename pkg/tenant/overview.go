@@ -54,7 +54,15 @@ const tenantRepoOverviewSQL = `
 		COUNT(e.type),
 		COUNT(CASE WHEN e.date >= $3 THEN 1 END),
 		COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
-		COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` AND d.reputation IS NOT NULL THEN e.username END),
+		(SELECT COUNT(DISTINCT e2.username)
+		 FROM devpulse_event e2
+		 JOIN devpulse_developer d ON e2.username = d.username
+		 WHERE e2.org = tr.org AND e2.repo = tr.repo
+		   AND e2.date >= $2
+		   AND d.reputation IS NOT NULL
+		   AND e2.type != 'fork'
+		   AND e2.username NOT LIKE '%[bot]'
+		   AND LOWER(e2.username) NOT IN (` + data.BotNames + `)),
 		COALESCE(rm.language, ''),
 		COALESCE(rm.license, ''),
 		COALESCE(rm.last_import_at, ''),
@@ -63,7 +71,6 @@ const tenantRepoOverviewSQL = `
 	FROM devpulse_tenant_repo tr
 	LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 	LEFT JOIN devpulse_event e ON tr.org = e.org AND tr.repo = e.repo AND e.date >= $2
-	LEFT JOIN devpulse_developer d ON e.username = d.username
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE
 	GROUP BY tr.org, tr.repo, rm.stars, rm.forks, rm.open_issues,
 		rm.language, rm.license, rm.last_import_at,
