@@ -87,7 +87,7 @@ func ValidateCSRF(expected, actual string) bool {
 }
 
 // AdminAuditLog logs an admin action with structured fields.
-func AdminAuditLog(action string, ctx context.Context, path, remoteAddr, detail string) {
+func AdminAuditLog(ctx context.Context, action, path, remoteAddr, detail string) {
 	username := ""
 	if tn := TenantFromContext(ctx); tn != nil {
 		username = tn.Username

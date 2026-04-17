@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
 func TestIsAdmin(t *testing.T) {
@@ -65,4 +67,14 @@ func TestValidateCSRF(t *testing.T) {
 	assert.False(t, ValidateCSRF("", token))
 	assert.False(t, ValidateCSRF(token, ""))
 	assert.False(t, ValidateCSRF("", ""))
+}
+
+func TestAdminAuditLog(t *testing.T) {
+	// With tenant in context — should not panic.
+	tn := &tenant.Tenant{Username: "alice"}
+	ctx := WithTenantContext(context.Background(), tn)
+	AdminAuditLog(ctx, "test_action", "/admin", "127.0.0.1", "detail")
+
+	// Without tenant in context — should not panic.
+	AdminAuditLog(context.Background(), "test_action", "/admin", "127.0.0.1", "no tenant")
 }
