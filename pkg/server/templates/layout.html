@@ -17,9 +17,11 @@
 <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
+{{block "nav" .}}
 <nav class="top-nav">
     <a href="/dashboard" class="top-nav-brand">DevPulse</a>
 </nav>
+{{end}}
 {{template "content" .}}
 <div style="max-width:1100px;margin:0 auto;padding:0 16px">
   <footer class="page-footer">

@@ -206,9 +206,8 @@ func init() {
 		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
 			"templates/layout.html", "templates/"+p))
 	}
-	// Dashboard uses the old header/home/footer pattern
 	pageTemplates["home.html"] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
-		"templates/header.html", "templates/home.html", "templates/footer.html"))
+		"templates/layout.html", "templates/home.html"))
 }
 
 const (
@@ -523,6 +522,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 		limits, _ := plan.Get(tn.Plan)
 
 		renderTemplate(w, "home.html", map[string]any{
+			"Title":         "Dashboard",
 			"base_path":     "",
 			"version":       opts.Version,
 			"commit":        opts.Commit,
