@@ -22,3 +22,4 @@ Documented in `docs/PLANS.md`. Recommended implementation order:
 
 - [ ] **Concurrent job execution guard** — Cloud Scheduler may launch a new execution while a manually-triggered one is still running. Consider adding a check in `runImport` (e.g., advisory lock or execution-count check) to skip if another execution is active.
 - [ ] **Stripe billing integration** — `feat/stripe-integration` branch exists, needs rebase. Docs in `docs/STRIPE.md`.
+- [ ] **Token quota time-series** — Sample GitHub API token utilization (used/limit per installation) a few times per hour during import, write as GCP custom metric. Would surface quota exhaustion mid-import that point-in-time checks on `/admin/tokens` miss (quota resets on a 60-min sliding window).
