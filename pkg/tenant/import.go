@@ -21,6 +21,10 @@ const resetImportErrorsByRepoSQL = `
 	SET import_errors = 0, import_last_error = NULL
 	WHERE org = $1 AND repo = $2 AND import_errors > 0`
 
+const deleteStateByRepoSQL = `DELETE FROM devpulse_state WHERE org = $1 AND repo = $2`
+
+const deleteRepoMetaByRepoSQL = `DELETE FROM devpulse_repo_meta WHERE org = $1 AND repo = $2`
+
 // IncrementImportErrors increments the consecutive error counter and stores the last error.
 func IncrementImportErrors(ctx context.Context, db *sql.DB, id, errMsg string) error {
 	if _, err := db.ExecContext(ctx, incrementImportErrorsSQL, id, errMsg); err != nil {
@@ -53,20 +57,18 @@ func HardResetRepo(ctx context.Context, db *sql.DB, org, repo string) (int64, er
 	if err != nil {
 		return 0, fmt.Errorf("starting transaction: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
 
 	res, err := tx.ExecContext(ctx, resetImportErrorsByRepoSQL, org, repo)
 	if err != nil {
-		_ = tx.Rollback()
 		return 0, fmt.Errorf("resetting import errors for %s/%s: %w", org, repo, err)
 	}
 
-	if _, err := tx.ExecContext(ctx, "DELETE FROM devpulse_state WHERE org = $1 AND repo = $2", org, repo); err != nil {
-		_ = tx.Rollback()
+	if _, err := tx.ExecContext(ctx, deleteStateByRepoSQL, org, repo); err != nil {
 		return 0, fmt.Errorf("clearing state for %s/%s: %w", org, repo, err)
 	}
 
-	if _, err := tx.ExecContext(ctx, "DELETE FROM devpulse_repo_meta WHERE org = $1 AND repo = $2", org, repo); err != nil {
-		_ = tx.Rollback()
+	if _, err := tx.ExecContext(ctx, deleteRepoMetaByRepoSQL, org, repo); err != nil {
 		return 0, fmt.Errorf("clearing repo meta for %s/%s: %w", org, repo, err)
 	}
 
@@ -93,7 +95,8 @@ const getActiveTenantsSQL = `
 	SELECT DISTINCT t.id, t.username
 	FROM devpulse_tenant t
 	JOIN devpulse_tenant_repo tr ON tr.tenant_id = t.id
-	WHERE tr.active = TRUE AND t.tos_accepted_at IS NOT NULL`
+	WHERE tr.active = TRUE AND t.tos_accepted_at IS NOT NULL
+	  AND t.status = 'active'`
 
 const getActiveInstallationsSQL = `
 	SELECT installation_id, target_login
@@ -173,6 +176,7 @@ const listImportWorkSQL = `
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
+	  AND t.status = 'active'
 	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
 
 const listImportWorkForRepoSQL = `
@@ -189,6 +193,7 @@ const listImportWorkForRepoSQL = `
 	  AND tr.org = $1
 	  AND tr.repo = $2
 	  AND t.tos_accepted_at IS NOT NULL
+	  AND t.status = 'active'
 	ORDER BY tr.tenant_id`
 
 // ListImportWorkForRepo returns import work rows for a single repo across all tenants.

@@ -39,6 +39,20 @@ func SessionCookieName() string {
 	return cookieName
 }
 
+// OAuthStateCookieName returns the OAuth state cookie name, using the __Host-
+// prefix in HTTPS mode for consistency with the session cookie.
+func OAuthStateCookieName() string {
+	if secure {
+		return "__Host-oauth_state"
+	}
+	return "oauth_state"
+}
+
+// IsSecure returns true when the BASE_URL uses HTTPS.
+func IsSecure() bool {
+	return secure
+}
+
 // RequireAuth validates the session cookie and injects the tenant into context.
 // Redirects to loginURL if no valid session is found.
 func RequireAuth(db *sql.DB, loginURL string) func(http.Handler) http.Handler {

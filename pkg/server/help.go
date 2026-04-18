@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"os"
@@ -49,13 +50,13 @@ func helpPageHandler(db *sql.DB) http.HandlerFunc {
 			Plans: plan.All,
 		}
 		if tn := tryGetTenant(r, db); tn != nil {
-			populateHelpTenant(&d, tn, r.Context(), db)
+			populateHelpTenant(r.Context(), &d, tn, db)
 		}
 		renderTemplate(w, "help.html", d)
 	}
 }
 
-func populateHelpTenant(d *helpData, tn *tenant.Tenant, ctx context.Context, db *sql.DB) {
+func populateHelpTenant(ctx context.Context, d *helpData, tn *tenant.Tenant, db *sql.DB) {
 	d.Username = tn.Username
 	d.Name = tn.Name
 	d.Email = tn.Email
@@ -95,14 +96,16 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 		subject := fmt.Sprintf("DevPulse Support Request - %s (%s)", tn.Username, tn.Name)
 		text := fmt.Sprintf("From: %s (%s)\nEmail: %s\nPlan: %s\nRepos: %d\nMember since: %s\n\n%s",
 			tn.Username, tn.Name, tn.Email, tn.Plan, repoCount, created, message)
-		html := fmt.Sprintf(
+		htmlBody := fmt.Sprintf(
 			`<p><strong>From:</strong> %s (%s)<br><strong>Email:</strong> %s<br>`+
 				`<strong>Plan:</strong> %s<br><strong>Repos:</strong> %d<br>`+
 				`<strong>Member since:</strong> %s</p><hr><p style="white-space:pre-wrap;">%s</p>`,
-			tn.Username, tn.Name, tn.Email, tn.Plan, repoCount, created, message,
+			html.EscapeString(tn.Username), html.EscapeString(tn.Name),
+			html.EscapeString(tn.Email), html.EscapeString(tn.Plan),
+			repoCount, created, html.EscapeString(message),
 		)
 
-		if err := devnet.SendEmail(r.Context(), apiKey, supportEmail, supportEmail, subject, html, text, tn.Email); err != nil {
+		if err := devnet.SendEmail(r.Context(), apiKey, supportEmail, supportEmail, subject, htmlBody, text, tn.Email); err != nil {
 			slog.Error("sending support email", "username", tn.Username, "error", err)
 			renderHelpWithError(w, r, db, tn, "Failed to send message. Please try again later.")
 			return
@@ -115,7 +118,7 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 			Plans: plan.All,
 			Sent:  true,
 		}
-		populateHelpTenant(&d, tn, r.Context(), db)
+		populateHelpTenant(r.Context(), &d, tn, db)
 		renderTemplate(w, "help.html", d)
 	}
 }
@@ -126,6 +129,6 @@ func renderHelpWithError(w http.ResponseWriter, r *http.Request, db *sql.DB, tn 
 		Plans: plan.All,
 		Error: msg,
 	}
-	populateHelpTenant(&d, tn, r.Context(), db)
+	populateHelpTenant(r.Context(), &d, tn, db)
 	renderTemplate(w, "help.html", d)
 }

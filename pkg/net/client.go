@@ -4,13 +4,15 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/config"
 )
 
 const timeoutInSeconds = 60
 
 var reqTransport = &http.Transport{
 	MaxIdleConns:          50,
-	MaxIdleConnsPerHost:   20,
+	MaxIdleConnsPerHost:   config.HTTPMaxIdleConnsPerHost(),
 	IdleConnTimeout:       time.Duration(timeoutInSeconds) * time.Second,
 	ResponseHeaderTimeout: time.Duration(timeoutInSeconds) * time.Second,
 }

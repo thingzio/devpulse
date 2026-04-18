@@ -54,6 +54,10 @@ type RepoDetail struct {
 	BackfillTarget int // target days (EventAgeDaysDefault)
 }
 
+const selectMinBackfillSQL = `
+	SELECT MIN(backfill_until) FROM devpulse_state
+	WHERE org = $1 AND repo = $2 AND backfill_until IS NOT NULL`
+
 const (
 	selectTenantIDByUsernameSQL = `SELECT id FROM devpulse_tenant WHERE username = $1`
 
@@ -218,9 +222,7 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 	// Populate backfill coverage from state table.
 	for i := range repos {
 		var backfillUnix sql.NullInt64
-		err := db.QueryRowContext(ctx,
-			`SELECT MIN(backfill_until) FROM devpulse_state
-			 WHERE org = $1 AND repo = $2 AND backfill_until IS NOT NULL`,
+		err := db.QueryRowContext(ctx, selectMinBackfillSQL,
 			repos[i].Org, repos[i].Repo).Scan(&backfillUnix)
 		if err != nil || !backfillUnix.Valid {
 			continue

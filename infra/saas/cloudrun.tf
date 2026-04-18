@@ -2,7 +2,7 @@ resource "google_cloud_run_v2_service" "serve" {
   name                = "${var.prefix}-serve"
   location            = var.region
   project             = var.project_id
-  deletion_protection = false # TODO: set to true after initial deploy
+  deletion_protection = true
 
   template {
     service_account = google_service_account.run.email
@@ -28,8 +28,13 @@ resource "google_cloud_run_v2_service" "serve" {
       }
 
       env {
-        name  = "DATABASE_URL"
-        value = "host=/cloudsql/${local.db_connection} dbname=${var.db_name} user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+        name = "DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.database_url.secret_id
+            version = "latest"
+          }
+        }
       }
 
       env {
@@ -173,7 +178,7 @@ resource "google_cloud_run_v2_job" "import" {
   name                = "${var.prefix}-import"
   location            = var.region
   project             = var.project_id
-  deletion_protection = false # TODO: set to true after initial deploy
+  deletion_protection = true
 
   template {
     task_count  = var.import_parallelism
@@ -195,8 +200,13 @@ resource "google_cloud_run_v2_job" "import" {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-import:latest"
 
         env {
-          name  = "DATABASE_URL"
-          value = "host=/cloudsql/${local.db_connection} dbname=${var.db_name} user=${google_sql_user.app.name} password=${random_password.db_password.result} sslmode=disable"
+          name = "DATABASE_URL"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.database_url.secret_id
+              version = "latest"
+            }
+          }
         }
 
         env {

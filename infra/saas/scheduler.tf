@@ -1,5 +1,5 @@
 resource "google_cloud_scheduler_job" "import" {
-  name     = "${var.prefix}-import-hourly"
+  name     = "${var.prefix}-import-scheduled"
   schedule = "0 */2 * * *"
   project  = var.project_id
   region   = var.region

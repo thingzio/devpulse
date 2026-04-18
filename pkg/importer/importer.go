@@ -116,7 +116,7 @@ func runImport(ctx context.Context) error {
 				if taskCtx.Err() != nil {
 					return
 				}
-				importErr, skipped := importRepoWork(taskCtx, db, store, pool, rw, llmCfg)
+				skipped, importErr := importRepoWork(taskCtx, db, store, pool, rw, llmCfg)
 				switch {
 				case skipped:
 					totalSkipped.Add(1)
@@ -213,7 +213,7 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 
 // importRepoWork imports shared repo data and handles per-tenant event limits.
 func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
-	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig) (error, bool) {
+	pool *ghutil.TokenPool, rw RepoWork, llmCfg *data.LLMConfig) (bool, error) {
 	bestPlan := bestPlanForRepo(rw.Tenants)
 
 	if limited, err := allTenantsAtLimit(ctx, db, rw.Tenants); err != nil {
@@ -221,7 +221,7 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 	} else if limited {
 		slog.Warn("all tenants at weekly event limit, skipping",
 			"org", rw.Org, "repo", rw.Repo)
-		return nil, false
+		return false, nil
 	}
 
 	slog.Info("importing repo",
@@ -230,11 +230,11 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 		"plan", bestPlan,
 		"tenants", len(rw.Tenants))
 
-	importErr, skipped := importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
+	skipped, importErr := importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
 	if skipped {
-		return nil, true
+		return true, nil
 	}
-	return importErr, false
+	return false, importErr
 }
 
 // bestPlanForRepo returns the highest-tier plan among all tenants tracking a repo.
@@ -337,7 +337,7 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 	return true, false
 }
 
-func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (error, bool) {
+func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (bool, error) {
 	start := time.Now()
 
 	tokenForPhase := func() string {
@@ -360,7 +360,7 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		errs++
 	}
 	if skip {
-		return nil, true
+		return true, nil
 	}
 
 	// Phase 2: Fresh pass — recent events
@@ -419,9 +419,9 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
 
 	if errs > 0 {
-		return fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo), false
+		return false, fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
 	}
-	return nil, false
+	return false, nil
 }
 
 // runEnrichmentPhases runs the non-event import phases: releases, metrics,

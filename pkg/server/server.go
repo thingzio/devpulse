@@ -22,6 +22,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/middleware"
+	"github.com/thingzio/devpulse/pkg/net"
 	"github.com/thingzio/devpulse/pkg/oauth"
 	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
@@ -217,14 +218,9 @@ const (
 	serverWriteTimeout      = 60 * time.Second
 	serverIdleTimeout       = 120 * time.Second
 	serverMaxHeaderBytes    = 64 * 1024 // 64KB
-	externalHTTPTimeout     = 10 * time.Second
-
-	addressDefault = "0.0.0.0"
-	portDefault    = "8080"
+	addressDefault          = "0.0.0.0"
+	portDefault             = "8080"
 )
-
-// httpClient is used for all outbound HTTP calls (GitHub API, etc.)
-var httpClient = &http.Client{Timeout: externalHTTPTimeout}
 
 // Options configures the server.
 type Options struct {
@@ -526,9 +522,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 		}
 		limits, _ := plan.Get(tn.Plan)
 
-		t := pageTemplates["home.html"]
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := t.ExecuteTemplate(w, "home", map[string]any{
+		renderTemplate(w, "home.html", map[string]any{
 			"base_path":     "",
 			"version":       opts.Version,
 			"commit":        opts.Commit,
@@ -542,9 +536,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			"csv_export":    limits.CSVExport,
 			"max_data_days": limits.MaxDataRangeMonths * 30,
 			"ai_level":      limits.AILevel,
-		}); err != nil {
-			slog.Error("rendering dashboard", "error", err)
-		}
+		})
 	}
 }
 
@@ -598,11 +590,11 @@ func oauthStartHandler(cfg *oauth.Config) http.HandlerFunc {
 			return
 		}
 		http.SetCookie(w, &http.Cookie{
-			Name:     "oauth_state",
+			Name:     middleware.OAuthStateCookieName(),
 			Value:    state,
 			Path:     "/",
 			MaxAge:   600,
-			Secure:   true,
+			Secure:   middleware.IsSecure(),
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
 		})
@@ -614,15 +606,15 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 	clearAndRedirect := func(w http.ResponseWriter, r *http.Request, msg string) {
 		// Clear all auth cookies so the user can retry cleanly.
 		http.SetCookie(w, &http.Cookie{
-			Name: "oauth_state", Value: "", MaxAge: -1, Path: "/",
-			HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+			Name: middleware.OAuthStateCookieName(), Value: "", MaxAge: -1, Path: "/",
+			HttpOnly: true, Secure: middleware.IsSecure(), SameSite: http.SameSiteLaxMode,
 		})
 		middleware.ClearSessionCookie(w)
 		http.Redirect(w, r, "/?err="+url.QueryEscape(msg), http.StatusSeeOther)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		stateCookie, err := r.Cookie("oauth_state")
+		stateCookie, err := r.Cookie(middleware.OAuthStateCookieName())
 		if err != nil || subtle.ConstantTimeCompare(
 			[]byte(stateCookie.Value),
 			[]byte(r.URL.Query().Get("state")),
@@ -633,12 +625,12 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 		}
 
 		http.SetCookie(w, &http.Cookie{
-			Name:     "oauth_state",
+			Name:     middleware.OAuthStateCookieName(),
 			Value:    "",
 			MaxAge:   -1,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   middleware.IsSecure(),
 			SameSite: http.SameSiteLaxMode,
 		})
 
@@ -866,7 +858,7 @@ func isPublicRepo(ctx context.Context, org, repo string) bool {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := httpClient.Do(req) //nolint:gosec // constant base URL
+	resp, err := net.GitHubClient.Do(req) //nolint:gosec // constant base URL
 	if err != nil {
 		return false
 	}
@@ -970,7 +962,7 @@ func availableReposHandler(db *sql.DB) http.HandlerFunc {
 		}
 		req.Header.Set("Accept", "application/vnd.github+json")
 
-		resp, err := httpClient.Do(req) //nolint:gosec // URL constructed from constant base + user query param
+		resp, err := net.GitHubClient.Do(req) //nolint:gosec // URL constructed from constant base + user query param
 		if err != nil {
 			slog.Error("searching github repos", "error", err)
 			writeJSON(w, http.StatusOK, []tenant.OrgRepo{})

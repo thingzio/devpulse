@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
@@ -37,7 +38,10 @@ func ScopedStoreMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 				// set_config with false is session-level; without this reset,
 				// the connection would retain a stale app.tenant_id, causing
 				// RLS violations for subsequent unscoped queries (e.g. session creation).
-				_, _ = conn.ExecContext(context.Background(), "SELECT set_config('app.tenant_id', '', false)")
+				// Use a bounded context so cleanup doesn't block indefinitely.
+				cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_, _ = conn.ExecContext(cleanupCtx, "SELECT set_config('app.tenant_id', '', false)")
 				conn.Close()
 			}()
 

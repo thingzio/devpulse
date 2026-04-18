@@ -21,7 +21,7 @@ func TestCheckTokenQuotaFull_Success(t *testing.T) {
 
 	orig := devnet.QuotaCheckClient
 	devnet.QuotaCheckClient = srv.Client()
-	defer func() { devnet.QuotaCheckClient = orig }()
+	t.Cleanup(func() { devnet.QuotaCheckClient = orig })
 
 	// Override URL by providing a custom request — but CheckTokenQuotaFull hardcodes
 	// the URL, so we test it through a transport that redirects.
@@ -38,7 +38,7 @@ func TestCheckTokenQuotaFull_Error(t *testing.T) {
 	// Use a client that always fails.
 	orig := devnet.QuotaCheckClient
 	devnet.QuotaCheckClient = &http.Client{Transport: &failTransport{}}
-	defer func() { devnet.QuotaCheckClient = orig }()
+	t.Cleanup(func() { devnet.QuotaCheckClient = orig })
 
 	q := CheckTokenQuotaFull(context.Background(), "test-token")
 	assert.Nil(t, q)
@@ -53,7 +53,7 @@ func TestCheckTokenQuotaFull_BadJSON(t *testing.T) {
 	orig := devnet.QuotaCheckClient
 	transport := &rewriteTransport{base: srv.Client().Transport, target: srv.URL}
 	devnet.QuotaCheckClient = &http.Client{Transport: transport}
-	defer func() { devnet.QuotaCheckClient = orig }()
+	t.Cleanup(func() { devnet.QuotaCheckClient = orig })
 
 	q := CheckTokenQuotaFull(context.Background(), "test-token")
 	assert.Nil(t, q)

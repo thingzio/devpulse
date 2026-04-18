@@ -105,6 +105,10 @@ var EventTypes = []string{
 type importerFunc func(ctx context.Context) error
 
 func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int) (map[string]int, error) {
+	if s.db == nil {
+		return nil, data.ErrDBNotInitialized
+	}
+
 	if token == "" {
 		return nil, errors.New("token is required")
 	}
@@ -157,6 +161,10 @@ func (s *Store) ImportEvents(
 	ctx context.Context, tokenFn data.TokenFunc, exhaustFn data.ExhaustFunc,
 	owner, repo string, windowStart, windowEnd time.Time,
 ) (map[string]int, *data.ImportSummary, error) {
+	if s.db == nil {
+		return nil, nil, data.ErrDBNotInitialized
+	}
+
 	if tokenFn == nil || owner == "" || repo == "" {
 		return nil, nil, errors.New("tokenFn, owner, and repo are required")
 	}
@@ -485,56 +493,8 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	batches := splitIntoBatches(events, dbBatchSize)
 
 	for _, batch := range batches {
-		seen := make(map[string]struct{}, len(batch))
-		for _, ev := range batch {
-			seen[ev.Username] = struct{}{}
-		}
-		batchDevs := make([]*data.Developer, 0, len(seen))
-		for username := range seen {
-			if u, ok := users[username]; ok {
-				batchDevs = append(batchDevs, ghutil.MapUserToDeveloper(u))
-			}
-		}
-		slices.SortFunc(batchDevs, func(a, b *data.Developer) int {
-			return strings.Compare(a.Username, b.Username)
-		})
-
-		var tx *sql.Tx
-		tx, err = db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("failed to begin transaction: %w", err)
-		}
-		defer rollbackTransaction(tx)
-
-		txDevStmt := tx.Stmt(devStmt)
-		defer txDevStmt.Close()
-		for i, u := range batchDevs {
-			if _, err = txDevStmt.ExecContext(ctx, u.Username,
-				u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
-				u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
-				return fmt.Errorf("error inserting developer[%d]: %s: %w", i, u.Username, err)
-			}
-		}
-
-		txEventStmt := tx.Stmt(eventStmt)
-		defer txEventStmt.Close()
-		for i, ev := range batch {
-			_, err = txEventStmt.ExecContext(ctx,
-				ev.Org, ev.Repo, ev.Username, ev.Type, ev.Date,
-				ev.URL, ev.Mentions, ev.Labels,
-				ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
-				ev.ChangedFiles, ev.Commits, ev.Title,
-				ev.URL, ev.Mentions, ev.Labels,
-				ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
-				ev.ChangedFiles, ev.Commits, ev.Title,
-			)
-			if err != nil {
-				return fmt.Errorf("error inserting event[%d]: %s/%s: %w", i, ev.Org, ev.Repo, err)
-			}
-		}
-
-		if err = tx.Commit(); err != nil {
-			return fmt.Errorf("failed to commit transaction: %w", err)
+		if batchErr := e.flushBatch(ctx, db, batch, users, devStmt, eventStmt); batchErr != nil {
+			return batchErr
 		}
 	}
 
@@ -572,6 +532,64 @@ func (e *eventImporter) flush(ctx context.Context) error {
 		"developers", len(users),
 		"duration_sec", time.Since(start).Seconds())
 
+	return nil
+}
+
+// flushBatch inserts a single batch of events and developers inside a
+// transaction. Extracted from the flush loop so defer operates per-batch.
+func (e *eventImporter) flushBatch(ctx context.Context, db DBTX,
+	batch []*data.Event, users map[string]*github.User,
+	devStmt, eventStmt *sql.Stmt) error {
+	seen := make(map[string]struct{}, len(batch))
+	for _, ev := range batch {
+		seen[ev.Username] = struct{}{}
+	}
+	batchDevs := make([]*data.Developer, 0, len(seen))
+	for username := range seen {
+		if u, ok := users[username]; ok {
+			batchDevs = append(batchDevs, ghutil.MapUserToDeveloper(u))
+		}
+	}
+	slices.SortFunc(batchDevs, func(a, b *data.Developer) int {
+		return strings.Compare(a.Username, b.Username)
+	})
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollbackTransaction(tx)
+
+	txDevStmt := tx.Stmt(devStmt)
+	defer txDevStmt.Close()
+	for i, u := range batchDevs {
+		if _, err = txDevStmt.ExecContext(ctx, u.Username,
+			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity,
+			u.FullName, u.Email, u.AvatarURL, u.ProfileURL, u.Entity, u.Entity); err != nil {
+			return fmt.Errorf("error inserting developer[%d]: %s: %w", i, u.Username, err)
+		}
+	}
+
+	txEventStmt := tx.Stmt(eventStmt)
+	defer txEventStmt.Close()
+	for i, ev := range batch {
+		_, err = txEventStmt.ExecContext(ctx,
+			ev.Org, ev.Repo, ev.Username, ev.Type, ev.Date,
+			ev.URL, ev.Mentions, ev.Labels,
+			ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
+			ev.ChangedFiles, ev.Commits, ev.Title,
+			ev.URL, ev.Mentions, ev.Labels,
+			ev.State, ev.Number, ev.CreatedAt, ev.ClosedAt, ev.MergedAt, ev.Additions, ev.Deletions,
+			ev.ChangedFiles, ev.Commits, ev.Title,
+		)
+		if err != nil {
+			return fmt.Errorf("error inserting event[%d]: %s/%s: %w", i, ev.Org, ev.Repo, err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
 	return nil
 }
 

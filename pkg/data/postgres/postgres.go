@@ -118,7 +118,9 @@ func New(dsn string, cfgs ...PoolConfig) (*Store, error) {
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
-	if err := db.PingContext(context.Background()); err != nil {
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer pingCancel()
+	if err := db.PingContext(pingCtx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}

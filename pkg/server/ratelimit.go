@@ -77,13 +77,30 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return false
 }
 
+// clientIP extracts the client IP from the request. It uses the first entry
+// in the X-Forwarded-For header (the original client IP), falling back to
+// RemoteAddr. The first entry is used because Cloud Run appends the true
+// client IP at the front.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if first, _, ok := strings.Cut(xff, ","); ok {
+			if ip := strings.TrimSpace(first); ip != "" {
+				return ip
+			}
+		}
+		return strings.TrimSpace(xff)
+	}
+	// RemoteAddr can include ":port"; strip it.
+	if host, _, ok := strings.Cut(r.RemoteAddr, ":"); ok {
+		return host
+	}
+	return r.RemoteAddr
+}
+
 func rateLimitMiddleware(rl *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.Header.Get("X-Forwarded-For")
-			if ip == "" {
-				ip = r.RemoteAddr
-			}
+			ip := clientIP(r)
 
 			if !rl.allow(ip) {
 				slog.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path)

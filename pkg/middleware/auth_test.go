@@ -68,6 +68,16 @@ func TestWithTenantContext(t *testing.T) {
 	assert.Equal(t, "testuser", got.Username)
 }
 
+func TestOAuthStateCookieName(t *testing.T) {
+	// In test env, BASE_URL is not set, so secure=false.
+	assert.Equal(t, "oauth_state", OAuthStateCookieName())
+}
+
+func TestIsSecure(t *testing.T) {
+	// In test env, BASE_URL is not set, so secure=false.
+	assert.False(t, IsSecure())
+}
+
 func TestRequireAuth_EmptyCookieValue(t *testing.T) {
 	// Empty cookie value — middleware should redirect.
 	handler := RequireAuth(nil, "/login")(

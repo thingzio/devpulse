@@ -1401,7 +1401,7 @@ func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, days
 	}
 
 	since := sinceDate(days)
-	thirtyDaysAgo := sinceDate(1)
+	thirtyDaysAgo := sinceDate(30)
 
 	var ps data.PortfolioSummary
 	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, repo, since, thirtyDaysAgo).Scan(

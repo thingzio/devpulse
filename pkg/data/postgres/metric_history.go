@@ -82,6 +82,10 @@ func (s *Store) GetRepoMetricHistory(ctx context.Context, org, repo *string, day
 }
 
 func (s *Store) ImportRepoMetricHistory(ctx context.Context, token, owner, repo string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	r, resp, err := client.Repositories.Get(ctx, owner, repo)
@@ -242,6 +246,10 @@ func buildDailyTotals(currentStars, currentForks int, starsByDay, forksByDay map
 }
 
 func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, history []*data.RepoMetricHistory) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -275,6 +283,10 @@ func (s *Store) upsertMetricHistory(ctx context.Context, owner, repo string, his
 }
 
 func (s *Store) ImportAllRepoMetricHistory(ctx context.Context, token string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)

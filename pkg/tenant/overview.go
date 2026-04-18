@@ -154,16 +154,17 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, days int) (*O
 	}, nil
 }
 
+const getWeeklyEventCountSQL = `
+	SELECT COUNT(*)
+	FROM devpulse_event e
+	JOIN devpulse_tenant_repo tr ON tr.org = e.org AND tr.repo = e.repo
+	WHERE tr.tenant_id = $1 AND tr.active = TRUE AND e.date >= $2`
+
 // GetWeeklyEventCount returns the total events this week for a tenant's repos.
 func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int, error) {
 	weekStart := StartOfWeek().Format("2006-01-02")
 	var count int
-	err := db.QueryRowContext(ctx, `
-		SELECT COUNT(*)
-		FROM devpulse_event e
-		JOIN devpulse_tenant_repo tr ON tr.org = e.org AND tr.repo = e.repo
-		WHERE tr.tenant_id = $1 AND tr.active = TRUE AND e.date >= $2`,
-		tenantID, weekStart).Scan(&count)
+	err := db.QueryRowContext(ctx, getWeeklyEventCountSQL, tenantID, weekStart).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("querying weekly events: %w", err)
 	}

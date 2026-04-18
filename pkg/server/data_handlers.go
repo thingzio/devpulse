@@ -182,23 +182,16 @@ func entityDevelopersAPIHandler(store data.Store) http.HandlerFunc {
 type percentageProvider func(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error)
 
 func percentageAPIHandler(w http.ResponseWriter, r *http.Request, fn percentageProvider) {
-	days := queryParamInt(r, "d", data.EventAgeDaysDefault)
-	org := r.URL.Query().Get("o")
-	repo := r.URL.Query().Get("r")
+	p := parseInsightParams(r)
 	entity := r.URL.Query().Get("e")
 	var exclude []string
 	if x := r.URL.Query().Get("x"); x != "" {
 		exclude = strings.Split(x, arraySelector)
 	}
 
-	slog.Debug("event type query", "org", org, "repo", repo, "entity", entity, "days", days)
+	slog.Debug("event type query", "org", p.org, "repo", p.repo, "entity", entity, "days", p.days)
 
-	if orgStr, repoStr, ok := parseRepo(&repo); ok {
-		org = *orgStr
-		repo = *repoStr
-	}
-
-	res, err := fn(r.Context(), optional(entity), optional(org), optional(repo), exclude, days)
+	res, err := fn(r.Context(), optional(entity), p.org, p.repo, exclude, p.days)
 	if err != nil {
 		slog.Error("failed to get event type series", "error", err)
 		writeError(w, http.StatusInternalServerError, "error querying event type series")

@@ -44,6 +44,10 @@ const (
 )
 
 func (s *Store) ImportContainerVersions(ctx context.Context, token, org, repo string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	matched, err := listRepoContainerPackages(ctx, client, org, repo)
@@ -191,6 +195,10 @@ func fetchAndStoreVersions(ctx context.Context, client *github.Client, stmt *sql
 }
 
 func (s *Store) ImportAllContainerVersions(ctx context.Context, token string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("getting org/repo list: %w", err)

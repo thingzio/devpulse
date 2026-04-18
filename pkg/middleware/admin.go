@@ -14,6 +14,8 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
+const csrfCookieName = "csrf_token"
+
 const adminUsersEnvVar = "DEVPULSE_ADMIN_USERS"
 
 // RequireAdmin validates the session cookie and checks the username against
@@ -52,7 +54,8 @@ func RequireAdmin(db *sql.DB) func(http.Handler) http.Handler {
 }
 
 // IsAdmin checks whether username is in the DEVPULSE_ADMIN_USERS env var
-// (comma-separated, whitespace-trimmed).
+// (comma-separated, whitespace-trimmed). Comparison is case-insensitive
+// because GitHub usernames are case-insensitive.
 func IsAdmin(username string) bool {
 	raw := os.Getenv(adminUsersEnvVar)
 	if raw == "" || username == "" {
@@ -60,7 +63,7 @@ func IsAdmin(username string) bool {
 	}
 
 	for entry := range strings.SplitSeq(raw, ",") {
-		if strings.TrimSpace(entry) == username {
+		if strings.EqualFold(strings.TrimSpace(entry), username) {
 			return true
 		}
 	}
@@ -75,6 +78,32 @@ func GenerateCSRFToken() string {
 		panic("csrf: crypto/rand failed: " + err.Error())
 	}
 	return base64.URLEncoding.EncodeToString(b)
+}
+
+// SetCSRFCookie writes the CSRF token as a non-HttpOnly cookie so the form
+// can read it, while the POST handler compares form value vs cookie value
+// (double-submit cookie pattern).
+func SetCSRFCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     csrfCookieName,
+		Value:    token,
+		Path:     "/admin",
+		MaxAge:   3600,
+		Secure:   secure,
+		HttpOnly: false, // form JS does not need it; HTML hidden field is pre-filled server-side
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+// ValidateCSRFFromRequest compares the csrf_token form field against the
+// csrf_token cookie (double-submit pattern). Returns true if they match.
+func ValidateCSRFFromRequest(r *http.Request) bool {
+	formToken := r.FormValue("csrf_token")
+	cookie, err := r.Cookie(csrfCookieName)
+	if err != nil || cookie.Value == "" || formToken == "" {
+		return false
+	}
+	return ValidateCSRF(cookie.Value, formToken)
 }
 
 // ValidateCSRF performs constant-time comparison of CSRF tokens.

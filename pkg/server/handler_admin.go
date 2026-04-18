@@ -63,10 +63,12 @@ func adminDashboardHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		csrfToken := middleware.GenerateCSRFToken()
+		middleware.SetCSRFCookie(w, csrfToken)
 		renderTemplate(w, "admin.html", adminDashboardData{
 			Title:     "Admin",
 			Summary:   summary,
-			CSRFToken: middleware.GenerateCSRFToken(),
+			CSRFToken: csrfToken,
 		})
 	}
 }
@@ -98,11 +100,13 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
+		csrfToken := middleware.GenerateCSRFToken()
+		middleware.SetCSRFCookie(w, csrfToken)
 		renderTemplate(w, "admin_tenants.html", adminTenantsData{
 			Title:     "Tenants",
 			Tenants:   out,
 			Plans:     plan.All,
-			CSRFToken: middleware.GenerateCSRFToken(),
+			CSRFToken: csrfToken,
 		})
 	}
 }
@@ -173,11 +177,13 @@ func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
 			out.Repos = append(out.Repos, d)
 		}
 
+		csrfToken := middleware.GenerateCSRFToken()
+		middleware.SetCSRFCookie(w, csrfToken)
 		renderTemplate(w, "admin_tenant.html", adminTenantDetailData{
 			Title:     "Tenant: " + username,
 			Detail:    out,
 			Plans:     plan.All,
-			CSRFToken: middleware.GenerateCSRFToken(),
+			CSRFToken: csrfToken,
 		})
 	}
 }
@@ -333,9 +339,8 @@ func adminUpdatePlanHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		csrfToken := r.FormValue("csrf_token")
-		if csrfToken == "" {
-			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+		if !middleware.ValidateCSRFFromRequest(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
 			return
 		}
 
@@ -387,6 +392,11 @@ func adminUpdateStatusHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		if !middleware.ValidateCSRFFromRequest(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
+			return
+		}
+
 		status := r.FormValue("status")
 		if status != tenant.StatusActive && status != tenant.StatusSuspended {
 			http.Error(w, fmt.Sprintf("invalid status: %s", status), http.StatusBadRequest)
@@ -424,9 +434,8 @@ func adminInviteHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		csrfToken := r.FormValue("csrf_token")
-		if csrfToken == "" {
-			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+		if !middleware.ValidateCSRFFromRequest(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
 			return
 		}
 
@@ -498,9 +507,8 @@ func adminRepoActionHandler(db *sql.DB, action string, fn func(ctx context.Conte
 			return
 		}
 
-		csrfToken := r.FormValue("csrf_token")
-		if csrfToken == "" {
-			http.Error(w, "missing CSRF token", http.StatusBadRequest)
+		if !middleware.ValidateCSRFFromRequest(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
 			return
 		}
 

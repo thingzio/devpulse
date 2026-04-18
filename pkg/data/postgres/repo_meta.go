@@ -66,6 +66,10 @@ const (
 )
 
 func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) (time.Time, error) {
+	if s.db == nil {
+		return time.Time{}, data.ErrDBNotInitialized
+	}
+
 	var lastUpdated string
 	var healthPct int
 	var pushedAtStr string
@@ -189,6 +193,10 @@ func fetchCommunityProfile(ctx context.Context, client *github.Client, owner, re
 }
 
 func (s *Store) ImportAllRepoMeta(ctx context.Context, token string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)

@@ -87,6 +87,56 @@ func TestRateLimitMiddleware_APIPath(t *testing.T) {
 	assert.Contains(t, w2.Body.String(), "please wait")
 }
 
+func TestClientIP(t *testing.T) {
+	tests := []struct {
+		name       string
+		xff        string
+		remoteAddr string
+		want       string
+	}{
+		{
+			name:       "single_xff",
+			xff:        "203.0.113.1",
+			remoteAddr: "10.0.0.1:1234",
+			want:       "203.0.113.1",
+		},
+		{
+			name:       "multiple_xff_takes_first",
+			xff:        "203.0.113.1, 10.0.0.1, 172.16.0.1",
+			remoteAddr: "10.0.0.1:1234",
+			want:       "203.0.113.1",
+		},
+		{
+			name:       "xff_with_spaces",
+			xff:        " 203.0.113.1 , 10.0.0.1",
+			remoteAddr: "10.0.0.1:1234",
+			want:       "203.0.113.1",
+		},
+		{
+			name:       "no_xff_uses_remote_addr",
+			xff:        "",
+			remoteAddr: "10.0.0.1:1234",
+			want:       "10.0.0.1",
+		},
+		{
+			name:       "no_xff_no_port",
+			xff:        "",
+			remoteAddr: "10.0.0.1",
+			want:       "10.0.0.1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r.RemoteAddr = tt.remoteAddr
+			if tt.xff != "" {
+				r.Header.Set("X-Forwarded-For", tt.xff)
+			}
+			assert.Equal(t, tt.want, clientIP(r))
+		})
+	}
+}
+
 func TestRateLimitMiddleware_XForwardedFor(t *testing.T) {
 	rl := newRateLimiter(1, time.Minute)
 

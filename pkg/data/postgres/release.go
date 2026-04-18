@@ -116,6 +116,10 @@ const (
 )
 
 func (s *Store) ImportReleases(ctx context.Context, token, owner, repo string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
 
 	var latestPublishedAt string
@@ -237,6 +241,10 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 }
 
 func (s *Store) ImportAllReleases(ctx context.Context, token string) error {
+	if s.db == nil {
+		return data.ErrDBNotInitialized
+	}
+
 	list, err := s.GetAllOrgRepos(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting org/repo list: %w", err)
