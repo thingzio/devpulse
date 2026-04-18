@@ -81,5 +81,62 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="/static/js/quota_chart.js"></script>
+
+  {{if .ErrorRepos}}
+  <h2 style="margin-top:32px;margin-bottom:16px">Repos with Import Errors</h2>
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+    <thead>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Org</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Repo</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Errors</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Last Error</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Tenant</th>
+        <th style="padding:10px 12px;border-bottom:1px solid var(--border-color)">Reset</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .ErrorRepos}}
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Org}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Repo}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if ge .Errors 5}}<span style="color:#ef4444;font-weight:bold">{{.Errors}}</span>{{else}}<span style="color:#eab308">{{.Errors}}</span>{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-size:0.85em;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.LastError}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">
+          <form method="POST" action="/admin/tenant/{{.Username}}/reset" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+            <input type="hidden" name="org" value="{{.Org}}">
+            <input type="hidden" name="repo" value="{{.Repo}}">
+            <button type="submit" style="padding:4px 10px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;background:var(--border-color);color:var(--page-content-txtColor);transition:background 0.2s ease">Reset</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  {{if .OrphanedRepos}}
+  <h2 style="margin-top:32px;margin-bottom:16px">Orphaned Repos <span style="font-size:0.6em;font-weight:normal;color:var(--gray)">(no matching installation)</span></h2>
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+    <thead>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Org</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Repo</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Tenant</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .OrphanedRepos}}
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Org}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Repo}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
 </div>
 {{end}}

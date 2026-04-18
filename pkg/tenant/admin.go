@@ -236,3 +236,84 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 
 	return repos, nil
 }
+
+// ImportErrorRepo holds a repo with import errors, including which tenant tracks it.
+type ImportErrorRepo struct {
+	Org       string
+	Repo      string
+	Errors    int
+	LastError string
+	Username  string
+}
+
+const listImportErrorReposSQL = `
+	SELECT tr.org, tr.repo, tr.import_errors, COALESCE(tr.import_last_error, ''), t.username
+	FROM devpulse_tenant_repo tr
+	JOIN devpulse_tenant t ON t.id = tr.tenant_id
+	WHERE tr.active = TRUE AND tr.import_errors > 0
+	ORDER BY tr.import_errors DESC, tr.org, tr.repo`
+
+// ListImportErrorRepos returns all active repos with import errors, including tenant context.
+func ListImportErrorRepos(ctx context.Context, db *sql.DB) ([]ImportErrorRepo, error) {
+	rows, err := db.QueryContext(ctx, listImportErrorReposSQL)
+	if err != nil {
+		return nil, fmt.Errorf("listing import error repos: %w", err)
+	}
+	defer rows.Close()
+
+	var out []ImportErrorRepo
+	for rows.Next() {
+		var r ImportErrorRepo
+		if err := rows.Scan(&r.Org, &r.Repo, &r.Errors, &r.LastError, &r.Username); err != nil {
+			return nil, fmt.Errorf("scanning import error repo: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating import error repos: %w", err)
+	}
+	return out, nil
+}
+
+// OrphanedRepo is a repo tracked by a tenant but with no matching GitHub App installation.
+type OrphanedRepo struct {
+	Org      string
+	Repo     string
+	Username string
+}
+
+const listOrphanedReposSQL = `
+	SELECT DISTINCT tr.org, tr.repo, t.username
+	FROM devpulse_tenant_repo tr
+	JOIN devpulse_tenant t ON t.id = tr.tenant_id
+	WHERE tr.active = TRUE
+	  AND t.status = 'active'
+	  AND t.tos_accepted_at IS NOT NULL
+	  AND NOT EXISTS (
+	    SELECT 1 FROM devpulse_github_app_installation gi
+	    WHERE gi.target_login = tr.org
+	      AND gi.suspended_at IS NULL
+	  )
+	ORDER BY tr.org, tr.repo`
+
+// ListOrphanedRepos returns repos with no matching GitHub App installation for their org.
+func ListOrphanedRepos(ctx context.Context, db *sql.DB) ([]OrphanedRepo, error) {
+	rows, err := db.QueryContext(ctx, listOrphanedReposSQL)
+	if err != nil {
+		return nil, fmt.Errorf("listing orphaned repos: %w", err)
+	}
+	defer rows.Close()
+
+	var out []OrphanedRepo
+	for rows.Next() {
+		var r OrphanedRepo
+		if err := rows.Scan(&r.Org, &r.Repo, &r.Username); err != nil {
+			return nil, fmt.Errorf("scanning orphaned repo: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating orphaned repos: %w", err)
+	}
+	return out, nil
+}
