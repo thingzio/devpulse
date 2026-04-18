@@ -1,0 +1,172 @@
+{
+  "displayName": "DevPulse: Import",
+  "gridLayout": {
+    "columns": "3",
+    "widgets": [
+      {
+        "title": "Job Execution Results",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "resource.type=\"cloud_run_job\" resource.labels.job_name=\"devpulse-saas-import\" metric.type=\"run.googleapis.com/job/completed_execution_count\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.result"]
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Import Duration (seconds)",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-duration\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_MEAN"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Repo Errors",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-repo-errors\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": ["metric.labels.org", "metric.labels.repo"]
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Repos Completed",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-repo-complete\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Repos Skipped (Unchanged)",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-repo-skipped-unchanged\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Event Limit Reached",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-event-limit-reached\"",
+                "aggregation": {
+                  "alignmentPeriod": "86400s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Backfill Completed (PRs updated)",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-backfill-completed\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_DELTA",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Backfill Rate Limited",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-backfill-rate-limited\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      },
+      {
+        "title": "Insights Generated",
+        "xyChart": {
+          "dataSets": [{
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-insights-generated\"",
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM"
+                }
+              }
+            },
+            "plotType": "STACKED_BAR"
+          }]
+        }
+      }
+    ]
+  }
+}

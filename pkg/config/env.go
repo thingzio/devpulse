@@ -145,10 +145,6 @@ func AnthropicModel(defaultModel string) string { return GetEnv("ANTHROPIC_MODEL
 // Override: GCP_PROJECT_ID (default "thingzio").
 func GCPProjectID() string { return GetEnv("GCP_PROJECT_ID", "thingzio") }
 
-// DBInstanceID returns the Cloud SQL instance identifier for monitoring filters.
-// Override: DB_INSTANCE_ID (default "thingzio-pg").
-func DBInstanceID() string { return GetEnv("DB_INSTANCE_ID", "thingzio-pg") }
-
 // ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------

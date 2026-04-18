@@ -41,19 +41,16 @@ type metricsConfig struct {
 	model        string
 	service      string
 	job          string
-	dbID         string
 }
 
 func newMetricsConfig() *metricsConfig {
-	project := config.GCPProjectID()
 	prefix := "devpulse-saas"
 	return &metricsConfig{
-		projectID:    project,
+		projectID:    config.GCPProjectID(),
 		anthropicKey: config.AnthropicAPIKey(),
 		model:        config.AnthropicModel(defaultInsightsModel),
 		service:      prefix + "-serve",
 		job:          prefix + "-import",
-		dbID:         project + ":" + config.DBInstanceID(),
 	}
 }
 
@@ -195,41 +192,20 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-backfill-completed"`,
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
-		// --- Cloud SQL ---
 		{
-			label:  "Cloud SQL: CPU Utilization",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/cpu/utilization"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+			label:  "Import: Repos Completed (by org/repo)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-complete"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
-			label:  "Cloud SQL: Memory Utilization",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/memory/utilization"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+			label:  "Import: Repos Skipped Unchanged",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-skipped-unchanged"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		{
-			label:  "Cloud SQL: Connections",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/postgresql/num_backends"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
-		},
-		{
-			label:  "Cloud SQL: Transactions/sec",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/postgresql/transaction_count"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_RATE&aggregation.crossSeriesReducer=REDUCE_SUM",
-		},
-		{
-			label:  "Cloud SQL: Deadlocks",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/postgresql/deadlock_count"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_DELTA&aggregation.crossSeriesReducer=REDUCE_SUM",
-		},
-		{
-			label:  "Cloud SQL: Disk Utilization",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/disk/utilization"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
-		},
-		{
-			label:  "Cloud SQL: Disk Used (bytes)",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/disk/bytes_used"`, cfg.dbID),
-			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_MEAN",
+			label:  "Import: Insights Generated",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-insights-generated"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
 		// --- User Engagement ---
 		{
@@ -265,6 +241,11 @@ func metricQueries(cfg *metricsConfig, hourlyAlign, dailyAlign string) []metricQ
 				cfg.service),
 			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
 		},
+		{
+			label:  "Rate Limit Events (hourly, by path)",
+			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-rate-limit-exceeded"`,
+			params: hourlyAlign + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM&aggregation.groupByFields=metric.labels.path",
+		},
 	}
 }
 
@@ -295,16 +276,6 @@ func trendQueries(cfg *metricsConfig) []metricQuery {
 			label:  "Import: Repo Errors (daily total)",
 			filter: `metric.type="logging.googleapis.com/user/devpulse-saas-import-repo-errors"`,
 			params: daily + "&aggregation.perSeriesAligner=ALIGN_SUM&aggregation.crossSeriesReducer=REDUCE_SUM",
-		},
-		{
-			label:  "Cloud SQL: CPU Utilization (daily avg)",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/cpu/utilization"`, cfg.dbID),
-			params: daily + "&aggregation.perSeriesAligner=ALIGN_MEAN",
-		},
-		{
-			label:  "Cloud SQL: Connections (daily max)",
-			filter: fmt.Sprintf(`resource.type="cloudsql_database" AND resource.labels.database_id="%s" AND metric.type="cloudsql.googleapis.com/database/postgresql/num_backends"`, cfg.dbID),
-			params: daily + "&aggregation.perSeriesAligner=ALIGN_MAX",
 		},
 		{
 			label:  "Sign-ins (daily)",
@@ -425,7 +396,7 @@ const (
 )
 
 const analysisBasePrompt = `You are a DevOps analyst reviewing GCP infrastructure metrics
-for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
+for DevPulse, a multi-tenant SaaS on Cloud Run.
 
 ## Architecture
 - **Serve service** (devpulse-saas-serve): HTTP server, min_instance_count=0 (scale-to-zero).
@@ -437,11 +408,10 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
   (skips tokens with <100 remaining). Tokens auto-skip when exhausted via Exhaust()/ActiveCount().
 - **PR Backfill**: Bounded to last 90 days, 500 PRs/run max, newest-first. 0 updated PRs is
   normal when all recent PRs already have size data — this is NOT a stall.
+- **Database**: Cloud SQL PostgreSQL (monitored separately via shared infra dashboard).
 
 ## Known Baselines & Thresholds
-- DB connection pools: serve=17max/5idle, import=5max/2idle.
-- Alert thresholds: p99 latency >1s for 600s, 5xx >5/min for 5min, DB CPU >80% for 5min,
-  DB connections >80 for 5min.
+- Alert thresholds: p99 latency >1s for 600s, 5xx >5/min for 5min.
 - GitHub rate limit: per-installation, 60-min sliding window (NOT top-of-hour reset).
 
 ## User Engagement Metrics Context
@@ -449,6 +419,7 @@ for DevPulse, a multi-tenant SaaS on Cloud Run + Cloud SQL PostgreSQL.
   business signals. Correlate them with load metrics (e.g. latency spikes during sign-in bursts).
 - "Event Limit Reached" means a tenant hit their weekly event import cap — indicates plan friction.
 - "Upgrade Requests" means a tenant clicked the upgrade button — revenue signal.
+- "Rate Limit Events" means the serve service rate limiter fired — indicates abuse or misconfigured clients.
 
 ## Suppression Rules (STRICT — do NOT mention these unless the override condition is met)
 The following are acknowledged steady-state behaviors. You MUST suppress them entirely —
@@ -460,10 +431,7 @@ override condition fires, in which case report the deviation, not the baseline.
 | Cold-start latency | ~2s | 7-day average exceeds 2.5s |
 | Serve p99 daily high/low alternation | Import-correlated pattern | Daily max exceeds 15s or pattern changes shape |
 | Weekend/Monday traffic dips | Normal usage cycle | Weekday traffic declines 3+ consecutive days |
-| Disk utilization | Flat ~2% | Growth trend visible over 7-day window |
-| DB connections | Well below threshold | Daily max exceeds 40 |
 | PR Backfill updated = 0 | All recent PRs already have size data | Non-zero AND errors present |
-| DB transactions/sec steady range | ~8-11 tx/s | Sustained >20 tx/s for 3+ hours |
 
 ## Analysis Instructions
 Provide a brief, actionable analysis. Bias HARD toward brevity — a quiet day should

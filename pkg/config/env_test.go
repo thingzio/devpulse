@@ -176,7 +176,3 @@ func TestCloudRunExecution(t *testing.T) {
 func TestGCPProjectID(t *testing.T) {
 	assert.Equal(t, "thingzio", GCPProjectID())
 }
-
-func TestDBInstanceID(t *testing.T) {
-	assert.Equal(t, "thingzio-pg", DBInstanceID())
-}

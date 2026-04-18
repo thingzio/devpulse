@@ -347,7 +347,89 @@ resource "google_monitoring_alert_policy" "import_repo_errors" {
   }
 }
 
-resource "google_monitoring_dashboard" "devpulse" {
+resource "google_logging_metric" "rate_limit_exceeded" {
+  name    = "${var.prefix}-rate-limit-exceeded"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" jsonPayload.msg=\"rate limit exceeded\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "path"
+      value_type  = "STRING"
+      description = "Request path"
+    }
+  }
+
+  label_extractors = {
+    "path" = "EXTRACT(jsonPayload.path)"
+  }
+}
+
+resource "google_logging_metric" "insights_generated" {
+  name    = "${var.prefix}-insights-generated"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"insights generated\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "org"
+      value_type  = "STRING"
+      description = "Organization name"
+    }
+
+    labels {
+      key         = "repo"
+      value_type  = "STRING"
+      description = "Repository name"
+    }
+  }
+
+  label_extractors = {
+    "org"  = "EXTRACT(jsonPayload.org)"
+    "repo" = "EXTRACT(jsonPayload.repo)"
+  }
+}
+
+resource "google_logging_metric" "import_repo_complete" {
+  name    = "${var.prefix}-import-repo-complete"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.prefix}-import\" jsonPayload.msg=\"repo import complete\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+
+    labels {
+      key         = "org"
+      value_type  = "STRING"
+      description = "Organization name"
+    }
+
+    labels {
+      key         = "repo"
+      value_type  = "STRING"
+      description = "Repository name"
+    }
+  }
+
+  label_extractors = {
+    "org"  = "EXTRACT(jsonPayload.org)"
+    "repo" = "EXTRACT(jsonPayload.repo)"
+  }
+}
+
+resource "google_monitoring_dashboard" "ui" {
   project        = var.project_id
-  dashboard_json = file("${path.module}/dashboard.json")
+  dashboard_json = file("${path.module}/dashboard_ui.json")
+}
+
+resource "google_monitoring_dashboard" "import" {
+  project        = var.project_id
+  dashboard_json = file("${path.module}/dashboard_import.json")
 }

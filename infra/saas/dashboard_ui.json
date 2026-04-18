@@ -1,10 +1,10 @@
 {
-  "displayName": "devpulse-saas",
+  "displayName": "DevPulse: UI",
   "gridLayout": {
     "columns": "3",
     "widgets": [
       {
-        "title": "Service: Request Count",
+        "title": "Request Count",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -23,7 +23,7 @@
         }
       },
       {
-        "title": "Service: Request Latency (p50/p95/p99)",
+        "title": "Request Latency (p50/p95/p99)",
         "xyChart": {
           "dataSets": [
             {
@@ -72,7 +72,7 @@
         }
       },
       {
-        "title": "Service: Instance Count",
+        "title": "Instance Count",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -90,7 +90,7 @@
         }
       },
       {
-        "title": "Service: CPU Utilization",
+        "title": "CPU Utilization",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -108,7 +108,7 @@
         }
       },
       {
-        "title": "Service: Memory Utilization",
+        "title": "Memory Utilization",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -126,7 +126,7 @@
         }
       },
       {
-        "title": "Service: Billable Instance Time",
+        "title": "Billable Instance Time",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
@@ -135,166 +135,6 @@
                 "aggregation": {
                   "alignmentPeriod": "3600s",
                   "perSeriesAligner": "ALIGN_RATE",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Import: Duration (seconds)",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-duration\"",
-                "aggregation": {
-                  "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_DELTA",
-                  "crossSeriesReducer": "REDUCE_MEAN"
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Import: Job Execution Results",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloud_run_job\" resource.labels.job_name=\"devpulse-saas-import\" metric.type=\"run.googleapis.com/job/completed_execution_count\"",
-                "aggregation": {
-                  "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_DELTA",
-                  "crossSeriesReducer": "REDUCE_SUM",
-                  "groupByFields": ["metric.labels.result"]
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Import: Repo Errors",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-import-repo-errors\"",
-                "aggregation": {
-                  "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_DELTA",
-                  "crossSeriesReducer": "REDUCE_SUM",
-                  "groupByFields": ["metric.labels.org", "metric.labels.repo"]
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: CPU Utilization",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_MEAN"
-                }
-              }
-            },
-            "plotType": "LINE"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: Memory Utilization",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/memory/utilization\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_MEAN"
-                }
-              }
-            },
-            "plotType": "LINE"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: Connections",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_MEAN"
-                }
-              }
-            },
-            "plotType": "LINE"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: Disk Used",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/disk/bytes_used\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_MEAN"
-                }
-              }
-            },
-            "plotType": "LINE"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: Transactions/sec",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/transaction_count\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_RATE",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
-            "plotType": "LINE"
-          }]
-        }
-      },
-      {
-        "title": "Cloud SQL: Deadlocks",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloudsql_database\" resource.labels.database_id=\"thingzio:thingzio-pg\" metric.type=\"cloudsql.googleapis.com/database/postgresql/deadlock_count\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_DELTA",
                   "crossSeriesReducer": "REDUCE_SUM"
                 }
               }
@@ -394,35 +234,17 @@
         }
       },
       {
-        "title": "Event Limit Reached",
+        "title": "Rate Limit Events",
         "xyChart": {
           "dataSets": [{
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-event-limit-reached\"",
-                "aggregation": {
-                  "alignmentPeriod": "86400s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
-            "plotType": "STACKED_BAR"
-          }]
-        }
-      },
-      {
-        "title": "Admin: Request Count",
-        "xyChart": {
-          "dataSets": [{
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"devpulse-saas-admin\" metric.type=\"run.googleapis.com/request_count\"",
+                "filter": "metric.type=\"logging.googleapis.com/user/devpulse-saas-rate-limit-exceeded\"",
                 "aggregation": {
                   "alignmentPeriod": "3600s",
-                  "perSeriesAligner": "ALIGN_RATE",
+                  "perSeriesAligner": "ALIGN_SUM",
                   "crossSeriesReducer": "REDUCE_SUM",
-                  "groupByFields": ["metric.labels.response_code_class"]
+                  "groupByFields": ["metric.labels.path"]
                 }
               }
             },
