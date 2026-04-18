@@ -48,6 +48,28 @@ var templateFuncs = template.FuncMap{
 		}
 		return fmt.Sprintf("%d%%", part*100/total)
 	},
+	"sub": func(a, b int) int { return a - b },
+	"mul": func(a, b int) int { return a * b },
+	"div": func(a, b int) int {
+		if b == 0 {
+			return 0
+		}
+		return a / b
+	},
+	"sumTokenLimit": func(tokens []tokenStatus) int {
+		var total int
+		for _, t := range tokens {
+			total += t.Limit
+		}
+		return total
+	},
+	"sumTokenUsed": func(tokens []tokenStatus) int {
+		var total int
+		for _, t := range tokens {
+			total += t.Used
+		}
+		return total
+	},
 	"comma": func(n int) string {
 		if n == 0 {
 			return "Unlimited"

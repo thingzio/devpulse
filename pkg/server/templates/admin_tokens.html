@@ -10,6 +10,26 @@
   <h2 style="margin-bottom:16px">Token Pool Status ({{len .Tokens}})</h2>
 
   {{if .Tokens}}
+  {{$limit := sumTokenLimit .Tokens}}{{$used := sumTokenUsed .Tokens}}{{$avail := sub $limit $used}}{{$pct := 0}}{{if gt $limit 0}}{{$pct = div (mul $used 100) $limit}}{{end}}
+  <div style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap">
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Total Limit</div>
+      <div style="font-size:22px;font-weight:700">{{comma $limit}}</div>
+    </div>
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Used</div>
+      <div style="font-size:22px;font-weight:700">{{comma $used}}</div>
+    </div>
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Available</div>
+      <div style="font-size:22px;font-weight:700">{{comma $avail}}</div>
+    </div>
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Utilization</div>
+      <div style="font-size:22px;font-weight:700;{{if gt $pct 90}}color:#ef4444{{else if gt $pct 75}}color:#eab308{{else}}color:#22c55e{{end}}">{{$pct}}%</div>
+    </div>
+  </div>
+
   <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
     <thead>
       <tr style="background:var(--table-header)">
