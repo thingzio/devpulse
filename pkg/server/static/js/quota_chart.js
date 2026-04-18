@@ -1,5 +1,6 @@
 (function() {
   var chart = null;
+  var dangerThreshold = 80;
 
   function fmtTime(iso) {
     var d = new Date(iso);
@@ -37,11 +38,10 @@
 
         var times = Object.keys(byTime).sort();
         var labels = times.map(fmtTime);
-        var usedData = times.map(function(t) { return byTime[t].used; });
-        var limitData = times.map(function(t) { return byTime[t].limit; });
         var pctData = times.map(function(t) {
           return byTime[t].limit > 0 ? Math.round(byTime[t].used / byTime[t].limit * 100) : 0;
         });
+        var thresholdData = times.map(function() { return dangerThreshold; });
 
         var ctx = document.getElementById('quotaChart').getContext('2d');
         if (chart) chart.destroy();
@@ -51,37 +51,36 @@
             labels: labels,
             datasets: [
               {
-                label: 'Used',
-                data: usedData,
+                label: 'Pool Utilization',
+                data: pctData,
                 borderColor: '#3b82f6',
-                backgroundColor: '#3b82f622',
+                backgroundColor: function(context) {
+                  var c = context.chart;
+                  var area = c.chartArea;
+                  if (!area) return '#3b82f622';
+                  var grad = c.ctx.createLinearGradient(0, area.bottom, 0, area.top);
+                  grad.addColorStop(0, 'rgba(59,130,246,0.02)');
+                  grad.addColorStop(0.8, 'rgba(59,130,246,0.15)');
+                  grad.addColorStop(1, 'rgba(239,68,68,0.3)');
+                  return grad;
+                },
                 borderWidth: 2,
                 pointRadius: 3,
+                pointBackgroundColor: function(context) {
+                  var v = context.parsed && context.parsed.y;
+                  return v >= dangerThreshold ? '#ef4444' : '#3b82f6';
+                },
                 tension: 0.3,
-                fill: true,
-                yAxisID: 'y'
+                fill: true
               },
               {
-                label: 'Pool Limit',
-                data: limitData,
-                borderColor: '#6b7280',
+                label: 'Throttle Risk (' + dangerThreshold + '%)',
+                data: thresholdData,
+                borderColor: '#ef4444',
                 borderDash: [6, 3],
                 borderWidth: 1,
                 pointRadius: 0,
-                tension: 0,
-                fill: false,
-                yAxisID: 'y'
-              },
-              {
-                label: 'Utilization %',
-                data: pctData,
-                borderColor: '#ef4444',
-                backgroundColor: '#ef444422',
-                borderWidth: 2,
-                pointRadius: 3,
-                tension: 0.3,
-                fill: false,
-                yAxisID: 'y1'
+                fill: false
               }
             ]
           },
@@ -91,36 +90,24 @@
             interaction: { mode: 'index', intersect: false },
             scales: {
               x: {
-                title: { display: true, text: 'Time' },
                 grid: { color: 'rgba(128,128,128,0.15)' },
                 ticks: { maxTicksLimit: 12 }
               },
               y: {
-                type: 'linear',
-                position: 'left',
-                min: 0,
-                title: { display: true, text: 'Tokens' },
-                grid: { color: 'rgba(128,128,128,0.15)' },
-                ticks: { callback: function(v) { return comma(v); } }
-              },
-              y1: {
-                type: 'linear',
-                position: 'right',
                 min: 0,
                 max: 100,
-                title: { display: true, text: 'Utilization %' },
-                grid: { drawOnChartArea: false },
+                grid: { color: 'rgba(128,128,128,0.15)' },
                 ticks: { callback: function(v) { return v + '%'; } }
               }
             },
             plugins: {
               tooltip: {
                 callbacks: {
-                  label: function(tip) {
-                    if (tip.dataset.yAxisID === 'y1') {
-                      return tip.dataset.label + ': ' + tip.parsed.y + '%';
-                    }
-                    return tip.dataset.label + ': ' + comma(tip.parsed.y);
+                  afterLabel: function(tip) {
+                    if (tip.datasetIndex !== 0) return '';
+                    var t = times[tip.dataIndex];
+                    var d = byTime[t];
+                    return comma(d.used) + ' / ' + comma(d.limit) + ' tokens';
                   }
                 }
               },
