@@ -41,10 +41,11 @@ type adminTenantDetailData struct {
 }
 
 type adminTokensData struct {
-	Title      string
-	Tokens     []tokenStatus
-	ErrorRepos []importErrorRepo
-	CSRFToken  string
+	Title            string
+	Tokens           []tokenStatus
+	ErrorRepos       []importErrorRepo
+	NoInstallTenants []noInstallTenant
+	CSRFToken        string
 }
 
 type importErrorRepo struct {
@@ -53,6 +54,12 @@ type importErrorRepo struct {
 	Errors    int
 	LastError string
 	Username  string
+}
+
+type noInstallTenant struct {
+	Username    string
+	Plan        string
+	ActiveRepos int
 }
 
 type adminMetricsData struct {
@@ -264,14 +271,29 @@ func adminTokensHandler(db *sql.DB) http.HandlerFunc {
 			})
 		}
 
+		noInstall, err := tenant.ListTenantsWithoutInstall(ctx, db)
+		if err != nil {
+			slog.Error("listing tenants without install", "error", err)
+		}
+
+		var noInstallOut []noInstallTenant
+		for _, t := range noInstall {
+			noInstallOut = append(noInstallOut, noInstallTenant{
+				Username:    t.Username,
+				Plan:        t.Plan,
+				ActiveRepos: t.ActiveRepos,
+			})
+		}
+
 		csrfToken := middleware.GenerateCSRFToken()
 		middleware.SetCSRFCookie(w, csrfToken)
 
 		renderTemplate(w, "admin_tokens.html", adminTokensData{
-			Title:      "Token Status",
-			Tokens:     results,
-			ErrorRepos: errRepos,
-			CSRFToken:  csrfToken,
+			Title:            "Token Status",
+			Tokens:           results,
+			ErrorRepos:       errRepos,
+			NoInstallTenants: noInstallOut,
+			CSRFToken:        csrfToken,
 		})
 	}
 }

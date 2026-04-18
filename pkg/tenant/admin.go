@@ -274,3 +274,46 @@ func ListImportErrorRepos(ctx context.Context, db *sql.DB) ([]ImportErrorRepo, e
 	}
 	return out, nil
 }
+
+// TenantWithoutInstall is a tenant consuming imports but contributing no token to the pool.
+type TenantWithoutInstall struct {
+	Username    string
+	Plan        string
+	ActiveRepos int
+}
+
+const listTenantsWithoutInstallSQL = `
+	SELECT t.username, t.plan, COUNT(tr.id) AS active_repos
+	FROM devpulse_tenant t
+	JOIN devpulse_tenant_repo tr ON tr.tenant_id = t.id AND tr.active = TRUE
+	WHERE t.status = 'active'
+	  AND t.tos_accepted_at IS NOT NULL
+	  AND NOT EXISTS (
+	    SELECT 1 FROM devpulse_github_app_installation gi
+	    WHERE gi.tenant_id = t.id
+	      AND gi.suspended_at IS NULL
+	  )
+	GROUP BY t.id, t.username, t.plan
+	ORDER BY active_repos DESC, t.username`
+
+// ListTenantsWithoutInstall returns active tenants that have repos but no GitHub App installation.
+func ListTenantsWithoutInstall(ctx context.Context, db *sql.DB) ([]TenantWithoutInstall, error) {
+	rows, err := db.QueryContext(ctx, listTenantsWithoutInstallSQL)
+	if err != nil {
+		return nil, fmt.Errorf("listing tenants without install: %w", err)
+	}
+	defer rows.Close()
+
+	var out []TenantWithoutInstall
+	for rows.Next() {
+		var t TenantWithoutInstall
+		if err := rows.Scan(&t.Username, &t.Plan, &t.ActiveRepos); err != nil {
+			return nil, fmt.Errorf("scanning tenant without install: %w", err)
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating tenants without install: %w", err)
+	}
+	return out, nil
+}

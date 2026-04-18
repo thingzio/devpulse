@@ -117,5 +117,27 @@
   </table>
   {{end}}
 
+  {{if .NoInstallTenants}}
+  <h2 style="margin-top:32px;margin-bottom:16px">Tenants without Installation <span style="font-size:0.6em;font-weight:normal;color:var(--gray)">(consuming quota, not contributing)</span></h2>
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+    <thead>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Tenant</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Plan</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Active Repos</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .NoInstallTenants}}
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);text-transform:capitalize">{{.Plan}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.ActiveRepos}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
 </div>
 {{end}}
