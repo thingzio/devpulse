@@ -103,11 +103,6 @@ func ImportOrg() string { return os.Getenv("IMPORT_ORG") }
 // Override: IMPORT_REPO (default "").
 func ImportRepo() string { return os.Getenv("IMPORT_REPO") }
 
-// ImportAdoptTimeout returns the minutes before a new repo (import_done_at IS NULL)
-// is adopted by the scheduled import as a safety net.
-// Override: IMPORT_ADOPT_TIMEOUT (default 60).
-func ImportAdoptTimeout() int { return GetEnvAsInt("IMPORT_ADOPT_TIMEOUT", 60) }
-
 // ImportJobName returns the fully-qualified Cloud Run import job name for triggering on-demand imports.
 // Override: IMPORT_JOB_NAME (default "").
 func ImportJobName() string { return os.Getenv("IMPORT_JOB_NAME") }

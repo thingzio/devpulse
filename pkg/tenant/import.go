@@ -173,7 +173,6 @@ const listImportWorkSQL = `
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
-	  AND (tr.import_done_at IS NOT NULL OR tr.created_at < NOW() - MAKE_INTERVAL(mins => $1))
 	ORDER BY lower(tr.repo), lower(tr.org), tr.tenant_id`
 
 const listImportWorkForRepoSQL = `
@@ -201,11 +200,6 @@ func ListImportWorkForRepo(ctx context.Context, db *sql.DB, org, repo string) ([
 	return scanImportWorkRows(rows)
 }
 
-const markImportDoneByRepoSQL = `
-	UPDATE devpulse_tenant_repo
-	SET import_done_at = NOW()
-	WHERE org = $1 AND repo = $2 AND active = TRUE`
-
 const incrementImportErrorsByRepoSQL = `
 	UPDATE devpulse_tenant_repo
 	SET import_errors = import_errors + 1, import_last_error = $3
@@ -223,8 +217,8 @@ type ImportWorkRow struct {
 
 // ListImportWork returns all active tenant_repo rows eligible for import,
 // joined with tenant plan. Sorted deterministically for sharding.
-func ListImportWork(ctx context.Context, db *sql.DB, adoptTimeoutMin int) ([]ImportWorkRow, error) {
-	rows, err := db.QueryContext(ctx, listImportWorkSQL, adoptTimeoutMin)
+func ListImportWork(ctx context.Context, db *sql.DB) ([]ImportWorkRow, error) {
+	rows, err := db.QueryContext(ctx, listImportWorkSQL)
 	if err != nil {
 		return nil, fmt.Errorf("listing import work: %w", err)
 	}
@@ -247,14 +241,6 @@ func scanImportWorkRows(rows *sql.Rows) ([]ImportWorkRow, error) {
 		return nil, fmt.Errorf("iterating import work rows: %w", err)
 	}
 	return result, nil
-}
-
-// MarkImportDoneByRepo marks all active tenant_repo rows for a given org/repo as imported.
-func MarkImportDoneByRepo(ctx context.Context, db *sql.DB, org, repo string) error {
-	if _, err := db.ExecContext(ctx, markImportDoneByRepoSQL, org, repo); err != nil {
-		return fmt.Errorf("marking import done for %s/%s: %w", org, repo, err)
-	}
-	return nil
 }
 
 // IncrementImportErrorsByRepo increments error counter for all active tenant_repo rows of a given org/repo.

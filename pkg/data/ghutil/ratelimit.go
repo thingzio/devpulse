@@ -126,6 +126,44 @@ func CheckTokenQuota(ctx context.Context, token string) int {
 	return rl.Resources.Core.Remaining
 }
 
+// TokenQuota holds the limit and remaining fields from the GitHub rate_limit API.
+type TokenQuota struct {
+	Limit     int
+	Remaining int
+}
+
+// CheckTokenQuotaFull calls the GitHub rate_limit API and returns both limit
+// and remaining. Returns nil on error.
+func CheckTokenQuotaFull(ctx context.Context, token string) *TokenQuota {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		return nil
+	}
+	net.SetGitHubHeaders(req, token)
+
+	resp, err := net.QuotaCheckClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var rl struct {
+		Resources struct {
+			Core struct {
+				Limit     int `json:"limit"`
+				Remaining int `json:"remaining"`
+			} `json:"core"`
+		} `json:"resources"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rl); err != nil {
+		return nil
+	}
+	return &TokenQuota{
+		Limit:     rl.Resources.Core.Limit,
+		Remaining: rl.Resources.Core.Remaining,
+	}
+}
+
 // HasSufficientQuota returns true if the token has enough remaining API calls.
 func HasSufficientQuota(ctx context.Context, token string) bool {
 	remaining := CheckTokenQuota(ctx, token)

@@ -442,6 +442,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	mux.Handle("POST /admin/tenant/{username}/reset", wrap(adminResetErrorsHandler(db)))
 	mux.Handle("POST /admin/tenant/{username}/hard-reset", wrap(adminHardResetHandler(db)))
 	mux.Handle("GET /admin/tokens", wrap(adminTokensHandler(db)))
+	mux.Handle("GET /admin/tokens/quota-history", wrap(adminTokenQuotaHistoryHandler(db)))
 	mux.Handle("GET /admin/metrics", wrap(adminMetricsHandler(mcfg)))
 }
 

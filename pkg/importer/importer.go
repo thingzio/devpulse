@@ -63,6 +63,9 @@ func runImport(ctx context.Context) error {
 		slog.Info("token pool ready", "tokens", pool.Size())
 	}
 
+	// Sample token quotas at the start of each import run.
+	sampleTokenQuotas(taskCtx, db, ghAppConfig)
+
 	llmCfg := data.NewLLMConfigFromEnv()
 
 	// Fetch work list — single-repo mode or scheduled.
@@ -168,11 +171,8 @@ func runImport(ctx context.Context) error {
 	return nil
 }
 
-// markImportSuccess marks a repo import as done and resets error counters.
+// markImportSuccess resets error counters after a successful import.
 func markImportSuccess(ctx context.Context, db *sql.DB, rw RepoWork) {
-	if err := tenant.MarkImportDoneByRepo(ctx, db, rw.Org, rw.Repo); err != nil {
-		slog.Warn("marking import done", "org", rw.Org, "repo", rw.Repo, "error", err)
-	}
 	for _, tr := range rw.Tenants {
 		if err := tenant.ResetImportErrors(ctx, db, tr.TenantRepoID); err != nil {
 			slog.Warn("resetting import errors", "error", err)
@@ -190,7 +190,7 @@ func fetchWorkList(ctx context.Context, db *sql.DB) ([]tenant.ImportWorkRow, boo
 		rows, err := tenant.ListImportWorkForRepo(ctx, db, org, repo)
 		return rows, true, err
 	}
-	rows, err := tenant.ListImportWork(ctx, db, config.ImportAdoptTimeout())
+	rows, err := tenant.ListImportWork(ctx, db)
 	return rows, false, err
 }
 

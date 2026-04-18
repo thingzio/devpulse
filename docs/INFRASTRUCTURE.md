@@ -344,7 +344,6 @@ Performance indexes beyond primary keys, defined in migration files:
 | `idx_tenant_member_github` | `(github_id)` | OAuth login lookup |
 | `idx_github_app_installation_tenant` | `(tenant_id)` | Installation token minting |
 | `idx_tenant_repo_rls` | `(tenant_id, org, repo) WHERE active` | RLS policy performance |
-| `idx_tenant_repo_import_queue` | `(active, import_claimed_at, import_done_at) WHERE active` | Legacy claim queue (columns unused, index retained for rollback) |
 
 ## Terraform
 

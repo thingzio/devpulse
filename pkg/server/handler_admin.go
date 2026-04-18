@@ -527,6 +527,28 @@ func adminRepoActionHandler(db *sql.DB, action string, fn func(ctx context.Conte
 	}
 }
 
+// GET /admin/tokens/quota-history — JSON time-series of token quota samples.
+func adminTokenQuotaHistoryHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hours := 24
+		if h := r.URL.Query().Get("hours"); h != "" {
+			if v, err := strconv.Atoi(h); err == nil && v > 0 && v <= 720 {
+				hours = v
+			}
+		}
+
+		since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
+		samples, err := getTokenQuotaSamples(r.Context(), db, since)
+		if err != nil {
+			slog.Error("querying quota history", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, samples)
+	}
+}
+
 // resolveGitHubUserID resolves a GitHub username to their numeric user ID.
 func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
 	apiURL := "https://api.github.com/users/" + url.PathEscape(username)
