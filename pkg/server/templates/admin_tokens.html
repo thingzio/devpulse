@@ -117,26 +117,5 @@
   </table>
   {{end}}
 
-  {{if .OrphanedRepos}}
-  <h2 style="margin-top:32px;margin-bottom:16px">Orphaned Repos <span style="font-size:0.6em;font-weight:normal;color:var(--gray)">(no matching installation)</span></h2>
-  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
-    <thead>
-      <tr style="background:var(--table-header)">
-        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Org</th>
-        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Repo</th>
-        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Tenant</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .OrphanedRepos}}
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Org}}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Repo}}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)"><a href="/admin/tenant/{{.Username}}">{{.Username}}</a></td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-  {{end}}
 </div>
 {{end}}

@@ -41,11 +41,10 @@ type adminTenantDetailData struct {
 }
 
 type adminTokensData struct {
-	Title         string
-	Tokens        []tokenStatus
-	ErrorRepos    []importErrorRepo
-	OrphanedRepos []orphanedRepo
-	CSRFToken     string
+	Title      string
+	Tokens     []tokenStatus
+	ErrorRepos []importErrorRepo
+	CSRFToken  string
 }
 
 type importErrorRepo struct {
@@ -54,12 +53,6 @@ type importErrorRepo struct {
 	Errors    int
 	LastError string
 	Username  string
-}
-
-type orphanedRepo struct {
-	Org      string
-	Repo     string
-	Username string
 }
 
 type adminMetricsData struct {
@@ -260,11 +253,6 @@ func adminTokensHandler(db *sql.DB) http.HandlerFunc {
 			slog.Error("listing import error repos", "error", err)
 		}
 
-		orphanedRepos, err := tenant.ListOrphanedRepos(ctx, db)
-		if err != nil {
-			slog.Error("listing orphaned repos", "error", err)
-		}
-
 		var errRepos []importErrorRepo
 		for _, r := range errorRepos {
 			errRepos = append(errRepos, importErrorRepo{
@@ -276,24 +264,14 @@ func adminTokensHandler(db *sql.DB) http.HandlerFunc {
 			})
 		}
 
-		var orphans []orphanedRepo
-		for _, r := range orphanedRepos {
-			orphans = append(orphans, orphanedRepo{
-				Org:      r.Org,
-				Repo:     r.Repo,
-				Username: r.Username,
-			})
-		}
-
 		csrfToken := middleware.GenerateCSRFToken()
 		middleware.SetCSRFCookie(w, csrfToken)
 
 		renderTemplate(w, "admin_tokens.html", adminTokensData{
-			Title:         "Token Status",
-			Tokens:        results,
-			ErrorRepos:    errRepos,
-			OrphanedRepos: orphans,
-			CSRFToken:     csrfToken,
+			Title:      "Token Status",
+			Tokens:     results,
+			ErrorRepos: errRepos,
+			CSRFToken:  csrfToken,
 		})
 	}
 }
