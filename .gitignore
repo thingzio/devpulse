@@ -28,6 +28,7 @@ gha-creds-*.json
 pkg/config/config.yaml
 
 .claude/settings.local.json
+docs/plans
 
 
 # =============================================================================
