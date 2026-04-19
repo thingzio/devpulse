@@ -1324,6 +1324,16 @@ a.link {
   background: #0860ca;
 }
 
+.modal-btn-success {
+  background: #2ea043;
+  color: var(--white);
+  border-color: #2ea043;
+}
+
+.modal-btn-success:hover {
+  background: #278a38;
+}
+
 /* FOOTER */
 .page-footer {
   display: flex;
