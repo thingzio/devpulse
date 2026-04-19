@@ -1,82 +1,116 @@
 {{define "content"}}
 <div class="landing">
   <div class="landing-hero">
-    <h1>Understand the health of your project</h1>
+    <h1>Know if the projects you depend on are thriving or dying</h1>
     {{if .Error}}
     <div class="error" style="margin:10px auto;max-width:500px;padding:10px 16px;border-radius:var(--border-radius);background:var(--error-bg, #fee);color:var(--error-fg, #c00);text-align:center;">
       <p style="margin:0;">{{.Error}}</p>
     </div>
     {{end}}
-    <p>Track activity, measure velocity, and assess code quality across your GitHub repos. Monitor community growth, explore events, and get AI-powered insights that surface risks before they become problems.</p>
+    <p>DevPulse tracks contributor trends, development velocity, and risk signals across your GitHub repos &mdash; so you can spot declining projects before they become incidents.</p>
     <a href="/auth/github" class="cta-btn">Sign in with GitHub</a>
-    <p style="margin-top:8px;font-size:0.85em;color:var(--gray);">Takes 1 minute: GitHub login + a one-click app install.</p>
+    <p style="margin-top:8px;font-size:0.85em;color:var(--gray);">Free tier available. GitHub login + a one-click app install.</p>
   </div>
 
   <div class="landing-features">
     <div class="landing-feature">
-      <h3>Project Health</h3>
-      <img src="/static/img/dashboard.png" alt="Project Health dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>Health scorecard</strong> &mdash; graded scores across demand, throughput, and responsiveness so you can see overall project health at a glance</li>
-        <li><strong>Bus factor &amp; pony factor</strong> &mdash; identify single-contributor risks and measure how evenly work is distributed</li>
-        <li><strong>Repository status</strong> &mdash; stars, forks, open issues, primary language, and license at a glance</li>
-        <li><strong>Community profile</strong> &mdash; check for README, contributing guide, code of conduct, and issue/PR templates</li>
-      </ul>
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
+      <h3>Health Scoring</h3>
+      <p>A&ndash;F grades across demand, throughput, and responsiveness. Bus factor and pony factor surface single-contributor and single-company risk before it becomes your incident.</p>
     </div>
 
     <div class="landing-feature">
-      <h3>Activity &amp; Velocity</h3>
-      <img src="/static/img/activity.png" alt="Activity and Velocity dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>Activity trends</strong> &mdash; monthly PRs, reviews, issues, comments, and forks visualized over time</li>
-        <li><strong>PR size distribution</strong> &mdash; changes bucketed by S/M/L/XL to spot review bottlenecks</li>
-        <li><strong>Lead time to merge</strong> &mdash; average days from PR creation to merge, tracked monthly</li>
-        <li><strong>Release cadence</strong> &mdash; monthly release counts and download trends to gauge delivery rhythm</li>
-      </ul>
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          <line x1="2" y1="20" x2="6" y2="20"/>
+          <line x1="6" y1="20" x2="10" y2="16"/>
+          <line x1="10" y1="16" x2="14" y2="20"/>
+          <line x1="14" y1="20" x2="18" y2="18"/>
+          <line x1="18" y1="18" x2="22" y2="20"/>
+        </svg>
+      </div>
+      <h3>Activity &amp; Trends</h3>
+      <p>Monthly PRs, reviews, issues, and forks visualized over time. PR size distribution shows review bottlenecks. Issue open/close ratios detect growing backlogs.</p>
     </div>
 
     <div class="landing-feature">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h3>Velocity</h3>
+      <p>Time to first response, lead time to merge, change failure rate, and release cadence. Know how fast work moves through the pipeline and whether releases are stable.</p>
+    </div>
+
+    <div class="landing-feature">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 11l3 3L22 4"/>
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+        </svg>
+      </div>
       <h3>Quality</h3>
-      <img src="/static/img/quality.png" alt="Quality dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>PR review ratio</strong> &mdash; PRs to reviews per month with trend line showing review culture health</li>
-        <li><strong>Review latency</strong> &mdash; average hours from PR creation to first review, helping teams set SLAs</li>
-        <li><strong>Time to close</strong> &mdash; average days to close issues, highlighting responsiveness</li>
-        <li><strong>Change failure rate</strong> &mdash; bug issues near releases and revert PRs as a proxy for release stability</li>
-      </ul>
+      <p>PR review ratio, review latency, and contributor reputation scoring. Surface PRs that need extra scrutiny and measure whether code is getting proper attention.</p>
     </div>
 
     <div class="landing-feature">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+          <path d="M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+      </div>
       <h3>Community</h3>
-      <img src="/static/img/community.png" alt="Community dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>Contributor retention</strong> &mdash; new vs. returning contributors per month to measure community stickiness</li>
-        <li><strong>Contributor momentum</strong> &mdash; rolling active count with period-over-period delta</li>
-        <li><strong>First-time contributor funnel</strong> &mdash; track newcomers from first comment to first PR to first merge</li>
-        <li><strong>Entity affiliations</strong> &mdash; see which companies are contributing and drill down to individual developers</li>
-      </ul>
+      <p>Contributor retention, momentum, and first-time contributor funnel. See which companies are contributing and whether newcomers are converting to repeat maintainers.</p>
     </div>
 
     <div class="landing-feature">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
       <h3>AI Insights</h3>
-      <img src="/static/img/insights.png" alt="AI Insights dashboard" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>Health-aware AI analysis</strong> &mdash; LLM-generated observations fed by scorecard metrics, trending signals, and activity data per repo</li>
-        <li><strong>Time to first response</strong> &mdash; hours to first review or comment, a key contributor experience metric</li>
-        <li><strong>Issue open/close ratio</strong> &mdash; monthly opened vs. closed to detect growing backlogs</li>
-        <li><strong>Contributor reputation</strong> &mdash; two-tier scoring with bot filtering to surface your most impactful contributors</li>
-      </ul>
+      <p>LLM-generated observations and prioritized action items that turn 30+ metrics into plain-language recommendations &mdash; so you don't have to interpret every chart yourself.</p>
     </div>
+  </div>
 
-    <div class="landing-feature">
-      <h3>Portfolio &amp; Search</h3>
-      <img src="/static/img/events.png" alt="Portfolio and search overview" style="width:100%;border-radius:var(--border-radius);margin-bottom:10px;border:1px solid var(--border-color);" loading="lazy" onerror="this.style.display='none'" />
-      <ul>
-        <li><strong>Portfolio summary</strong> &mdash; cross-repo KPIs and trending signals with week-over-week changes across all your tracked projects</li>
-        <li><strong>Search &amp; filter</strong> &mdash; scope by organization, repository, entity, event type, and time period</li>
-        <li><strong>Data export</strong> &mdash; download event data as CSV or generate PDF reports (plan-dependent)</li>
-        <li><strong>Usage tracking</strong> &mdash; weekly event limits with per-repo breakdown so you always know your consumption</li>
-      </ul>
+  <div class="landing-callouts">
+    <div class="landing-callout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="callout-icon">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+      </svg>
+      <div>
+        <strong>Portfolio view</strong>
+        <span>Monitor all your repos in a single dashboard with cross-project KPIs and week-over-week trends.</span>
+      </div>
+    </div>
+    <div class="landing-callout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="callout-icon">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <div>
+        <strong>Export &amp; report</strong>
+        <span>Download PDF reports and CSV archives for stakeholder reviews, audits, and governance meetings.</span>
+      </div>
+    </div>
+    <div class="landing-callout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="callout-icon">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <div>
+        <strong>Supply chain awareness</strong>
+        <span>Stars tell you nothing. Track the metrics that actually predict whether a dependency is thriving or running on fumes.</span>
+      </div>
     </div>
   </div>
 
