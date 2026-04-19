@@ -32,14 +32,20 @@ jobs:
 
       - name: Deploy to Cloud Run
         shell: bash
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          REGION: ${{ vars.REGION }}
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          AR_REPO: ${{ vars.AR_REPO }}
+          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+          JOB_NAME: ${{ vars.JOB_NAME }}
         run: |
           set -euo pipefail
-          TAG="${{ inputs.image_tag }}"
-          AR="${{ vars.REGION }}-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ vars.AR_REPO }}"
-          echo "Deploying ${TAG} via ${AR}..."
-          gcloud run services update ${{ vars.SERVICE_NAME }} \
-            --region=${{ vars.REGION }} \
-            --image="${AR}/devpulse-site:${TAG}"
-          gcloud run jobs update ${{ vars.JOB_NAME }} \
-            --region=${{ vars.REGION }} \
-            --image="${AR}/devpulse-import:${TAG}"
+          AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}"
+          echo "Deploying ${IMAGE_TAG} via ${AR}..."
+          gcloud run services update "${SERVICE_NAME}" \
+            --region="${REGION}" \
+            --image="${AR}/devpulse-site:${IMAGE_TAG}"
+          gcloud run jobs update "${JOB_NAME}" \
+            --region="${REGION}" \
+            --image="${AR}/devpulse-import:${IMAGE_TAG}"

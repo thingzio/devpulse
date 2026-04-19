@@ -185,8 +185,9 @@ GitHub Actions workflows in `.github/workflows/`:
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
-| `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
+| `test-on-push.yaml` | push to main, PRs (paths-ignore: docs, md, .claude) | Calls reusable test workflow |
+| `test-on-call.yaml` | reusable (workflow_call) | lint, unit test, integration test, e2e |
+| `tfsec-on-push.yaml` | push to main, PRs (paths: infra/**, .settings.yaml) | Terraform security scanning |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, container image push, Cloud Run deploy |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
 
