@@ -15,6 +15,25 @@
 <meta name="twitter:description" content="Understand the health of any open source project at a glance. Track contributor activity, PR velocity, and community trends.">
 <meta name="twitter:image" content="https://devpulse.thingz.io/static/img/dashboard.png">
 <link rel="stylesheet" href="/static/css/app.css">
+<script>
+(function(){
+  var key = 'theme';
+  var saved = localStorage.getItem(key) || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.addEventListener('DOMContentLoaded', function(){
+    var btns = document.querySelectorAll('.theme-btn[data-theme]');
+    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme') === saved); });
+    btns.forEach(function(b){
+      b.addEventListener('click', function(){
+        var t = this.getAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem(key, t);
+        btns.forEach(function(x){ x.classList.toggle('active', x.getAttribute('data-theme') === t); });
+      });
+    });
+  });
+})();
+</script>
 </head>
 <body>
 {{block "nav" .}}
