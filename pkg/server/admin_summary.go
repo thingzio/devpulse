@@ -44,7 +44,7 @@ const collectOpsMetricsSQL = `SELECT
      WHERE s.created_at > NOW() - INTERVAL '7 days'),
     (SELECT COUNT(*) FROM devpulse_tenant WHERE tos_accepted_at IS NOT NULL),
     (SELECT COUNT(*) FROM devpulse_tenant WHERE status = 'suspended'),
-    (SELECT COUNT(*) FROM devpulse_tenant_repo WHERE active = TRUE AND insight IS NOT NULL),
+    (SELECT COUNT(DISTINCT (org, repo)) FROM devpulse_repo_insights),
     (SELECT COUNT(*) FROM devpulse_developer WHERE reputation IS NOT NULL AND username NOT LIKE '%[bot]')`
 
 func collectOpsMetrics(ctx context.Context, db *sql.DB) (opsMetrics, error) {
