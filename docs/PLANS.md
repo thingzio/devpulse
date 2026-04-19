@@ -1,6 +1,6 @@
 # Plan Feature Gating — Phase 2
 
-> **Phase 1 (shipped):** Repos, data retention, exports (PDF/CSV), AI insights. Deep reputation was removed in v0.47.0 (replaced by Contributor Composition using local DB data). See `pkg/plan/plan.go` for current limits.
+> **Phase 1 (shipped):** Repos, data retention, exports (PDF/CSV), AI insights, reputation scoring. See `pkg/plan/plan.go` for current limits.
 >
 > **Retention limits:** Free=3 months, Starter=6 months, Pro=12 months, Enterprise=unlimited.
 >

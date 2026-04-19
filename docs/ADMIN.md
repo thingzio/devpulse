@@ -34,39 +34,27 @@ variable "db_tier" {
 
 See [INFRASTRUCTURE.md](INFRASTRUCTURE.md) for the full scaling plan and cost estimates per tier.
 
-## Tenant Management
+## Admin Dashboard
 
-### CLI Tools
+The admin dashboard is integrated into `devpulse-site` at `/admin`. Access requires session authentication and inclusion in the `DEVPULSE_ADMIN_USERS` whitelist (set via environment variable in Terraform).
 
-All tools call the IAM-protected `devpulse-saas-admin` Cloud Run service.
+Admin pages: tenant list, tenant detail, token quota, metrics overview.
+
+## CLI Tools
+
+Scripts in the `tools/` directory:
 
 ```shell
-./tools/tenant-list                          # list all tenants with plan, repos, events
-./tools/tenant-detail <username>             # detailed tenant view: repos, backfill, contributors
-./tools/tenant-upgrade <username> <plan>     # upgrade tenant plan (free/starter/pro/enterprise)
-./tools/tenant-invite <username>             # invite a new tenant
-./tools/tenant-tokens                        # show GitHub App token quota per installation
-./tools/metrics-review                       # AI-powered review of GCP monitoring metrics
-./tools/repo-reset <org/repo>               # reset import errors for a repo
-./tools/repo-reset --all <username>          # reset all import errors for a tenant
-./tools/job-detail <execution-name>          # show import job execution status and logs
-./tools/db-connect                           # open psql to the production database
-./tools/db-snapshot                          # create a database backup snapshot
+./tools/bump                       # version bump (used by make bump-*)
+./tools/db-attach                  # attach to local/remote Postgres via Docker
+./tools/job-detail <execution>     # show import job execution status and logs
+./tools/setup-gh-env               # populate GitHub Actions environment from Terraform outputs
+./tools/setup-tools                # install/validate local dev tool dependencies
+./tools/e2e                        # end-to-end test runner
+./tools/common                     # shared shell helpers (sourced by other scripts)
 ```
 
-### Admin Service Endpoints
-
-The admin service (`devpulse-saas-admin`) exposes these IAM-gated endpoints:
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/tenants` | GET | List all tenants |
-| `/tenant` | GET | Get tenant detail |
-| `/upgrade` | POST | Upgrade tenant plan |
-| `/invite` | POST | Invite new tenant |
-| `/reset-errors` | POST | Reset repo import errors |
-| `/tokens` | GET | GitHub App token quota per installation |
-| `/metrics/review` | GET | AI-powered metrics analysis (Anthropic) |
+## Tenant Management
 
 ### Direct SQL
 
@@ -126,7 +114,6 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | Memory Utilization | Sustained > 80% = add memory limit |
 | Billable Instance Time | Cost tracking |
 | Application Errors | Error spikes across all services |
-| Admin: Request Count | Admin service usage |
 
 #### Import Widgets
 
@@ -157,7 +144,7 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 | Transactions/sec | Query load patterns |
 | Deadlocks | Should be zero; investigate any occurrence |
 
-### Alert Policies (8)
+### Alert Policies
 
 | Alert | Condition | Action |
 |-------|-----------|--------|
@@ -196,14 +183,6 @@ gcloud run jobs executions list --job devpulse-saas-import \
     --project=$PROJECT_ID --region=us-west1 --limit=5
 ```
 
-### Local Stats
-
-```shell
-make stats
-```
-
-Shows tenant count, active repos, imported repos, total events, recent sign-ins, and repos per tenant.
-
 ## Secret Rotation
 
 1. Regenerate in GitHub (OAuth App settings / GitHub App settings)
@@ -220,9 +199,11 @@ GitHub Actions workflows in `.github/workflows/`:
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `test-on-push.yaml` | push to main, PRs | Calls reusable test workflow |
+| `test-on-push.yaml` | push to main, PRs (paths-ignore: md, docs, .claude) | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
+| `tfsec-on-push.yaml` | push to main, PRs (paths: infra/**, .settings.yaml) | Terraform security scanning |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, image push, Cloud Run deploy |
+| `deploy-cloud-run.yaml` | reusable (workflow_call) | Cloud Run deployment (called by release and deploy-saas) |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |
 
 Supply chain: container images built via ko, pushed to Artifact Registry (`us-west1-docker.pkg.dev/thingzio/devpulse-saas-images`). govulncheck in CI. All GitHub Actions pinned by commit hash. Tool versions centralized in `.settings.yaml`.

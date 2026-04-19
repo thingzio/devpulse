@@ -4,7 +4,7 @@
 
 ```bash
 git clone https://github.com/thingzio/devpulse.git && cd devpulse
-make up             # start local Postgres
+make db-up          # start local Postgres
 make server         # run HTTP server on :8080
 make import         # run import worker (needs GITHUB_TOKEN)
 make qualify        # full check: test-coverage + lint + vulncheck + e2e
@@ -77,12 +77,11 @@ export ANTHROPIC_BASE_URL="https://..."               # optional, custom endpoin
 ### Workflow
 
 ```bash
-make up             # start Postgres (data persists in pgdata volume)
+make db-up          # start Postgres (data persists in pgdata volume)
 make server         # runs devpulse-site on :8080
 make import         # runs devpulse-import, processes tenants and exits
-make stats          # show tenant count, repos, recent sign-ins
-make db             # open psql shell
-make down           # stop Postgres (data preserved)
+make db-connect     # open psql shell
+make db-down        # stop Postgres (data preserved)
 ```
 
 ### Mode Selection
@@ -99,12 +98,11 @@ Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
 | Target | Description |
 |--------|-------------|
-| `make up` | Start local Postgres (docker compose) |
-| `make down` | Stop local Postgres |
+| `make db-up` | Start local Postgres (docker compose) |
+| `make db-down` | Stop local Postgres |
+| `make db-connect` | Open psql shell to local Postgres |
 | `make server` | Run HTTP server on :8080 |
 | `make import` | Run import worker |
-| `make db` | Open psql shell to local Postgres |
-| `make stats` | Show tenant and repo stats |
 
 ### Quality
 
@@ -115,7 +113,7 @@ Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 | `make test-coverage` | Tests with coverage threshold enforcement |
 | `make lint` | Go + YAML + Terraform linting |
 | `make vulncheck` | Vulnerability scanning with govulncheck |
-| `make e2e` | End-to-end tests |
+| `make e2e` | End-to-end tests (via `tools/e2e`) |
 
 ### Build & Release
 
@@ -129,12 +127,21 @@ Debug logging: set `DEVPULSE_DEBUG=true` (always JSON format).
 
 Pushing a version tag triggers the CI release workflow (goreleaser build, container image push, Cloud Run deploy).
 
+### Infrastructure
+
+| Target | Description |
+|--------|-------------|
+| `make tf-init` | Initialize Terraform |
+| `make tf-plan` | Plan Terraform changes |
+| `make tf-apply` | Apply Terraform changes |
+
 ### Maintenance
 
 | Target | Description |
 |--------|-------------|
 | `make tidy` | Format code, tidy modules, vendor dependencies |
 | `make upgrade` | Upgrade all dependencies to latest |
+| `make setup` | Validate and install local dev tool dependencies |
 | `make clean` | Clean build artifacts |
 | `make clean-all` | Deep clean including Go module cache |
 | `make info` | Print version, commit, branch, Go version, linter version |
@@ -150,7 +157,7 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | Linter errors | Run `make lint` and fix reported issues |
 | Build failures | Run `make tidy` to update dependencies |
 | Import hits rate limit | Re-run; the importer uses jitter backoff automatically |
-| `make server` fails | Ensure Postgres is running (`make up`) and `DATABASE_URL` is set |
+| `make server` fails | Ensure Postgres is running (`make db-up`) and `DATABASE_URL` is set |
 
 ### Testing Patterns
 

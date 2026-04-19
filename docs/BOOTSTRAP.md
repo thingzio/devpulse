@@ -116,9 +116,9 @@ terraform init
 terraform apply
 ```
 
-This creates: DB user (`devpulse`) in shared Cloud SQL instance, Secret Manager secrets, service accounts, Artifact Registry standard repo, Cloud Run service + job (import) + admin service, Cloud Scheduler (every 2 hours), WIF for GitHub Actions, monitoring alerts + log metrics. VPC, Cloud SQL instance, and DB monitoring are owned by `thingzio/infra`.
+This creates: DB user (`devpulse`) in shared Cloud SQL instance, Secret Manager secrets, service accounts, Artifact Registry standard repo, Cloud Run service + job (import), Cloud Scheduler (every 2 hours), WIF for GitHub Actions, monitoring alerts + log metrics. VPC, Cloud SQL instance, and DB monitoring are owned by `thingzio/infra`.
 
-> **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for both service and job during initial setup. Set back to `true` after successful deploy.
+> **First apply note:** Set `deletion_protection = false` in `cloudrun.tf` for the service and job during initial setup. Set back to `true` after successful deploy.
 
 Note the outputs:
 ```shell
@@ -134,8 +134,8 @@ cd ../..  # back to repo root
 ./tools/setup-gh-env
 ```
 
-This creates 9 variables in the GitHub `saas` environment:
-`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`, `ADMIN_SERVICE_NAME`
+This creates 8 variables in the GitHub `saas` environment:
+`WIF_PROVIDER`, `DEPLOYER_SA`, `SERVICE_NAME`, `JOB_NAME`, `ADMIN_SERVICE_NAME`, `REGION`, `PROJECT_ID`, `AR_REPO`
 
 ## 9. Configure DNS
 
@@ -213,7 +213,7 @@ gcloud run jobs update devpulse-saas-import --region=$REGION \
 
 After verifying everything works:
 ```shell
-# Edit infra/saas/cloudrun.tf — set deletion_protection = true on all resources (serve, import, admin)
+# Edit infra/saas/cloudrun.tf — set deletion_protection = true on both resources (serve, import)
 cd infra/saas && terraform apply
 ```
 

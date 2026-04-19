@@ -5,11 +5,11 @@ Multi-tenant SaaS for GitHub project health analytics. Two binaries: `devpulse-s
 ## Data Flow
 
 ```
-GitHub App webhook ──→ devpulse (serve) ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
-Cloud Scheduler */2h ──→ devpulse (import) ──→ shared token pool ──→ PostgreSQL
+GitHub App webhook ──→ devpulse-site ──→ tenant_repo ──→ PostgreSQL (RLS-scoped)
+Cloud Scheduler */2h ──→ devpulse-import ──→ shared token pool ──→ PostgreSQL
 Browser ──→ POST /api/repos ──→ public check + install check ──→ tenant_repo ──→ on-demand import
-Browser ──→ devpulse (serve) ──→ OAuth ──→ RLS-scoped dashboard
-Admin  ──→ devpulse (admin) ──→ IAM auth ──→ tenant plan management ──→ PostgreSQL
+Browser ──→ devpulse-site ──→ OAuth ──→ RLS-scoped dashboard
+Admin  ──→ devpulse-site /admin ──→ session auth + whitelist ──→ tenant management ──→ PostgreSQL
 ```
 
 ### Repo-Add Gating
@@ -29,7 +29,9 @@ devpulse/
 ├── pkg/
 │   ├── server/             HTTP server, handlers, templates, static assets (includes admin at /admin)
 │   │   ├── static/         Frontend: CSS, JS, images (embedded via go:embed)
-│   │   └── templates/      HTML templates: layout, header, footer, home, landing, dashboard, help, tos
+│   │   └── templates/      HTML templates: layout, header, footer, home, landing, dashboard,
+│   │                        help, tos, settings, changelog, plans_table, suspended,
+│   │                        admin, admin_tenants, admin_tenant, admin_tokens, admin_metrics
 │   ├── importer/           Import worker (sharded task-index + goroutine workers)
 │   ├── config/             Environment configuration
 │   ├── data/               Store interface, shared types, helpers
@@ -51,7 +53,7 @@ devpulse/
 
 ## Binaries
 
-Two binaries with independent lifecycles. `devpulse-site` serves HTTP and includes an integrated admin dashboard at `/admin` (session auth + username whitelist). `devpulse-import` runs the full import pipeline (events, reputation, insights). Each creates its own store via `postgres.NewFromEnv()`.
+Two binaries with independent lifecycles. `devpulse-site` serves HTTP and includes an integrated admin dashboard at `/admin` (session auth + `DEVPULSE_ADMIN_USERS` whitelist). `devpulse-import` runs the full import pipeline (events, reputation, insights). Each creates its own store via `postgres.NewFromEnv()`.
 
 ## Data Layer
 

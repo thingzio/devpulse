@@ -13,7 +13,7 @@ Two binaries: `devpulse-site` (HTTP server + integrated admin dashboard), `devpu
 ```shell
 git clone https://github.com/thingzio/devpulse.git && cd devpulse
 make test       # unit tests with race detector
-make lint       # go vet + golangci-lint + tfsec
+make lint       # go vet + golangci-lint + yamllint + tfsec
 make qualify    # test-coverage + lint + govulncheck + e2e
 ```
 
@@ -22,10 +22,13 @@ make qualify    # test-coverage + lint + govulncheck + e2e
 | Doc | Purpose |
 |-----|---------|
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local setup, make targets, debugging |
-| [ADMIN.md](docs/ADMIN.md) | Day-2 operations, monitoring, CI/CD, tenant management |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data model, tenant isolation |
+| [ADMIN.md](docs/ADMIN.md) | Day-2 operations, monitoring, CI/CD, tenant management |
 | [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | GCP tiers, scaling, costs, API throughput |
 | [BOOTSTRAP.md](docs/BOOTSTRAP.md) | One-time GCP deployment guide |
+| [PLANS.md](docs/PLANS.md) | Plan feature gating (Free, Starter, Pro, Enterprise) |
+| [VIEWS.md](docs/VIEWS.md) | Dashboard tabs and chart guide |
+| [GITLAB.md](docs/GITLAB.md) | GitLab support feasibility assessment |
 
 ## Contributing
 

@@ -7,18 +7,16 @@ DevPulse runs on GCP: Cloud Run for compute, Cloud SQL (PostgreSQL) for storage,
 ```
 Internet
    |
-   +-- Cloud Run service (serve mode)
+   +-- Cloud Run service (devpulse-site)
    |     +-- OAuth sign-in
    |     +-- Dashboard (Chart.js)
    |     +-- Webhook endpoint (GitHub App)
    |     +-- Data API (30+ chart endpoints)
+   |     +-- Admin dashboard at /admin (session auth + whitelist)
    |
-   +-- Cloud Run job (import, every 2 hours)
+   +-- Cloud Run job (devpulse-import, every 2 hours)
    |     +-- Per-tenant repo import via GitHub API
    |     +-- LLM insights generation (Claude Haiku 4.5)
-   |
-   +-- Cloud Run service (admin, IAM-gated)
-   |     +-- Tenant plan management (upgrade/downgrade)
    |
    +-- GitHub
          +-- OAuth (user identity)
@@ -37,15 +35,14 @@ Cloudflare DNS  -> devpulse.thingz.io
 
 ## Compute
 
-Two container images: `devpulse-site` (Cloud Run service, includes admin dashboard), `devpulse-import` (Cloud Run job).
+Two container images: `devpulse-site` (Cloud Run service, includes admin dashboard at `/admin`), `devpulse-import` (Cloud Run job).
 
 | Mode | Deployment | Scaling | Access |
 |------|-----------|---------|--------|
 | Serve | Cloud Run service | 0-10 instances (scale-to-zero) | Public |
 | Import | Cloud Run job | Every 2 hours, parallelism=3 (deterministic sharding), full pipeline | Internal |
-| Admin | Cloud Run service | 0-1 instances, scale-to-zero | IAM-gated |
 
-The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize cost. Cold starts for the Go binary are ~2s, within the 1s p99 latency alert threshold. The import job runs for the duration of the import and exits. The admin service is IAM-protected (`roles/run.invoker`) and scales to zero when idle.
+The serve service runs with `min_instance_count=0` (scale-to-zero) to minimize cost. Cold starts for the Go binary are ~2s, within the 1s p99 latency alert threshold. The import job runs for the duration of the import and exits. Admin access is gated by session auth and a `DEVPULSE_ADMIN_USERS` whitelist.
 
 ## Response Caching
 
@@ -80,21 +77,20 @@ Each call sends ~2-4K input tokens (JSON metrics payload + DORA benchmarks + ins
 
 ## Current Cost (Actual)
 
-Current production setup: `db-g1-small`, 3 Cloud Run deployments, ~5 tenants.
+Current production setup: `db-g1-small`, 2 Cloud Run deployments, ~5 tenants.
 
 | Service | Details | Estimate |
 |---------|---------|----------|
 | Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
 | Cloud Run Service (serve) | scale-to-zero (min=0), 1 vCPU/512MB | $5/mo |
 | Cloud Run Job (import) | every 2 hours, ~3 tasks, ~10 min/run | $3.50/mo |
-| Cloud Run Service (admin) | scale-to-zero, 1 vCPU/512MB | $0.50/mo |
 | Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
 | Cloud Scheduler | 1 job every 2 hours | free (3 free) |
 | Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
 | Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
 | Cloud DNS | 1 hosted zone | $0.20/mo |
 | Cloud Monitoring | log-based metrics, 11 alert policies, email | free tier |
-| **Total** | | **~$37/mo** |
+| **Total** | | **~$36/mo** |
 
 ## Cost by Tenant Scale
 
@@ -110,10 +106,9 @@ Total repos: ~93. Paid repos with AI: ~78.
 | Cloud SQL | db-g1-small, ~15GB storage | $29/mo |
 | Cloud Run (serve) | always-on, light load | $15/mo |
 | Cloud Run (import) | hourly, ~15 min/run | $6/mo |
-| Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~78 repos x $0.02/mo (cached) | $1.50/mo |
 | Fixed (scheduler, DNS, secrets, AR, monitoring) | | $1/mo |
-| **Total** | | **~$53/mo** |
+| **Total** | | **~$52/mo** |
 
 ### 100 Tenants
 
@@ -125,10 +120,9 @@ Total repos: ~360. Paid repos with AI: ~300.
 | Cloud SQL | db-g1-small, ~25GB storage | $31/mo |
 | Cloud Run (serve) | always-on, moderate load | $18/mo |
 | Cloud Run (import) | hourly, ~30 min/run | $11/mo |
-| Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Anthropic API | ~300 repos x $0.02/mo (cached) | $6/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$68/mo** |
+| **Total** | | **~$67/mo** |
 
 **Upgrade signal:** DB CPU sustained > 80%, or import duration > 30 minutes.
 
@@ -142,11 +136,10 @@ Total repos: ~1,080. Paid repos with AI: ~900.
 | Cloud SQL | db-custom-1-3840, 1 vCPU, 3.75GB, ~50GB storage | $59/mo |
 | Cloud Run (serve) | always-on, higher concurrency | $25/mo |
 | Cloud Run (import) | parallelism=5, ~45 min/run | $20/mo |
-| Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | PgBouncer sidecar | connection pooling | $10/mo |
 | Anthropic API | ~900 repos x $0.02/mo (cached) | $18/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$134/mo** |
+| **Total** | | **~$133/mo** |
 
 **Upgrade signal:** connection count approaching limits, query latency > 500ms.
 
@@ -161,21 +154,20 @@ Total repos: ~3,600. Paid repos with AI: ~3,000.
 | AlloyDB read pool (optional) | 2 vCPU | $150/mo |
 | Cloud Run (serve) | always-on, 2-5 instances avg | $50/mo |
 | Cloud Run (import) | parallelism=10+, Cloud Tasks | $33/mo |
-| Cloud Run (admin) | scale-to-zero | $0.50/mo |
 | Cloud Tasks | parallel import dispatch | $10/mo |
 | Anthropic API | ~3,000 repos x $0.02/mo (cached) | $60/mo |
 | Fixed | | $1/mo |
-| **Total** | | **~$490/mo** |
+| **Total** | | **~$489/mo** |
 
 ### Cost Scaling Summary
 
 | Tenants | DB Tier | Repos (est) | Anthropic | Total |
 |---------|---------|-------------|-----------|-------|
-| 5 (current) | db-g1-small | ~15 | $0.30 | ~$37 |
-| 25 | db-g1-small | ~93 | $1.50 | ~$53 |
-| 100 | db-g1-small | ~360 | $6 | ~$68 |
-| 300 | db-custom-1-3840 | ~1,080 | $18 | ~$134 |
-| 1,000 | AlloyDB | ~3,600 | $60 | ~$490 |
+| 5 (current) | db-g1-small | ~15 | $0.30 | ~$36 |
+| 25 | db-g1-small | ~93 | $1.50 | ~$52 |
+| 100 | db-g1-small | ~360 | $6 | ~$67 |
+| 300 | db-custom-1-3840 | ~1,080 | $18 | ~$133 |
+| 1,000 | AlloyDB | ~3,600 | $60 | ~$489 |
 
 With insight caching, the Anthropic API drops from the dominant cost to a minor line item (~12% at 1K tenants vs ~55% without caching). The database and compute are now the primary cost drivers at scale. Key cost levers:
 1. **AI gating by plan** — Free tenants generate zero LLM cost
@@ -357,8 +349,8 @@ All infrastructure is defined in `infra/saas/`:
 | `database.tf` | DB user (`devpulse`) in shared Cloud SQL instance |
 | `secrets.tf` | Secret Manager secrets + IAM bindings |
 | `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
-| `cloudrun.tf` | Cloud Run service (serve) + job (import) + service (admin, IAM-gated) |
-| `scheduler.tf` | Import job trigger (every 2 hours) + daily report |
+| `cloudrun.tf` | Cloud Run service (serve) + job (import) |
+| `scheduler.tf` | Import job trigger (every 2 hours) |
 | `monitoring.tf` | Uptime checks, log-based metrics, service-level alert policies, email notifications |
 | `registry.tf` | Artifact Registry standard repo (direct push from CI) |
 | `outputs.tf` | Service URL, deployer SA, WIF provider |
@@ -374,7 +366,6 @@ Shared infrastructure (VPC, Cloud SQL instance, DB monitoring) is owned by the `
 - **Covering indexes** — heaviest self-join queries use index-only scans, 2-5x faster on cache miss
 - **PK-sorted upserts** — all import batches sorted by primary key before execution, preventing deadlocks and reducing transaction retries
 - **Import job exits after completion** — no idle compute; ~85% of hourly runs are no-ops (queue empty), exiting in <200ms
-- **Admin service scale-to-zero** — no cost when not in use
 - **Shared data model** — repos imported by one tenant are visible to others (no duplicate imports)
 - **Incremental imports** — pagination state ensures only new data is fetched
 - **Staleness checks** — metadata skipped if fresh (< 24h)

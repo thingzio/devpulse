@@ -88,7 +88,7 @@ Default to proven, simple technologies.
 
 Every released artifact carries verifiable proof of origin and build process.
 
-**What:** Container images are built in CI from pinned dependencies and pushed to GHCR. Vulnerability scanning runs on every push.
+**What:** Container images are built in CI from pinned dependencies and pushed to Artifact Registry. Vulnerability scanning runs on every push.
 
 **Why:** "Trust us" is not a security model.
 
@@ -124,9 +124,9 @@ Every released artifact carries verifiable proof of origin and build process.
    - Vulnerability scan (govulncheck)
 
 2. **Maintainer review** covers:
-   - Correctness and functionality
+   - Correctness and test coverage
    - Code style and Go idioms
-   - Test coverage and quality
+   - Consistency with existing patterns
 
 3. **Address feedback** by pushing new commits
 
