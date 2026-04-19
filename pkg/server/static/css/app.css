@@ -993,6 +993,7 @@ fieldset {
   .page-footer {
     font-size: 10px;
     letter-spacing: 0;
+    padding: 10px 10px 20px;
   }
 }
 
@@ -1312,10 +1313,11 @@ a.link {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 20px;
-  padding-bottom: 32px;
+  margin-top: 0;
+  padding: 20px 30px 32px;
   text-transform: uppercase;
   color: var(--page-header-headingColor);
+  background: var(--page-content-bgColor);
   font-size: 0.8rem;
 }
 
