@@ -47,10 +47,26 @@
 
   <div class="settings-section">
     <h2>Appearance</h2>
-    <div class="theme-toggle">
+    <div class="theme-toggle" id="theme-toggle">
       <button class="theme-btn" data-theme="dark">Dark</button>
       <button class="theme-btn" data-theme="light">Light</button>
     </div>
+    <script>
+    (function(){
+      var wrap = document.getElementById('theme-toggle');
+      if (!wrap) return;
+      var btns = wrap.querySelectorAll('button[data-theme]');
+      var current = localStorage.getItem('theme') || 'dark';
+      btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme') === current); });
+      wrap.addEventListener('click', function(e){
+        var t = e.target.getAttribute('data-theme');
+        if (!t) return;
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('theme', t);
+        btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-theme') === t); });
+      });
+    })();
+    </script>
   </div>
 </div>
 {{end}}
