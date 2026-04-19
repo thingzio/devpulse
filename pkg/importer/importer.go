@@ -471,7 +471,7 @@ func runEnrichmentPhases(
 			errs++
 		}
 	} else if llmCfg != nil {
-		slog.Debug("skipping insights, not included in plan", "org", org, "repo", repo, "plan", planName)
+		slog.Info("skipping insights, not included in plan", "org", org, "repo", repo, "plan", planName)
 	}
 
 	return errs
@@ -620,7 +620,7 @@ func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMCo
 
 	shouldRegen, reason := checkInsightStaleness(generatedAt, savedCount, summary.Events)
 	if !shouldRegen {
-		slog.Debug("skipping insights generation", "org", org, "repo", repo, "reason", reason)
+		slog.Info("skipping insights generation", "org", org, "repo", repo, "reason", reason)
 		return nil
 	}
 	slog.Info("regenerating insights", "org", org, "repo", repo, "reason", reason)

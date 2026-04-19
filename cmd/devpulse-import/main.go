@@ -18,7 +18,7 @@ var (
 )
 
 func main() {
-	logging.SetupLogger(version)
+	logging.SetupLogger(version, "import")
 
 	slog.Info("starting devpulse-import",
 		"commit", commit,

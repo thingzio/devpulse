@@ -8,13 +8,13 @@ import (
 )
 
 // SetupLogger configures the default slog logger with JSON output.
-// Level is determined by the DEVPULSE_DEBUG env var. The version string
-// is attached to every log entry via slog.With.
-func SetupLogger(version string) {
+// Level is determined by the DEVPULSE_DEBUG env var. The version and
+// source strings are attached to every log entry via slog.With.
+func SetupLogger(version, source string) {
 	level := slog.LevelInfo
 	if config.DebugEnabled() {
 		level = slog.LevelDebug
 	}
 	handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
-	slog.SetDefault(slog.New(handler).With("version", version))
+	slog.SetDefault(slog.New(handler).With("version", version, "source", source))
 }

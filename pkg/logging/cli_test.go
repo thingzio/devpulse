@@ -11,7 +11,7 @@ func TestSetupLogger(t *testing.T) {
 	original := slog.Default()
 	defer slog.SetDefault(original)
 
-	SetupLogger("v0.0.1-test")
+	SetupLogger("v0.0.1-test", "test")
 
 	logger := slog.Default()
 	assert.NotNil(t, logger)

@@ -414,6 +414,11 @@ for DevPulse, a multi-tenant SaaS on Cloud Run.
 - Alert thresholds: p99 latency >1s for 600s, 5xx >5/min for 5min.
 - GitHub rate limit: per-installation, 60-min sliding window (NOT top-of-hour reset).
 
+## Log Source Attribution
+- All structured log entries include a "source" field: "serve" for the HTTP server, "import" for the batch worker.
+- Application Errors metric counts ERROR-severity log entries. Use the source field to distinguish serve-side from import-side errors when investigating.
+- Insight generation logs are now at INFO level: "skipping insights generation" (with reason) and "insights generated" (with counts). Use these to distinguish intentional skips from failures.
+
 ## User Engagement Metrics Context
 - Sign-ins, ToS Accepted, Upgrade Requests, Webhook Installs, Event Limit Reached are
   business signals. Correlate them with load metrics (e.g. latency spikes during sign-in bursts).
