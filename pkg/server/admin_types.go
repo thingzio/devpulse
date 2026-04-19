@@ -87,9 +87,18 @@ type errorRepo struct {
 	LastError string `json:"last_error"`
 }
 
+type opsMetrics struct {
+	ActiveTenants7d    int `json:"active_tenants_7d"`
+	Onboarded          int `json:"onboarded"`
+	Suspended          int `json:"suspended"`
+	ReposWithInsights  int `json:"repos_with_insights"`
+	ScoredContributors int `json:"scored_contributors"`
+}
+
 type summaryResponse struct {
 	Date       string        `json:"date"`
 	Current    platformStats `json:"current"`
+	Ops        opsMetrics    `json:"ops"`
 	DoD        *statsDelta   `json:"dod,omitempty"`
 	WoW        *statsDelta   `json:"wow,omitempty"`
 	MoM        *statsDelta   `json:"mom,omitempty"`

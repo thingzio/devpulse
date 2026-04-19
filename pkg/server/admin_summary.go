@@ -39,6 +39,26 @@ const errorReposSQL = `SELECT org, repo, import_errors, COALESCE(import_last_err
     FROM devpulse_tenant_repo WHERE active = TRUE AND import_errors > 0
     ORDER BY import_errors DESC`
 
+const collectOpsMetricsSQL = `SELECT
+    (SELECT COUNT(DISTINCT s.tenant_id) FROM devpulse_session s
+     WHERE s.created_at > NOW() - INTERVAL '7 days'),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE tos_accepted_at IS NOT NULL),
+    (SELECT COUNT(*) FROM devpulse_tenant WHERE status = 'suspended'),
+    (SELECT COUNT(*) FROM devpulse_tenant_repo WHERE active = TRUE AND insight IS NOT NULL),
+    (SELECT COUNT(*) FROM devpulse_developer WHERE reputation IS NOT NULL AND username NOT LIKE '%[bot]')`
+
+func collectOpsMetrics(ctx context.Context, db *sql.DB) (opsMetrics, error) {
+	var m opsMetrics
+	err := db.QueryRowContext(ctx, collectOpsMetricsSQL).Scan(
+		&m.ActiveTenants7d, &m.Onboarded, &m.Suspended,
+		&m.ReposWithInsights, &m.ScoredContributors,
+	)
+	if err != nil {
+		return m, fmt.Errorf("collecting ops metrics: %w", err)
+	}
+	return m, nil
+}
+
 func collectStats(ctx context.Context, db *sql.DB) (platformStats, error) {
 	var s platformStats
 	err := db.QueryRowContext(ctx, collectStatsSQL).Scan(
@@ -175,9 +195,15 @@ func collectSummary(ctx context.Context, db *sql.DB) (summaryResponse, error) {
 		return summaryResponse{}, fmt.Errorf("getting error repos: %w", err)
 	}
 
+	ops, err := collectOpsMetrics(ctx, db)
+	if err != nil {
+		return summaryResponse{}, fmt.Errorf("collecting ops metrics: %w", err)
+	}
+
 	return summaryResponse{
 		Date:       today,
 		Current:    current,
+		Ops:        ops,
 		DoD:        computeDelta(current, prevDay),
 		WoW:        computeDelta(current, prevWeek),
 		MoM:        computeDelta(current, prevMonth),

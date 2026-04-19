@@ -27,10 +27,14 @@ type adminDashboardData struct {
 }
 
 type adminTenantsData struct {
-	Title     string
-	Tenants   []tenantSummary
-	Plans     map[string]plan.Limits
-	CSRFToken string
+	Title      string
+	Tenants    []tenantSummary
+	Plans      map[string]plan.Limits
+	CSRFToken  string
+	Search     string
+	Page       int
+	TotalPages int
+	Total      int
 }
 
 type adminTenantDetailData struct {
@@ -90,18 +94,29 @@ func adminDashboardHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GET /admin/tenants — list all tenants.
+// GET /admin/tenants — list all tenants with server-side search and pagination.
 func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
+	const pageSize = 10
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		tenants, err := tenant.ListTenantSummaries(r.Context(), db)
+		search := r.URL.Query().Get("q")
+		page := 1
+		if p := r.URL.Query().Get("page"); p != "" {
+			if v, err := strconv.Atoi(p); err == nil && v > 0 {
+				page = v
+			}
+		}
+		offset := (page - 1) * pageSize
+
+		result, err := tenant.ListTenantSummariesPaged(r.Context(), db, search, pageSize, offset)
 		if err != nil {
 			slog.Error("listing tenants", "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 
-		out := make([]tenantSummary, len(tenants))
-		for i, t := range tenants {
+		out := make([]tenantSummary, len(result.Tenants))
+		for i, t := range result.Tenants {
 			out[i] = tenantSummary{
 				Username:         t.Username,
 				Email:            t.Email,
@@ -113,17 +128,26 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 				CreatedAt:        t.CreatedAt.Format("2006-01-02"),
 			}
 			if t.LastSignIn != nil {
-				out[i].LastSignIn = t.LastSignIn.Format("2006-01-02")
+				out[i].LastSignIn = t.LastSignIn.Format("2006-01-02 15:04")
 			}
+		}
+
+		totalPages := (result.Total + pageSize - 1) / pageSize
+		if totalPages < 1 {
+			totalPages = 1
 		}
 
 		csrfToken := middleware.GenerateCSRFToken()
 		middleware.SetCSRFCookie(w, csrfToken)
 		renderTemplate(w, "admin_tenants.html", adminTenantsData{
-			Title:     "Tenants",
-			Tenants:   out,
-			Plans:     plan.All,
-			CSRFToken: csrfToken,
+			Title:      "Tenants",
+			Tenants:    out,
+			Plans:      plan.All,
+			CSRFToken:  csrfToken,
+			Search:     search,
+			Page:       page,
+			TotalPages: totalPages,
+			Total:      result.Total,
 		})
 	}
 }

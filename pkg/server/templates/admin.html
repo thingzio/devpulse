@@ -94,6 +94,32 @@
     </tbody>
   </table>
 
+  <h3 style="margin-bottom:12px">Operational</h3>
+  <div style="display:flex;gap:24px;margin-bottom:24px;flex-wrap:wrap">
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px;min-width:120px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Active (7d)</div>
+      <div style="font-size:22px;font-weight:700">{{.Summary.Ops.ActiveTenants7d}}<span style="font-size:13px;font-weight:400;color:var(--gray)"> / {{.Summary.Current.Tenants}}</span></div>
+    </div>
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px;min-width:120px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Onboarded</div>
+      <div style="font-size:22px;font-weight:700">{{.Summary.Ops.Onboarded}}<span style="font-size:13px;font-weight:400;color:var(--gray)"> / {{.Summary.Current.Tenants}}</span></div>
+    </div>
+    {{if gt .Summary.Ops.Suspended 0}}
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px;min-width:120px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Suspended</div>
+      <div style="font-size:22px;font-weight:700;color:#ef4444">{{.Summary.Ops.Suspended}}</div>
+    </div>
+    {{end}}
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px;min-width:120px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Repos w/ Insights</div>
+      <div style="font-size:22px;font-weight:700">{{.Summary.Ops.ReposWithInsights}}<span style="font-size:13px;font-weight:400;color:var(--gray)"> / {{.Summary.Current.Repos}}</span></div>
+    </div>
+    <div style="padding:12px 18px;border:1px solid var(--border-color);border-radius:8px;min-width:120px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray);margin-bottom:4px">Scored Contributors</div>
+      <div style="font-size:22px;font-weight:700">{{.Summary.Ops.ScoredContributors}}<span style="font-size:13px;font-weight:400;color:var(--gray)"> / {{.Summary.Current.Contributors}}</span></div>
+    </div>
+  </div>
+
   {{if .Summary.ErrorRepos}}
   <h3 style="margin-bottom:12px">Repos with Import Errors</h3>
   <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">

@@ -80,6 +80,21 @@ const (
 		GROUP BY t.id
 		ORDER BY t.created_at`
 
+	countTenantSummariesSearchSQL = `
+		SELECT COUNT(*) FROM devpulse_tenant t
+		WHERE ($1 = '' OR t.username ILIKE '%' || $1 || '%' OR COALESCE(t.name, '') ILIKE '%' || $1 || '%')`
+
+	listTenantSummariesPagedSQL = `
+		SELECT t.username, COALESCE(t.email, ''), COALESCE(t.name, ''),
+		       t.plan, t.status, t.max_repos, t.max_events_per_week,
+		       t.created_at, MAX(s.created_at) AS last_sign_in
+		FROM devpulse_tenant t
+		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
+		WHERE ($1 = '' OR t.username ILIKE '%' || $1 || '%' OR COALESCE(t.name, '') ILIKE '%' || $1 || '%')
+		GROUP BY t.id
+		ORDER BY MAX(s.created_at) DESC NULLS LAST
+		LIMIT $2 OFFSET $3`
+
 	getTenantDetailByUsernameSQL = `
 		SELECT t.id, t.username, t.email,
 		       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
@@ -138,6 +153,47 @@ func InsertMinimalTenant(ctx context.Context, db *sql.DB, githubID int64, userna
 		return "", fmt.Errorf("inserting minimal tenant %q: %w", username, err)
 	}
 	return id, nil
+}
+
+// TenantSummaryPage is a paginated result of tenant summaries.
+type TenantSummaryPage struct {
+	Tenants []TenantSummary
+	Total   int
+}
+
+// ListTenantSummariesPaged returns tenants filtered by search, sorted by last sign-in DESC, with pagination.
+func ListTenantSummariesPaged(ctx context.Context, db *sql.DB, search string, limit, offset int) (*TenantSummaryPage, error) {
+	var total int
+	if err := db.QueryRowContext(ctx, countTenantSummariesSearchSQL, search).Scan(&total); err != nil {
+		return nil, fmt.Errorf("counting tenant summaries: %w", err)
+	}
+
+	rows, err := db.QueryContext(ctx, listTenantSummariesPagedSQL, search, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("listing tenant summaries paged: %w", err)
+	}
+	defer rows.Close()
+
+	var tenants []TenantSummary
+	for rows.Next() {
+		var t TenantSummary
+		var lastSignIn sql.NullTime
+		if err := rows.Scan(
+			&t.Username, &t.Email, &t.Name,
+			&t.Plan, &t.Status, &t.MaxRepos, &t.MaxEventsPerWeek,
+			&t.CreatedAt, &lastSignIn,
+		); err != nil {
+			return nil, fmt.Errorf("scanning tenant summary: %w", err)
+		}
+		if lastSignIn.Valid {
+			t.LastSignIn = &lastSignIn.Time
+		}
+		tenants = append(tenants, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating tenant summaries: %w", err)
+	}
+	return &TenantSummaryPage{Tenants: tenants, Total: total}, nil
 }
 
 // ListTenantSummaries returns all tenants with their last sign-in time.
