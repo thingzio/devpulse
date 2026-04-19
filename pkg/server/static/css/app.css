@@ -174,54 +174,8 @@ fieldset {
   padding: 3px;
 }
 
-/* THEME TOGGLE BUTTON (top bar) */
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background: var(--white);
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-left: 10px;
-}
-
-.theme-toggle-btn:hover {
-  background: var(--page-header-bgColor-hover);
-}
-
-.theme-toggle-btn:focus {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.theme-toggle-btn svg {
-  width: 20px;
-  height: 20px;
-  fill: var(--gray);
-}
-
-.theme-toggle-btn:hover svg {
-  fill: var(--dark-color);
-}
-
-.theme-toggle-btn .icon-sun,
-.theme-toggle-btn .icon-moon {
-  display: none;
-}
-
-.theme-toggle-btn .icon-moon { display: block; }
-
-[data-theme="dark"] .theme-toggle-btn .icon-moon { display: none; }
-[data-theme="dark"] .theme-toggle-btn .icon-sun { display: block; }
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .theme-toggle-btn .icon-moon { display: none; }
-  :root:not([data-theme="light"]) .theme-toggle-btn .icon-sun { display: block; }
-}
+/* THEME TOGGLE (settings page) */
+.theme-toggle { display: flex; gap: 0; }
 
 /* USER AVATAR MENU */
 .user-menu-wrap {
@@ -386,6 +340,25 @@ fieldset {
   background: var(--accent);
   color: #fff;
 }
+
+.settings-btn {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--light-color);
+  color: var(--dark-color);
+  cursor: pointer;
+}
+.settings-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.settings-section .hint {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--medium-color);
+}
+.settings-section .hint a { color: var(--accent); }
 
 /* PAGE CONTENT */
 .error {

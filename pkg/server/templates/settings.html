@@ -32,6 +32,8 @@
         <div class="settings-label">Last Login</div>
         <div class="settings-value">{{ .last_login }}</div>
       </div>
+      <button class="settings-btn" disabled title="Coming soon">Change Plan</button>
+      <p class="hint">Plan changes are not available yet. To request an upgrade, visit the <a href="/help">Help</a> page.</p>
     </div>
 
     <div class="settings-section">
@@ -39,43 +41,13 @@
       <div class="settings-grid">
         <div class="settings-label">Theme</div>
         <div class="settings-value">
-          <div class="theme-switcher">
-            <button class="theme-btn" data-theme="light">Light</button>
+          <div class="theme-toggle">
             <button class="theme-btn" data-theme="dark">Dark</button>
-            <button class="theme-btn" data-theme="system">System</button>
+            <button class="theme-btn" data-theme="light">Light</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 </div>
-
-<script>
-(function() {
-  function getEffectiveTheme() {
-    return localStorage.getItem('theme') || 'dark';
-  }
-  function applyTheme(choice) {
-    if (choice === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.removeItem('theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', choice);
-      localStorage.setItem('theme', choice);
-    }
-    updateButtons(choice);
-  }
-  function updateButtons(active) {
-    document.querySelectorAll('.theme-btn').forEach(function(btn) {
-      btn.classList.toggle('active', btn.getAttribute('data-theme') === active);
-    });
-  }
-  document.querySelectorAll('.theme-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      applyTheme(this.getAttribute('data-theme'));
-    });
-  });
-  updateButtons(getEffectiveTheme());
-})();
-</script>
 {{end}}

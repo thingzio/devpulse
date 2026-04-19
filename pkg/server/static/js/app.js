@@ -99,30 +99,32 @@ function applyChartDefaults() {
     Chart.defaults.transitions.resize = { animation: { duration: 0 } };
 }
 
-function initTheme() {
-    const saved = localStorage.getItem('theme');
-    // Default to dark; users can switch to light in settings.
-    document.documentElement.setAttribute('data-theme', saved || 'dark');
-    applyChartDefaults();
+function highlightThemeBtn(theme) {
+    document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
+    });
 }
 
-function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    let next;
-    if (!current) {
-        next = prefersDark ? 'light' : 'dark';
-    } else if (current === 'dark') {
-        next = 'light';
-    } else {
-        next = 'dark';
-    }
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+function initTheme() {
+    var saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
     applyChartDefaults();
+    highlightThemeBtn(saved);
 }
 
 initTheme();
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var theme = this.getAttribute('data-theme');
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            applyChartDefaults();
+            highlightThemeBtn(theme);
+        });
+    });
+});
 
 const colors = [
     '#0969da',
