@@ -115,6 +115,7 @@ function initTheme() {
 initTheme();
 
 document.addEventListener('DOMContentLoaded', function() {
+    highlightThemeBtn(localStorage.getItem('theme') || 'dark');
     document.querySelectorAll('.theme-btn[data-theme]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var theme = this.getAttribute('data-theme');
