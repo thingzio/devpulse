@@ -301,45 +301,46 @@ const (
 		  AND e.date >= $2
 		  %[1]s
 	),
-	avg_counts AS (
+	per_user AS (
 		SELECT
-			AVG(prs_opened) AS prs_opened,
-			AVG(prs_merged) AS prs_merged,
-			AVG(pr_reviews) AS pr_reviews,
-			AVG(issues_opened) AS issues_opened,
-			AVG(issue_comments) AS issue_comments,
-			AVG(pr_small) AS pr_small,
-			AVG(pr_medium) AS pr_medium,
-			AVG(pr_large) AS pr_large,
-			AVG(pr_xlarge) AS pr_xlarge
-		FROM (
-			SELECT
-				e.username,
-				SUM(CASE WHEN e.type = 'pr' THEN 1 ELSE 0 END) AS prs_opened,
-				SUM(CASE WHEN e.type = 'pr' AND e.state = 'merged' THEN 1 ELSE 0 END) AS prs_merged,
-				SUM(CASE WHEN e.type = 'pr_review' THEN 1 ELSE 0 END) AS pr_reviews,
-				SUM(CASE WHEN e.type = 'issue' THEN 1 ELSE 0 END) AS issues_opened,
-				SUM(CASE WHEN e.type = 'issue_comment' THEN 1 ELSE 0 END) AS issue_comments,
-				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS pr_small,
-				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS pr_medium,
-				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS pr_large,
-				SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS pr_xlarge
-			FROM devpulse_event e
-			JOIN devpulse_developer d ON e.username = d.username
-			WHERE e.date >= $2
-			  ` + botExcludeTpl + `
-			  %[1]s
-			GROUP BY e.username
-		) sub
+			e.username,
+			SUM(CASE WHEN e.type = 'pr' THEN 1 ELSE 0 END) AS prs_opened,
+			SUM(CASE WHEN e.type = 'pr' AND e.state = 'merged' THEN 1 ELSE 0 END) AS prs_merged,
+			SUM(CASE WHEN e.type = 'pr_review' THEN 1 ELSE 0 END) AS pr_reviews,
+			SUM(CASE WHEN e.type = 'issue' THEN 1 ELSE 0 END) AS issues_opened,
+			SUM(CASE WHEN e.type = 'issue_comment' THEN 1 ELSE 0 END) AS issue_comments,
+			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS pr_small,
+			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS pr_medium,
+			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS pr_large,
+			SUM(CASE WHEN e.type = 'pr' AND COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS pr_xlarge
+		FROM devpulse_event e
+		JOIN devpulse_developer d ON e.username = d.username
+		WHERE e.date >= $2
+		  ` + botExcludeTpl + `
+		  %[1]s
+		GROUP BY e.username
+	),
+	median_counts AS (
+		SELECT
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY prs_opened) AS prs_opened,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY prs_merged) AS prs_merged,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr_reviews) AS pr_reviews,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY issues_opened) AS issues_opened,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY issue_comments) AS issue_comments,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr_small) AS pr_small,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr_medium) AS pr_medium,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr_large) AS pr_large,
+			PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr_xlarge) AS pr_xlarge
+		FROM per_user
 	)
 	SELECT
 		COALESCE(u.prs_opened, 0), COALESCE(u.prs_merged, 0), COALESCE(u.pr_reviews, 0),
 		COALESCE(u.issues_opened, 0), COALESCE(u.issue_comments, 0),
 		COALESCE(u.pr_small, 0), COALESCE(u.pr_medium, 0), COALESCE(u.pr_large, 0), COALESCE(u.pr_xlarge, 0),
-		COALESCE(a.prs_opened, 0), COALESCE(a.prs_merged, 0), COALESCE(a.pr_reviews, 0),
-		COALESCE(a.issues_opened, 0), COALESCE(a.issue_comments, 0),
-		COALESCE(a.pr_small, 0), COALESCE(a.pr_medium, 0), COALESCE(a.pr_large, 0), COALESCE(a.pr_xlarge, 0)
-	FROM user_counts u, avg_counts a
+		COALESCE(m.prs_opened, 0), COALESCE(m.prs_merged, 0), COALESCE(m.pr_reviews, 0),
+		COALESCE(m.issues_opened, 0), COALESCE(m.issue_comments, 0),
+		COALESCE(m.pr_small, 0), COALESCE(m.pr_medium, 0), COALESCE(m.pr_large, 0), COALESCE(m.pr_xlarge, 0)
+	FROM user_counts u, median_counts m
 	`
 
 	// selectInsightsSummaryTpl combines bus factor, pony factor, and banner stats
@@ -1256,14 +1257,14 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 
 	var prs, prsMerged, reviews, issues, comments int
 	var prSmall, prMedium, prLarge, prXLarge int
-	var avgPrs, avgMerged, avgReviews, avgIssues, avgComments float64
-	var avgSmall, avgMedium, avgLarge, avgXLarge float64
+	var medPrs, medMerged, medReviews, medIssues, medComments float64
+	var medSmall, medMedium, medLarge, medXLarge float64
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&prs, &prsMerged, &reviews, &issues, &comments,
 		&prSmall, &prMedium, &prLarge, &prXLarge,
-		&avgPrs, &avgMerged, &avgReviews, &avgIssues, &avgComments,
-		&avgSmall, &avgMedium, &avgLarge, &avgXLarge,
+		&medPrs, &medMerged, &medReviews, &medIssues, &medComments,
+		&medSmall, &medMedium, &medLarge, &medXLarge,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query contributor profile: %w", err)
@@ -1272,8 +1273,8 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 	result := &data.ContributorProfileSeries{
 		Metrics: []string{"PRs Opened", "PRs Merged", "PR Reviews", "Issues Opened", "Issue Comments",
 			"PR Size S", "PR Size M", "PR Size L", "PR Size XL"},
-		Values:   []int{prs, prsMerged, reviews, issues, comments, prSmall, prMedium, prLarge, prXLarge},
-		Averages: []float64{avgPrs, avgMerged, avgReviews, avgIssues, avgComments, avgSmall, avgMedium, avgLarge, avgXLarge},
+		Values:  []int{prs, prsMerged, reviews, issues, comments, prSmall, prMedium, prLarge, prXLarge},
+		Medians: []float64{medPrs, medMerged, medReviews, medIssues, medComments, medSmall, medMedium, medLarge, medXLarge},
 	}
 
 	var rep sql.NullFloat64

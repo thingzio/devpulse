@@ -162,9 +162,9 @@
     <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Usage Limits</h3>
       <ul>
-        <li><strong>Free</strong> &mdash; {{(index .Plans "free").MaxRepos}} repo, {{comma (index .Plans "free").MaxEventsPerWeek}} events/week, 3 months data retention, no AI insights, no exports</li>
-        <li><strong>Starter</strong> &mdash; {{(index .Plans "starter").MaxRepos}} repos, {{comma (index .Plans "starter").MaxEventsPerWeek}} events/week, 6 months retention, AI insights, PDF export</li>
-        <li><strong>Pro</strong> &mdash; {{(index .Plans "pro").MaxRepos}} repos, {{comma (index .Plans "pro").MaxEventsPerWeek}} events/week, 12 months retention, AI insights, deep reputation, PDF + CSV export</li>
+        <li><strong>Free</strong> &mdash; {{(index .PlanMap "free").MaxRepos}} repo, {{comma (index .PlanMap "free").MaxEventsPerWeek}} events/week, 3 months data retention, no AI insights, no exports</li>
+        <li><strong>Starter</strong> &mdash; {{(index .PlanMap "starter").MaxRepos}} repos, {{comma (index .PlanMap "starter").MaxEventsPerWeek}} events/week, 6 months retention, AI insights, PDF export</li>
+        <li><strong>Pro</strong> &mdash; {{(index .PlanMap "pro").MaxRepos}} repos, {{comma (index .PlanMap "pro").MaxEventsPerWeek}} events/week, 12 months retention, AI insights, deep reputation, PDF + CSV export</li>
         <li><strong>Enterprise</strong> &mdash; unlimited repos, unlimited events/week, unlimited retention, AI insights, deep reputation, PDF + CSV export, on-demand imports</li>
         <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your plan limits</li>
         <li><strong>Import pauses</strong> &mdash; when the weekly event limit is reached, imports pause automatically until the following week. Existing data remains fully accessible.</li>

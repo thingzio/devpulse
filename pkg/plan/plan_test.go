@@ -53,3 +53,61 @@ func TestFreeLimits(t *testing.T) {
 	assert.False(t, l.PDFExport)
 	assert.False(t, l.CSVExport)
 }
+
+func TestDisplayPlans(t *testing.T) {
+	dp := DisplayPlans()
+	require.Len(t, dp, 4)
+	assert.Equal(t, "Free", dp[0].DisplayName)
+	assert.Equal(t, "Starter", dp[1].DisplayName)
+	assert.Equal(t, "Pro", dp[2].DisplayName)
+	assert.Equal(t, "Enterprise", dp[3].DisplayName)
+}
+
+func TestDisplayFeatures(t *testing.T) {
+	features := DisplayFeatures()
+	require.Len(t, features, 11)
+
+	// Spot-check feature IDs and labels.
+	assert.Equal(t, "feature-repos", features[0].ID)
+	assert.Equal(t, "Repos", features[0].Label)
+	require.Len(t, features[0].Values, 4)
+	assert.Equal(t, "1", features[0].Values[0])
+	assert.Equal(t, "Unlimited", features[0].Values[3])
+
+	// AI row.
+	ai := features[6]
+	assert.Equal(t, "feature-ai", ai.ID)
+	assert.Equal(t, "AI", ai.Label)
+	assert.Equal(t, "\u2014", ai.Values[0])
+	assert.Equal(t, "Insights", ai.Values[1])
+	assert.Equal(t, "Insights + Actions", ai.Values[2])
+
+	// Every feature row has 4 values (one per plan).
+	for _, f := range features {
+		assert.Len(t, f.Values, 4, "feature %s should have 4 values", f.ID)
+		assert.False(t, f.Span, "feature %s should not span", f.ID)
+	}
+}
+
+func TestGetName(t *testing.T) {
+	p, ok := Get(Pro)
+	require.True(t, ok)
+	assert.Equal(t, "pro", p.Name)
+	assert.Equal(t, "Pro", p.DisplayName)
+}
+
+func TestFormatMaxRepos(t *testing.T) {
+	free := FreeLimits()
+	assert.Equal(t, "1", free.FormatMaxRepos())
+
+	ent, _ := Get(Enterprise)
+	assert.Equal(t, "unlimited", ent.FormatMaxRepos())
+}
+
+func TestFormatMaxEvents(t *testing.T) {
+	free := FreeLimits()
+	assert.Equal(t, "500", free.FormatMaxEvents())
+
+	ent, _ := Get(Enterprise)
+	assert.Equal(t, "unlimited", ent.FormatMaxEvents())
+}

@@ -107,26 +107,15 @@
                 <option value="{{ .period_days }}">6 months</option>
             </select>
         </div>
-        {{ if .csv_export }}
-        <button class="pdf-btn" id="csv-download" disabled aria-label="Download CSV export" title="Download CSV export">
-            <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            <span class="pdf-label">CSV</span>
-        </button>
-        {{ end }}
-        {{ if .pdf_export }}
-        <button class="pdf-btn" id="pdf-download" disabled aria-label="Download PDF report" title="Download PDF report">
+        {{ if or .csv_export .pdf_export }}
+        <button class="export-btn" id="export-btn" style="display:none" aria-label="Export" title="Export data">
             <svg class="pdf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
                 <line x1="12" y1="18" x2="12" y2="12"/>
                 <polyline points="9 15 12 18 15 15"/>
             </svg>
-            <span class="pdf-label">PDF</span>
+            <span class="pdf-label">Export</span>
         </button>
         {{ end }}
     </section>
@@ -149,30 +138,6 @@
                         <div class="insight-card">
                             <span class="insight-label">Events</span>
                             <span class="insight-val" id="ps-events">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Contributors</span>
-                            <span class="insight-val" id="ps-contributors">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Total Stars</span>
-                            <span class="insight-val" id="ps-stars">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Total Forks</span>
-                            <span class="insight-val" id="ps-forks">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Open Issues</span>
-                            <span class="insight-val" id="ps-issues">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Closed PRs</span>
-                            <span class="insight-val" id="ps-prs">—</span>
-                        </div>
-                        <div class="insight-card">
-                            <span class="insight-label">Avg Merge (hrs)</span>
-                            <span class="insight-val" id="ps-merge">—</span>
                         </div>
                         <div class="insight-card">
                             <span class="insight-label">Last Import</span>
@@ -220,7 +185,7 @@
                             <tbody></tbody>
                         </table>
                     </div>
-                    <span class="insight-desc">Overview of all repositories in the selected scope and period.{{ if .csv_export }} | <a href="#" id="csv-export-all" title="Export all repos to CSV">Export All (CSV)</a>{{ end }}</span>
+                    <span class="insight-desc">Overview of all repositories in the selected scope and period.</span>
                 </div>
             </article>
         </section>
@@ -597,7 +562,7 @@
                     <div class="tbl-chart tbl-home">
                         <canvas class="chart" id="contributor-profile-chart"></canvas>
                     </div>
-                    <span class="insight-desc">Per-contributor metrics vs. average across all contributors in the selected period.</span>
+                    <span class="insight-desc">Per-contributor metrics vs. median (50th percentile) across all contributors. The median is more representative than the average because it is not skewed by low-activity contributors.</span>
                 </div>
             </article>
         </section>
@@ -718,5 +683,26 @@
       </div>
     </div>
   </div>
+  {{ if or .csv_export .pdf_export }}
+  <div id="export-modal" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <span>Export</span>
+        <button class="modal-close" id="export-modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">
+        {{ if .csv_export }}
+        <button class="modal-btn" id="export-csv-btn">Download CSV</button>
+        {{ end }}
+        {{ if .pdf_export }}
+        <button class="modal-btn pdf-btn" id="export-pdf-btn">Download PDF</button>
+        {{ end }}
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn" id="export-modal-done">Close</button>
+      </div>
+    </div>
+  </div>
+  {{ end }}
 </section>
 {{ end }}

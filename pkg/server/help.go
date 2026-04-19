@@ -18,7 +18,9 @@ import (
 
 type helpData struct {
 	Title    string
-	Plans    map[string]plan.Limits
+	PlanMap  map[string]plan.Plan
+	Plans    []plan.Plan
+	Features []plan.Feature
 	Username string
 	Name     string
 	Email    string
@@ -46,8 +48,8 @@ func tryGetTenant(r *http.Request, db *sql.DB) *tenant.Tenant {
 func helpPageHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		d := helpData{
-			Title: "Help",
-			Plans: plan.All,
+			Title:   "Help",
+			PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
 		}
 		if tn := tryGetTenant(r, db); tn != nil {
 			populateHelpTenant(r.Context(), &d, tn, db)
@@ -114,9 +116,9 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 		slog.Info("support email sent", "from", tn.Email, "username", tn.Username)
 
 		d := helpData{
-			Title: "Help",
-			Plans: plan.All,
-			Sent:  true,
+			Title:   "Help",
+			PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
+			Sent: true,
 		}
 		populateHelpTenant(r.Context(), &d, tn, db)
 		renderTemplate(w, "help.html", d)
@@ -125,8 +127,8 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 
 func renderHelpWithError(w http.ResponseWriter, r *http.Request, db *sql.DB, tn *tenant.Tenant, msg string) {
 	d := helpData{
-		Title: "Help",
-		Plans: plan.All,
+		Title:   "Help",
+		PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
 		Error: msg,
 	}
 	populateHelpTenant(r.Context(), &d, tn, db)

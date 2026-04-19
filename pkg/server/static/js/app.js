@@ -335,13 +335,14 @@ $(function () {
         initSearchFilters();
         initPeriodSelector();
         initTabs();
-        $("#pdf-download").on("click", function () {
-            if (!$(this).prop("disabled")) { generatePDF(); }
+        $("#export-btn").on("click", function () {
+            $("#export-modal").addClass("open");
         });
-        $("#csv-download").on("click", function () {
-            if (!$(this).prop("disabled")) { downloadCSV(true); }
+        $("#export-modal-close, #export-modal-done").on("click", function () {
+            $("#export-modal").removeClass("open");
         });
-        $("#csv-export-all").on("click", function (e) { e.preventDefault(); downloadCSV(false); });
+        $("#export-csv-btn").on("click", function () { downloadCSV(true); });
+        $("#export-pdf-btn").on("click", function () { generatePDF(); });
         var params = new URLSearchParams(window.location.search);
         var paramOrg = params.get("o") || "";
         var paramRepo = params.get("r") || "";
@@ -534,28 +535,17 @@ function loadAllCharts(days, org, repo, entity) {
 function loadPortfolioView(days, org, entity) {
     loadRepoOverview('/api/repos/overview');
 
-    // Summary stats (orgs, repos, events, contributors, last import)
+    // Summary stats (orgs, repos, events, last import)
     $.get('/data/insights/summary?d=' + days + '&o=' + org + '&e=' + (entity || ''), function (s) {
         if (!s) return;
         setAdaptiveCacheTier(s.events || 0);
         $("#ps-orgs").text(s.orgs ? s.orgs.toLocaleString() : '0');
         $("#ps-repos").text(s.repos ? s.repos.toLocaleString() : '0');
         $("#ps-events").text(s.events ? s.events.toLocaleString() : '0');
-        $("#ps-contributors").text(s.contributors ? s.contributors.toLocaleString() : '0');
         $("#ps-last-import").html(formatImportDate(s.last_import));
         if (s.last_import) {
             $("#ps-last-import").attr('title', new Date(s.last_import).toLocaleString());
         }
-    });
-
-    // Portfolio metrics (stars, forks, issues, PRs, merge time)
-    $.get('/data/insights/portfolio-summary?d=' + days + '&o=' + org, function (d) {
-        if (!d) return;
-        $("#ps-stars").text(d.total_stars ? d.total_stars.toLocaleString() : '0');
-        $("#ps-forks").text(d.total_forks ? d.total_forks.toLocaleString() : '0');
-        $("#ps-issues").text(d.total_open_issues ? d.total_open_issues.toLocaleString() : '0');
-        $("#ps-prs").text(d.total_closed_prs ? d.total_closed_prs.toLocaleString() : '0');
-        $("#ps-merge").text(d.avg_merge_hours ? d.avg_merge_hours.toFixed(1) : '—');
     });
 }
 
@@ -578,9 +568,7 @@ function applySelection(scope, item, skipPushState) {
     rightChartExcludes = [];
 
     searchItem = item;
-    $("#pdf-download").prop("disabled", scope !== "repo");
-    $("#csv-download").prop("disabled", scope !== "repo");
-    $("#csv-export-all").toggle(scope !== "repo");
+    $("#export-btn").toggle(scope === "repo");
     $(".header-term").html(item.value);
 
     resetCharts();
@@ -746,9 +734,7 @@ function resetSearch() {
     $("#result-table-content").empty();
     $("#search-results-wrap").hide();
     searchCriteria.reset();
-    $("#pdf-download").prop("disabled", true);
-    $("#csv-download").prop("disabled", true);
-    $("#csv-export-all").show();
+    $("#export-btn").hide();
     clearFilterInputs();
     $("#bus-factor-val").text("—");
     $("#pony-factor-val").text("—");
@@ -3119,8 +3105,8 @@ function loadContributorProfileChart(url) {
                         borderRadius: 3
                     },
                     {
-                        label: 'Average',
-                        data: data.averages.map(function(v) { return Math.round(v * 10) / 10; }),
+                        label: 'Median',
+                        data: data.medians.map(function(v) { return Math.round(v * 10) / 10; }),
                         backgroundColor: avgColor,
                         borderRadius: 3
                     }
@@ -3595,7 +3581,7 @@ function generatePDF() {
 
     var days = $("#period_days").val();
     var q = 'd=' + days + '&o=' + org + '&r=' + repo + '&e=';
-    var btn = $("#pdf-download");
+    var btn = $("#export-pdf-btn");
 
     if (!btn.find('.pdf-spinner').length) {
         btn.append('<span class="pdf-spinner"></span>');

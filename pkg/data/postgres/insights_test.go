@@ -585,7 +585,7 @@ func TestGetContributorProfile_EmptyDB(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, series.Metrics, 9)
 	assert.Len(t, series.Values, 9)
-	assert.Len(t, series.Averages, 9)
+	assert.Len(t, series.Medians, 9)
 	for _, v := range series.Values {
 		assert.Equal(t, 0, v)
 	}
@@ -641,7 +641,52 @@ func TestGetContributorProfile_WithData(t *testing.T) {
 	// alice: PR Size S = 4 (all PRs have 0 additions+deletions < 50)
 	assert.Equal(t, 4, series.Values[5])
 	// Averages > 0
-	assert.Greater(t, series.Averages[0], float64(0))
+	assert.Greater(t, series.Medians[0], float64(0))
+}
+
+// TestGetContributorProfile_MedianNotMean verifies the comparison uses median
+// (50th percentile), not mean. With 3 users having 10, 1, 1 PRs the mean is 4
+// but the median is 1. If the query were still AVG, the assertion would fail.
+func TestGetContributorProfile_MedianNotMean(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name, entity) VALUES
+		('alice', 'Alice', 'ACME'),
+		('bob', 'Bob', 'ACME'),
+		('carol', 'Carol', 'ACME')`)
+	require.NoError(t, err)
+
+	// alice: 10 PRs
+	for i := 0; i < 10; i++ {
+		_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+			VALUES ('org1', 'repo1', 'alice', 'pr', $1, $2, '', '')
+			ON CONFLICT DO NOTHING`,
+			"2026-01-"+padDay(i), "http://alice-"+padDay(i))
+		require.NoError(t, err)
+	}
+	// bob: 1 PR
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+		VALUES ('org1', 'repo1', 'bob', 'pr', '2026-01-15', 'http://bob-1', '', '')
+		ON CONFLICT DO NOTHING`)
+	require.NoError(t, err)
+	// carol: 1 PR
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+		VALUES ('org1', 'repo1', 'carol', 'pr', '2026-01-16', 'http://carol-1', '', '')
+		ON CONFLICT DO NOTHING`)
+	require.NoError(t, err)
+
+	series, err := store.GetContributorProfile(ctx, "alice", nil, nil, nil, 730)
+	require.NoError(t, err)
+
+	// alice: PRs opened = 10
+	assert.Equal(t, 10, series.Values[0])
+
+	// Median of {10, 1, 1} = 1.0 (not mean which would be 4.0)
+	assert.Equal(t, 1.0, series.Medians[0], "expected median=1, got %f (would be 4 if still using AVG)", series.Medians[0])
+
+	// PR Size S median should also be 1 (all PRs have 0 additions+deletions < 50)
+	assert.Equal(t, 1.0, series.Medians[5])
 }
 
 func TestGetAgingPRs_EmptyDB(t *testing.T) {

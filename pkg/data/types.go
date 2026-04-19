@@ -345,7 +345,7 @@ type ContributorFunnelSeries struct {
 type ContributorProfileSeries struct {
 	Metrics    []string  `json:"metrics"`
 	Values     []int     `json:"values"`
-	Averages   []float64 `json:"averages"`
+	Medians    []float64 `json:"medians"`
 	Reputation *float64  `json:"reputation,omitempty"`
 }
 

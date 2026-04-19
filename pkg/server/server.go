@@ -194,17 +194,23 @@ func deltaColor(v int64, invert bool) string {
 }
 
 func init() {
-	// Simple pages using layout.html
+	// Simple pages using layout.html only.
 	simplePages := []string{
-		"landing.html", "tos.html", "help.html", "settings.html", "changelog.html",
-		"suspended.html",
+		"settings.html", "changelog.html", "suspended.html",
 		"admin.html", "admin_tenants.html", "admin_tenant.html",
 		"admin_tokens.html", "admin_metrics.html",
 	}
-	pageTemplates = make(map[string]*template.Template, len(simplePages)+1)
+	// Pages that also need the plans_table partial.
+	planPages := []string{"landing.html", "tos.html", "help.html"}
+
+	pageTemplates = make(map[string]*template.Template, len(simplePages)+len(planPages)+1)
 	for _, p := range simplePages {
 		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
 			"templates/layout.html", "templates/"+p))
+	}
+	for _, p := range planPages {
+		pageTemplates[p] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
+			"templates/layout.html", "templates/plans_table.html", "templates/"+p))
 	}
 	pageTemplates["home.html"] = template.Must(template.New("").Funcs(templateFuncs).ParseFS(templateFS,
 		"templates/layout.html", "templates/home.html"))
@@ -482,7 +488,9 @@ type pageData struct {
 	Version      string
 	Commit       string
 	Date         string
-	Plans        map[string]plan.Limits
+	PlanMap      map[string]plan.Plan
+	Plans        []plan.Plan
+	Features     []plan.Feature
 	Error        string
 }
 
@@ -502,12 +510,14 @@ func landingHandler(opts Options) http.HandlerFunc {
 			}
 		}
 		renderTemplate(w, "landing.html", pageData{
-			Title:   "Home",
-			Version: opts.Version,
-			Commit:  opts.Commit,
-			Date:    opts.Date,
-			Plans:   plan.All,
-			Error:   errMsg,
+			Title:    "Home",
+			Version:  opts.Version,
+			Commit:   opts.Commit,
+			Date:     opts.Date,
+			PlanMap:  plan.All,
+			Plans:    plan.DisplayPlans(),
+			Features: plan.DisplayFeatures(),
+			Error:    errMsg,
 		})
 	}
 }
@@ -699,7 +709,7 @@ func signoutHandler(db *sql.DB) http.HandlerFunc {
 
 func tosPageHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate(w, "tos.html", pageData{Title: "Terms of Service", Plans: plan.All})
+		renderTemplate(w, "tos.html", pageData{Title: "Terms of Service", PlanMap: plan.All})
 	}
 }
 

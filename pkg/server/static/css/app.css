@@ -489,6 +489,24 @@ fieldset {
 .pdf-btn.loading .pdf-spinner { display: inline-block; }
 @keyframes pdf-spin { to { transform: rotate(360deg); } }
 
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 50px;
+    padding: 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: opacity 0.2s ease;
+}
+.export-btn:hover {
+    background: var(--border-color);
+}
+
 .period-label {
   font-size: 0.8rem;
   color: var(--gray);
@@ -891,7 +909,8 @@ fieldset {
     gap: 8px;
   }
 
-  .search-and-user .pdf-btn { display: none; }
+  .search-and-user .pdf-btn,
+  .search-and-user .export-btn { display: none; }
 
   .search-and-user form {
     order: -1;
@@ -1309,6 +1328,7 @@ a.link {
   align-items: center;
   justify-content: space-between;
   margin-top: 20px;
+  padding-bottom: 32px;
   text-transform: uppercase;
   color: var(--page-header-headingColor);
   font-size: 0.8rem;

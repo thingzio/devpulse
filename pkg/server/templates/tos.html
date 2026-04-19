@@ -56,7 +56,7 @@
     <div class="landing-feature" style="margin-bottom:20px">
       <h3>6. Usage Limits</h3>
       <ul>
-        <li>Free accounts are limited to {{(index .Plans "free").MaxRepos}} tracked repositories and {{comma (index .Plans "free").MaxEventsPerWeek}} imported events per week.</li>
+        <li>Free accounts are limited to {{(index .PlanMap "free").MaxRepos}} tracked repositories and {{comma (index .PlanMap "free").MaxEventsPerWeek}} imported events per week.</li>
         <li>When weekly limits are reached, data imports are paused until the following week.</li>
         <li>Higher limits are available on paid plans. See <a href="/#plans">Plans</a> for details.</li>
       </ul>
