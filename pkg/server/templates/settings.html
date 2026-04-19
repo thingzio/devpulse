@@ -1,52 +1,55 @@
 {{define "content"}}
 <div class="settings-page">
-  <div class="settings-header">
-    <h1>Settings</h1>
-    <p><a href="/dashboard">&larr; Back to Dashboard</a></p>
+  <p class="settings-back"><a href="/dashboard">&larr; Dashboard</a></p>
+  <h1 class="settings-title">Settings</h1>
+
+  <div class="settings-section">
+    <h2>Profile</h2>
+    <div class="settings-grid">
+      <div class="settings-label">Username</div>
+      <div class="settings-value">{{ .username }}</div>
+      <div class="settings-label">Name</div>
+      <div class="settings-value">{{ if .name }}{{ .name }}{{ else }}&mdash;{{ end }}</div>
+      <div class="settings-label">Email</div>
+      <div class="settings-value">{{ if .email }}{{ .email }}{{ else }}&mdash;{{ end }}</div>
+      {{ if .company }}
+      <div class="settings-label">Company</div>
+      <div class="settings-value">{{ .company }}</div>
+      {{ end }}
+      {{ if .location }}
+      <div class="settings-label">Location</div>
+      <div class="settings-value">{{ .location }}</div>
+      {{ end }}
+      {{ if .bio }}
+      <div class="settings-label">Bio</div>
+      <div class="settings-value">{{ .bio }}</div>
+      {{ end }}
+      <div class="settings-label">Member since</div>
+      <div class="settings-value">{{ .created_at }}</div>
+      <div class="settings-label">Last sign-in</div>
+      <div class="settings-value">{{ .last_login }}</div>
+    </div>
   </div>
 
-  <div class="settings-sections">
-    <div class="settings-section">
-      <h2>Profile</h2>
-      <div class="settings-grid">
-        <div class="settings-label">Username</div>
-        <div class="settings-value">{{ .username }}</div>
-        <div class="settings-label">Name</div>
-        <div class="settings-value">{{ if .name }}{{ .name }}{{ else }}&mdash;{{ end }}</div>
-        <div class="settings-label">Email</div>
-        <div class="settings-value">{{ if .email }}{{ .email }}{{ else }}&mdash;{{ end }}</div>
-      </div>
+  <div class="settings-section">
+    <h2>Plan</h2>
+    <div class="settings-grid">
+      <div class="settings-label">Current plan</div>
+      <div class="settings-value"><span class="plan-badge">{{ .plan }}</span></div>
+      <div class="settings-label">Repos</div>
+      <div class="settings-value">{{ .repo_count }} / {{ .max_repos }}</div>
+      <div class="settings-label">Events/week</div>
+      <div class="settings-value">{{ .max_events }}</div>
     </div>
+    <button class="settings-btn settings-btn-accent" disabled title="Coming soon">Change Plan</button>
+    <p class="hint">Plan changes are not available yet. <a href="/help#help-contact">Request a complementary upgrade</a>.</p>
+  </div>
 
-    <div class="settings-section">
-      <h2>Plan</h2>
-      <div class="settings-grid">
-        <div class="settings-label">Plan</div>
-        <div class="settings-value" style="text-transform:capitalize">{{ .plan }}</div>
-        <div class="settings-label">Repos</div>
-        <div class="settings-value">{{ .repo_count }} / {{ .max_repos }}</div>
-        <div class="settings-label">Events/Wk</div>
-        <div class="settings-value">{{ .max_events }}</div>
-        <div class="settings-label">Created</div>
-        <div class="settings-value">{{ .created_at }}</div>
-        <div class="settings-label">Last Login</div>
-        <div class="settings-value">{{ .last_login }}</div>
-      </div>
-      <button class="settings-btn" disabled title="Coming soon">Change Plan</button>
-      <p class="hint">Plan changes are not available yet. To request an upgrade, visit the <a href="/help">Help</a> page.</p>
-    </div>
-
-    <div class="settings-section">
-      <h2>Appearance</h2>
-      <div class="settings-grid">
-        <div class="settings-label">Theme</div>
-        <div class="settings-value">
-          <div class="theme-toggle">
-            <button class="theme-btn" data-theme="dark">Dark</button>
-            <button class="theme-btn" data-theme="light">Light</button>
-          </div>
-        </div>
-      </div>
+  <div class="settings-section">
+    <h2>Appearance</h2>
+    <div class="theme-toggle">
+      <button class="theme-btn" data-theme="dark">Dark</button>
+      <button class="theme-btn" data-theme="light">Light</button>
     </div>
   </div>
 </div>
