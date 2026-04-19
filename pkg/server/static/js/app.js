@@ -3077,7 +3077,7 @@ function loadContributorProfileChart(url) {
         if (dtUser && dtOrg && dtRepo) {
             var dtURL = 'https://devtrace.thingz.io/score/' + encodeURIComponent(dtUser) +
                 '?repo=' + encodeURIComponent(dtOrg + '/' + dtRepo);
-            $("#contributor-score").html('<a href="' + dtURL + '" target="_blank" rel="noopener">View reputation</a>');
+            $("#contributor-score").html('<a href="' + dtURL + '" target="_blank" rel="noopener" style="color:#2ea043;">View reputation &#8599;</a>');
         } else {
             $("#contributor-score").text('');
         }
