@@ -52,8 +52,8 @@
       <div class="settings-value">
         <form method="POST" action="/settings/digest" style="display:inline">
           <input type="hidden" name="enabled" value="{{ if .weekly_digest }}false{{ else }}true{{ end }}">
-          <button type="submit" class="settings-btn{{ if .weekly_digest }} settings-btn-accent{{ end }}">
-            {{ if .weekly_digest }}Enabled{{ else }}Disabled{{ end }}
+          <button type="submit" class="digest-toggle{{ if .weekly_digest }} digest-on{{ else }} digest-off{{ end }}">
+            {{ if .weekly_digest }}On{{ else }}Off{{ end }}
           </button>
         </form>
       </div>
