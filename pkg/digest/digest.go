@@ -24,7 +24,7 @@ import (
 const (
 	digestDays       = 180
 	maxSignals       = 5
-	fromEmail        = "DevPulse <digest@devpulse.thingz.io>"
+	fromEmail        = "DevPulse <noreply@thingz.io>"
 	emailSubject     = "Your weekly DevPulse digest"
 	sendTimeout      = 30 * time.Second
 	perTenantTimeout = 15 * time.Second
