@@ -186,10 +186,10 @@ func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
 			CreatedAt:        td.CreatedAt.Format("2006-01-02"),
 		}
 		if td.LastSignIn != nil {
-			out.LastSignIn = td.LastSignIn.Format("2006-01-02")
+			out.LastSignIn = td.LastSignIn.Format("2006-01-02 15:04")
 		}
 		if td.DigestLastSentAt != nil {
-			out.DigestLastSentAt = td.DigestLastSentAt.Format("2006-01-02")
+			out.DigestLastSentAt = td.DigestLastSentAt.Format("2006-01-02 15:04")
 		}
 
 		since := time.Now().UTC().AddDate(0, 0, -180).Format("2006-01-02")
