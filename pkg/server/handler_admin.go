@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/config"
+	"github.com/thingzio/devpulse/pkg/digest"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/net"
 	"github.com/thingzio/devpulse/pkg/plan"
@@ -633,6 +634,49 @@ func adminTokenQuotaHistoryHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, samples)
+	}
+}
+
+// POST /admin/digest/send — send digest email to the current admin user now.
+func adminDigestSendHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1024)
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
+		if !middleware.ValidateCSRFFromRequest(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
+			return
+		}
+
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Error(w, "no tenant in context", http.StatusUnauthorized)
+			return
+		}
+
+		cfg := digest.NewConfigFromEnv()
+		if cfg == nil {
+			http.Error(w, "digest not configured (missing env vars)", http.StatusServiceUnavailable)
+			return
+		}
+
+		cfg.TestUsername = tn.Username
+
+		if err := digest.Run(r.Context(), db, cfg); err != nil {
+			slog.Error("admin digest send", "username", tn.Username, "error", err)
+			http.Error(w, fmt.Sprintf("digest send failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		middleware.AdminAuditLog(r.Context(), "digest_send",
+			r.URL.Path, r.RemoteAddr,
+			fmt.Sprintf("username=%s", tn.Username))
+
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 	}
 }
 

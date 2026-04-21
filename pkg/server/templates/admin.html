@@ -120,6 +120,14 @@
     </div>
   </div>
 
+  <div style="margin-bottom:24px">
+    <form method="POST" action="/admin/digest/send" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button type="submit" class="settings-btn" style="margin-top:0;padding:8px 18px;font-size:0.85rem">Send Digest Now</button>
+    </form>
+    <span style="color:var(--gray);font-size:0.8em;margin-left:8px">Sends to your account only</span>
+  </div>
+
   {{if .Summary.ErrorRepos}}
   <h3 style="margin-bottom:12px">Repos with Import Errors</h3>
   <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">

@@ -467,6 +467,7 @@ func registerAdminRoutes(mux *http.ServeMux, db *sql.DB) {
 	mux.Handle("GET /admin/tokens", wrap(adminTokensHandler(db)))
 	mux.Handle("GET /admin/tokens/quota-history", wrap(adminTokenQuotaHistoryHandler(db)))
 	mux.Handle("GET /admin/metrics", wrap(adminMetricsHandler(mcfg)))
+	mux.Handle("POST /admin/digest/send", wrap(adminDigestSendHandler(db)))
 }
 
 func securityHeaders(next http.Handler) http.Handler {
