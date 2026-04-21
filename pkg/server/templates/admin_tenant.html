@@ -52,8 +52,12 @@
         <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Detail.CreatedAt}}</td>
       </tr>
       <tr>
-        <td style="padding:8px 12px;font-weight:bold">Last Sign-in</td>
-        <td style="padding:8px 12px">{{if .Detail.LastSignIn}}{{.Detail.LastSignIn}}{{else}}&mdash;{{end}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color);font-weight:bold">Last Sign-in</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{if .Detail.LastSignIn}}{{.Detail.LastSignIn}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;font-weight:bold">Last Digest</td>
+        <td style="padding:8px 12px">{{if .Detail.DigestLastSentAt}}{{.Detail.DigestLastSentAt}}{{else}}&mdash;{{end}}</td>
       </tr>
     </tbody>
   </table>

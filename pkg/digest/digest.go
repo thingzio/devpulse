@@ -197,7 +197,14 @@ func sendDigest(ctx context.Context, db *sql.DB, cfg *Config, dt tenant.DigestTe
 	sendCtx, sendCancel := context.WithTimeout(ctx, sendTimeout)
 	defer sendCancel()
 
-	return devnet.SendEmail(sendCtx, cfg.ResendAPIKey, fromEmail, dt.Email, emailSubject, htmlBody, textBody, "")
+	if err := devnet.SendEmail(sendCtx, cfg.ResendAPIKey, fromEmail, dt.Email, emailSubject, htmlBody, textBody, ""); err != nil {
+		return err
+	}
+
+	if updateErr := tenant.UpdateDigestLastSent(ctx, db, dt.ID); updateErr != nil {
+		slog.Error("recording digest sent timestamp", "tenant", dt.ID, "error", updateErr)
+	}
+	return nil
 }
 
 // digestData holds all values needed by the HTML digest template.

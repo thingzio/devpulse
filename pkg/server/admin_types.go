@@ -25,6 +25,7 @@ type tenantDetail struct {
 	MaxEventsPerWeek int          `json:"max_events_per_week"`
 	CreatedAt        string       `json:"created_at"`
 	LastSignIn       string       `json:"last_sign_in"`
+	DigestLastSentAt string       `json:"digest_last_sent_at"`
 	Repos            []repoDetail `json:"repos"`
 }
 

@@ -75,6 +75,8 @@ const updateStatusSQL = `UPDATE devpulse_tenant SET status = $2, updated_at = NO
 
 const updateWeeklyDigestSQL = `UPDATE devpulse_tenant SET weekly_digest = $2, updated_at = NOW() WHERE id = $1`
 
+const updateDigestLastSentSQL = `UPDATE devpulse_tenant SET digest_last_sent_at = NOW(), updated_at = NOW() WHERE id = $1`
+
 const listDigestTenantsSQL = `
 	SELECT id, username, email FROM devpulse_tenant
 	WHERE status = 'active' AND weekly_digest = TRUE AND COALESCE(email, '') != ''`
@@ -157,6 +159,15 @@ func UpdateWeeklyDigest(ctx context.Context, db *sql.DB, tenantID string, enable
 	_, err := db.ExecContext(ctx, updateWeeklyDigestSQL, tenantID, enabled)
 	if err != nil {
 		return fmt.Errorf("updating weekly digest: %w", err)
+	}
+	return nil
+}
+
+// UpdateDigestLastSent records when a digest email was last sent to a tenant.
+func UpdateDigestLastSent(ctx context.Context, db *sql.DB, tenantID string) error {
+	_, err := db.ExecContext(ctx, updateDigestLastSentSQL, tenantID)
+	if err != nil {
+		return fmt.Errorf("updating digest last sent: %w", err)
 	}
 	return nil
 }

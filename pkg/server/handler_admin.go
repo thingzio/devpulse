@@ -188,6 +188,9 @@ func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
 		if td.LastSignIn != nil {
 			out.LastSignIn = td.LastSignIn.Format("2006-01-02")
 		}
+		if td.DigestLastSentAt != nil {
+			out.DigestLastSentAt = td.DigestLastSentAt.Format("2006-01-02")
+		}
 
 		since := time.Now().UTC().AddDate(0, 0, -180).Format("2006-01-02")
 		weekStart := tenant.StartOfWeek().Format("2006-01-02")

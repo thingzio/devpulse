@@ -37,6 +37,7 @@ type TenantDetail struct {
 	MaxEventsPerWeek int
 	CreatedAt        time.Time
 	LastSignIn       *time.Time
+	DigestLastSentAt *time.Time
 }
 
 // RepoDetail holds per-repo statistics for admin inspection.
@@ -99,7 +100,8 @@ const (
 		SELECT t.id, t.username, t.email,
 		       COALESCE(t.name, ''), COALESCE(t.company, ''), COALESCE(t.location, ''), COALESCE(t.bio, ''),
 		       t.plan, t.status, t.max_repos, t.max_events_per_week,
-		       t.created_at, MAX(s.created_at) AS last_sign_in
+		       t.created_at, MAX(s.created_at) AS last_sign_in,
+		       t.digest_last_sent_at
 		FROM devpulse_tenant t
 		LEFT JOIN devpulse_session s ON s.tenant_id = t.id
 		WHERE t.username = $1
@@ -229,19 +231,22 @@ func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, erro
 // GetTenantDetailByUsername returns detailed tenant info including email and last sign-in.
 func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string) (*TenantDetail, error) {
 	var td TenantDetail
-	var lastSignIn sql.NullTime
+	var lastSignIn, digestLastSent sql.NullTime
 	var email sql.NullString
 	err := db.QueryRowContext(ctx, getTenantDetailByUsernameSQL, username).Scan(
 		&td.ID, &td.Username, &email,
 		&td.Name, &td.Company, &td.Location, &td.Bio,
 		&td.Plan, &td.Status, &td.MaxRepos, &td.MaxEventsPerWeek,
-		&td.CreatedAt, &lastSignIn,
+		&td.CreatedAt, &lastSignIn, &digestLastSent,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("getting tenant detail for %q: %w", username, err)
 	}
 	if lastSignIn.Valid {
 		td.LastSignIn = &lastSignIn.Time
+	}
+	if digestLastSent.Valid {
+		td.DigestLastSentAt = &digestLastSent.Time
 	}
 	if email.Valid {
 		td.Email = email.String
