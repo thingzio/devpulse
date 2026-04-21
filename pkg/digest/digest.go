@@ -230,39 +230,39 @@ func severityColor(sev string) string {
 var digestTmpl = template.Must(template.New("digest").Funcs(template.FuncMap{
 	"severityColor": severityColor,
 }).Parse(`<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#111;color:#ccc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<body style="margin:0;padding:0;background:#0c1017;color:#f0f0f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:24px;">
 <div style="text-align:center;margin-bottom:24px;">
-<h1 style="color:#fff;font-size:20px;margin:0;">DevPulse Weekly Digest</h1>
-<p style="color:#888;font-size:13px;margin:4px 0 0;">Your project health highlights this week</p>
+<h1 style="color:#f0f0f0;font-size:20px;margin:0;">DevPulse Weekly Digest</h1>
+<p style="color:#999;font-size:13px;margin:4px 0 0;">Your project health highlights this week</p>
 </div>
 {{- if .Portfolio}}
-<div style="background:#1a1a2e;border-radius:8px;padding:16px;margin-bottom:16px;">
-<h2 style="color:#fff;font-size:15px;margin:0 0 12px;">Portfolio Pulse</h2>
-<table style="width:100%;color:#ccc;font-size:13px;" cellpadding="0" cellspacing="0">
+<div style="background:#171a22;border:1px solid #242836;border-radius:6px;padding:16px;margin-bottom:16px;">
+<h2 style="color:#f0f0f0;font-size:15px;margin:0 0 12px;">Portfolio Pulse</h2>
+<table style="width:100%;color:#f0f0f0;font-size:13px;" cellpadding="0" cellspacing="0">
 {{- range .KPIs}}
-<tr><td style="padding:4px 0;color:#888;">{{.Label}}</td><td style="padding:4px 0;text-align:right;color:#fff;font-weight:600;">{{.Value}}</td>{{if .Delta}}<td style="padding:4px 0;text-align:right;color:#888;font-size:12px;">{{.Delta}}</td>{{else}}<td style="padding:4px 0;"></td>{{end}}</tr>
+<tr><td style="padding:4px 0;color:#999;">{{.Label}}</td><td style="padding:4px 0;text-align:right;color:#f0f0f0;font-weight:600;">{{.Value}}</td>{{if .Delta}}<td style="padding:4px 0;text-align:right;color:#999;font-size:12px;">{{.Delta}}</td>{{else}}<td style="padding:4px 0;"></td>{{end}}</tr>
 {{- end}}
 </table></div>
 {{- end}}
 {{- if .Signals}}
-<div style="background:#1a1a2e;border-radius:8px;padding:16px;margin-bottom:16px;">
-<h2 style="color:#fff;font-size:15px;margin:0 0 12px;">Notable Changes</h2>
+<div style="background:#171a22;border:1px solid #242836;border-radius:6px;padding:16px;margin-bottom:16px;">
+<h2 style="color:#f0f0f0;font-size:15px;margin:0 0 12px;">Notable Changes</h2>
 {{- range .Signals}}
-<div style="padding:8px 0;border-bottom:1px solid #333;">
+<div style="padding:8px 0;border-bottom:1px solid #242836;">
 <div style="color:{{severityColor .Severity}};font-size:12px;font-weight:600;">{{.Org}}/{{.Repo}} &middot; {{.Metric}}</div>
-<div style="color:#ddd;font-size:13px;margin-top:2px;">{{.Message}}</div>
+<div style="color:#f0f0f0;font-size:13px;margin-top:2px;">{{.Message}}</div>
 </div>
 {{- end}}
 </div>
 {{- end}}
 <div style="text-align:center;margin-top:24px;">
-<a href="{{.DashURL}}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;">View Dashboard</a>
+<a href="{{.DashURL}}" style="display:inline-block;background:#4a9eff;color:#fff;text-decoration:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;">View Dashboard</a>
 </div>
-<div style="text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #333;">
-<p style="color:#666;font-size:11px;margin:0;">
+<div style="text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #242836;">
+<p style="color:#999;font-size:11px;margin:0;">
 You're receiving this because you have a DevPulse account with weekly digests enabled.<br>
-<a href="{{.UnsubURL}}" style="color:#666;text-decoration:underline;">Unsubscribe</a>
+<a href="{{.UnsubURL}}" style="color:#999;text-decoration:underline;">Unsubscribe</a>
 </p>
 </div>
 </div></body></html>`))
