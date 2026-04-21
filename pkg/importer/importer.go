@@ -13,6 +13,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/ghutil"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/digest"
 	"github.com/thingzio/devpulse/pkg/plan"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
@@ -91,18 +92,12 @@ func runImport(ctx context.Context) error {
 		"shard_weight", shardWeight,
 		"task_index", taskIndex)
 
-	// Fan out to workers.
 	start := time.Now()
-
 	if len(myRepos) == 0 {
-		slog.Info("import worker complete",
-			"repos", 0,
-			"errors", 0,
-			"skipped", 0,
-			"duration", time.Since(start).String(),
-			"duration_sec", time.Since(start).Seconds())
+		logImportComplete(0, 0, 0, start)
 		return nil
 	}
+
 	work := make(chan RepoWork)
 	var wg sync.WaitGroup
 	shardSize := len(myRepos)
@@ -154,21 +149,29 @@ func runImport(ctx context.Context) error {
 
 	postImport(taskCtx, store, pool)
 
+	// Send weekly digest emails (only on task 0 to avoid duplicates).
+	if taskIndex == 0 {
+		sendDigests(taskCtx, db)
+	}
+
 	repos := int(totalRepos.Load())
 	errs := int(totalErrors.Load())
-	skipped := int(totalSkipped.Load())
-	elapsed := time.Since(start)
-	slog.Info("import worker complete",
-		"repos", repos,
-		"errors", errs,
-		"skipped", skipped,
-		"duration", elapsed.String(),
-		"duration_sec", elapsed.Seconds())
+	skippedN := int(totalSkipped.Load())
+	logImportComplete(repos, errs, skippedN, start)
 
 	if errs > 0 && errs == repos {
 		return fmt.Errorf("all %d repo imports failed", errs)
 	}
 	return nil
+}
+
+func logImportComplete(repos, errs, skipped int, start time.Time) {
+	slog.Info("import worker complete",
+		"repos", repos,
+		"errors", errs,
+		"skipped", skipped,
+		"duration", time.Since(start).String(),
+		"duration_sec", time.Since(start).Seconds())
 }
 
 // markImportSuccess resets error counters after a successful import.
@@ -208,6 +211,20 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 	slog.Info("phase: entity normalization")
 	if cleanErr := store.CleanEntities(ctx); cleanErr != nil {
 		slog.Warn("cleaning entity names", "error", cleanErr)
+	}
+}
+
+// sendDigests runs the weekly digest email sender.
+func sendDigests(ctx context.Context, db *sql.DB) {
+	cfg := digest.NewConfigFromEnv()
+	if cfg == nil {
+		slog.Debug("digest: SEND_API_KEY or BASE_URL not set, skipping")
+		return
+	}
+
+	slog.Info("phase: weekly digest")
+	if err := digest.Run(ctx, db, cfg); err != nil {
+		slog.Error("digest send failed", "error", err)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/config"
 	"github.com/thingzio/devpulse/pkg/data"
 	"github.com/thingzio/devpulse/pkg/data/postgres"
+	"github.com/thingzio/devpulse/pkg/digest"
 	"github.com/thingzio/devpulse/pkg/middleware"
 	"github.com/thingzio/devpulse/pkg/net"
 	"github.com/thingzio/devpulse/pkg/oauth"
@@ -292,8 +293,10 @@ func Run(ctx context.Context, opts Options) error {
 	defer oauthRL.stop()
 	repoSearchRL := newRateLimiter(config.RepoSearchRateLimit(), time.Minute)
 	defer repoSearchRL.stop()
+	unsubRL := newRateLimiter(5, time.Minute)
+	defer unsubRL.stop()
 
-	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, trigger, ghAppID)
+	mux := makeRouter(db, store, oauthCfg, webhookSecret, opts, oauthRL, repoSearchRL, unsubRL, trigger, ghAppID)
 
 	address := fmt.Sprintf("%s:%s", addressDefault, port)
 	s := &http.Server{
@@ -333,7 +336,7 @@ func Run(ctx context.Context, opts Options) error {
 
 func makeRouter(
 	db *sql.DB, store data.Store, oauthCfg *oauth.Config, webhookSecret string,
-	opts Options, oauthRLimiter, repoSearchRLimiter *rateLimiter,
+	opts Options, oauthRLimiter, repoSearchRLimiter, unsubRLimiter *rateLimiter,
 	trigger *importTrigger, ghAppID int64,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
@@ -344,6 +347,7 @@ func makeRouter(
 	// Rate limit middleware for abuse-sensitive endpoints.
 	oauthRL := rateLimitMiddleware(oauthRLimiter)
 	repoSearchRL := rateLimitMiddleware(repoSearchRLimiter)
+	unsubRL := rateLimitMiddleware(unsubRLimiter)
 
 	// Public routes (no auth)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
@@ -359,6 +363,7 @@ func makeRouter(
 	mux.HandleFunc("GET /suspended", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "suspended.html", pageData{Title: "Account Suspended"})
 	})
+	mux.Handle("GET /digest/unsubscribe", unsubRL(digestUnsubscribeHandler(db)))
 	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
 		middleware.ClearSessionCookie(w)
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -375,6 +380,7 @@ func makeRouter(
 	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
 	mux.Handle("GET /dashboard", wrap(dashboardHandler(opts)))
 	mux.Handle("GET /settings", wrap(settingsHandler(db)))
+	mux.Handle("POST /settings/digest", wrap(digestToggleHandler(db)))
 	mux.Handle("POST /auth/signout", wrap(signoutHandler(db)))
 
 	// Tenant management API
@@ -593,20 +599,74 @@ func settingsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		renderTemplate(w, "settings.html", map[string]any{
-			"Title":      "Settings",
-			"username":   tn.Username,
-			"name":       tn.Name,
-			"email":      tn.Email,
-			"company":    tn.Company,
-			"location":   tn.Location,
-			"bio":        tn.Bio,
-			"plan":       tn.Plan,
-			"repo_count": repoCount,
-			"max_repos":  maxRepos,
-			"max_events": maxEvents,
-			"created_at": tn.CreatedAt.Format("2006-01-02"),
-			"last_login": lastLogin,
+			"Title":         "Settings",
+			"username":      tn.Username,
+			"name":          tn.Name,
+			"email":         tn.Email,
+			"company":       tn.Company,
+			"location":      tn.Location,
+			"bio":           tn.Bio,
+			"plan":          tn.Plan,
+			"repo_count":    repoCount,
+			"max_repos":     maxRepos,
+			"max_events":    maxEvents,
+			"weekly_digest": tn.WeeklyDigest,
+			"created_at":    tn.CreatedAt.Format("2006-01-02"),
+			"last_login":    lastLogin,
 		})
+	}
+}
+
+func digestToggleHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tn := middleware.TenantFromContext(r.Context())
+		if tn == nil {
+			http.Redirect(w, r, "/auth/github", http.StatusFound)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 1024)
+		enabled := r.FormValue("enabled") == "true"
+		if err := tenant.UpdateWeeklyDigest(r.Context(), db, tn.ID, enabled); err != nil {
+			slog.Error("updating weekly digest", "tenant", tn.Username, "error", err)
+			http.Error(w, "failed to update preference", http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+func digestUnsubscribeHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tenantID := r.URL.Query().Get("tenant")
+		token := r.URL.Query().Get("token")
+		secret := digest.HMACSecret()
+
+		if tenantID == "" || token == "" || secret == "" {
+			http.Error(w, "invalid unsubscribe link", http.StatusBadRequest)
+			return
+		}
+
+		if !digest.ValidateUnsubscribeToken(secret, tenantID, token) {
+			http.Error(w, "invalid unsubscribe link", http.StatusForbidden)
+			return
+		}
+
+		if err := tenant.UpdateWeeklyDigest(r.Context(), db, tenantID, false); err != nil {
+			slog.Error("unsubscribing from digest", "tenant", tenantID, "error", err)
+			http.Error(w, "failed to unsubscribe", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Unsubscribed</title></head>
+<body style="background:#111;color:#ccc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
+<div style="text-align:center;max-width:400px;">
+<h1 style="color:#fff;font-size:20px;">Unsubscribed</h1>
+<p>You've been unsubscribed from the weekly DevPulse digest.</p>
+<p style="color:#888;font-size:13px;">You can re-enable it anytime from your <a href="/settings" style="color:#6366f1;">Settings</a> page.</p>
+</div></body></html>`)
 	}
 }
 

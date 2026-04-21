@@ -117,6 +117,16 @@ resource "google_cloud_run_v2_service" "serve" {
         value = "claude-sonnet-4-6"
       }
 
+      env {
+        name = "DIGEST_HMAC_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.digest_hmac_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
@@ -242,6 +252,41 @@ resource "google_cloud_run_v2_job" "import" {
         env {
           name  = "IMPORT_TASK_TIMEOUT"
           value = tostring(var.import_task_timeout)
+        }
+
+        env {
+          name = "SEND_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.send_api_key.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name  = "BASE_URL"
+          value = "https://${var.domain}"
+        }
+
+        env {
+          name = "DIGEST_HMAC_SECRET"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.digest_hmac_secret.secret_id
+              version = "latest"
+            }
+          }
+        }
+
+        env {
+          name  = "DEVPULSE_ADMIN_USERS"
+          value = var.admin_users
+        }
+
+        env {
+          name  = "DIGEST_ADMIN_ONLY"
+          value = tostring(var.digest_admin_only)
         }
 
         resources {

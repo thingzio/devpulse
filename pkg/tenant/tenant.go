@@ -29,6 +29,7 @@ type Tenant struct {
 	MaxEventsPerWeek   int
 	Plan               string
 	Status             string
+	WeeklyDigest       bool
 	ToSAcceptedAt      *time.Time
 	UpgradeRequestedAt *time.Time
 	CreatedAt          time.Time
@@ -47,22 +48,22 @@ const upsertTenantSQL = `
 		location = EXCLUDED.location,
 		bio = EXCLUDED.bio,
 		updated_at = NOW()
-	RETURNING id, github_id, username, email, avatar_url,
+	RETURNING id, github_id, username, COALESCE(email, ''), COALESCE(avatar_url, ''),
 		          COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	          max_repos, max_events_per_week, plan, status,
+	          max_repos, max_events_per_week, plan, status, weekly_digest,
 	          tos_accepted_at, upgrade_requested_at, created_at, updated_at`
 
 const getTenantByGitHubIDSQL = `
-	SELECT id, github_id, username, email, avatar_url,
+	SELECT id, github_id, username, COALESCE(email, ''), COALESCE(avatar_url, ''),
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	       max_repos, max_events_per_week, plan, status,
+	       max_repos, max_events_per_week, plan, status, weekly_digest,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM devpulse_tenant WHERE github_id = $1`
 
 const getTenantByIDSQL = `
-	SELECT id, github_id, username, email, avatar_url,
+	SELECT id, github_id, username, COALESCE(email, ''), COALESCE(avatar_url, ''),
 	       COALESCE(name, ''), COALESCE(company, ''), COALESCE(location, ''), COALESCE(bio, ''),
-	       max_repos, max_events_per_week, plan, status,
+	       max_repos, max_events_per_week, plan, status, weekly_digest,
 	       tos_accepted_at, upgrade_requested_at, created_at, updated_at
 	FROM devpulse_tenant WHERE id = $1`
 
@@ -71,6 +72,12 @@ const acceptToSSQL = `UPDATE devpulse_tenant SET tos_accepted_at = NOW(), update
 const updatePlanSQL = `UPDATE devpulse_tenant SET plan = $2, max_repos = $3, max_events_per_week = $4, updated_at = NOW() WHERE id = $1`
 
 const updateStatusSQL = `UPDATE devpulse_tenant SET status = $2, updated_at = NOW() WHERE id = $1`
+
+const updateWeeklyDigestSQL = `UPDATE devpulse_tenant SET weekly_digest = $2, updated_at = NOW() WHERE id = $1`
+
+const listDigestTenantsSQL = `
+	SELECT id, username, email FROM devpulse_tenant
+	WHERE status = 'active' AND weekly_digest = TRUE AND COALESCE(email, '') != ''`
 
 const requestUpgradeSQL = `
 	UPDATE devpulse_tenant SET upgrade_requested_at = NOW(), updated_at = NOW()
@@ -82,7 +89,8 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	err := row.Scan(
 		&t.ID, &t.GitHubID, &t.Username, &t.Email, &t.AvatarURL,
 		&t.Name, &t.Company, &t.Location, &t.Bio,
-		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.Status, &t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
+		&t.MaxRepos, &t.MaxEventsPerWeek, &t.Plan, &t.Status, &t.WeeklyDigest,
+		&t.ToSAcceptedAt, &t.UpgradeRequestedAt, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scanning tenant: %w", err)
@@ -142,6 +150,42 @@ func UpdateStatus(ctx context.Context, db *sql.DB, tenantID, status string) erro
 		return fmt.Errorf("updating status: %w", err)
 	}
 	return nil
+}
+
+// UpdateWeeklyDigest toggles the weekly digest preference for a tenant.
+func UpdateWeeklyDigest(ctx context.Context, db *sql.DB, tenantID string, enabled bool) error {
+	_, err := db.ExecContext(ctx, updateWeeklyDigestSQL, tenantID, enabled)
+	if err != nil {
+		return fmt.Errorf("updating weekly digest: %w", err)
+	}
+	return nil
+}
+
+// DigestTenant is a lightweight record for digest-eligible tenants.
+type DigestTenant struct {
+	ID       string
+	Username string
+	Email    string
+}
+
+// ListDigestTenants returns all active tenants opted into the weekly digest
+// that have a non-empty email address.
+func ListDigestTenants(ctx context.Context, db *sql.DB) ([]DigestTenant, error) {
+	rows, err := db.QueryContext(ctx, listDigestTenantsSQL)
+	if err != nil {
+		return nil, fmt.Errorf("listing digest tenants: %w", err)
+	}
+	defer rows.Close()
+
+	var out []DigestTenant
+	for rows.Next() {
+		var dt DigestTenant
+		if err := rows.Scan(&dt.ID, &dt.Username, &dt.Email); err != nil {
+			return nil, fmt.Errorf("scanning digest tenant: %w", err)
+		}
+		out = append(out, dt)
+	}
+	return out, rows.Err()
 }
 
 // UpgradeRequest holds details returned when an upgrade is first requested.

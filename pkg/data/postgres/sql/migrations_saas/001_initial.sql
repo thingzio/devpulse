@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS devpulse_tenant (
     max_repos            INT NOT NULL DEFAULT 3,
     max_events_per_week  INT NOT NULL DEFAULT 1000,
     plan                 TEXT NOT NULL DEFAULT 'free',
+    weekly_digest         BOOLEAN NOT NULL DEFAULT TRUE,
     tos_accepted_at      TIMESTAMPTZ,
     upgrade_requested_at TIMESTAMPTZ,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),

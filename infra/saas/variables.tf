@@ -76,6 +76,12 @@ variable "support_email" {
   default     = "devpulse@thingz.io"
 }
 
+variable "digest_admin_only" {
+  description = "Restrict digest emails to admin users only (true/false)"
+  type        = bool
+  default     = true
+}
+
 # --- Shared infrastructure (from thingzio/infra) ---
 
 variable "vpc_id" {

@@ -95,6 +95,35 @@ resource "google_secret_manager_secret_iam_member" "run_send" {
   member    = "serviceAccount:${google_service_account.run.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "import_send" {
+  secret_id = google_secret_manager_secret.send_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.import.email}"
+}
+
+resource "google_secret_manager_secret" "digest_hmac_secret" {
+  secret_id = "${var.prefix}-digest-hmac-secret"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.default]
+}
+
+resource "google_secret_manager_secret_iam_member" "run_digest_hmac" {
+  secret_id = google_secret_manager_secret.digest_hmac_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.run.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "import_digest_hmac" {
+  secret_id = google_secret_manager_secret.digest_hmac_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.import.email}"
+}
+
 resource "google_secret_manager_secret" "database_url" {
   secret_id = "${var.prefix}-database-url"
   project   = var.project_id

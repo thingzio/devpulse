@@ -46,6 +46,25 @@
   </div>
 
   <div class="settings-section">
+    <h2>Notifications</h2>
+    <div class="settings-grid">
+      <div class="settings-label">Weekly digest</div>
+      <div class="settings-value">
+        <form method="POST" action="/settings/digest" style="display:inline">
+          <input type="hidden" name="enabled" value="{{ if .weekly_digest }}false{{ else }}true{{ end }}">
+          <button type="submit" class="settings-btn{{ if .weekly_digest }} settings-btn-accent{{ end }}">
+            {{ if .weekly_digest }}Enabled{{ else }}Disabled{{ end }}
+          </button>
+        </form>
+      </div>
+      <div class="settings-label"></div>
+      <div class="settings-value">
+        <p class="hint">{{ if .email }}Sent to {{ .email }} once a week with highlights from your repos.{{ else }}No email on your GitHub profile. Add one to receive digests.{{ end }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
     <h2>Appearance</h2>
     <div class="theme-toggle">
       <button class="theme-btn" data-theme="dark">Dark</button>
