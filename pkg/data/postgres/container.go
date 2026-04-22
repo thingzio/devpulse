@@ -121,7 +121,6 @@ func upsertContainerVersions(ctx context.Context, client *github.Client, db DBTX
 
 	stmt, err := tx.PrepareContext(ctx, upsertContainerVersionSQL)
 	if err != nil {
-		rollbackTransaction(tx)
 		return 0, fmt.Errorf("preparing container version upsert: %w", err)
 	}
 	defer stmt.Close()
@@ -131,14 +130,12 @@ func upsertContainerVersions(ctx context.Context, client *github.Client, db DBTX
 		pkgName := pkg.GetName()
 
 		var latestCreatedAt string
-		if err := db.QueryRowContext(ctx, selectLatestContainerVersionSQL, org, repo, pkgName).Scan(&latestCreatedAt); err != nil {
-			rollbackTransaction(tx)
+		if err := tx.QueryRowContext(ctx, selectLatestContainerVersionSQL, org, repo, pkgName).Scan(&latestCreatedAt); err != nil {
 			return 0, fmt.Errorf("querying latest container version for %s/%s/%s: %w", org, repo, pkgName, err)
 		}
 
 		n, fetchErr := fetchAndStoreVersions(ctx, client, stmt, org, repo, pkgName, latestCreatedAt)
 		if fetchErr != nil {
-			rollbackTransaction(tx)
 			return 0, fetchErr
 		}
 		total += n

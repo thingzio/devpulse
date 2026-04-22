@@ -39,6 +39,30 @@ func TestSplitBatch(t *testing.T) {
 	}
 }
 
+func TestSplitIntoBatchesContent(t *testing.T) {
+	tests := []struct {
+		name  string
+		items []int
+		size  int
+		want  [][]int
+	}{
+		{"nil_input", nil, 5, nil},
+		{"empty_input", []int{}, 5, nil},
+		{"single_batch", []int{1, 2, 3}, 5, [][]int{{1, 2, 3}}},
+		{"exact_batches", []int{1, 2, 3, 4}, 2, [][]int{{1, 2}, {3, 4}}},
+		{"partial_last", []int{1, 2, 3}, 2, [][]int{{1, 2}, {3}}},
+		{"single_element", []int{42}, 1, [][]int{{42}}},
+		{"zero_size", []int{1, 2}, 0, nil},
+		{"negative_size", []int{1, 2}, -1, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitIntoBatches(tt.items, tt.size)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestParseIssueNumberFromURL(t *testing.T) {
 	tests := []struct {
 		name string
@@ -180,6 +204,27 @@ func TestIsEventBatchValidAge(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestFlushEmptyList(t *testing.T) {
+	ctx := context.Background()
+
+	// eventImporter with nil store -- flush must return before touching DB.
+	imp := &eventImporter{
+		list:   nil,
+		users:  make(map[string]*github.User),
+		state:  make(map[string]*data.State),
+		counts: make(map[string]int),
+	}
+
+	// Empty list (nil): should return nil without DB access.
+	require.NoError(t, imp.flush(ctx))
+	assert.Equal(t, 0, imp.flushed)
+
+	// Empty list (allocated but zero-length): same behavior.
+	imp.list = make([]*data.Event, 0)
+	require.NoError(t, imp.flush(ctx))
+	assert.Equal(t, 0, imp.flushed)
 }
 
 func TestFlushSubBatching(t *testing.T) {

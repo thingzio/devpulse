@@ -671,7 +671,7 @@ func adminDigestSendHandler(db *sql.DB) http.HandlerFunc {
 
 		if err := digest.Run(r.Context(), db, cfg); err != nil {
 			slog.Error("admin digest send", "username", tn.Username, "error", err)
-			http.Error(w, fmt.Sprintf("digest send failed: %v", err), http.StatusInternalServerError)
+			http.Error(w, "digest send failed", http.StatusInternalServerError)
 			return
 		}
 

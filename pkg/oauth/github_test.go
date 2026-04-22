@@ -168,6 +168,22 @@ func TestFetchUser_EmailFallbackFailure(t *testing.T) {
 	assert.Empty(t, user.Email)
 }
 
+func TestExchangeCode_NonOKStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	cfg := &Config{
+		ClientID:     "id",
+		ClientSecret: "secret",
+		TokenURL:     srv.URL,
+	}
+	_, err := ExchangeCode(context.Background(), cfg, "code")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "status 502")
+}
+
 func TestBuildAuthURL_StateLength(t *testing.T) {
 	cfg := &Config{ClientID: "abc"}
 	_, state, err := BuildAuthURL(cfg)

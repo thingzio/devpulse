@@ -90,6 +90,10 @@ func ExchangeCode(ctx context.Context, cfg *Config, code string) (string, error)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("token exchange: status %d", resp.StatusCode)
+	}
+
 	var result struct {
 		AccessToken string `json:"access_token"`
 		Error       string `json:"error"`

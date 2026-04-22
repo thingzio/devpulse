@@ -32,7 +32,7 @@ type tokenTransport struct {
 
 func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
-	req.Header.Set("Authorization", "token "+t.token)
+	req.Header.Set("Authorization", "Bearer "+t.token)
 	return t.base.RoundTrip(req)
 }
 

@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -88,6 +91,48 @@ func TestLoadGitHubAppConfig_MissingKeyFile(t *testing.T) {
 	t.Setenv("GITHUB_APP_KEY_PATH", "/nonexistent/path/key.pem")
 	_, err := LoadGitHubAppConfig()
 	require.Error(t, err)
+}
+
+func TestLoadGitHubAppConfig_PKCS8Key(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
+	require.NoError(t, err)
+
+	pemBlock := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8Bytes})
+
+	tmpFile := filepath.Join(t.TempDir(), "key.pem")
+	require.NoError(t, os.WriteFile(tmpFile, pemBlock, 0600))
+
+	t.Setenv("GITHUB_APP_ID", "12345")
+	t.Setenv("GITHUB_APP_KEY_PATH", tmpFile)
+
+	cfg, err := LoadGitHubAppConfig()
+	require.NoError(t, err)
+	assert.Equal(t, int64(12345), cfg.AppID)
+	assert.NotNil(t, cfg.PrivateKey)
+}
+
+func TestLoadGitHubAppConfig_PKCS1Key(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	pemBlock := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
+	})
+
+	tmpFile := filepath.Join(t.TempDir(), "key.pem")
+	require.NoError(t, os.WriteFile(tmpFile, pemBlock, 0600))
+
+	t.Setenv("GITHUB_APP_ID", "12345")
+	t.Setenv("GITHUB_APP_KEY_PATH", tmpFile)
+
+	cfg, err := LoadGitHubAppConfig()
+	require.NoError(t, err)
+	assert.Equal(t, int64(12345), cfg.AppID)
+	assert.NotNil(t, cfg.PrivateKey)
 }
 
 func TestLoadGitHubAppConfig_InvalidPEM(t *testing.T) {

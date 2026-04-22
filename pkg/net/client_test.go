@@ -36,12 +36,12 @@ func TestGetOAuthClientSetsAuthHeader(t *testing.T) {
 		{
 			name:  "single token",
 			token: "ghp_abc123",
-			want:  "token ghp_abc123",
+			want:  "Bearer ghp_abc123",
 		},
 		{
 			name:  "comma-separated tokens produce invalid header",
 			token: "ghp_abc123,ghp_def456",
-			want:  "token ghp_abc123,ghp_def456",
+			want:  "Bearer ghp_abc123,ghp_def456",
 		},
 	}
 
@@ -67,7 +67,7 @@ func TestPrintHTTPResponse_Nil(t *testing.T) {
 func TestPrintHTTPResponse_WithResponse(t *testing.T) {
 	resp := &http.Response{
 		StatusCode: 200,
-		Header:     http.Header{},
+		Header:     http.Header{"X-Test": {"value"}},
 		Body:       http.NoBody,
 	}
 	// should not panic

@@ -201,7 +201,10 @@ func ListDigestTenants(ctx context.Context, db *sql.DB) ([]DigestTenant, error) 
 		}
 		out = append(out, dt)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating digest tenants: %w", err)
+	}
+	return out, nil
 }
 
 // UpgradeRequest holds details returned when an upgrade is first requested.

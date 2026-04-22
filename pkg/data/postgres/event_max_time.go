@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,9 +18,6 @@ func (s *Store) GetMaxEventTime(ctx context.Context, org, repo string) (time.Tim
 
 	var raw sql.NullString
 	if err := s.db.QueryRowContext(ctx, selectMaxEventTimeSQL, org, repo).Scan(&raw); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, nil
-		}
 		return time.Time{}, fmt.Errorf("querying max event time for %s/%s: %w", org, repo, err)
 	}
 

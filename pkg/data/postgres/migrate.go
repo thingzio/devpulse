@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 )
 
 // migrateConfig holds the parameters for a migration run.
@@ -23,7 +24,8 @@ type migrateConfig struct {
 // Uses a dedicated connection so the advisory lock is held on the same session
 // as the version check and migration execution.
 func applyMigrations(db *sql.DB, cfg migrateConfig) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	conn, connErr := db.Conn(ctx)
 	if connErr != nil {
@@ -83,31 +85,36 @@ func applyMigrations(db *sql.DB, cfg migrateConfig) error {
 			return fmt.Errorf("reading %s migration %s: %w", cfg.label, name, err)
 		}
 
-		slog.Debug("applying migration", "label", cfg.label, "version", ver, "file", name)
-
-		tx, err := conn.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("beginning %s migration tx %d: %w", cfg.label, ver, err)
+		if err := applyOneMigration(ctx, conn, cfg, ver, name, content); err != nil {
+			return err
 		}
-		defer rollbackTransaction(tx)
-
-		if _, err := tx.ExecContext(ctx, string(content)); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("executing %s migration %s: %w", cfg.label, name, err)
-		}
-
-		insertSQL := "INSERT INTO " + cfg.versionTable + " (version) VALUES ($1) ON CONFLICT DO NOTHING" //nolint:gosec // table name from trusted config, not user input
-		if _, err := tx.ExecContext(ctx, insertSQL, ver); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("recording %s migration %d: %w", cfg.label, ver, err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("committing %s migration %d: %w", cfg.label, ver, err)
-		}
-
-		slog.Info("applied migration", "label", cfg.label, "version", ver, "file", name)
 	}
 
+	return nil
+}
+
+func applyOneMigration(ctx context.Context, conn *sql.Conn, cfg migrateConfig, ver int, name string, content []byte) error {
+	slog.Debug("applying migration", "label", cfg.label, "version", ver, "file", name)
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning %s migration tx %d: %w", cfg.label, ver, err)
+	}
+	defer rollbackTransaction(tx)
+
+	if _, err := tx.ExecContext(ctx, string(content)); err != nil {
+		return fmt.Errorf("executing %s migration %s: %w", cfg.label, name, err)
+	}
+
+	insertSQL := "INSERT INTO " + cfg.versionTable + " (version) VALUES ($1) ON CONFLICT DO NOTHING" //nolint:gosec // table name from trusted config, not user input
+	if _, err := tx.ExecContext(ctx, insertSQL, ver); err != nil {
+		return fmt.Errorf("recording %s migration %d: %w", cfg.label, ver, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing %s migration %d: %w", cfg.label, ver, err)
+	}
+
+	slog.Info("applied migration", "label", cfg.label, "version", ver, "file", name)
 	return nil
 }

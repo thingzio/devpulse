@@ -275,7 +275,15 @@ func Run(ctx context.Context, opts Options) error {
 		RedirectURL:  baseURL + "/auth/github/callback",
 	}
 	webhookSecret := os.Getenv("GITHUB_WEBHOOK_SECRET")
-	ghAppID, _ := strconv.ParseInt(os.Getenv("GITHUB_APP_ID"), 10, 64)
+	ghAppIDStr := os.Getenv("GITHUB_APP_ID")
+	var ghAppID int64
+	if ghAppIDStr != "" {
+		var parseErr error
+		ghAppID, parseErr = strconv.ParseInt(ghAppIDStr, 10, 64)
+		if parseErr != nil {
+			return fmt.Errorf("parsing GITHUB_APP_ID %q: %w", ghAppIDStr, parseErr)
+		}
+	}
 
 	trigger, err := newImportTrigger(ctx, config.ImportJobName())
 	if err != nil {
@@ -331,7 +339,12 @@ func Run(ctx context.Context, opts Options) error {
 		slog.Error("shutdown failed", "error", err)
 	}
 
-	return nil
+	select {
+	case listenErr := <-errCh:
+		return fmt.Errorf("server listen error during shutdown: %w", listenErr)
+	default:
+		return nil
+	}
 }
 
 func makeRouter(

@@ -18,6 +18,24 @@ const csrfCookieName = "csrf_token"
 
 const adminUsersEnvVar = "DEVPULSE_ADMIN_USERS"
 
+var adminUsers []string
+
+func init() {
+	loadAdminUsers()
+}
+
+func loadAdminUsers() {
+	adminUsers = nil
+	raw := os.Getenv(adminUsersEnvVar)
+	if raw != "" {
+		for entry := range strings.SplitSeq(raw, ",") {
+			if u := strings.TrimSpace(entry); u != "" {
+				adminUsers = append(adminUsers, strings.ToLower(u))
+			}
+		}
+	}
+}
+
 // RequireAdmin validates the session cookie and checks the username against
 // the DEVPULSE_ADMIN_USERS whitelist. Returns 404 (not 403) to hide route
 // existence from non-admins.
@@ -57,17 +75,15 @@ func RequireAdmin(db *sql.DB) func(http.Handler) http.Handler {
 // (comma-separated, whitespace-trimmed). Comparison is case-insensitive
 // because GitHub usernames are case-insensitive.
 func IsAdmin(username string) bool {
-	raw := os.Getenv(adminUsersEnvVar)
-	if raw == "" || username == "" {
+	if username == "" {
 		return false
 	}
-
-	for entry := range strings.SplitSeq(raw, ",") {
-		if strings.EqualFold(strings.TrimSpace(entry), username) {
+	lower := strings.ToLower(username)
+	for _, u := range adminUsers {
+		if u == lower {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -80,9 +96,8 @@ func GenerateCSRFToken() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-// SetCSRFCookie writes the CSRF token as a non-HttpOnly cookie so the form
-// can read it, while the POST handler compares form value vs cookie value
-// (double-submit cookie pattern).
+// SetCSRFCookie writes the CSRF token cookie for the double-submit pattern.
+// The form value is injected server-side into a hidden field.
 func SetCSRFCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookieName,
@@ -90,7 +105,7 @@ func SetCSRFCookie(w http.ResponseWriter, token string) {
 		Path:     "/admin",
 		MaxAge:   3600,
 		Secure:   secure,
-		HttpOnly: false, // form JS does not need it; HTML hidden field is pre-filled server-side
+		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	})
 }
@@ -122,7 +137,7 @@ func AdminAuditLog(ctx context.Context, action, path, remoteAddr, detail string)
 		username = tn.Username
 	}
 
-	slog.Warn("admin action",
+	slog.Info("admin action",
 		"action", action,
 		"admin", username,
 		"path", path,

@@ -14,6 +14,7 @@ import (
 
 func TestIsAdmin(t *testing.T) {
 	t.Setenv(adminUsersEnvVar, "alice,bob")
+	loadAdminUsers()
 
 	assert.True(t, IsAdmin("alice"))
 	assert.True(t, IsAdmin("bob"))
@@ -23,6 +24,7 @@ func TestIsAdmin(t *testing.T) {
 
 func TestIsAdmin_CaseInsensitive(t *testing.T) {
 	t.Setenv(adminUsersEnvVar, "Alice,BOB")
+	loadAdminUsers()
 
 	assert.True(t, IsAdmin("alice"))
 	assert.True(t, IsAdmin("ALICE"))
@@ -34,6 +36,7 @@ func TestIsAdmin_CaseInsensitive(t *testing.T) {
 
 func TestIsAdmin_Empty(t *testing.T) {
 	t.Setenv(adminUsersEnvVar, "")
+	loadAdminUsers()
 
 	assert.False(t, IsAdmin("alice"))
 	assert.False(t, IsAdmin(""))
@@ -41,6 +44,7 @@ func TestIsAdmin_Empty(t *testing.T) {
 
 func TestIsAdmin_Whitespace(t *testing.T) {
 	t.Setenv(adminUsersEnvVar, " alice , bob ")
+	loadAdminUsers()
 
 	assert.True(t, IsAdmin("alice"))
 	assert.True(t, IsAdmin("bob"))
@@ -92,6 +96,7 @@ func TestSetCSRFCookie(t *testing.T) {
 	assert.Equal(t, token, cookies[0].Value)
 	assert.Equal(t, "/admin", cookies[0].Path)
 	assert.Equal(t, http.SameSiteStrictMode, cookies[0].SameSite)
+	assert.True(t, cookies[0].HttpOnly)
 }
 
 func TestValidateCSRFFromRequest(t *testing.T) {

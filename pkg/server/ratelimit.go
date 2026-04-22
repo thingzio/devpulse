@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// rateLimiter implements a per-IP sliding-window token bucket.
+// rateLimiter implements a per-IP fixed-window token bucket with lazy expiration.
 type rateLimiter struct {
 	mu       sync.Mutex
 	visitors map[string]*visitor

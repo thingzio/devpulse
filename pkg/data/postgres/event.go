@@ -68,7 +68,7 @@ const (
 		WHERE type = 'pr' AND org = $5 AND repo = $6 AND number = $7
 	`
 
-	// insertEventSQL: 18 INSERT params + 14 ON CONFLICT params = 32 total
+	// insertEventSQL: 18 INSERT params + 13 ON CONFLICT params = 31 total
 	insertEventSQL = `INSERT INTO devpulse_event (
 			org, repo, username, type, date, url, mentions, labels,
 			state, number, created_at, closed_at, merged_at, additions, deletions,
@@ -445,10 +445,6 @@ func splitIntoBatches[T any](items []T, size int) [][]T {
 }
 
 func (e *eventImporter) flush(ctx context.Context) error {
-	if len(e.list) == 0 {
-		return nil
-	}
-
 	start := time.Now()
 
 	var events []*data.Event
@@ -456,6 +452,10 @@ func (e *eventImporter) flush(ctx context.Context) error {
 	var state map[string]*data.State
 
 	e.mu.Lock()
+	if len(e.list) == 0 {
+		e.mu.Unlock()
+		return nil
+	}
 	events = e.list
 	e.list = make([]*data.Event, 0)
 

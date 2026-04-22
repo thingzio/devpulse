@@ -3,9 +3,7 @@ package tenant
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -107,14 +105,9 @@ func LoadGitHubAppConfig() (*GitHubAppConfig, error) {
 		return nil, fmt.Errorf("reading private key from %s: %w", keyPath, err)
 	}
 
-	block, _ := pem.Decode(keyData)
-	if block == nil {
-		return nil, fmt.Errorf("no PEM block found in %s", keyPath)
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	key, err := jwt.ParseRSAPrivateKeyFromPEM(keyData)
 	if err != nil {
-		return nil, fmt.Errorf("parsing private key: %w", err)
+		return nil, fmt.Errorf("parsing private key from %s: %w", keyPath, err)
 	}
 
 	return &GitHubAppConfig{

@@ -92,12 +92,54 @@ func runImport(ctx context.Context) error {
 		"shard_weight", shardWeight,
 		"task_index", taskIndex)
 
+	return dispatchAndFinalize(taskCtx, db, store, pool, llmCfg, myRepos, numWorkers, taskIndex)
+}
+
+// dispatchAndFinalize fans out repo imports to workers, runs post-import
+// phases, and reports the final status.
+func dispatchAndFinalize(
+	taskCtx context.Context, db *sql.DB, store data.Store,
+	pool *ghutil.TokenPool, llmCfg *data.LLMConfig,
+	myRepos []RepoWork, numWorkers, taskIndex int,
+) error {
 	start := time.Now()
 	if len(myRepos) == 0 {
 		logImportComplete(0, 0, 0, start)
 		return nil
 	}
 
+	repos, errs, skippedN := runWorkers(taskCtx, db, store, pool, llmCfg, myRepos, numWorkers)
+
+	if taskCtx.Err() != nil {
+		slog.Warn("import interrupted by timeout, skipping post-import phases",
+			"completed", repos,
+			"total", len(myRepos))
+	} else {
+		postImport(taskCtx, store, pool)
+	}
+
+	if taskIndex == 0 && taskCtx.Err() == nil {
+		sendDigests(taskCtx, db)
+	}
+
+	logImportComplete(repos, errs, skippedN, start)
+
+	if errs > 0 && errs == repos {
+		return fmt.Errorf("all %d repo imports failed", errs)
+	}
+	if taskCtx.Err() != nil {
+		return fmt.Errorf("import interrupted: %w", taskCtx.Err())
+	}
+	return nil
+}
+
+// runWorkers dispatches repo import work to a pool of goroutines and waits
+// for all to complete. Returns (total, errors, skipped).
+func runWorkers(
+	taskCtx context.Context, db *sql.DB, store data.Store,
+	pool *ghutil.TokenPool, llmCfg *data.LLMConfig,
+	myRepos []RepoWork, numWorkers int,
+) (int, int, int) {
 	work := make(chan RepoWork)
 	var wg sync.WaitGroup
 	shardSize := len(myRepos)
@@ -138,31 +180,18 @@ func runImport(ctx context.Context) error {
 		}()
 	}
 
+sendLoop:
 	for _, rw := range myRepos {
-		if taskCtx.Err() != nil {
-			break
+		select {
+		case work <- rw:
+		case <-taskCtx.Done():
+			break sendLoop
 		}
-		work <- rw
 	}
 	close(work)
 	wg.Wait()
 
-	postImport(taskCtx, store, pool)
-
-	// Send weekly digest emails (only on task 0 to avoid duplicates).
-	if taskIndex == 0 {
-		sendDigests(taskCtx, db)
-	}
-
-	repos := int(totalRepos.Load())
-	errs := int(totalErrors.Load())
-	skippedN := int(totalSkipped.Load())
-	logImportComplete(repos, errs, skippedN, start)
-
-	if errs > 0 && errs == repos {
-		return fmt.Errorf("all %d repo imports failed", errs)
-	}
-	return nil
+	return int(totalRepos.Load()), int(totalErrors.Load()), int(totalSkipped.Load())
 }
 
 func logImportComplete(repos, errs, skipped int, start time.Time) {
