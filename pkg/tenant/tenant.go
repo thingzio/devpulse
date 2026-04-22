@@ -78,7 +78,7 @@ const updateWeeklyDigestSQL = `UPDATE devpulse_tenant SET weekly_digest = $2, up
 const updateDigestLastSentSQL = `UPDATE devpulse_tenant SET digest_last_sent_at = NOW(), updated_at = NOW() WHERE id = $1`
 
 const listDigestTenantsSQL = `
-	SELECT id, username, email FROM devpulse_tenant
+	SELECT id, username, email, digest_last_sent_at FROM devpulse_tenant
 	WHERE status = 'active' AND weekly_digest = TRUE AND COALESCE(email, '') != ''`
 
 const requestUpgradeSQL = `
@@ -174,9 +174,10 @@ func UpdateDigestLastSent(ctx context.Context, db *sql.DB, tenantID string) erro
 
 // DigestTenant is a lightweight record for digest-eligible tenants.
 type DigestTenant struct {
-	ID       string
-	Username string
-	Email    string
+	ID         string
+	Username   string
+	Email      string
+	LastSentAt *time.Time
 }
 
 // ListDigestTenants returns all active tenants opted into the weekly digest
@@ -191,8 +192,12 @@ func ListDigestTenants(ctx context.Context, db *sql.DB) ([]DigestTenant, error) 
 	var out []DigestTenant
 	for rows.Next() {
 		var dt DigestTenant
-		if err := rows.Scan(&dt.ID, &dt.Username, &dt.Email); err != nil {
+		var lastSent sql.NullTime
+		if err := rows.Scan(&dt.ID, &dt.Username, &dt.Email, &lastSent); err != nil {
 			return nil, fmt.Errorf("scanning digest tenant: %w", err)
+		}
+		if lastSent.Valid {
+			dt.LastSentAt = &lastSent.Time
 		}
 		out = append(out, dt)
 	}

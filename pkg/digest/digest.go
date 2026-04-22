@@ -103,13 +103,19 @@ func ValidateUnsubscribeToken(secret, tenantID, token string) bool {
 	return hmac.Equal([]byte(expected), []byte(token))
 }
 
+// digestCooldown is the minimum time between digest sends for a single tenant.
+// Set below 7 days so the deterministic weekday rotation isn't blocked by
+// clock drift or scheduler jitter.
+const digestCooldown = 6 * 24 * time.Hour
+
 // Run sends weekly digest emails to eligible tenants whose deterministic
 // send-day matches today's day of week.
 //
 // When Config.TestUsername is set, only that tenant receives a digest
 // (day-of-week check is skipped).
 func Run(ctx context.Context, db *sql.DB, cfg *Config) error {
-	today := int(time.Now().Weekday())
+	now := time.Now()
+	today := int(now.Weekday())
 
 	if cfg.TestUsername != "" {
 		slog.Info("digest running in test mode", "test_username", cfg.TestUsername)
@@ -134,6 +140,14 @@ func Run(ctx context.Context, db *sql.DB, cfg *Config) error {
 
 		// In normal mode, only send on the tenant's deterministic day.
 		if cfg.TestUsername == "" && digestDay(dt.ID) != today {
+			skipped++
+			continue
+		}
+
+		// Skip if already sent within the cooldown window.
+		if dt.LastSentAt != nil && now.Sub(*dt.LastSentAt) < digestCooldown {
+			slog.Debug("digest already sent recently, skipping",
+				"tenant", dt.ID, "last_sent", dt.LastSentAt.Format(time.RFC3339))
 			skipped++
 			continue
 		}
