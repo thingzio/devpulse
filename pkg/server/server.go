@@ -815,6 +815,18 @@ func seedSampleRepos(ctx context.Context, db *sql.DB, tn *tenant.Tenant) {
 		return
 	}
 	slog.Info("seeded sample repos", "tenant_id", tn.ID, "count", len(repos))
+
+	for _, s := range samples {
+		var exists bool
+		err := db.QueryRowContext(ctx,
+			`SELECT EXISTS(SELECT 1 FROM devpulse_repo_meta WHERE org = $1 AND repo = $2)`,
+			s.Org, s.Repo).Scan(&exists)
+		if err != nil {
+			slog.Warn("checking sample repo data", "org", s.Org, "repo", s.Repo, "error", err)
+		} else if !exists {
+			slog.Warn("sample repo has no imported data", "org", s.Org, "repo", s.Repo)
+		}
+	}
 }
 
 func signoutHandler(db *sql.DB) http.HandlerFunc {
