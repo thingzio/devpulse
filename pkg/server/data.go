@@ -83,6 +83,15 @@ func (c *responseCache) setWithTTL(key string, val []byte, ttl time.Duration) {
 	})
 }
 
+func (c *responseCache) invalidatePrefix(prefix string) {
+	c.entries.Range(func(key, _ any) bool {
+		if k, ok := key.(string); ok && strings.HasPrefix(k, prefix) {
+			c.entries.Delete(key)
+		}
+		return true
+	})
+}
+
 const maxCacheTTL = 30 * time.Minute
 
 // requestCacheTTL returns the cache TTL from the ttl query param (seconds),

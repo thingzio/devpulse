@@ -65,7 +65,7 @@ const (
 			d.full_name,
 			d.avatar,
 			d.url,
-			d.entity
+			COALESCE(d.entity, '') AS entity
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE 1=1
