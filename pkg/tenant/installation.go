@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -206,11 +207,21 @@ const markRepoSampleSQL = `
 	UPDATE devpulse_tenant_repo SET sample = TRUE
 	WHERE tenant_id = $1 AND org = $2 AND repo = $3 AND active = TRUE`
 
+const sampleRepoHasDataSQL = `SELECT EXISTS(SELECT 1 FROM devpulse_repo_meta WHERE org = $1 AND repo = $2)`
+
 // AddSampleRepos inserts sample repos for a tenant, bypassing plan limits.
+// Logs a warning for any repo that has no imported data yet.
 func AddSampleRepos(ctx context.Context, db *sql.DB, tenantID string, repos []OrgRepo) error {
 	for _, r := range repos {
 		if _, err := db.ExecContext(ctx, addSampleRepoSQL, tenantID, r.Org, r.Repo); err != nil {
 			return fmt.Errorf("adding sample repo %s/%s: %w", r.Org, r.Repo, err)
+		}
+
+		var exists bool
+		if err := db.QueryRowContext(ctx, sampleRepoHasDataSQL, r.Org, r.Repo).Scan(&exists); err != nil {
+			slog.Warn("checking sample repo data", "org", r.Org, "repo", r.Repo, "error", err)
+		} else if !exists {
+			slog.Warn("sample repo has no imported data", "org", r.Org, "repo", r.Repo)
 		}
 	}
 	return nil
