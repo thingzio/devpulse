@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS devpulse_tenant_repo (
     reputation       JSONB,
     insight          JSONB,
     active           BOOLEAN NOT NULL DEFAULT TRUE,
+    sample           BOOLEAN NOT NULL DEFAULT FALSE,
     import_errors    INT NOT NULL DEFAULT 0,
     import_last_error TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -779,6 +779,8 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 
 		middleware.SetSessionCookie(w, sessionToken, int(sessionTTL.Seconds()))
 
+		seedSampleRepos(r.Context(), db, tn)
+
 		if tn.ToSAcceptedAt == nil {
 			http.Redirect(w, r, "/tos", http.StatusFound)
 			return
@@ -786,6 +788,33 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 
 		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	}
+}
+
+func seedSampleRepos(ctx context.Context, db *sql.DB, tn *tenant.Tenant) {
+	samples := config.SampleRepos()
+	if len(samples) == 0 {
+		return
+	}
+
+	count, err := tenant.CountTenantRepos(ctx, db, tn.ID)
+	if err != nil {
+		slog.Warn("checking repo count for sample seeding", "error", err)
+		return
+	}
+	if count > 0 {
+		return
+	}
+
+	repos := make([]tenant.OrgRepo, len(samples))
+	for i, s := range samples {
+		repos[i] = tenant.OrgRepo{Org: s.Org, Repo: s.Repo}
+	}
+
+	if err := tenant.AddSampleRepos(ctx, db, tn.ID, repos); err != nil {
+		slog.Error("seeding sample repos", "tenant_id", tn.ID, "error", err)
+		return
+	}
+	slog.Info("seeded sample repos", "tenant_id", tn.ID, "count", len(repos))
 }
 
 func signoutHandler(db *sql.DB) http.HandlerFunc {
@@ -908,6 +937,12 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger, ghAppID int64) http.Hand
 			}
 			http.Error(w, "error adding repository", http.StatusInternalServerError)
 			return
+		}
+
+		if config.IsSampleRepo(org, repo) {
+			if err := tenant.MarkRepoAsSample(r.Context(), db, tn.ID, org, repo); err != nil {
+				slog.Warn("marking re-added sample repo", "org", org, "repo", repo, "error", err)
+			}
 		}
 
 		apiCache.invalidatePrefix(tn.ID + "|/api/repos/overview")

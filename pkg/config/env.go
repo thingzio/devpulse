@@ -107,6 +107,39 @@ func ImportRepo() string { return os.Getenv("IMPORT_REPO") }
 // Override: IMPORT_JOB_NAME (default "").
 func ImportJobName() string { return os.Getenv("IMPORT_JOB_NAME") }
 
+// SampleRepo is an org/repo pair from the SAMPLE_REPOS env var.
+type SampleRepo struct {
+	Org  string
+	Repo string
+}
+
+// SampleRepos parses SAMPLE_REPOS (comma-separated org/repo pairs) into a slice.
+// Override: SAMPLE_REPOS (default "").
+func SampleRepos() []SampleRepo {
+	raw := os.Getenv("SAMPLE_REPOS")
+	if raw == "" {
+		return nil
+	}
+	var out []SampleRepo
+	for _, entry := range strings.Split(raw, ",") {
+		parts := strings.SplitN(strings.TrimSpace(entry), "/", 2)
+		if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+			out = append(out, SampleRepo{Org: parts[0], Repo: parts[1]})
+		}
+	}
+	return out
+}
+
+// IsSampleRepo returns true if the given org/repo is in the SAMPLE_REPOS list.
+func IsSampleRepo(org, repo string) bool {
+	for _, sr := range SampleRepos() {
+		if sr.Org == org && sr.Repo == repo {
+			return true
+		}
+	}
+	return false
+}
+
 // CloudRunTaskIndex returns the 0-based task index within the job execution.
 // Override: CLOUD_RUN_TASK_INDEX (default 0 for local/single-task runs).
 func CloudRunTaskIndex() int { return GetEnvAsIntNonNeg("CLOUD_RUN_TASK_INDEX", 0) }

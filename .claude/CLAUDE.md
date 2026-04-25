@@ -162,6 +162,7 @@ Tenant isolation layers:
 2. **ScopedStoreMiddleware** acquires dedicated `db.Conn()`, calls `set_config`, creates scoped Store
 3. **Data handlers** use `storeFromRequest()` to get the scoped Store from request context
 4. **Repo-add gating** — public repo check (HEAD to GitHub API) + GitHub App installation check (tenant must have at least one active installation for import tokens)
+5. **Sample repos** — `devpulse_tenant_repo.sample = TRUE` rows are seeded on first login via `SAMPLE_REPOS` env var. Excluded from repo count and weekly event quota limits. Shared data (events already imported by other tenants) means new users see analytics immediately
 
 ## Environment Variables
 
@@ -178,6 +179,7 @@ Tenant isolation layers:
 - `IMPORT_FRESH_DAYS` — fresh pass lookback window in days (default: 21)
 - `IMPORT_BACKFILL_CHUNK_DAYS` — backfill chunk size in days (default: 7)
 - `IMPORT_DB_BATCH_SIZE` — events per DB transaction during flush (default: 100)
+- `SAMPLE_REPOS` — comma-separated `org/repo` pairs seeded for new users (e.g. `etcd-io/etcd,prometheus/prometheus`); sample repos don't count against plan limits
 
 ## CI/CD
 

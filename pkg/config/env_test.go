@@ -173,6 +173,54 @@ func TestCloudRunExecution(t *testing.T) {
 	})
 }
 
+func TestSampleRepos(t *testing.T) {
+	t.Run("empty when unset", func(t *testing.T) {
+		assert.Nil(t, SampleRepos())
+	})
+	t.Run("single repo", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", "etcd-io/etcd")
+		got := SampleRepos()
+		assert.Len(t, got, 1)
+		assert.Equal(t, SampleRepo{Org: "etcd-io", Repo: "etcd"}, got[0])
+	})
+	t.Run("multiple repos", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", "etcd-io/etcd,prometheus/prometheus,containerd/containerd")
+		got := SampleRepos()
+		assert.Len(t, got, 3)
+		assert.Equal(t, "prometheus", got[1].Org)
+		assert.Equal(t, "prometheus", got[1].Repo)
+	})
+	t.Run("trims whitespace", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", " etcd-io/etcd , prometheus/prometheus ")
+		got := SampleRepos()
+		assert.Len(t, got, 2)
+		assert.Equal(t, "etcd-io", got[0].Org)
+		assert.Equal(t, "etcd", got[0].Repo)
+	})
+	t.Run("skips malformed entries", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", "good/repo,,bad,/nope,also-bad/,ok/fine")
+		got := SampleRepos()
+		assert.Len(t, got, 2)
+		assert.Equal(t, SampleRepo{Org: "good", Repo: "repo"}, got[0])
+		assert.Equal(t, SampleRepo{Org: "ok", Repo: "fine"}, got[1])
+	})
+}
+
+func TestIsSampleRepo(t *testing.T) {
+	t.Run("false when unset", func(t *testing.T) {
+		assert.False(t, IsSampleRepo("etcd-io", "etcd"))
+	})
+	t.Run("true for match", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", "etcd-io/etcd,prometheus/prometheus")
+		assert.True(t, IsSampleRepo("etcd-io", "etcd"))
+		assert.True(t, IsSampleRepo("prometheus", "prometheus"))
+	})
+	t.Run("false for non-match", func(t *testing.T) {
+		t.Setenv("SAMPLE_REPOS", "etcd-io/etcd")
+		assert.False(t, IsSampleRepo("other", "repo"))
+	})
+}
+
 func TestGCPProjectID(t *testing.T) {
 	assert.Equal(t, "thingzio", GCPProjectID())
 }

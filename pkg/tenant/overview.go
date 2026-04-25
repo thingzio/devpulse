@@ -24,6 +24,7 @@ type RepoOverview struct {
 	Language        string  `json:"language"`
 	License         string  `json:"license"`
 	LastImport      string  `json:"last_import"`
+	Sample          bool    `json:"sample"`
 	LimitReached    bool    `json:"limit_reached"`
 	ImportErrors    int     `json:"import_errors"`
 	ImportLastError string  `json:"import_last_error,omitempty"`
@@ -58,6 +59,7 @@ const tenantRepoOverviewSQL = `
 		COALESCE(rm.language, ''),
 		COALESCE(rm.license, ''),
 		COALESCE(rm.last_import_at, ''),
+		tr.sample,
 		tr.import_errors,
 		COALESCE(tr.import_last_error, '')
 	FROM devpulse_tenant_repo tr
@@ -81,7 +83,7 @@ const tenantLimitsSQL = `
 	FROM devpulse_tenant WHERE id = $1`
 
 const tenantActiveRepoCountSQL = `
-	SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE`
+	SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE AND sample = FALSE`
 
 // GetOverview returns the full overview response with repo data and usage summary.
 func GetOverview(ctx context.Context, db *sql.DB, tenantID string, days int) (*OverviewResponse, error) {
@@ -116,10 +118,13 @@ func GetOverview(ctx context.Context, db *sql.DB, tenantID string, days int) (*O
 			&r.Events, &r.WeeklyEvents,
 			&r.Contributors, &r.Scored,
 			&r.Language, &r.License, &r.LastImport,
+			&r.Sample,
 			&r.ImportErrors, &r.ImportLastError); err != nil {
 			return nil, fmt.Errorf("scanning repo overview: %w", err)
 		}
-		totalWeeklyEvents += r.WeeklyEvents
+		if !r.Sample {
+			totalWeeklyEvents += r.WeeklyEvents
+		}
 		repos = append(repos, r)
 	}
 	if err := rows.Err(); err != nil {
@@ -158,7 +163,7 @@ const getWeeklyEventCountSQL = `
 	SELECT COUNT(*)
 	FROM devpulse_event e
 	JOIN devpulse_tenant_repo tr ON tr.org = e.org AND tr.repo = e.repo
-	WHERE tr.tenant_id = $1 AND tr.active = TRUE AND e.date >= $2`
+	WHERE tr.tenant_id = $1 AND tr.active = TRUE AND tr.sample = FALSE AND e.date >= $2`
 
 // GetWeeklyEventCount returns the total events this week for a tenant's repos.
 func GetWeeklyEventCount(ctx context.Context, db *sql.DB, tenantID string) (int, error) {

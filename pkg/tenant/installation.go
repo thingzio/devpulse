@@ -29,6 +29,7 @@ type TenantRepo struct {
 	Org          string  `json:"org"`
 	Repo         string  `json:"repo"`
 	Active       bool    `json:"active"`
+	Sample       bool    `json:"sample"`
 	LastImportAt *string `json:"last_import_at"`
 }
 
@@ -61,7 +62,7 @@ const addTenantRepoSQL = `
 	ON CONFLICT (tenant_id, org, repo) DO UPDATE SET active = TRUE`
 
 const listTenantReposSQL = `
-	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, tr.active, rm.last_import_at
+	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, tr.active, tr.sample, rm.last_import_at
 	FROM devpulse_tenant_repo tr
 	LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE ORDER BY tr.org, tr.repo`
@@ -69,7 +70,7 @@ const listTenantReposSQL = `
 const deactivateTenantRepoSQL = `
 	UPDATE devpulse_tenant_repo SET active = FALSE WHERE tenant_id = $1 AND org = $2 AND repo = $3`
 
-const countTenantReposSQL = `SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE`
+const countTenantReposSQL = `SELECT COUNT(*) FROM devpulse_tenant_repo WHERE tenant_id = $1 AND active = TRUE AND sample = FALSE`
 
 const getTenantMaxReposSQL = `SELECT max_repos FROM devpulse_tenant WHERE id = $1`
 
@@ -90,7 +91,7 @@ func SaveInstallation(ctx context.Context, db *sql.DB, tenantID string, installa
 	return nil
 }
 
-// ListInstallations returns all installations for a tenant.
+//nolint:dupl // same row-scan pattern as ListTenantRepos but different query/type
 func ListInstallations(ctx context.Context, db *sql.DB, tenantID string) ([]Installation, error) {
 	rows, err := db.QueryContext(ctx, listInstallationsSQL, tenantID)
 	if err != nil {
@@ -165,7 +166,7 @@ func CountTenantRepos(ctx context.Context, db *sql.DB, tenantID string) (int, er
 	return count, nil
 }
 
-// ListTenantRepos returns all active repos for a tenant.
+//nolint:dupl // same row-scan pattern as ListInstallations but different query/type
 func ListTenantRepos(ctx context.Context, db *sql.DB, tenantID string) ([]TenantRepo, error) {
 	rows, err := db.QueryContext(ctx, listTenantReposSQL, tenantID)
 	if err != nil {
@@ -176,7 +177,7 @@ func ListTenantRepos(ctx context.Context, db *sql.DB, tenantID string) ([]Tenant
 	var result []TenantRepo
 	for rows.Next() {
 		var r TenantRepo
-		if err := rows.Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo, &r.Active, &r.LastImportAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.Org, &r.Repo, &r.Active, &r.Sample, &r.LastImportAt); err != nil {
 			return nil, fmt.Errorf("scanning repo: %w", err)
 		}
 		result = append(result, r)
@@ -192,6 +193,33 @@ func DeactivateTenantRepo(ctx context.Context, db *sql.DB, tenantID, org, repo s
 	_, err := db.ExecContext(ctx, deactivateTenantRepoSQL, tenantID, org, repo)
 	if err != nil {
 		return fmt.Errorf("deactivating repo: %w", err)
+	}
+	return nil
+}
+
+const addSampleRepoSQL = `
+	INSERT INTO devpulse_tenant_repo (tenant_id, org, repo, sample)
+	VALUES ($1, $2, $3, TRUE)
+	ON CONFLICT (tenant_id, org, repo) DO UPDATE SET active = TRUE, sample = TRUE`
+
+const markRepoSampleSQL = `
+	UPDATE devpulse_tenant_repo SET sample = TRUE
+	WHERE tenant_id = $1 AND org = $2 AND repo = $3 AND active = TRUE`
+
+// AddSampleRepos inserts sample repos for a tenant, bypassing plan limits.
+func AddSampleRepos(ctx context.Context, db *sql.DB, tenantID string, repos []OrgRepo) error {
+	for _, r := range repos {
+		if _, err := db.ExecContext(ctx, addSampleRepoSQL, tenantID, r.Org, r.Repo); err != nil {
+			return fmt.Errorf("adding sample repo %s/%s: %w", r.Org, r.Repo, err)
+		}
+	}
+	return nil
+}
+
+// MarkRepoAsSample marks an existing tenant repo as a sample.
+func MarkRepoAsSample(ctx context.Context, db *sql.DB, tenantID, org, repo string) error {
+	if _, err := db.ExecContext(ctx, markRepoSampleSQL, tenantID, org, repo); err != nil {
+		return fmt.Errorf("marking repo %s/%s as sample: %w", org, repo, err)
 	}
 	return nil
 }

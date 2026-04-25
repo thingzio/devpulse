@@ -2489,6 +2489,9 @@ function loadRepoOverview(url) {
                     applySelection('repo', { value: name, label: name });
                 });
                 $nameCell.append($link);
+                if (r.sample) {
+                    $nameCell.append(' <span style="font-size:0.7em;color:var(--blue);font-weight:600;border:1px solid var(--blue);border-radius:3px;padding:1px 4px;vertical-align:middle">sample</span>');
+                }
             } else if (paused) {
                 $nameCell.text(name).css('color', 'var(--red)');
                 $nameCell.append(' <span style="font-size:0.75em;font-weight:700">(paused)</span>');

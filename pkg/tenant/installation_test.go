@@ -275,6 +275,147 @@ func TestGetActiveInstallations(t *testing.T) {
 	assert.Equal(t, "active", insts[0].Login)
 }
 
+func TestAddSampleRepos(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60020, "sampleuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	samples := []OrgRepo{
+		{Org: "sample-org", Repo: "repo1"},
+		{Org: "sample-org", Repo: "repo2"},
+	}
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, samples))
+
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+	assert.True(t, list[0].Sample)
+	assert.True(t, list[1].Sample)
+}
+
+func TestSampleReposExcludedFromCount(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60021, "samplecountuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Add sample repos
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, []OrgRepo{
+		{Org: "sample-org", Repo: "s1"},
+		{Org: "sample-org", Repo: "s2"},
+	}))
+
+	// Count should be 0 — samples excluded
+	count, err := CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	// Add a regular repo
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "real-org", Repo: "r1"}}))
+
+	// Count should be 1 — only regular repo
+	count, err = CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// List should have 3 total
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Len(t, list, 3)
+}
+
+func TestSampleReposDontBreakPlanLimit(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60022, "samplelimituser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	got, err := GetTenantByID(ctx, db, tn.ID)
+	require.NoError(t, err)
+	maxRepos := got.MaxRepos
+
+	// Seed samples — these should not count toward limit
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, []OrgRepo{
+		{Org: "sample", Repo: "s1"},
+		{Org: "sample", Repo: "s2"},
+	}))
+
+	// Fill to plan limit with regular repos
+	repos := make([]OrgRepo, maxRepos)
+	for i := range repos {
+		repos[i] = OrgRepo{Org: "org", Repo: "repo" + string(rune('a'+i))}
+	}
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, repos))
+
+	// One more regular should exceed
+	err = AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "excess"}})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRepoLimitExceeded)
+}
+
+func TestMarkRepoAsSample(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60023, "markuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Add a regular repo
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "repo"}}))
+
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.False(t, list[0].Sample)
+
+	// Mark as sample
+	require.NoError(t, MarkRepoAsSample(ctx, db, tn.ID, "org", "repo"))
+
+	list, err = ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.True(t, list[0].Sample)
+
+	// Should no longer count
+	count, err := CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
+
+func TestSampleRepoDeactivateAndReactivate(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60024, "samplereactivate", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Add sample repo
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "sample-repo"}}))
+
+	// Deactivate
+	require.NoError(t, DeactivateTenantRepo(ctx, db, tn.ID, "org", "sample-repo"))
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Empty(t, list)
+
+	// Re-add via regular path (sample flag cleared by regular add)
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "sample-repo"}}))
+	list, err = ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.False(t, list[0].Sample)
+
+	// Mark it back as sample
+	require.NoError(t, MarkRepoAsSample(ctx, db, tn.ID, "org", "sample-repo"))
+	list, err = ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.True(t, list[0].Sample)
+}
+
 func TestGetActiveReposForInstall(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
