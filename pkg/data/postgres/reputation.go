@@ -56,21 +56,19 @@ const (
 		WHERE username = $1
 	`
 
-	// selectContributorCompositionSQL: $1=org, $2=repo, $3=entity, $4=since
-	selectContributorCompositionSQL = `
+	// selectContributorCompositionTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// %s = queryBuilder whereClause
+	selectContributorCompositionTpl = `
 WITH contributor_roles AS (
     SELECT e.username,
         bool_or(e.type = 'pr_review') AS is_reviewer,
         bool_or(e.type = 'pr') AS is_author,
         bool_or(e.type = 'issue_comment') AS is_commenter
     FROM devpulse_event e
-    WHERE e.org = COALESCE($1, e.org)
-      AND e.repo = COALESCE($2, e.repo)
-      AND ($3::text IS NULL OR e.username IN (
-        SELECT username FROM devpulse_developer WHERE entity = $3))
-      AND e.date >= $4
-      AND e.username NOT LIKE '%[bot]'
+    WHERE e.date >= $1
+      AND e.username NOT LIKE '%%[bot]'
       AND e.type != 'fork'
+      %s
     GROUP BY e.username
 )
 SELECT
@@ -166,8 +164,20 @@ func (s *Store) GetContributorComposition(ctx context.Context, org, repo, entity
 	since := sinceDate(days)
 	c := &data.ContributorComposition{}
 
+	qb := newQueryBuilder(2)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
+	if entity != nil {
+		qb.clauses = append(qb.clauses, fmt.Sprintf(
+			"e.username IN (SELECT username FROM devpulse_developer WHERE entity = $%d)", qb.paramIdx))
+		qb.args = append(qb.args, *entity)
+		qb.paramIdx++
+	}
+	query := fmt.Sprintf(selectContributorCompositionTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
+
 	var reviewers, authors, commenters, total int
-	if err := s.db.QueryRowContext(ctx, selectContributorCompositionSQL, org, repo, entity, since).Scan(
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&reviewers, &authors, &commenters, &total,
 	); err != nil {
 		return nil, fmt.Errorf("failed to query contributor composition: %w", err)
