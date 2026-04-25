@@ -402,18 +402,82 @@ func TestSampleRepoDeactivateAndReactivate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, list)
 
-	// Re-add via regular path (sample flag cleared by regular add)
+	// Re-add via regular path — upsert reactivates but preserves sample flag
 	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "org", Repo: "sample-repo"}}))
 	list, err = ListTenantRepos(ctx, db, tn.ID)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
-	assert.False(t, list[0].Sample)
-
-	// Mark it back as sample
-	require.NoError(t, MarkRepoAsSample(ctx, db, tn.ID, "org", "sample-repo"))
-	list, err = ListTenantRepos(ctx, db, tn.ID)
-	require.NoError(t, err)
 	assert.True(t, list[0].Sample)
+}
+
+func TestAddSampleRepos_NoDataWarning(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60025, "nodatauser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Add sample repos when no repo_meta exists — should succeed (warning logged)
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, []OrgRepo{
+		{Org: "no-data-org", Repo: "no-data-repo"},
+	}))
+
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.True(t, list[0].Sample)
+}
+
+func TestAddSampleRepos_WithData(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60026, "withdatauser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Insert repo_meta row to simulate previously imported repo
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO devpulse_repo_meta (org, repo) VALUES ('has-data-org', 'has-data-repo')`)
+	require.NoError(t, err)
+
+	// Add sample repo that has data — should succeed (no warning)
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, []OrgRepo{
+		{Org: "has-data-org", Repo: "has-data-repo"},
+	}))
+
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.True(t, list[0].Sample)
+}
+
+func TestSeedSampleRepos_OnlyWhenNoRepos(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60027, "seedonceuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	samples := []OrgRepo{{Org: "seed-org", Repo: "seed-repo"}}
+
+	// Simulate seeding logic: count == 0 → seed
+	count, err := CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+	require.NoError(t, AddSampleRepos(ctx, db, tn.ID, samples))
+
+	// Now add a regular repo
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "real", Repo: "repo"}}))
+
+	// Simulate second login: count > 0 → should not re-seed
+	count, err = CountTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count) // only regular repo counted
+
+	// Verify total is 2 (1 sample + 1 regular)
+	list, err := ListTenantRepos(ctx, db, tn.ID)
+	require.NoError(t, err)
+	assert.Len(t, list, 2)
 }
 
 func TestGetActiveReposForInstall(t *testing.T) {
