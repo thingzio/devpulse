@@ -910,6 +910,8 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger, ghAppID int64) http.Hand
 			return
 		}
 
+		apiCache.invalidatePrefix(tn.ID + "|/api/repos/overview")
+
 		go func() { //nolint:gosec // fire-and-forget: goroutine intentionally outlives the HTTP request
 			triggerCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ServerTriggerTimeout())*time.Second)
 			defer cancel()
@@ -1028,6 +1030,7 @@ func deleteRepoHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		apiCache.invalidatePrefix(tn.ID + "|/api/repos/overview")
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

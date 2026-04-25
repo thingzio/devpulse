@@ -533,15 +533,16 @@ SELECT
 FROM first_response
 `
 
-	// selectPortfolioSummarySQL: $1=org, $2=repo, $3=since, $4=30_days_ago_date
-	selectPortfolioSummarySQL = `WITH current_totals AS (
+	// selectPortfolioSummaryTpl: dynamic org/repo via queryBuilder
+	// %[1]s = orgRepoWhere for repo_meta, %[2]s = orgRepoWhere for metric_history,
+	// %[3]s = orgRepoWhere for event (e. prefix)
+	selectPortfolioSummaryTpl = `WITH current_totals AS (
     SELECT
         COALESCE(SUM(stars), 0) AS stars,
         COALESCE(SUM(forks), 0) AS forks,
         COALESCE(SUM(open_issues), 0) AS open_issues
     FROM devpulse_repo_meta
-    WHERE org = COALESCE($1, org)
-      AND repo = COALESCE($2, repo)
+    WHERE 1=1 %[1]s
 ),
 prev_snapshot AS (
     SELECT
@@ -550,9 +551,7 @@ prev_snapshot AS (
     FROM (
         SELECT DISTINCT ON (org, repo) org, repo, stars, forks
         FROM devpulse_repo_metric_history
-        WHERE org = COALESCE($1, org)
-          AND repo = COALESCE($2, repo)
-          AND date <= $4
+        WHERE date <= $2 %[2]s
         ORDER BY org, repo, date DESC
     ) h
 ),
@@ -567,10 +566,9 @@ pr_stats AS (
         ) FILTER (WHERE e.merged_at IS NOT NULL AND e.created_at IS NOT NULL), 0) AS median_merge_h
     FROM devpulse_event e
     WHERE e.type = 'pr'
-      AND e.org = COALESCE($1, e.org)
-      AND e.repo = COALESCE($2, e.repo)
-      AND e.date >= $3
-      ` + botExcludeSQL + `
+      AND e.date >= $1
+      ` + botExcludeTpl + `
+      %[3]s
 )
 SELECT c.stars, c.forks, c.open_issues,
        c.stars - p.stars, c.forks - p.forks,
@@ -579,23 +577,24 @@ SELECT c.stars, c.forks, c.open_issues,
 FROM current_totals c, prev_snapshot p, pr_stats ps
 `
 
-	// selectSignalsSQL: $1=org, $2=7_days_ago, $3=14_days_ago, $4=limit
-	selectSignalsSQL = `WITH this_week AS (
+	// selectSignalsTpl: $1=7_days_ago, $2=14_days_ago, $3=limit
+	// %[1]s = org filter for this_week, %[2]s = org filter for last_week
+	selectSignalsTpl = `WITH this_week AS (
     SELECT e.org, e.repo, COUNT(*) AS events
     FROM devpulse_event e
-    WHERE e.org = COALESCE($1, e.org)
-      AND e.date >= $2
-      ` + botExcludeSQL + `
+    WHERE e.date >= $1
+      ` + botExcludeTpl + `
       ` + forkExcludeSQL + `
+      %[1]s
     GROUP BY e.org, e.repo
 ),
 last_week AS (
     SELECT e.org, e.repo, COUNT(*) AS events
     FROM devpulse_event e
-    WHERE e.org = COALESCE($1, e.org)
-      AND e.date >= $3 AND e.date < $2
-      ` + botExcludeSQL + `
+    WHERE e.date >= $2 AND e.date < $1
+      ` + botExcludeTpl + `
       ` + forkExcludeSQL + `
+      %[2]s
     GROUP BY e.org, e.repo
 )
 SELECT
@@ -609,7 +608,7 @@ FROM this_week t
 FULL OUTER JOIN last_week l ON t.org = l.org AND t.repo = l.repo
 WHERE ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) > 0
 ORDER BY ABS(COALESCE(t.events, 0) - COALESCE(l.events, 0)) DESC
-LIMIT $4
+LIMIT $3
 `
 
 	// selectDailyActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
@@ -1404,8 +1403,30 @@ func (s *Store) GetPortfolioSummary(ctx context.Context, org, repo *string, days
 	since := sinceDate(days)
 	thirtyDaysAgo := sinceDate(30)
 
+	// Fixed params: $1=since, $2=30_days_ago. Dynamic org/repo start at $3.
+	qbMeta := newQueryBuilder(3)
+	qbMeta.addOptional("org", org)
+	qbMeta.addOptional("repo", repo)
+
+	qbHist := newQueryBuilder(qbMeta.nextParam())
+	qbHist.addOptional("org", org)
+	qbHist.addOptional("repo", repo)
+
+	qbEvent := newQueryBuilder(qbHist.nextParam())
+	qbEvent.addOptional("e.org", org)
+	qbEvent.addOptional("e.repo", repo)
+
+	query := fmt.Sprintf(selectPortfolioSummaryTpl,
+		qbMeta.whereClause(), qbHist.whereClause(), qbEvent.whereClause())
+
+	args := make([]any, 0, 2+len(qbMeta.args)+len(qbHist.args)+len(qbEvent.args))
+	args = append(args, since, thirtyDaysAgo)
+	args = append(args, qbMeta.args...)
+	args = append(args, qbHist.args...)
+	args = append(args, qbEvent.args...)
+
 	var ps data.PortfolioSummary
-	if err := s.db.QueryRowContext(ctx, selectPortfolioSummarySQL, org, repo, since, thirtyDaysAgo).Scan(
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&ps.TotalStars, &ps.TotalForks, &ps.TotalOpenIssues,
 		&ps.StarsDelta, &ps.ForksDelta,
 		&ps.TotalClosedPRs, &ps.TotalContributors,
@@ -1439,7 +1460,19 @@ func (s *Store) GetSignals(ctx context.Context, org *string, limit int) ([]*data
 	weekAgo := now.AddDate(0, 0, -7).Format("2006-01-02")
 	twoWeeksAgo := now.AddDate(0, 0, -14).Format("2006-01-02")
 
-	rows, err := s.db.QueryContext(ctx, selectSignalsSQL, org, weekAgo, twoWeeksAgo, limit)
+	// Fixed params: $1=weekAgo, $2=twoWeeksAgo, $3=limit. Dynamic org starts at $4.
+	qbThis := newQueryBuilder(4)
+	qbThis.addOptional("e.org", org)
+	qbLast := newQueryBuilder(qbThis.nextParam())
+	qbLast.addOptional("e.org", org)
+
+	query := fmt.Sprintf(selectSignalsTpl, qbThis.whereClause(), qbLast.whereClause())
+	args := make([]any, 0, 3+len(qbThis.args)+len(qbLast.args))
+	args = append(args, weekAgo, twoWeeksAgo, limit)
+	args = append(args, qbThis.args...)
+	args = append(args, qbLast.args...)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query signals: %w", err)
 	}

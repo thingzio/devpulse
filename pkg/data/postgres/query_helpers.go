@@ -15,11 +15,7 @@ import (
 const (
 	nonAlphaNumRegex string = "[^a-zA-Z0-9 ]+"
 
-	// botExcludeSQL filters out bot accounts using the "e" table alias.
-	botExcludeSQL = `AND e.username NOT LIKE '%[bot]'
-		AND LOWER(e.username) NOT IN (` + data.BotNames + `)`
-
-	// botExcludeTpl is botExcludeSQL with % escaped for use in fmt.Sprintf templates.
+	// botExcludeTpl filters out bot accounts using the "e" table alias (%-escaped for fmt.Sprintf).
 	botExcludeTpl = `AND e.username NOT LIKE '%%[bot]'
 		AND LOWER(e.username) NOT IN (` + data.BotNames + `)`
 
@@ -356,6 +352,36 @@ func (qb *queryBuilder) addOptional(col string, val *string) {
 		return
 	}
 	qb.clauses = append(qb.clauses, fmt.Sprintf("%s = $%d", col, qb.paramIdx))
+	qb.args = append(qb.args, *val)
+	qb.paramIdx++
+}
+
+// addOptionalGte appends "col >= $N" only when val is non-nil.
+func (qb *queryBuilder) addOptionalGte(col string, val *string) {
+	if val == nil {
+		return
+	}
+	qb.clauses = append(qb.clauses, fmt.Sprintf("%s >= $%d", col, qb.paramIdx))
+	qb.args = append(qb.args, *val)
+	qb.paramIdx++
+}
+
+// addOptionalLte appends "col <= $N" only when val is non-nil.
+func (qb *queryBuilder) addOptionalLte(col string, val *string) {
+	if val == nil {
+		return
+	}
+	qb.clauses = append(qb.clauses, fmt.Sprintf("%s <= $%d", col, qb.paramIdx))
+	qb.args = append(qb.args, *val)
+	qb.paramIdx++
+}
+
+// addOptionalLike appends "col LIKE $N" only when val is non-nil.
+func (qb *queryBuilder) addOptionalLike(col string, val *string) {
+	if val == nil {
+		return
+	}
+	qb.clauses = append(qb.clauses, fmt.Sprintf("%s LIKE $%d", col, qb.paramIdx))
 	qb.args = append(qb.args, *val)
 	qb.paramIdx++
 }

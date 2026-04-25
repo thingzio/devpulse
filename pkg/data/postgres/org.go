@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
 const (
-	selectOrgEntityPercentSQL = `SELECT
+	// selectOrgEntityPercentTpl: $1=since, dynamic entity/org/repo + exclusions via queryBuilder
+	// %s = queryBuilder whereClause (includes optional filters + exclusion NOT IN)
+	selectOrgEntityPercentTpl = `SELECT
 			entity,
 			ROUND(100.0 * events / (SUM(events) OVER ())) AS percent
 		FROM (
@@ -21,17 +22,16 @@ const (
 			JOIN devpulse_event e ON d.username = e.username
 			WHERE d.entity IS NOT NULL AND d.entity <> ''
 			AND e.date >= $1
-			AND d.entity = COALESCE($2, d.entity)
-			AND e.org = COALESCE($3, e.org)
-			AND e.repo = COALESCE($4, e.repo)
-			%s
 			` + forkExcludeSQL + `
+			%s
 			GROUP BY d.entity
 		) dt
 		ORDER BY 2 DESC
 	`
 
-	selectDeveloperPercentSQL = `SELECT
+	// selectDeveloperPercentTpl: $1=since, dynamic entity/org/repo + exclusions via queryBuilder
+	// %s = queryBuilder whereClause (includes optional filters + exclusion NOT IN)
+	selectDeveloperPercentTpl = `SELECT
 			username,
 			ROUND(100.0 * events / (SUM(events) OVER ())) AS percent
 		FROM (
@@ -41,12 +41,9 @@ const (
 			FROM devpulse_developer d
 			JOIN devpulse_event e ON d.username = e.username
 			WHERE e.date >= $1
-			AND d.entity = COALESCE($2, d.entity)
-			AND e.org = COALESCE($3, e.org)
-			AND e.repo = COALESCE($4, e.repo)
-			%s
 			` + botExcludeTpl + `
 			` + forkExcludeSQL + `
+			%s
 			GROUP BY d.username
 		) dt
 		ORDER BY 2 DESC
@@ -103,38 +100,29 @@ func (s *Store) GetAllOrgRepos(ctx context.Context) ([]*data.OrgRepoItem, error)
 	return list, nil
 }
 
-func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
+func (s *Store) getPercentages(ctx context.Context, sqlTpl, exColumn string, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
 	if s.db == nil {
 		return nil, data.ErrDBNotInitialized
 	}
 
 	since := sinceDate(days)
 
-	// First 4 params are $1-$4 (since, entity, org, repo).
-	// The exclusion list starts at $5.
-	qArgs := []interface{}{since, entity, org, repo}
+	// $1=since. Dynamic filters start at $2.
+	qb := newQueryBuilder(2)
+	qb.addOptional("d.entity", entity)
+	qb.addOptional("e.org", org)
+	qb.addOptional("e.repo", repo)
 
-	var formattedSQL string
-	if len(ex) == 0 {
-		// When no exclusions, omit the NOT IN clause entirely.
-		formattedSQL = fmt.Sprintf(sqlStr, "")
-	} else {
-		params := make([]string, len(ex))
-		for i, v := range ex {
-			params[i] = fmt.Sprintf("$%d", 5+i)
-			qArgs = append(qArgs, v)
-		}
-		clause := fmt.Sprintf("AND %s NOT IN (%s)", exColumn, strings.Join(params, ","))
-		formattedSQL = fmt.Sprintf(sqlStr, clause)
+	for _, v := range ex {
+		qb.clauses = append(qb.clauses, fmt.Sprintf("%s != $%d", exColumn, qb.paramIdx))
+		qb.args = append(qb.args, v)
+		qb.paramIdx++
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, formattedSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare percentages statement: %w", err)
-	}
-	defer stmt.Close()
+	formattedSQL := fmt.Sprintf(sqlTpl, qb.whereClause())
+	args := append([]any{since}, qb.args...)
 
-	rows, err := stmt.QueryContext(ctx, qArgs...)
+	rows, err := s.db.QueryContext(ctx, formattedSQL, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute select statement: %w", err)
 	}
@@ -157,11 +145,11 @@ func (s *Store) getPercentages(ctx context.Context, sqlStr, exColumn string, ent
 }
 
 func (s *Store) GetDeveloperPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
-	return s.getPercentages(ctx, selectDeveloperPercentSQL, "d.username", entity, org, repo, ex, days)
+	return s.getPercentages(ctx, selectDeveloperPercentTpl, "d.username", entity, org, repo, ex, days)
 }
 
 func (s *Store) GetEntityPercentages(ctx context.Context, entity, org, repo *string, ex []string, days int) ([]*data.CountedItem, error) {
-	return s.getPercentages(ctx, selectOrgEntityPercentSQL, "d.entity", entity, org, repo, ex, days)
+	return s.getPercentages(ctx, selectOrgEntityPercentTpl, "d.entity", entity, org, repo, ex, days)
 }
 
 func (s *Store) SearchDeveloperUsernames(ctx context.Context, query string, org, repo *string, days, limit int) ([]string, error) {

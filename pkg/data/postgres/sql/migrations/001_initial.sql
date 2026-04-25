@@ -1,4 +1,4 @@
--- DevPulse base schema (prefixed for shared database)
+-- DevPulse base schema (squashed from migrations 001-014, 2026-04-25).
 
 CREATE TABLE IF NOT EXISTS devpulse_developer (
     username TEXT NOT NULL,
@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS devpulse_repo_meta (
     has_issue_template INTEGER NOT NULL DEFAULT 0,
     has_pr_template INTEGER NOT NULL DEFAULT 0,
     community_health_pct INTEGER NOT NULL DEFAULT 0,
+    pushed_at TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (org, repo)
 );
 
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS devpulse_state (
     repo TEXT NOT NULL,
     page INTEGER NOT NULL,
     since INTEGER NOT NULL,
+    backfill_until INTEGER,
     PRIMARY KEY (query, org, repo)
 );
 
@@ -122,15 +124,31 @@ CREATE TABLE IF NOT EXISTS devpulse_sub (
     PRIMARY KEY (type, old)
 );
 
--- Base indexes (from original 001)
+-- ─── Indexes ────────────────────────────────────────────────────────
+
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_date ON devpulse_event (org, repo, date);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_type_date ON devpulse_event (org, repo, type, date);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_created_at ON devpulse_event (org, repo, created_at);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_username ON devpulse_event (username);
 CREATE INDEX IF NOT EXISTS idx_devpulse_developer_reputation ON devpulse_developer (reputation);
 
--- Performance indexes (from original 003)
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_number ON devpulse_event (org, repo, number);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_username_org_repo ON devpulse_event (username, org, repo);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_number_type ON devpulse_event (org, repo, number, type, created_at);
 CREATE INDEX IF NOT EXISTS idx_devpulse_developer_entity_null ON devpulse_developer (username) WHERE entity IS NULL;
+
+-- Performance indexes (from migration 014)
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_type_created
+    ON devpulse_event (org, repo, type, created_at);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_date_user
+    ON devpulse_event (org, repo, date, username);
+CREATE INDEX IF NOT EXISTS idx_devpulse_developer_entity
+    ON devpulse_developer (entity)
+    WHERE entity IS NOT NULL AND entity != '';
+CREATE INDEX IF NOT EXISTS idx_devpulse_release_org_repo_published
+    ON devpulse_release (org, repo, published_at);
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_open_prs
+    ON devpulse_event (org, repo, created_at)
+    WHERE type = 'pr' AND (state IS NULL OR state NOT IN ('merged', 'closed'));
+CREATE INDEX IF NOT EXISTS idx_devpulse_event_date
+    ON devpulse_event (date);
