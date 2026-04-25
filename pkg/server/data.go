@@ -17,7 +17,7 @@ import (
 
 const (
 	serverCacheTTL        = 5 * time.Minute
-	browserCacheMaxAge    = "private, max-age=1800"
+	browserCacheMaxAge    = "private, max-age=600"
 	cacheControlHeaderKey = "Cache-Control"
 )
 
