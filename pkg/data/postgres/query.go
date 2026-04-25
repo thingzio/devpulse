@@ -40,7 +40,10 @@ const (
 		ORDER BY 1
 	`
 
-	selectEventSQL = `SELECT
+	// selectEventTpl is the base query for SearchEvents; WHERE clauses are
+	// appended dynamically by searchQueryBuilder so the planner can use indexes.
+	// %s = dynamic WHERE clauses, %d/%d = LIMIT/OFFSET param positions.
+	selectEventTpl = `SELECT
 			e.org,
 			e.repo,
 			e.date,
@@ -65,18 +68,11 @@ const (
 			d.entity
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
-		WHERE e.date >= COALESCE($1, e.date)
-		AND e.date <= COALESCE($2, e.date)
-		AND e.type = COALESCE($3, e.type)
-		AND e.org = COALESCE($4, e.org)
-		AND e.repo = COALESCE($5, e.repo)
-		AND e.username = COALESCE($6, e.username)
-		AND e.mentions LIKE COALESCE($7, e.mentions)
-		AND e.labels LIKE COALESCE($8, e.labels)
-		AND d.entity = COALESCE($9, d.entity)
-		` + botExcludeSQL + `
-		ORDER BY 1 DESC, 2, 3
-		LIMIT $10 OFFSET $11
+		WHERE 1=1
+		` + botExcludeTpl + `
+		%s
+		ORDER BY e.date DESC, e.org, e.repo
+		LIMIT $%d OFFSET $%d
 	`
 )
 
@@ -93,14 +89,27 @@ func (s *Store) SearchEvents(ctx context.Context, q *data.EventSearchCriteria) (
 		return nil, data.ErrDBNotInitialized
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, selectEventSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare event search statement: %w", err)
-	}
-	defer stmt.Close()
+	qb := newQueryBuilder(1)
+	qb.addOptionalGte("e.date", q.FromDate)
+	qb.addOptionalLte("e.date", q.ToDate)
+	qb.addOptional("e.type", q.Type)
+	qb.addOptional("e.org", q.Org)
+	qb.addOptional("e.repo", q.Repo)
+	qb.addOptional("e.username", q.Username)
+	qb.addOptionalLike("e.mentions", optionalLike(q.Mention))
+	qb.addOptionalLike("e.labels", optionalLike(q.Label))
+	qb.addOptional("d.entity", q.Entity)
+
+	limitParam := qb.nextParam()
+	offsetParam := limitParam + 1
+	query := fmt.Sprintf(selectEventTpl, qb.whereClause(), limitParam, offsetParam)
 
 	offset := (q.Page - 1) * q.PageSize
-	rows, err := stmt.QueryContext(ctx, q.FromDate, q.ToDate, q.Type, q.Org, q.Repo, q.Username, optionalLike(q.Mention), optionalLike(q.Label), q.Entity, q.PageSize, offset)
+	args := make([]any, 0, len(qb.args)+2)
+	args = append(args, qb.args...)
+	args = append(args, q.PageSize, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute event search statement: %w", err)
 	}

@@ -165,14 +165,10 @@ func GetActiveInstallations(ctx context.Context, db *sql.DB, tenantID string, ap
 
 const listImportWorkSQL = `
 	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
-	       COALESCE(ec.cnt, 0) AS event_count
+	       (SELECT COUNT(*) FROM devpulse_event e
+	        WHERE e.org = tr.org AND e.repo = tr.repo) AS event_count
 	FROM devpulse_tenant_repo tr
 	JOIN devpulse_tenant t ON t.id = tr.tenant_id
-	LEFT JOIN (
-		SELECT org, repo, COUNT(*) AS cnt
-		FROM devpulse_event
-		GROUP BY org, repo
-	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.active = TRUE
 	  AND tr.import_errors < 5
 	  AND t.tos_accepted_at IS NOT NULL
@@ -181,14 +177,10 @@ const listImportWorkSQL = `
 
 const listImportWorkForRepoSQL = `
 	SELECT tr.id, tr.tenant_id, tr.org, tr.repo, t.plan,
-	       COALESCE(ec.cnt, 0) AS event_count
+	       (SELECT COUNT(*) FROM devpulse_event e
+	        WHERE e.org = tr.org AND e.repo = tr.repo) AS event_count
 	FROM devpulse_tenant_repo tr
 	JOIN devpulse_tenant t ON t.id = tr.tenant_id
-	LEFT JOIN (
-		SELECT org, repo, COUNT(*) AS cnt
-		FROM devpulse_event
-		GROUP BY org, repo
-	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.active = TRUE
 	  AND tr.org = $1
 	  AND tr.repo = $2
