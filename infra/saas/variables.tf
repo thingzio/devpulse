@@ -82,6 +82,12 @@ variable "digest_admin_only" {
   default     = true
 }
 
+variable "sample_repos" {
+  description = "Comma-separated org/repo pairs seeded for new users as sample data"
+  type        = string
+  default     = "containerd/containerd,etcd-io/etcd,grafana/grafana,prometheus/prometheus"
+}
+
 # --- Shared infrastructure (from thingzio/infra) ---
 
 variable "vpc_id" {

@@ -127,6 +127,11 @@ resource "google_cloud_run_v2_service" "serve" {
         }
       }
 
+      env {
+        name  = "SAMPLE_REPOS"
+        value = var.sample_repos
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
