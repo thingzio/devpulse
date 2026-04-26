@@ -1,5 +1,5 @@
 -- DevPulse SaaS schema: tenant tables, indexes, RLS policies.
--- Squashed from migrations 001-023 (2026-04-25).
+-- Squashed from migrations 001-022 (2026-04-25).
 
 -- ─── Tenant tables ──────────────────────────────────────────────────
 
