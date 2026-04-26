@@ -1,11 +1,11 @@
 resource "google_monitoring_uptime_check_config" "serve" {
   display_name = "${var.prefix}-uptime"
   timeout      = "10s"
-  period       = "300s"
+  period       = "600s"
   project      = var.project_id
 
   http_check {
-    path         = "/"
+    path         = "/health"
     port         = 443
     use_ssl      = true
     validate_ssl = true

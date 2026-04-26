@@ -9,7 +9,7 @@ resource "google_cloud_run_v2_service" "serve" {
 
     scaling {
       min_instance_count = 0
-      max_instance_count = 10
+      max_instance_count = 3
     }
 
     vpc_access {
@@ -137,6 +137,8 @@ resource "google_cloud_run_v2_service" "serve" {
           cpu    = "1000m"
           memory = "512Mi"
         }
+        cpu_idle          = true
+        startup_cpu_boost = true
       }
 
       volume_mounts {
