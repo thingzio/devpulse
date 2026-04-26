@@ -385,7 +385,22 @@ func makeRouter(
 	})
 	mux.Handle("GET /digest/unsubscribe", unsubRL(digestUnsubscribeHandler(db)))
 	mux.HandleFunc("GET /auth/reset", func(w http.ResponseWriter, r *http.Request) {
+		var username, tenantID string
+		if cookie, err := r.Cookie(middleware.SessionCookieName()); err == nil {
+			if tn, vErr := tenant.ValidateSession(r.Context(), db, cookie.Value); vErr == nil {
+				username = tn.Username
+				tenantID = tn.ID
+			}
+			if dErr := tenant.DestroySession(r.Context(), db, cookie.Value); dErr != nil {
+				slog.Debug("destroying session", "error", dErr)
+			}
+		}
 		middleware.ClearSessionCookie(w)
+		slog.Info("user signed out",
+			"username", username,
+			"tenant_id", tenantID,
+			"path", r.URL.Path,
+		)
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
 
