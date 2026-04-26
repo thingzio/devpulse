@@ -58,6 +58,12 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
   - `Tenant` struct in `pkg/tenant/tenant.go`
   - Migration in `pkg/data/postgres/sql/migrations_saas/001_initial.sql`
 
+**Schema migrations (CRITICAL):**
+- `001_initial.sql` is a squashed file — production `saas_schema_version` is at version 22
+- New migrations MUST be numbered above the current high-water mark (e.g. `023_*.sql`, `024_*.sql`)
+- Never rely on editing `001_initial.sql` for production schema changes — it only affects fresh databases
+- Always use `IF NOT EXISTS` / `IF EXISTS` for idempotent DDL
+
 **Error handling:**
 - Use `fmt.Errorf("context: %w", err)` for wrapping — never bare `return err`
 - Exported sentinel errors: `ErrRepoLimitExceeded`, `ErrSessionInvalid`

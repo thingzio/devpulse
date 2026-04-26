@@ -60,12 +60,6 @@ func applyMigrations(db *sql.DB, cfg migrateConfig) error {
 		return entries[i].Name() < entries[j].Name()
 	})
 
-	var fileNames []string
-	for _, e := range entries {
-		fileNames = append(fileNames, e.Name())
-	}
-	slog.Info("migration check", "label", cfg.label, "current_version", currentVersion, "files", fileNames)
-
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
