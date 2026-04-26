@@ -15,6 +15,11 @@ import (
 const (
 	reputationStaleHours = 24
 
+	// reputationChunkSize bounds the number of UPDATE rows committed per
+	// transaction so each tx stays short even when scoring thousands of
+	// users — minimizing replication lag and lock duration.
+	reputationChunkSize = 100
+
 	// selectStaleReputationUsernamesTpl: $1=threshold, %s=queryBuilder whereClause
 	selectStaleReputationUsernamesTpl = `SELECT DISTINCT d.username
 		FROM devpulse_developer d
@@ -113,42 +118,75 @@ func (s *Store) ImportReputation(ctx context.Context, org, repo *string) (*data.
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 	res := &data.ReputationResult{}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error starting reputation tx: %w", err)
-	}
-	defer rollbackTransaction(tx)
-
-	stmt, err := tx.PrepareContext(ctx, updateReputationSQL)
-	if err != nil {
-		rollbackTransaction(tx)
-		return nil, fmt.Errorf("error preparing reputation update: %w", err)
-	}
-	defer stmt.Close()
-
 	total := len(usernames)
 	logEvery := total / 10
 	if logEvery < 1 {
 		logEvery = 1
 	}
 
-	for i, username := range usernames {
-		signals := s.gatherLocalSignals(ctx, username, since, stats)
-		rep := score.Compute(signals)
+	// Score signals are gathered with read-only queries outside any tx, then
+	// flushed in chunks. Splitting the writes keeps each transaction short
+	// so replication lag and lock duration stay bounded even when scoring
+	// thousands of users.
+	type scored struct {
+		username string
+		rep      float64
+	}
+	chunk := make([]scored, 0, reputationChunkSize)
 
-		if _, execErr := stmt.ExecContext(ctx, rep, now, username); execErr != nil {
-			rollbackTransaction(tx)
-			return nil, fmt.Errorf("error updating reputation for %s: %w", username, execErr)
+	flush := func() error {
+		if len(chunk) == 0 {
+			return nil
 		}
-		res.Updated++
+		tx, txErr := s.db.BeginTx(ctx, nil)
+		if txErr != nil {
+			return fmt.Errorf("error starting reputation tx: %w", txErr)
+		}
+		defer rollbackTransaction(tx)
+
+		stmt, prepErr := tx.PrepareContext(ctx, updateReputationSQL)
+		if prepErr != nil {
+			return fmt.Errorf("error preparing reputation update: %w", prepErr)
+		}
+		defer stmt.Close()
+
+		for _, c := range chunk {
+			if _, execErr := stmt.ExecContext(ctx, c.rep, now, c.username); execErr != nil {
+				return fmt.Errorf("error updating reputation for %s: %w", c.username, execErr)
+			}
+			res.Updated++
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			return fmt.Errorf("error committing reputation tx: %w", commitErr)
+		}
+		chunk = chunk[:0]
+		return nil
+	}
+
+	for i, username := range usernames {
+		if err := ctx.Err(); err != nil {
+			if flushErr := flush(); flushErr != nil {
+				slog.Warn("flushing reputation on cancel", "error", flushErr)
+			}
+			return res, fmt.Errorf("reputation scoring canceled: %w", err)
+		}
+
+		signals := s.gatherLocalSignals(ctx, username, since, stats)
+		chunk = append(chunk, scored{username: username, rep: score.Compute(signals)})
+
+		if len(chunk) >= reputationChunkSize {
+			if flushErr := flush(); flushErr != nil {
+				return res, flushErr
+			}
+		}
 
 		if (i+1)%logEvery == 0 {
 			slog.Info("reputation progress", "scored", i+1, "total", total)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("error committing reputation tx: %w", err)
+	if flushErr := flush(); flushErr != nil {
+		return res, flushErr
 	}
 
 	slog.Info("reputation done", "updated", res.Updated)

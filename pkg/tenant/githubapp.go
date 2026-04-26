@@ -104,6 +104,14 @@ func LoadGitHubAppConfig() (*GitHubAppConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading private key from %s: %w", keyPath, err)
 	}
+	// Wipe the raw PEM bytes once parsed so a memory dump or coredump can't
+	// recover the key from process heap. The parsed *rsa.PrivateKey holds its
+	// own copy of the key material.
+	defer func() {
+		for i := range keyData {
+			keyData[i] = 0
+		}
+	}()
 
 	key, err := jwt.ParseRSAPrivateKeyFromPEM(keyData)
 	if err != nil {

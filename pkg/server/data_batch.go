@@ -60,7 +60,7 @@ func batchHealthHandler(defaultStore data.Store) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 
@@ -119,7 +119,7 @@ func batchActivityHandler(defaultStore data.Store) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 
@@ -176,7 +176,7 @@ func batchVelocityHandler(defaultStore data.Store) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 
@@ -251,7 +251,7 @@ func batchQualityHandler(defaultStore data.Store) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 
@@ -314,7 +314,7 @@ func batchCommunityHandler(defaultStore data.Store) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 

@@ -124,6 +124,24 @@ func TestClientIP(t *testing.T) {
 			remoteAddr: "10.0.0.1",
 			want:       "10.0.0.1",
 		},
+		{
+			name:       "ipv6_with_port",
+			xff:        "",
+			remoteAddr: "[2001:db8::1]:1234",
+			want:       "2001:db8::1",
+		},
+		{
+			name:       "ipv6_localhost_with_port",
+			xff:        "",
+			remoteAddr: "[::1]:1234",
+			want:       "::1",
+		},
+		{
+			name:       "xff_ipv6_first",
+			xff:        "2001:db8::1, 10.0.0.1",
+			remoteAddr: "[::1]:9999",
+			want:       "2001:db8::1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

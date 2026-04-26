@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -23,4 +24,11 @@ func TestImportTrigger_Close_NilSafe(t *testing.T) {
 	var trigger *importTrigger
 	err := trigger.Close()
 	assert.NoError(t, err)
+}
+
+func TestImportTrigger_AsyncAndWait_NilSafe(t *testing.T) {
+	var trigger *importTrigger
+	// Should be a no-op and not panic.
+	trigger.TriggerRepoImportAsync("org", "repo", time.Second)
+	trigger.Wait()
 }

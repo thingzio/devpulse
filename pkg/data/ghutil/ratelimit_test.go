@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	gonet "net"
 	"net/http"
 	"testing"
 	"time"
@@ -187,5 +189,125 @@ func TestAbuseRetryAfter(t *testing.T) {
 	t.Run("abuse error with nil retry-after returns 60s default", func(t *testing.T) {
 		err := &github.AbuseRateLimitError{RetryAfter: nil}
 		assert.Equal(t, 60*time.Second, AbuseRetryAfter(err))
+	})
+}
+
+type fakeNetTimeout struct{ msg string }
+
+func (f *fakeNetTimeout) Error() string   { return f.msg }
+func (f *fakeNetTimeout) Timeout() bool   { return true }
+func (f *fakeNetTimeout) Temporary() bool { return true }
+
+func TestIsTransient(t *testing.T) {
+	t.Run("nil error is not transient", func(t *testing.T) {
+		assert.False(t, IsTransient(nil))
+	})
+
+	t.Run("context canceled is not transient", func(t *testing.T) {
+		assert.False(t, IsTransient(context.Canceled))
+	})
+
+	t.Run("context deadline exceeded is not transient", func(t *testing.T) {
+		assert.False(t, IsTransient(context.DeadlineExceeded))
+		assert.False(t, IsTransient(fmt.Errorf("wrap: %w", context.DeadlineExceeded)))
+	})
+
+	t.Run("github 5xx is transient", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusBadGateway},
+		}
+		assert.True(t, IsTransient(err))
+		assert.True(t, IsTransient(fmt.Errorf("wrap: %w", err)))
+	})
+
+	t.Run("github 4xx is not transient", func(t *testing.T) {
+		err := &github.ErrorResponse{
+			Response: &http.Response{StatusCode: http.StatusNotFound},
+		}
+		assert.False(t, IsTransient(err))
+	})
+
+	t.Run("io.EOF is transient", func(t *testing.T) {
+		assert.True(t, IsTransient(io.EOF))
+		assert.True(t, IsTransient(fmt.Errorf("wrap: %w", io.EOF)))
+	})
+
+	t.Run("io.ErrUnexpectedEOF is transient", func(t *testing.T) {
+		assert.True(t, IsTransient(io.ErrUnexpectedEOF))
+	})
+
+	t.Run("net.Error timeout is transient", func(t *testing.T) {
+		var ne gonet.Error = &fakeNetTimeout{msg: "i/o timeout"}
+		assert.True(t, IsTransient(ne))
+	})
+
+	t.Run("connection reset is transient by string match", func(t *testing.T) {
+		assert.True(t, IsTransient(errors.New("read tcp: connection reset by peer")))
+	})
+
+	t.Run("broken pipe is transient by string match", func(t *testing.T) {
+		assert.True(t, IsTransient(errors.New("write tcp: broken pipe")))
+	})
+
+	t.Run("generic error is not transient", func(t *testing.T) {
+		assert.False(t, IsTransient(errors.New("invalid argument")))
+	})
+}
+
+func TestBackoffDuration(t *testing.T) {
+	base := 100 * time.Millisecond
+	maxDelay := 5 * time.Second
+
+	t.Run("attempt 0 returns at least base", func(t *testing.T) {
+		d := BackoffDuration(0, base, maxDelay)
+		assert.GreaterOrEqual(t, d, base)
+	})
+
+	t.Run("delays grow with attempt", func(t *testing.T) {
+		// attempt N delivers >= base * 2^N (jitter is additive, not subtractive)
+		for attempt := 0; attempt < 4; attempt++ {
+			d := BackoffDuration(attempt, base, maxDelay)
+			expected := base << attempt
+			if expected > maxDelay {
+				expected = maxDelay
+			}
+			assert.GreaterOrEqual(t, d, expected,
+				"attempt %d should be >= %v", attempt, expected)
+		}
+	})
+
+	t.Run("delay is capped at max", func(t *testing.T) {
+		// large attempt — exponent saturates well past max. jitter can add
+		// up to max(base/4, 250ms) above the cap; verify within that bound.
+		d := BackoffDuration(20, base, maxDelay)
+		assert.LessOrEqual(t, d, maxDelay+500*time.Millisecond)
+	})
+
+	t.Run("negative attempt is treated as zero", func(t *testing.T) {
+		d := BackoffDuration(-5, base, maxDelay)
+		assert.GreaterOrEqual(t, d, base)
+	})
+}
+
+func TestSleepWithContext(t *testing.T) {
+	t.Run("non-positive duration returns ctx err state", func(t *testing.T) {
+		err := SleepWithContext(context.Background(), 0)
+		assert.NoError(t, err)
+	})
+
+	t.Run("normal sleep returns nil", func(t *testing.T) {
+		start := time.Now()
+		err := SleepWithContext(context.Background(), 20*time.Millisecond)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, time.Since(start), 20*time.Millisecond)
+	})
+
+	t.Run("canceled context returns immediately", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		start := time.Now()
+		err := SleepWithContext(ctx, time.Hour)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Less(t, time.Since(start), 100*time.Millisecond)
 	})
 }

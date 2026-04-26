@@ -144,6 +144,37 @@ func TestDeactivateTenantRepo(t *testing.T) {
 	assert.Equal(t, "keep", list[0].Repo)
 }
 
+// TestDeactivateTenantRepo_TenantIsolation verifies that deactivating a repo
+// for one tenant does not affect another tenant's row for the same org/repo.
+// Defense-in-depth check on top of RLS — the SQL itself must filter by tenant_id.
+func TestDeactivateTenantRepo_TenantIsolation(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn1, err := UpsertTenant(ctx, db, 60050, "isouser1", "", "", "", "", "", "")
+	require.NoError(t, err)
+	tn2, err := UpsertTenant(ctx, db, 60051, "isouser2", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	require.NoError(t, AddTenantRepos(ctx, db, tn1.ID, []OrgRepo{{Org: "shared-org", Repo: "shared-repo"}}))
+	require.NoError(t, AddTenantRepos(ctx, db, tn2.ID, []OrgRepo{{Org: "shared-org", Repo: "shared-repo"}}))
+
+	// Deactivate for tenant 1 only.
+	require.NoError(t, DeactivateTenantRepo(ctx, db, tn1.ID, "shared-org", "shared-repo"))
+
+	// Tenant 1 should have no active repos.
+	list1, err := ListTenantRepos(ctx, db, tn1.ID)
+	require.NoError(t, err)
+	assert.Empty(t, list1, "tenant 1's repo should be deactivated")
+
+	// Tenant 2's row must be untouched.
+	list2, err := ListTenantRepos(ctx, db, tn2.ID)
+	require.NoError(t, err)
+	require.Len(t, list2, 1, "tenant 2's repo must remain active")
+	assert.True(t, list2[0].Active)
+	assert.Equal(t, "shared-repo", list2[0].Repo)
+}
+
 func TestDeactivateTenantRepo_ReactivateByAdd(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

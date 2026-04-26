@@ -17,10 +17,13 @@ const (
 			insights_json = $8, period_months = $9, model = $10, generated_at = $11, event_count = $12
 	`
 
-	selectRepoInsightsSQL = `SELECT org, repo, insights_json, period_months, model, generated_at, event_count
+	// selectRepoInsightsTpl: %s = queryBuilder whereClause for org/repo.
+	// Replaces COALESCE($1, org) anti-pattern which prevents the planner
+	// from using the (org, repo) primary key when both are NULL.
+	selectRepoInsightsTpl = `SELECT org, repo, insights_json, period_months, model, generated_at, event_count
 		FROM devpulse_repo_insights
-		WHERE org = COALESCE($1, org)
-		  AND repo = COALESCE($2, repo)
+		WHERE 1=1
+		  %s
 		ORDER BY org, repo
 	`
 
@@ -62,7 +65,12 @@ func (s *Store) GetRepoInsights(ctx context.Context, org, repo *string) ([]*data
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(ctx, selectRepoInsightsSQL, org, repo)
+	qb := newQueryBuilder(1)
+	qb.addOptional("org", org)
+	qb.addOptional("repo", repo)
+	query := fmt.Sprintf(selectRepoInsightsTpl, qb.whereClause())
+
+	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying repo insights: %w", err)
 	}

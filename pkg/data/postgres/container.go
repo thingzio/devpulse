@@ -29,15 +29,15 @@ const (
 		WHERE org = $1 AND repo = $2 AND package = $3
 	`
 
-	// selectContainerActivityTpl: $1=org, $2=repo, $3=since
-	// %s = GroupExpr(gran, "cv.created_at")
+	// selectContainerActivityTpl: $1=since fixed; first %s = GroupExpr(gran),
+	// second %s = queryBuilder whereClause for cv.org / cv.repo. Replaces
+	// COALESCE anti-pattern so the (org, repo, ...) primary key can be used.
 	selectContainerActivityTpl = `SELECT
 		%s AS period,
 		COUNT(*) AS versions
 	FROM devpulse_container_version cv
-	WHERE cv.org = COALESCE($1, cv.org)
-	  AND cv.repo = COALESCE($2, cv.repo)
-	  AND cv.created_at >= $3
+	WHERE cv.created_at >= $1
+	  %s
 	GROUP BY period
 	ORDER BY period
 	`
@@ -216,10 +216,19 @@ func (s *Store) GetContainerActivity(ctx context.Context, org, repo *string, day
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectContainerActivityTpl, GroupExpr(gran, "cv.created_at"))
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
+	// $1 = since fixed; queryBuilder starts at $2 for cv.org / cv.repo.
+	qb := newQueryBuilder(2)
+	qb.addOptional("cv.org", org)
+	qb.addOptional("cv.repo", repo)
+	query := fmt.Sprintf(selectContainerActivityTpl,
+		GroupExpr(gran, "cv.created_at"), qb.whereClause())
+
+	args := make([]any, 0, 1+len(qb.args))
+	args = append(args, since)
+	args = append(args, qb.args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying container activity: %w", err)
 	}

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand/v2"
+	gonet "net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v83/github"
@@ -34,6 +37,48 @@ func IsServerError(err error) bool {
 	var errResp *github.ErrorResponse
 	if errors.As(err, &errResp) {
 		return errResp.Response != nil && errResp.Response.StatusCode >= 500
+	}
+	return false
+}
+
+// IsTransient reports whether err looks like a transient network or upstream
+// failure that may succeed on retry. Distinct from IsRateLimited: callers
+// generally want to first WaitForRateReset (rate-limit handling) and then
+// fall back to backoff for transient errors.
+//
+// Returns true for: GitHub 5xx, io.EOF / io.ErrUnexpectedEOF, net.Error
+// timeouts, and well-known transient strings ("connection reset by peer",
+// "broken pipe", "EOF"). Returns false for context cancellation/deadline
+// (those reflect a deliberate caller decision) and for non-network errors.
+func IsTransient(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Caller-driven cancellation/deadline must not be retried.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if IsServerError(err) {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var nerr gonet.Error
+	if errors.As(err, &nerr) && nerr.Timeout() {
+		return true
+	}
+	// Match common transient strings that don't always map to typed errors.
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "connection reset by peer"):
+		return true
+	case strings.Contains(msg, "broken pipe"):
+		return true
+	case strings.Contains(msg, "unexpected EOF"):
+		return true
+	case strings.Contains(msg, "TLS handshake timeout"):
+		return true
 	}
 	return false
 }
@@ -168,6 +213,50 @@ func CheckTokenQuotaFull(ctx context.Context, token string) *TokenQuota {
 func HasSufficientQuota(ctx context.Context, token string) bool {
 	remaining := CheckTokenQuota(ctx, token)
 	return remaining < 0 || remaining >= minTokenQuota
+}
+
+// BackoffDuration returns the sleep duration for retry attempt `attempt`
+// (0-indexed) using bounded exponential backoff with jitter. Capped at max.
+//
+//	attempt 0 -> base + jitter
+//	attempt 1 -> 2*base + jitter
+//	attempt 2 -> 4*base + jitter
+//	... capped at max.
+func BackoffDuration(attempt int, base, maxDelay time.Duration) time.Duration {
+	if attempt < 0 {
+		attempt = 0
+	}
+	// Cap exponent to avoid overflow; 2^30 * base saturates well past maxDelay.
+	if attempt > 30 {
+		attempt = 30
+	}
+	d := base << attempt
+	if d <= 0 || d > maxDelay {
+		d = maxDelay
+	}
+	// Jitter: add up to 25% of base (or 250ms minimum) to break herd.
+	jitterRange := int64(base / 4)
+	if jitterRange < int64(250*time.Millisecond) {
+		jitterRange = int64(250 * time.Millisecond)
+	}
+	jitter := time.Duration(rand.Int64N(jitterRange)) //nolint:gosec // jitter, not security-sensitive
+	return d + jitter
+}
+
+// SleepWithContext sleeps for d, returning early with ctx.Err() if the
+// context is canceled. Returns nil on full sleep.
+func SleepWithContext(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 // AbuseRetryAfter returns the retry-after duration if the error is a secondary

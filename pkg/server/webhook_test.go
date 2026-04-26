@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -115,4 +116,40 @@ func TestWebhookHandler(t *testing.T) {
 		h(w, r)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+
+	t.Run("duplicate delivery id is dropped", func(t *testing.T) {
+		// Use a fresh cache so other tests don't interfere.
+		deliverySeen = &deliverySeenCache{entries: make(map[string]time.Time)}
+
+		h := WebhookHandler(nil, secret)
+		send := func() *httptest.ResponseRecorder {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(payload))
+			r.Header.Set("X-Hub-Signature-256", validSig(payload))
+			r.Header.Set("X-GitHub-Event", "push")
+			r.Header.Set("X-GitHub-Delivery", "dup-delivery-1")
+			h(w, r)
+			return w
+		}
+
+		assert.Equal(t, http.StatusOK, send().Code)
+		// Second delivery with the same id is silently dropped (still 200).
+		assert.Equal(t, http.StatusOK, send().Code)
+	})
+}
+
+func TestDeliverySeenCache(t *testing.T) {
+	c := &deliverySeenCache{entries: make(map[string]time.Time)}
+	now := time.Unix(0, 0)
+
+	assert.False(t, c.seenOrRecord("abc", now), "first time should not be seen")
+	assert.True(t, c.seenOrRecord("abc", now), "second time within window should be seen")
+
+	// After window expires, the id is re-accepted.
+	later := now.Add(webhookDeliveryWindow + time.Hour)
+	assert.False(t, c.seenOrRecord("abc", later), "after window, id is fresh again")
+
+	// Empty id is never deduped.
+	assert.False(t, c.seenOrRecord("", now))
+	assert.False(t, c.seenOrRecord("", now))
 }

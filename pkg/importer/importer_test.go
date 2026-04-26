@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/go-github/v83/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thingzio/devpulse/pkg/data"
@@ -30,23 +34,14 @@ func TestRetryRL(t *testing.T) {
 		assert.Contains(t, err.Error(), "retryRL:")
 	})
 
-	t.Run("transient error then success not confused as error", func(t *testing.T) {
-		// Simulates the old bug: if fn succeeds, retryRL must return nil.
-		// With a non-rate-limit error WaitForRateReset returns false,
-		// so this tests the wrapping path. The rate-limit retry path
-		// is structurally identical — the fix ensures fn() returning nil
-		// produces a nil return.
+	t.Run("non-transient error fails immediately without retry", func(t *testing.T) {
 		calls := 0
 		err := retryRL(func() error {
 			calls++
-			if calls == 1 {
-				return errors.New("transient")
-			}
-			return nil
+			return errors.New("permanent failure")
 		})
-		// Non-rate-limit errors are not retried, so this returns an error.
 		require.Error(t, err)
-		assert.Equal(t, 1, calls)
+		assert.Equal(t, 1, calls, "non-transient errors must not be retried")
 	})
 
 	t.Run("wrapped error preserves chain", func(t *testing.T) {
@@ -55,6 +50,82 @@ func TestRetryRL(t *testing.T) {
 		err := retryRL(func() error { return wrapped })
 		require.Error(t, err)
 		assert.ErrorIs(t, err, inner)
+	})
+}
+
+func TestRetryRL_TransientRetry(t *testing.T) {
+	ctx := context.Background()
+	retryRL := newRetryRL(ctx)
+
+	t.Run("transient 5xx then success", func(t *testing.T) {
+		var calls atomic.Int32
+		err := retryRL(func() error {
+			n := calls.Add(1)
+			if n == 1 {
+				return &github.ErrorResponse{
+					Response: &http.Response{StatusCode: http.StatusBadGateway},
+				}
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int32(2), calls.Load())
+	})
+
+	t.Run("transient EOF then success", func(t *testing.T) {
+		var calls atomic.Int32
+		err := retryRL(func() error {
+			n := calls.Add(1)
+			if n < 3 {
+				return io.EOF
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int32(3), calls.Load())
+	})
+
+	t.Run("exhausts attempts on persistent transient error", func(t *testing.T) {
+		var calls atomic.Int32
+		err := retryRL(func() error {
+			calls.Add(1)
+			return io.ErrUnexpectedEOF
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exhausted")
+		// Initial attempt + transientRetryAttempts retries.
+		assert.Equal(t, int32(transientRetryAttempts+1), calls.Load())
+	})
+}
+
+func TestRetryRL_ContextCancellation(t *testing.T) {
+	t.Run("canceled before first call", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		retryRL := newRetryRL(ctx)
+		var calls atomic.Int32
+		err := retryRL(func() error {
+			calls.Add(1)
+			return nil
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, int32(0), calls.Load())
+	})
+
+	t.Run("canceled during backoff stops retries", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		retryRL := newRetryRL(ctx)
+		var calls atomic.Int32
+		// Cancel after first call so backoff sleep returns immediately.
+		err := retryRL(func() error {
+			calls.Add(1)
+			cancel()
+			return io.EOF
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, int32(1), calls.Load(), "must not call fn again after ctx cancel")
 	})
 }
 

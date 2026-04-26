@@ -124,19 +124,32 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 
 	results := make(map[string]int)
 	var mu sync.Mutex
+	var failed int
 
-	g, ctx := errgroup.WithContext(ctx)
+	// errgroup.WithContext propagates parent cancellation but per-repo errors
+	// are logged and swallowed — one bad repo must not abort the whole batch.
+	// We track failure count under the mutex and surface it as a summary
+	// error after Wait so callers can detect partial failures.
+	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrency)
 
 	for _, r := range list {
 		org, repo := r.Org, r.Repo
 		g.Go(func() error {
+			// Honor parent cancellation; returning ctx.Err() short-circuits
+			// the remaining queued goroutines without faulting them as failures.
+			if err := gctx.Err(); err != nil {
+				return err
+			}
 			staticToken := func() string { return token }
 			windowStart := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
 			windowEnd := time.Now().UTC()
-			m, _, importErr := s.ImportEvents(ctx, staticToken, nil, org, repo, windowStart, windowEnd)
+			m, _, importErr := s.ImportEvents(gctx, staticToken, nil, org, repo, windowStart, windowEnd)
 			if importErr != nil {
 				slog.Error("error importing events", "org", org, "repo", repo, "error", importErr)
+				mu.Lock()
+				failed++
+				mu.Unlock()
 				return nil // log and continue, don't abort other repos
 			}
 
@@ -150,10 +163,10 @@ func (s *Store) UpdateEvents(ctx context.Context, token string, concurrency int)
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return results, fmt.Errorf("error during event update: %w", err)
+	_ = g.Wait()
+	if failed > 0 {
+		return results, fmt.Errorf("event update completed with %d failed repos", failed)
 	}
-
 	return results, nil
 }
 
@@ -225,18 +238,31 @@ func (s *Store) ImportEvents(
 		"org", owner,
 		"repo", repo,
 		"since", earliest.Format("2006-01-02"))
-	var g errgroup.Group
+	// errgroup.WithContext propagates ctx cancellation to all importer
+	// goroutines if the parent ctx is canceled (worker shutdown). Per-phase
+	// errors are intentionally swallowed: one phase failing should not
+	// cancel siblings, since each tracks independent state. We capture the
+	// first error so the caller knows imports were partial.
+	g, gctx := errgroup.WithContext(ctx)
+	var firstErr error
+	var firstErrOnce sync.Once
 	for i := range importers {
 		fn := importers[i]
 		g.Go(func() error {
-			if err := fn(ctx); err != nil {
+			if err := fn(gctx); err != nil {
 				slog.Error("event import failed", "org", owner, "repo", repo, "error", err)
+				firstErrOnce.Do(func() { firstErr = err })
 			}
 			return nil // log and continue, don't cancel siblings
 		})
 	}
 
 	_ = g.Wait()
+	if firstErr != nil && ctx.Err() != nil {
+		// Parent context canceled mid-flight — propagate so the caller
+		// can short-circuit instead of attempting a final flush.
+		return nil, nil, fmt.Errorf("event import canceled: %w", ctx.Err())
+	}
 
 	if err := imp.flush(ctx); err != nil {
 		return nil, nil, fmt.Errorf("error flushing final events: %s/%s: %w", imp.owner, imp.repo, err)

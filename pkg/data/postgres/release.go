@@ -23,16 +23,16 @@ const (
 			name = $7, published_at = $8, prerelease = $9
 	`
 
-	// selectReleaseCadenceTpl: $1=org, $2=repo, $3=since
-	// %s = GroupExpr(gran, "published_at")
+	// selectReleaseCadenceTpl: $1=since (fixed); first %s = GroupExpr(gran),
+	// second %s = queryBuilder whereClause for org/repo. Replaces COALESCE
+	// anti-pattern so the (org, repo) primary key can be used.
 	selectReleaseCadenceTpl = `SELECT
 			%s AS period,
 			COUNT(*) AS total,
 			SUM(CASE WHEN prerelease = 0 THEN 1 ELSE 0 END) AS stable
 		FROM devpulse_release
-		WHERE org = COALESCE($1, org)
-		  AND repo = COALESCE($2, repo)
-		  AND published_at >= $3
+		WHERE published_at >= $1
+		  %s
 		GROUP BY period
 		ORDER BY period
 	`
@@ -44,22 +44,21 @@ const (
 			content_type = $8, size = $9, download_count = $10
 	`
 
-	// selectReleaseDownloadsTpl: $1=org, $2=repo, $3=since
-	// %s = GroupExpr(gran, "r.published_at")
+	// selectReleaseDownloadsTpl: $1=since (fixed); first %s = GroupExpr(gran),
+	// second %s = queryBuilder whereClause for ra.org / ra.repo.
 	selectReleaseDownloadsTpl = `SELECT
 			%s AS period,
 			SUM(ra.download_count) AS downloads
 		FROM devpulse_release_asset ra
 		JOIN devpulse_release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
-		WHERE ra.org = COALESCE($1, ra.org)
-		  AND ra.repo = COALESCE($2, ra.repo)
-		  AND r.published_at >= $3
+		WHERE r.published_at >= $1
+		  %s
 		GROUP BY period
 		ORDER BY period
 	`
 
-	// selectMergedPRDeploymentsTpl: $1=org, $2=repo, $3=entity, $4=since
-	// %s = GroupExpr(gran, "e.merged_at")
+	// selectMergedPRDeploymentsTpl: $1=since (fixed); first %s = GroupExpr(gran),
+	// second %s = queryBuilder whereClause for org/repo/entity.
 	selectMergedPRDeploymentsTpl = `SELECT
 			%s AS period,
 			COUNT(*) AS cnt
@@ -68,11 +67,9 @@ const (
 		WHERE e.type = 'pr'
 		  AND e.state = 'merged'
 		  AND e.merged_at IS NOT NULL
-		  AND e.org = COALESCE($1, e.org)
-		  AND e.repo = COALESCE($2, e.repo)
-		  AND COALESCE(d.entity, '') = COALESCE($3, COALESCE(d.entity, ''))
-		  AND e.merged_at >= $4
+		  AND e.merged_at >= $1
 		  ` + botExcludeTpl + `
+		  %s
 		GROUP BY period
 		ORDER BY period
 	`
@@ -83,22 +80,22 @@ const (
 		WHERE org = $1 AND repo = $2
 	`
 
-	// selectReleaseDownloadsByTagSQL: $1=org, $2=repo, $3=since, $4=org, $5=repo, $6=since
-	selectReleaseDownloadsByTagSQL = `WITH recent AS (
+	// selectReleaseDownloadsByTagTpl: $1=since (fixed); first %s = queryBuilder
+	// for r.org / r.repo (recent CTE), second %s = queryBuilder for ra.org /
+	// ra.repo (top CTE). Two builders so each CTE keeps its own table aliases.
+	selectReleaseDownloadsByTagTpl = `WITH recent AS (
 			SELECT r.org, r.repo, r.tag, r.published_at
 			FROM devpulse_release r
-			WHERE r.org = COALESCE($1, r.org)
-			  AND r.repo = COALESCE($2, r.repo)
-			  AND r.published_at >= $3
+			WHERE r.published_at >= $1
+			  %s
 			ORDER BY r.published_at DESC
 			LIMIT 9
 		), top AS (
 			SELECT ra.org, ra.repo, ra.tag, r.published_at
 			FROM devpulse_release_asset ra
 			JOIN devpulse_release r ON ra.org = r.org AND ra.repo = r.repo AND ra.tag = r.tag
-			WHERE ra.org = COALESCE($4, ra.org)
-			  AND ra.repo = COALESCE($5, ra.repo)
-			  AND r.published_at >= $6
+			WHERE r.published_at >= $1
+			  %s
 			GROUP BY ra.org, ra.repo, ra.tag, r.published_at
 			ORDER BY SUM(ra.download_count) DESC
 			LIMIT 1
@@ -265,10 +262,19 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 	}
 
 	gran := AutoGranularity(days)
-	cadenceQuery := fmt.Sprintf(selectReleaseCadenceTpl, GroupExpr(gran, "published_at"))
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, cadenceQuery, org, repo, since)
+	// $1 = since fixed; queryBuilder starts at $2 for org/repo.
+	qb := newQueryBuilder(2)
+	qb.addOptional("org", org)
+	qb.addOptional("repo", repo)
+	cadenceQuery := fmt.Sprintf(selectReleaseCadenceTpl,
+		GroupExpr(gran, "published_at"), qb.whereClause())
+
+	args := make([]any, 0, 1+len(qb.args))
+	args = append(args, since)
+	args = append(args, qb.args...)
+	rows, err := s.db.QueryContext(ctx, cadenceQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release cadence: %w", err)
 	}
@@ -306,8 +312,24 @@ func (s *Store) GetReleaseCadence(ctx context.Context, org, repo, entity *string
 		return sr, nil
 	}
 
-	fallbackQuery := fmt.Sprintf(selectMergedPRDeploymentsTpl, GroupExpr(gran, "e.merged_at"))
-	fallbackRows, err := s.db.QueryContext(ctx, fallbackQuery, org, repo, entity, since)
+	// Fallback: count merged PRs as deployment proxy when no releases exist.
+	// $1 = since fixed; queryBuilder starts at $2 for e.org / e.repo / d.entity.
+	fbQb := newQueryBuilder(2)
+	fbQb.addOptional("e.org", org)
+	fbQb.addOptional("e.repo", repo)
+	if entity != nil {
+		fbQb.clauses = append(fbQb.clauses,
+			fmt.Sprintf("COALESCE(d.entity, '') = $%d", fbQb.paramIdx))
+		fbQb.args = append(fbQb.args, *entity)
+		fbQb.paramIdx++
+	}
+	fallbackQuery := fmt.Sprintf(selectMergedPRDeploymentsTpl,
+		GroupExpr(gran, "e.merged_at"), fbQb.whereClause())
+
+	fbArgs := make([]any, 0, 1+len(fbQb.args))
+	fbArgs = append(fbArgs, since)
+	fbArgs = append(fbArgs, fbQb.args...)
+	fallbackRows, err := s.db.QueryContext(ctx, fallbackQuery, fbArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query merged PR deployments: %w", err)
 	}
@@ -342,10 +364,19 @@ func (s *Store) GetReleaseDownloads(ctx context.Context, org, repo *string, days
 	}
 
 	gran := AutoGranularity(days)
-	query := fmt.Sprintf(selectReleaseDownloadsTpl, GroupExpr(gran, "r.published_at"))
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, query, org, repo, since)
+	// $1 = since fixed; queryBuilder starts at $2 for ra.org / ra.repo.
+	qb := newQueryBuilder(2)
+	qb.addOptional("ra.org", org)
+	qb.addOptional("ra.repo", repo)
+	query := fmt.Sprintf(selectReleaseDownloadsTpl,
+		GroupExpr(gran, "r.published_at"), qb.whereClause())
+
+	args := make([]any, 0, 1+len(qb.args))
+	args = append(args, since)
+	args = append(args, qb.args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads: %w", err)
 	}
@@ -384,7 +415,27 @@ func (s *Store) GetReleaseDownloadsByTag(ctx context.Context, org, repo *string,
 
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectReleaseDownloadsByTagSQL, org, repo, since, org, repo, since)
+	// Both CTEs share $1 = since but use different table aliases for the
+	// org/repo filter. Build two queryBuilders that start their parameter
+	// numbering AFTER $1 — the first builds `recent` clauses ($2+), the
+	// second builds `top` clauses (numbered after the first).
+	qbRecent := newQueryBuilder(2)
+	qbRecent.addOptional("r.org", org)
+	qbRecent.addOptional("r.repo", repo)
+
+	qbTop := newQueryBuilder(qbRecent.nextParam())
+	qbTop.addOptional("ra.org", org)
+	qbTop.addOptional("ra.repo", repo)
+
+	query := fmt.Sprintf(selectReleaseDownloadsByTagTpl,
+		qbRecent.whereClause(), qbTop.whereClause())
+
+	args := make([]any, 0, 1+len(qbRecent.args)+len(qbTop.args))
+	args = append(args, since)
+	args = append(args, qbRecent.args...)
+	args = append(args, qbTop.args...)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query release downloads by tag: %w", err)
 	}

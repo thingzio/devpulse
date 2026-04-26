@@ -75,6 +75,13 @@ func runImport(ctx context.Context) error {
 		return fmt.Errorf("listing import work: %w", err)
 	}
 	if singleRepo {
+		// Only task 0 processes a single-repo override; sibling Cloud Run
+		// tasks would race on every DB write for the same repo.
+		if taskIndex != 0 {
+			slog.Info("single-repo mode: non-zero task index exiting",
+				"task_index", taskIndex, "task_count", taskCount)
+			return nil
+		}
 		taskCount = 1
 		taskIndex = 0
 	}
@@ -276,7 +283,26 @@ func importRepoWork(ctx context.Context, db *sql.DB, store data.Store,
 		"plan", bestPlan,
 		"tenants", len(rw.Tenants))
 
-	skipped, importErr := importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan)
+	// recheckLimits narrows the TOCTOU window between the initial gate and
+	// the expensive event-import phases. Concurrent imports of shared repos
+	// can fill other tenants' weekly buckets while this worker holds the
+	// repo, so we re-evaluate just before each event-fetching phase. The
+	// ultimate per-tenant cap remains best-effort since events are stored
+	// in a shared table — but this caps wasted GitHub API quota.
+	recheckLimits := func() bool {
+		limited, err := allTenantsAtLimit(ctx, db, rw.Tenants)
+		if err != nil {
+			slog.Warn("rechecking event limits", "org", rw.Org, "repo", rw.Repo, "error", err)
+			return false
+		}
+		if limited {
+			slog.Warn("all tenants reached weekly limit mid-import, aborting remaining phases",
+				"org", rw.Org, "repo", rw.Repo)
+		}
+		return limited
+	}
+
+	skipped, importErr := importRepo(ctx, store, pool, rw.Org, rw.Repo, llmCfg, bestPlan, recheckLimits)
 	if skipped {
 		return true, nil
 	}
@@ -383,7 +409,7 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 	return true, false
 }
 
-func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string) (bool, error) {
+func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, org, repo string, llmCfg *data.LLMConfig, planName string, atLimit func() bool) (bool, error) {
 	start := time.Now()
 
 	tokenForPhase := func() string {
@@ -393,6 +419,16 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		return pool.Token()
 	}
 
+	// phaseGate aborts a phase early when the parent context has been
+	// canceled (worker shutdown). Returning ctx.Err lets the caller decide
+	// whether to count it as a failure or a graceful stop.
+	phaseGate := func() error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("import canceled before next phase: %w", err)
+		}
+		return nil
+	}
+
 	var errs int
 
 	retryRL := newRetryRL(ctx)
@@ -400,6 +436,9 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 	token := tokenForPhase()
 
 	// Phase 1: Metadata + skip check (unchanged)
+	if err := phaseGate(); err != nil {
+		return false, err
+	}
 	slog.Info("phase: metadata", "org", org, "repo", repo)
 	metaOK, skip := importMetaAndCheckSkip(ctx, store, retryRL, token, org, repo)
 	if !metaOK {
@@ -419,15 +458,75 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		"window_start", freshStart.Format("2006-01-02"),
 		"window_end", freshEnd.Format("2006-01-02"))
 
+	// Recheck the per-tenant limit immediately before the expensive event
+	// fetch — concurrent imports may have filled tenant buckets since the
+	// initial gate.
+	if atLimit != nil && atLimit() {
+		return false, nil
+	}
+	if err := phaseGate(); err != nil {
+		return false, err
+	}
+
+	eventTokenFn, eventExhaustFn, backfillUntil, freshErrs := runFreshPass(
+		ctx, store, retryRL, pool, token, org, repo, freshStart, freshEnd)
+	errs += freshErrs
+
+	// Phases 3-8: Non-event phases run after fresh pass so the dashboard
+	// has complete data for the recent window before backfill starts.
+	if err := phaseGate(); err != nil {
+		return false, err
+	}
+	errs += runEnrichmentPhases(ctx, store, retryRL, tokenForPhase, org, repo, planName, llmCfg)
+
+	// Phase 9: Backfill pass — extend historical coverage. Recheck limits
+	// before this potentially long-running phase since other workers may
+	// have consumed the shared event budget.
+	if atLimit != nil && atLimit() {
+		slog.Info("repo import complete (backfill skipped, all tenants at limit)",
+			"org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
+		if errs > 0 {
+			return false, fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
+		}
+		return false, nil
+	}
+	if err := phaseGate(); err != nil {
+		return false, err
+	}
+	if backfillErr := runBackfillPass(ctx, store, retryRL, eventTokenFn, eventExhaustFn, pool, tokenForPhase, org, repo, backfillUntil); backfillErr != nil {
+		slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", backfillErr)
+		errs++
+	}
+
+	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
+
+	if errs > 0 {
+		return false, fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
+	}
+	return false, nil
+}
+
+// runFreshPass executes the recent-events import (Phase 2) and ensures
+// backfill_until is initialized for first imports. The token closures it
+// builds are shared with the backfill pass so token rotation/exhaustion
+// state is preserved across both event phases.
+func runFreshPass(
+	ctx context.Context, store data.Store,
+	retryRL func(func() error) error,
+	pool *ghutil.TokenPool,
+	fallbackToken, org, repo string,
+	freshStart, freshEnd time.Time,
+) (data.TokenFunc, data.ExhaustFunc, *time.Time, int) {
 	var eventTokenFn data.TokenFunc
 	var eventExhaustFn data.ExhaustFunc
 	if pool != nil {
 		eventTokenFn = func() string { return pool.Token() }
 		eventExhaustFn = func(t string) { pool.Exhaust(t) }
 	} else {
-		eventTokenFn = func() string { return token }
+		eventTokenFn = func() string { return fallbackToken }
 	}
 
+	var errs int
 	if err := retryRL(func() error {
 		_, _, importErr := store.ImportEvents(ctx, eventTokenFn, eventExhaustFn, org, repo, freshStart, freshEnd)
 		if importErr != nil {
@@ -445,29 +544,14 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		slog.Warn("checking backfill state", "org", org, "repo", repo, "error", err)
 	}
 	if backfillUntil == nil {
-		if err := store.SaveBackfillUntil(ctx, org, repo, freshStart); err != nil {
-			slog.Warn("setting initial backfill_until", "org", org, "repo", repo, "error", err)
+		if saveErr := store.SaveBackfillUntil(ctx, org, repo, freshStart); saveErr != nil {
+			slog.Warn("setting initial backfill_until", "org", org, "repo", repo, "error", saveErr)
 		}
 		t := freshStart
 		backfillUntil = &t
 	}
 
-	// Phases 3-8: Non-event phases run after fresh pass so the dashboard
-	// has complete data for the recent window before backfill starts.
-	errs += runEnrichmentPhases(ctx, store, retryRL, tokenForPhase, org, repo, planName, llmCfg)
-
-	// Phase 9: Backfill pass — extend historical coverage
-	if backfillErr := runBackfillPass(ctx, store, retryRL, eventTokenFn, eventExhaustFn, pool, tokenForPhase, org, repo, backfillUntil); backfillErr != nil {
-		slog.Error("importing events (backfill)", "org", org, "repo", repo, "error", backfillErr)
-		errs++
-	}
-
-	slog.Info("repo import complete", "org", org, "repo", repo, "errors", errs, "duration", time.Since(start).String())
-
-	if errs > 0 {
-		return false, fmt.Errorf("import completed with %d errors for %s/%s", errs, org, repo)
-	}
-	return false, nil
+	return eventTokenFn, eventExhaustFn, backfillUntil, errs
 }
 
 // runEnrichmentPhases runs the non-event import phases: releases, metrics,
@@ -481,6 +565,14 @@ func runEnrichmentPhases(
 ) int {
 	var errs int
 
+	// canceled returns true once the parent ctx has been canceled. Each
+	// enrichment phase is independent, so we exit cleanly between phases
+	// rather than letting a long retry loop run after shutdown was signaled.
+	canceled := func() bool { return ctx.Err() != nil }
+
+	if canceled() {
+		return errs
+	}
 	token := tokenForPhase()
 	slog.Info("phase: releases", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportReleases(ctx, token, org, repo) }); err != nil {
@@ -488,6 +580,9 @@ func runEnrichmentPhases(
 		errs++
 	}
 
+	if canceled() {
+		return errs
+	}
 	token = tokenForPhase()
 	slog.Info("phase: metrics", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportRepoMetricHistory(ctx, token, org, repo) }); err != nil {
@@ -495,6 +590,9 @@ func runEnrichmentPhases(
 		errs++
 	}
 
+	if canceled() {
+		return errs
+	}
 	token = tokenForPhase()
 	slog.Info("phase: containers", "org", org, "repo", repo)
 	if err := retryRL(func() error { return store.ImportContainerVersions(ctx, token, org, repo) }); err != nil {
@@ -502,6 +600,9 @@ func runEnrichmentPhases(
 		errs++
 	}
 
+	if canceled() {
+		return errs
+	}
 	slog.Info("phase: reputation", "org", org, "repo", repo)
 	if err := retryRL(func() error { _, err := store.ImportReputation(ctx, &org, &repo); return err }); err != nil {
 		slog.Error("importing reputation", "org", org, "repo", repo, "error", err)
@@ -510,6 +611,9 @@ func runEnrichmentPhases(
 
 	limits, _ := plan.Get(planName)
 
+	if canceled() {
+		return errs
+	}
 	if llmCfg != nil && limits.AILevel > 0 {
 		slog.Info("phase: insights", "org", org, "repo", repo)
 		if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
@@ -586,21 +690,65 @@ func runBackfillPass(
 	return nil
 }
 
-// newRetryRL returns a function that calls fn and, if it fails with a GitHub
-// rate limit error, waits for the reset and retries once.
+// retry tunables. transientRetryAttempts caps total transient retries per
+// call so a persistent upstream failure does not block import progress.
+const (
+	transientRetryAttempts = 4
+	transientRetryBase     = 500 * time.Millisecond
+	transientRetryMax      = 30 * time.Second
+)
+
+// newRetryRL returns a function that wraps fn with rate-limit and transient
+// failure handling:
+//
+//   - On GitHub primary/secondary rate limit: wait for reset (one shot).
+//   - On transient error (5xx, EOF, network timeout): exponential backoff
+//     with jitter, up to transientRetryAttempts retries.
+//   - On context cancellation: stop immediately and propagate the error.
+//   - On non-retriable error: return wrapped immediately.
+//
+// The two strategies are layered: if a call fails with a rate-limit error
+// after a transient retry (rare), the rate-limit branch will run on the next
+// iteration. This keeps each branch's logic local and easy to reason about.
 func newRetryRL(ctx context.Context) func(func() error) error {
 	return func(fn func() error) error {
-		err := fn()
-		if err == nil {
-			return nil
-		}
-		if ghutil.WaitForRateReset(ctx, err) {
-			if retryErr := fn(); retryErr != nil {
-				return fmt.Errorf("retryRL (after wait): %w", retryErr)
+		var lastErr error
+		for attempt := 0; attempt <= transientRetryAttempts; attempt++ {
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("retryRL: %w", err)
 			}
-			return nil
+
+			err := fn()
+			if err == nil {
+				return nil
+			}
+			lastErr = err
+
+			// Rate limit: wait for reset and retry without consuming an
+			// attempt slot — this is a deterministic wait, not a backoff.
+			if ghutil.WaitForRateReset(ctx, err) {
+				continue
+			}
+
+			if !ghutil.IsTransient(err) {
+				return fmt.Errorf("retryRL: %w", err)
+			}
+
+			if attempt == transientRetryAttempts {
+				break
+			}
+
+			delay := ghutil.BackoffDuration(attempt, transientRetryBase, transientRetryMax)
+			slog.Warn("transient error, backing off",
+				"attempt", attempt+1,
+				"max_attempts", transientRetryAttempts,
+				"delay_ms", delay.Milliseconds(),
+				"error", err)
+			if sleepErr := ghutil.SleepWithContext(ctx, delay); sleepErr != nil {
+				return fmt.Errorf("retryRL: %w", sleepErr)
+			}
 		}
-		return fmt.Errorf("retryRL: %w", err)
+		return fmt.Errorf("retryRL (exhausted): %w", lastErr)
 	}
 }
 

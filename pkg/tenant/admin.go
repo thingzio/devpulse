@@ -9,6 +9,27 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
+// adminConn acquires a dedicated DB connection and explicitly clears
+// app.tenant_id so the RLS "bypass when no tenant" policy fires. Without
+// this, admin queries against the shared pool can pick up a connection
+// with a stale tenant scope set by an earlier scoped data API request,
+// silently returning a tenant-filtered subset of rows.
+//
+// Callers MUST close the returned connection. Errors from the cleanup
+// path are returned so calling code fails closed instead of running a
+// query that may be RLS-filtered.
+func adminConn(ctx context.Context, db *sql.DB) (*sql.Conn, error) {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring admin connection: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, "SELECT set_config('app.tenant_id', '', false)"); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("clearing tenant scope on admin connection: %w", err)
+	}
+	return conn, nil
+}
+
 // TenantSummary is a lightweight tenant record for admin listing.
 type TenantSummary struct {
 	Username         string
@@ -133,8 +154,14 @@ const (
 
 // GetTenantIDByUsername returns the tenant ID for a given GitHub username.
 func GetTenantIDByUsername(ctx context.Context, db *sql.DB, username string) (string, error) {
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
 	var id string
-	if err := db.QueryRowContext(ctx, selectTenantIDByUsernameSQL, username).Scan(&id); err != nil {
+	if err := conn.QueryRowContext(ctx, selectTenantIDByUsernameSQL, username).Scan(&id); err != nil {
 		return "", fmt.Errorf("getting tenant by username %q: %w", username, err)
 	}
 	return id, nil
@@ -142,7 +169,13 @@ func GetTenantIDByUsername(ctx context.Context, db *sql.DB, username string) (st
 
 // ClearUpgradeRequest removes a pending upgrade request for a tenant.
 func ClearUpgradeRequest(ctx context.Context, db *sql.DB, tenantID string) error {
-	if _, err := db.ExecContext(ctx, clearUpgradeRequestSQL, tenantID); err != nil {
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, clearUpgradeRequestSQL, tenantID); err != nil {
 		return fmt.Errorf("clearing upgrade request: %w", err)
 	}
 	return nil
@@ -150,8 +183,14 @@ func ClearUpgradeRequest(ctx context.Context, db *sql.DB, tenantID string) error
 
 // InsertMinimalTenant creates a tenant with only GitHub ID and username (for admin invites).
 func InsertMinimalTenant(ctx context.Context, db *sql.DB, githubID int64, username string) (string, error) {
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
 	var id string
-	if err := db.QueryRowContext(ctx, insertMinimalTenantSQL, githubID, username).Scan(&id); err != nil {
+	if err := conn.QueryRowContext(ctx, insertMinimalTenantSQL, githubID, username).Scan(&id); err != nil {
 		return "", fmt.Errorf("inserting minimal tenant %q: %w", username, err)
 	}
 	return id, nil
@@ -165,12 +204,18 @@ type TenantSummaryPage struct {
 
 // ListTenantSummariesPaged returns tenants filtered by search, sorted by last sign-in DESC, with pagination.
 func ListTenantSummariesPaged(ctx context.Context, db *sql.DB, search string, limit, offset int) (*TenantSummaryPage, error) {
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
 	var total int
-	if err := db.QueryRowContext(ctx, countTenantSummariesSearchSQL, search).Scan(&total); err != nil {
-		return nil, fmt.Errorf("counting tenant summaries: %w", err)
+	if cErr := conn.QueryRowContext(ctx, countTenantSummariesSearchSQL, search).Scan(&total); cErr != nil {
+		return nil, fmt.Errorf("counting tenant summaries: %w", cErr)
 	}
 
-	rows, err := db.QueryContext(ctx, listTenantSummariesPagedSQL, search, limit, offset)
+	rows, err := conn.QueryContext(ctx, listTenantSummariesPagedSQL, search, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("listing tenant summaries paged: %w", err)
 	}
@@ -200,7 +245,13 @@ func ListTenantSummariesPaged(ctx context.Context, db *sql.DB, search string, li
 
 // ListTenantSummaries returns all tenants with their last sign-in time.
 func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, error) {
-	rows, err := db.QueryContext(ctx, listTenantSummariesSQL)
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	rows, err := conn.QueryContext(ctx, listTenantSummariesSQL)
 	if err != nil {
 		return nil, fmt.Errorf("listing tenant summaries: %w", err)
 	}
@@ -230,10 +281,16 @@ func ListTenantSummaries(ctx context.Context, db *sql.DB) ([]TenantSummary, erro
 
 // GetTenantDetailByUsername returns detailed tenant info including email and last sign-in.
 func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string) (*TenantDetail, error) {
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
 	var td TenantDetail
 	var lastSignIn, digestLastSent sql.NullTime
 	var email sql.NullString
-	err := db.QueryRowContext(ctx, getTenantDetailByUsernameSQL, username).Scan(
+	err = conn.QueryRowContext(ctx, getTenantDetailByUsernameSQL, username).Scan(
 		&td.ID, &td.Username, &email,
 		&td.Name, &td.Company, &td.Location, &td.Bio,
 		&td.Plan, &td.Status, &td.MaxRepos, &td.MaxEventsPerWeek,
@@ -257,7 +314,13 @@ func GetTenantDetailByUsername(ctx context.Context, db *sql.DB, username string)
 // GetTenantRepoDetails returns per-repo statistics for a tenant.
 // backfillSince scopes PR backfill counts to match the worker's BACKFILL_MAX_DAYS window.
 func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, weekStart, backfillSince string) ([]RepoDetail, error) {
-	rows, err := db.QueryContext(ctx, getTenantRepoDetailsSQL, tenantID, since, weekStart, backfillSince)
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	rows, err := conn.QueryContext(ctx, getTenantRepoDetailsSQL, tenantID, since, weekStart, backfillSince)
 	if err != nil {
 		return nil, fmt.Errorf("querying tenant repo details: %w", err)
 	}
@@ -280,10 +343,11 @@ func GetTenantRepoDetails(ctx context.Context, db *sql.DB, tenantID, since, week
 		return nil, fmt.Errorf("iterating repo details: %w", err)
 	}
 
-	// Populate backfill coverage from state table.
+	// Populate backfill coverage from state table — reuse the same scoped
+	// connection so all queries see the cleared tenant scope.
 	for i := range repos {
 		var backfillUnix sql.NullInt64
-		err := db.QueryRowContext(ctx, selectMinBackfillSQL,
+		err := conn.QueryRowContext(ctx, selectMinBackfillSQL,
 			repos[i].Org, repos[i].Repo).Scan(&backfillUnix)
 		if err != nil || !backfillUnix.Valid {
 			continue
@@ -316,7 +380,13 @@ const listImportErrorReposSQL = `
 
 // ListImportErrorRepos returns all active repos with import errors, including tenant context.
 func ListImportErrorRepos(ctx context.Context, db *sql.DB) ([]ImportErrorRepo, error) {
-	rows, err := db.QueryContext(ctx, listImportErrorReposSQL)
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	rows, err := conn.QueryContext(ctx, listImportErrorReposSQL)
 	if err != nil {
 		return nil, fmt.Errorf("listing import error repos: %w", err)
 	}
@@ -359,7 +429,13 @@ const listTenantsWithoutInstallSQL = `
 
 // ListTenantsWithoutInstall returns active tenants that have repos but no GitHub App installation.
 func ListTenantsWithoutInstall(ctx context.Context, db *sql.DB) ([]TenantWithoutInstall, error) {
-	rows, err := db.QueryContext(ctx, listTenantsWithoutInstallSQL)
+	conn, err := adminConn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	rows, err := conn.QueryContext(ctx, listTenantsWithoutInstallSQL)
 	if err != nil {
 		return nil, fmt.Errorf("listing tenants without install: %w", err)
 	}

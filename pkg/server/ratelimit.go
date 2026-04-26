@@ -2,6 +2,7 @@ package server
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -90,8 +91,8 @@ func clientIP(r *http.Request) string {
 		}
 		return strings.TrimSpace(xff)
 	}
-	// RemoteAddr can include ":port"; strip it.
-	if host, _, ok := strings.Cut(r.RemoteAddr, ":"); ok {
+	// RemoteAddr is "host:port" or "[v6]:port"; strip the port.
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}
 	return r.RemoteAddr

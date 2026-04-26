@@ -24,21 +24,25 @@ const (
 			stars = $6, forks = $7
 	`
 
-	// selectRepoMetricHistorySQL: $1=org, $2=repo, $3=since
-	selectRepoMetricHistorySQL = `SELECT org, repo, date, stars, forks
+	// selectRepoMetricHistoryTpl: $1=since fixed; %s = queryBuilder for org/repo.
+	// Replaces COALESCE($N, col) anti-pattern so the planner can use the
+	// (org, repo, date) primary key when org/repo are provided.
+	selectRepoMetricHistoryTpl = `SELECT org, repo, date, stars, forks
 		FROM devpulse_repo_metric_history
-		WHERE org = COALESCE($1, org)
-		  AND repo = COALESCE($2, repo)
-		  AND date >= $3
+		WHERE date >= $1
+		  %s
 		ORDER BY org, repo, date
 	`
 
-	// selectRepoMetricHistoryAggSQL: $1=org (label), $2=org (filter), $3=since
-	selectRepoMetricHistoryAggSQL = `SELECT COALESCE($1, '') AS org, '' AS repo, date,
+	// selectRepoMetricHistoryAggTpl: $1=org label (parameterized projection),
+	// $2=since fixed; %s = queryBuilder for the org filter. Splitting the
+	// projection from the filter lets the planner use the org index when an
+	// org is provided.
+	selectRepoMetricHistoryAggTpl = `SELECT COALESCE($1, '') AS org, '' AS repo, date,
 			SUM(stars) AS stars, SUM(forks) AS forks
 		FROM devpulse_repo_metric_history
-		WHERE org = COALESCE($2, org)
-		  AND date >= $3
+		WHERE date >= $2
+		  %s
 		GROUP BY date
 		ORDER BY date
 	`
@@ -56,9 +60,27 @@ func (s *Store) GetRepoMetricHistory(ctx context.Context, org, repo *string, day
 	var rows *sql.Rows
 	var err error
 	if repo == nil {
-		rows, err = s.db.QueryContext(ctx, selectRepoMetricHistoryAggSQL, org, org, since)
+		// Aggregate by date across all repos in `org` (or all orgs).
+		// $1 = org label, $2 = since; queryBuilder starts at $3.
+		qb := newQueryBuilder(3)
+		qb.addOptional("org", org)
+		query := fmt.Sprintf(selectRepoMetricHistoryAggTpl, qb.whereClause())
+
+		args := make([]any, 0, 2+len(qb.args))
+		args = append(args, org, since)
+		args = append(args, qb.args...)
+		rows, err = s.db.QueryContext(ctx, query, args...)
 	} else {
-		rows, err = s.db.QueryContext(ctx, selectRepoMetricHistorySQL, org, repo, since)
+		// Per-repo. $1 = since fixed; queryBuilder starts at $2.
+		qb := newQueryBuilder(2)
+		qb.addOptional("org", org)
+		qb.addOptional("repo", repo)
+		query := fmt.Sprintf(selectRepoMetricHistoryTpl, qb.whereClause())
+
+		args := make([]any, 0, 1+len(qb.args))
+		args = append(args, since)
+		args = append(args, qb.args...)
+		rows, err = s.db.QueryContext(ctx, query, args...)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo metric history: %w", err)

@@ -12,9 +12,55 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
+
+// webhookDeliveryWindow is how long a delivery ID is remembered for replay
+// defense. GitHub retries deliveries on transient failure, so the window
+// must be longer than the longest expected retry interval (~24h per docs)
+// but bounded to keep the in-memory map small.
+const webhookDeliveryWindow = 24 * time.Hour
+
+// deliverySeen is an in-memory dedupe set for webhook delivery IDs. It is
+// per-process — a webhook delivered to a different instance will not be
+// recognized as a duplicate. This is acceptable as a best-effort defense:
+// the canonical authentication is the HMAC signature; this only blocks
+// replay against a single instance.
+type deliverySeenCache struct {
+	mu      sync.Mutex
+	entries map[string]time.Time
+}
+
+var deliverySeen = &deliverySeenCache{entries: make(map[string]time.Time)}
+
+// seenOrRecord returns true if id has been seen within the window. Otherwise
+// it records the id and returns false. Callers should treat true as "duplicate
+// — drop this delivery". An empty id is never deduped (return false) so the
+// handler still processes the event.
+func (c *deliverySeenCache) seenOrRecord(id string, now time.Time) bool {
+	if id == "" {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cutoff := now.Add(-webhookDeliveryWindow)
+	if seenAt, ok := c.entries[id]; ok && seenAt.After(cutoff) {
+		return true
+	}
+
+	// Opportunistic GC: drop stale entries on each write.
+	for k, v := range c.entries {
+		if v.Before(cutoff) {
+			delete(c.entries, k)
+		}
+	}
+	c.entries[id] = now
+	return false
+}
 
 // WebhookHandler handles GitHub App webhook events.
 func WebhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {
@@ -35,6 +81,16 @@ func WebhookHandler(db *sql.DB, webhookSecret string) http.HandlerFunc {
 		sig := r.Header.Get("X-Hub-Signature-256")
 		if !verifyWebhookSignature(body, sig, webhookSecret) {
 			http.Error(w, "invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		// Replay defense: drop deliveries we've already processed within the
+		// dedupe window. GitHub retries on 5xx so we still respond 200 to
+		// indicate the duplicate was successfully ignored.
+		deliveryID := r.Header.Get("X-GitHub-Delivery")
+		if deliverySeen.seenOrRecord(deliveryID, time.Now()) {
+			slog.Debug("webhook duplicate delivery ignored", "delivery_id", deliveryID)
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 

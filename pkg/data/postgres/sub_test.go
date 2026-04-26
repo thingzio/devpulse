@@ -71,3 +71,27 @@ func TestApplySubstitutions_NilDB(t *testing.T) {
 	_, err := s.ApplySubstitutions(ctx)
 	assert.Error(t, err)
 }
+
+func TestDeveloperSubSQL(t *testing.T) {
+	tests := []struct {
+		prop string
+		ok   bool
+	}{
+		{"entity", true},
+		{"", false},
+		{"username", false},
+		{"DROP TABLE devpulse_developer; --", false},
+		{"entity; DROP TABLE devpulse_developer", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.prop, func(t *testing.T) {
+			sql, ok := developerSubSQL(tt.prop)
+			assert.Equal(t, tt.ok, ok)
+			if tt.ok {
+				assert.Equal(t, updateDeveloperEntityBatchSQL, sql)
+			} else {
+				assert.Empty(t, sql)
+			}
+		})
+	}
+}

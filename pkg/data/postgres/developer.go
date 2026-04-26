@@ -241,9 +241,18 @@ func (s *Store) GetUnenrichedDeveloperUsernames(ctx context.Context) ([]string, 
 	return s.getDBSlice(ctx, selectUnenrichedDeveloperUsernameSQL)
 }
 
+// developerEnrichmentChunk is the number of (username, entity) updates committed
+// per transaction. Sized so progress is not lost on transient failure but each
+// transaction stays well under typical lock-wait timeouts.
+const developerEnrichmentChunk = 50
+
 // EnrichDeveloperEntities fetches full GitHub profiles for developers whose entity
 // is NULL (never enriched) and writes entity back. Developers with no GitHub company
 // get entity=” which marks them as enriched so they are not re-fetched next run.
+//
+// Updates are batched into transactions of developerEnrichmentChunk rows so the
+// per-row round-trip overhead is amortized and a transient failure does not
+// invalidate progress made by earlier chunks.
 func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error {
 	if s.db == nil {
 		return data.ErrDBNotInitialized
@@ -262,14 +271,51 @@ func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error
 
 	client := net.GetOAuthClient(ctx, token)
 
-	stmt, err := s.db.PrepareContext(ctx, updateDeveloperEntitySQL)
-	if err != nil {
-		return fmt.Errorf("preparing developer entity update: %w", err)
+	type pendingUpdate struct {
+		username string
+		entity   string
 	}
-	defer stmt.Close()
+	pending := make([]pendingUpdate, 0, developerEnrichmentChunk)
+
+	flush := func() error {
+		if len(pending) == 0 {
+			return nil
+		}
+		tx, txErr := s.db.BeginTx(ctx, nil)
+		if txErr != nil {
+			return fmt.Errorf("beginning enrichment tx: %w", txErr)
+		}
+		defer rollbackTransaction(tx)
+
+		stmt, prepErr := tx.PrepareContext(ctx, updateDeveloperEntitySQL)
+		if prepErr != nil {
+			return fmt.Errorf("preparing developer entity update: %w", prepErr)
+		}
+		defer stmt.Close()
+
+		for _, p := range pending {
+			if _, execErr := stmt.ExecContext(ctx, p.username, p.entity); execErr != nil {
+				return fmt.Errorf("updating developer entity %q: %w", p.username, execErr)
+			}
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			return fmt.Errorf("committing enrichment tx: %w", commitErr)
+		}
+		pending = pending[:0]
+		return nil
+	}
 
 	var enriched, skipped int
 	for _, username := range usernames {
+		// Honor cancellation between API calls so worker shutdown doesn't
+		// stall behind a slow GitHub response.
+		if err := ctx.Err(); err != nil {
+			if flushErr := flush(); flushErr != nil {
+				slog.Warn("flushing enrichment on cancel", "error", flushErr)
+			}
+			return fmt.Errorf("developer enrichment canceled: %w", err)
+		}
+
 		dev, fetchErr := ghutil.GetGitHubDeveloper(ctx, client, username)
 		if fetchErr != nil {
 			// If user is deleted/renamed (404), mark as enriched with empty entity
@@ -277,25 +323,26 @@ func (s *Store) EnrichDeveloperEntities(ctx context.Context, token string) error
 			var ghErr *github.ErrorResponse
 			if errors.As(fetchErr, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == http.StatusNotFound {
 				slog.Debug("developer not found on github, marking enriched", "username", username)
-				if _, execErr := stmt.ExecContext(ctx, username, ""); execErr != nil {
-					slog.Warn("marking gone developer enriched", "username", username, "error", execErr)
-				}
+				pending = append(pending, pendingUpdate{username: username, entity: ""})
 				skipped++
-				continue
+			} else {
+				slog.Warn("fetching developer profile", "username", username, "error", fetchErr)
+				skipped++
 			}
-			slog.Warn("fetching developer profile", "username", username, "error", fetchErr)
-			skipped++
-			continue
+		} else {
+			pending = append(pending, pendingUpdate{username: username, entity: cleanEntityName(dev.Entity)})
+			enriched++
 		}
 
-		entity := cleanEntityName(dev.Entity)
-		if _, execErr := stmt.ExecContext(ctx, username, entity); execErr != nil {
-			slog.Warn("updating developer entity", "username", username, "error", execErr)
-			skipped++
-			continue
+		if len(pending) >= developerEnrichmentChunk {
+			if flushErr := flush(); flushErr != nil {
+				return flushErr
+			}
 		}
+	}
 
-		enriched++
+	if flushErr := flush(); flushErr != nil {
+		return flushErr
 	}
 
 	slog.Info("developer enrichment complete",

@@ -19,7 +19,7 @@ func insightWithEntityHandler(defaultStore data.Store, label string, fn func(con
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 
@@ -55,7 +55,7 @@ func insightHandler(defaultStore data.Store, label string, fn func(context.Conte
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 

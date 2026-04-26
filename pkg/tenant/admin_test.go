@@ -199,6 +199,46 @@ func TestRequestUpgrade(t *testing.T) {
 	assert.Nil(t, req2)
 }
 
+// TestAdminQueriesIgnoreDirtyPoolConnection verifies that admin queries
+// see all tenants even when a previous request left a connection in the
+// pool with app.tenant_id set to a specific tenant. This is the core
+// guarantee of the adminConn helper.
+func TestAdminQueriesIgnoreDirtyPoolConnection(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tnA, err := UpsertTenant(ctx, db, 80100, "dirtyA", "", "", "", "", "", "")
+	require.NoError(t, err)
+	tnB, err := UpsertTenant(ctx, db, 80101, "dirtyB", "", "", "", "", "", "")
+	require.NoError(t, err)
+
+	// Drain the pool to a single connection so subsequent acquires reuse it.
+	db.SetMaxOpenConns(1)
+
+	// Dirty the only pool connection: scope it to tnA, then return it.
+	dirty, err := db.Conn(ctx)
+	require.NoError(t, err)
+	_, err = dirty.ExecContext(ctx, "SELECT set_config('app.tenant_id', $1, false)", tnA.ID)
+	require.NoError(t, err)
+	require.NoError(t, dirty.Close())
+
+	// Admin call must see BOTH tenants — proving adminConn cleared the scope.
+	summaries, err := ListTenantSummaries(ctx, db)
+	require.NoError(t, err)
+
+	seen := map[string]bool{}
+	for _, s := range summaries {
+		seen[s.Username] = true
+	}
+	assert.True(t, seen["dirtyA"], "expected to see dirtyA after dirty-pool cleanup")
+	assert.True(t, seen["dirtyB"], "expected to see dirtyB after dirty-pool cleanup")
+
+	// Targeted admin lookup must also succeed.
+	id, err := GetTenantIDByUsername(ctx, db, "dirtyB")
+	require.NoError(t, err)
+	assert.Equal(t, tnB.ID, id)
+}
+
 func TestValidateSession_InvalidToken(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

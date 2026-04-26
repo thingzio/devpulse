@@ -3,18 +3,30 @@ package ghutil
 import (
 	"strings"
 	"sync"
+	"time"
 )
+
+// defaultExhaustionWindow is how long an exhausted token stays out of
+// rotation before becoming eligible again. The GitHub primary rate limit
+// resets hourly so 1h is the correct ceiling; pick a touch shorter to
+// reduce the window where every token is considered exhausted.
+const defaultExhaustionWindow = 55 * time.Minute
 
 // TokenPool manages a pool of GitHub API tokens using round-robin selection.
 // Safe for concurrent use. Works transparently with a single token.
 // Tracks per-token usage counts for observability and supports marking
 // individual tokens as exhausted (e.g. after hitting a rate limit).
+//
+// Exhausted tokens automatically re-enter rotation after exhaustionWindow,
+// so the pool degrades temporarily rather than monotonically.
 type TokenPool struct {
-	mu        sync.Mutex
-	tokens    []string
-	counts    []int
-	exhausted []bool
-	current   int
+	mu               sync.Mutex
+	tokens           []string
+	counts           []int
+	exhaustedUntil   []time.Time
+	exhaustionWindow time.Duration
+	now              func() time.Time
+	current          int
 }
 
 // NewTokenPool creates a pool from one or more tokens. Tokens can be passed
@@ -30,10 +42,21 @@ func NewTokenPool(tokens ...string) *TokenPool {
 		}
 	}
 	return &TokenPool{
-		tokens:    list,
-		counts:    make([]int, len(list)),
-		exhausted: make([]bool, len(list)),
+		tokens:           list,
+		counts:           make([]int, len(list)),
+		exhaustedUntil:   make([]time.Time, len(list)),
+		exhaustionWindow: defaultExhaustionWindow,
+		now:              time.Now,
 	}
+}
+
+// isExhausted reports whether token i is currently exhausted. Caller must hold p.mu.
+func (p *TokenPool) isExhausted(i int) bool {
+	until := p.exhaustedUntil[i]
+	if until.IsZero() {
+		return false
+	}
+	return p.now().Before(until)
 }
 
 // Token returns the next non-exhausted token in the round-robin rotation.
@@ -51,7 +74,7 @@ func (p *TokenPool) Token() string {
 	for range n {
 		idx := p.current
 		p.current = (idx + 1) % n
-		if !p.exhausted[idx] {
+		if !p.isExhausted(idx) {
 			p.counts[idx]++
 			return p.tokens[idx]
 		}
@@ -60,14 +83,16 @@ func (p *TokenPool) Token() string {
 	return "" // all exhausted
 }
 
-// Exhaust marks the given token as exhausted so Token() skips it.
+// Exhaust marks the given token as exhausted so Token() skips it for the
+// configured exhaustion window. After the window elapses, the token is
+// eligible for selection again automatically.
 func (p *TokenPool) Exhaust(token string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	for i, t := range p.tokens {
 		if t == token {
-			p.exhausted[i] = true
+			p.exhaustedUntil[i] = p.now().Add(p.exhaustionWindow)
 			return
 		}
 	}
@@ -80,7 +105,7 @@ func (p *TokenPool) ActiveCount() int {
 
 	count := 0
 	for i := range p.tokens {
-		if !p.exhausted[i] {
+		if !p.isExhausted(i) {
 			count++
 		}
 	}

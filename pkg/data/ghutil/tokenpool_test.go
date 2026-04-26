@@ -3,6 +3,7 @@ package ghutil
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,5 +147,43 @@ func TestTokenPoolExhaustMidRotation(t *testing.T) {
 
 	// Next should skip "b" and return "c"
 	assert.Equal(t, "c", pool.Token())
+	assert.Equal(t, "a", pool.Token())
+}
+
+// TestTokenPoolExhaustionRecovers verifies that an exhausted token re-enters
+// the rotation once the exhaustion window has elapsed. Uses a manual clock
+// to avoid sleeping.
+func TestTokenPoolExhaustionRecovers(t *testing.T) {
+	pool := NewTokenPool("a", "b")
+	now := time.Unix(0, 0)
+	pool.now = func() time.Time { return now }
+
+	pool.Exhaust("a")
+	assert.Equal(t, 1, pool.ActiveCount(), "a is exhausted")
+	assert.Equal(t, "b", pool.Token())
+	assert.Equal(t, "b", pool.Token(), "a still exhausted")
+
+	// Advance past the exhaustion window.
+	now = now.Add(defaultExhaustionWindow + time.Second)
+	assert.Equal(t, 2, pool.ActiveCount(), "a recovered")
+
+	seen := make(map[string]int)
+	for range 4 {
+		seen[pool.Token()]++
+	}
+	assert.Greater(t, seen["a"], 0, "a back in rotation")
+	assert.Greater(t, seen["b"], 0)
+}
+
+func TestTokenPoolExhaustionWindowConfigurable(t *testing.T) {
+	pool := NewTokenPool("a")
+	now := time.Unix(0, 0)
+	pool.now = func() time.Time { return now }
+	pool.exhaustionWindow = time.Minute
+
+	pool.Exhaust("a")
+	assert.Equal(t, "", pool.Token())
+
+	now = now.Add(time.Minute + time.Second)
 	assert.Equal(t, "a", pool.Token())
 }

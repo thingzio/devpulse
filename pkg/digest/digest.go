@@ -179,7 +179,10 @@ func sendDigest(ctx context.Context, db *sql.DB, cfg *Config, dt tenant.DigestTe
 		return fmt.Errorf("setting tenant scope: %w", setErr)
 	}
 	defer func() {
-		cleanupCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		// Use WithoutCancel so the RLS reset still runs even if the parent
+		// ctx is canceled. Bound with an independent timeout because the
+		// underlying conn.Close() will release the conn to the pool next.
+		cleanupCtx, c := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer c()
 		_, _ = conn.ExecContext(cleanupCtx, "SELECT set_config('app.tenant_id', '', false)")
 	}()

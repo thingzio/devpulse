@@ -72,6 +72,15 @@ func csvExportHandler(defaultStore data.Store, listRepos func(ctx context.Contex
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
+		// Streaming exports can take longer than the default WriteTimeout.
+		// Extend the deadline using ResponseController so a large multi-repo
+		// export is not killed mid-stream by the server's write timeout.
+		rc := http.NewResponseController(w)
+		// Best-effort: errors here just mean the underlying conn does not
+		// support deadlines (e.g. test recorders), in which case the default
+		// WriteTimeout still applies.
+		_ = rc.SetWriteDeadline(time.Now().Add(csvExportWriteDeadline))
+
 		zw := zip.NewWriter(w)
 		defer zw.Close()
 
@@ -81,6 +90,10 @@ func csvExportHandler(defaultStore data.Store, listRepos func(ctx context.Contex
 		}
 	}
 }
+
+// csvExportWriteDeadline bounds the streaming response so a slow client or
+// a large export cannot hold a connection open indefinitely.
+const csvExportWriteDeadline = 10 * time.Minute
 
 func exportRepoCSVs(ctx context.Context, zw *zip.Writer, s data.Store, org, repo string, days int, prefix string) {
 	o := &org

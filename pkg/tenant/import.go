@@ -4,7 +4,36 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 )
+
+// importErrorMaxLen bounds the size of error strings stored in the
+// import_last_error column. Prevents pathological GitHub/Anthropic error
+// bodies (HTML pages, full prompt echoes) from flooding the row.
+const importErrorMaxLen = 1024
+
+// secret-bearing tokens we may receive in error strings:
+//   - GitHub Personal Access Tokens: ghp_, gho_, ghu_, ghs_, ghr_
+//   - GitHub installation tokens: ghs_
+//   - Bearer prefixes from upstream services
+//   - Generic "Authorization: <scheme> <token>" headers
+var (
+	importErrTokenRE  = regexp.MustCompile(`gh[opusr]_[A-Za-z0-9]{20,}`)
+	importErrBearerRE = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._\-]+`)
+	importErrAuthRE   = regexp.MustCompile(`(?i)authorization:\s*\S+\s+\S+`)
+)
+
+// sanitizeImportError redacts secrets and truncates long error messages
+// before they are persisted in the database.
+func sanitizeImportError(s string) string {
+	s = importErrTokenRE.ReplaceAllString(s, "[REDACTED]")
+	s = importErrBearerRE.ReplaceAllString(s, "Bearer [REDACTED]")
+	s = importErrAuthRE.ReplaceAllString(s, "Authorization: [REDACTED]")
+	if len(s) > importErrorMaxLen {
+		s = s[:importErrorMaxLen] + "...[truncated]"
+	}
+	return s
+}
 
 const incrementImportErrorsSQL = `
 	UPDATE devpulse_tenant_repo
@@ -27,7 +56,7 @@ const deleteRepoMetaByRepoSQL = `DELETE FROM devpulse_repo_meta WHERE org = $1 A
 
 // IncrementImportErrors increments the consecutive error counter and stores the last error.
 func IncrementImportErrors(ctx context.Context, db *sql.DB, id, errMsg string) error {
-	if _, err := db.ExecContext(ctx, incrementImportErrorsSQL, id, errMsg); err != nil {
+	if _, err := db.ExecContext(ctx, incrementImportErrorsSQL, id, sanitizeImportError(errMsg)); err != nil {
 		return fmt.Errorf("incrementing import errors: %w", err)
 	}
 	return nil
@@ -242,7 +271,7 @@ func scanImportWorkRows(rows *sql.Rows) ([]ImportWorkRow, error) {
 
 // IncrementImportErrorsByRepo increments error counter for all active tenant_repo rows of a given org/repo.
 func IncrementImportErrorsByRepo(ctx context.Context, db *sql.DB, org, repo, errMsg string) error {
-	if _, err := db.ExecContext(ctx, incrementImportErrorsByRepoSQL, org, repo, errMsg); err != nil {
+	if _, err := db.ExecContext(ctx, incrementImportErrorsByRepoSQL, org, repo, sanitizeImportError(errMsg)); err != nil {
 		return fmt.Errorf("incrementing import errors for %s/%s: %w", org, repo, err)
 	}
 	return nil

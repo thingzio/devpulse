@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,9 +22,18 @@ const (
 	cacheControlHeaderKey = "Cache-Control"
 )
 
-// responseCache is a TTL-based in-memory cache for JSON API responses.
+// defaultCacheMaxEntries caps the number of cache entries to bound memory.
+// At ~100KB per JSON response this allows up to roughly 500MB of cached data.
+// When the cap is exceeded we evict the entries with the soonest expiry.
+const defaultCacheMaxEntries = 5000
+
+// responseCache is a bounded TTL-based in-memory cache for JSON API responses.
+// The map+mutex layout lets the cache enforce a hard size cap so a misbehaving
+// caller (or an unbounded path/query namespace) cannot exhaust process memory.
 type responseCache struct {
-	entries sync.Map
+	mu         sync.RWMutex
+	entries    map[string]*cacheEntry
+	maxEntries int
 }
 
 type cacheEntry struct {
@@ -44,52 +54,115 @@ func (c *responseCache) startEviction(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				now := time.Now()
-				c.entries.Range(func(key, value any) bool {
-					if e, ok := value.(*cacheEntry); ok && now.After(e.expires) {
-						c.entries.Delete(key)
-					}
-					return true
-				})
+				c.purgeExpired()
 			}
 		}
 	}()
 }
 
+func (c *responseCache) purgeExpired() {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, e := range c.entries {
+		if now.After(e.expires) {
+			delete(c.entries, k)
+		}
+	}
+}
+
 func (c *responseCache) get(key string) ([]byte, bool) {
-	v, ok := c.entries.Load(key)
+	c.mu.RLock()
+	e, ok := c.entries[key]
+	c.mu.RUnlock()
 	if !ok {
 		return nil, false
 	}
-	e := v.(*cacheEntry)
 	if time.Now().After(e.expires) {
-		c.entries.Delete(key)
+		c.mu.Lock()
+		// Re-check under write lock — another goroutine may have refreshed.
+		if cur, still := c.entries[key]; still && cur == e {
+			delete(c.entries, key)
+		}
+		c.mu.Unlock()
 		return nil, false
 	}
 	return e.data, true
 }
 
 func (c *responseCache) set(key string, val []byte) {
-	c.entries.Store(key, &cacheEntry{
-		data:    val,
-		expires: time.Now().Add(serverCacheTTL),
-	})
+	c.setWithTTL(key, val, serverCacheTTL)
 }
 
 func (c *responseCache) setWithTTL(key string, val []byte, ttl time.Duration) {
-	c.entries.Store(key, &cacheEntry{
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.entries == nil {
+		c.entries = make(map[string]*cacheEntry)
+	}
+	c.entries[key] = &cacheEntry{
 		data:    val,
 		expires: time.Now().Add(ttl),
+	}
+	c.evictLocked()
+}
+
+// evictLocked enforces maxEntries by removing the soonest-to-expire entries.
+// Caller must hold c.mu. Costs O(n) but only runs when the cap is hit.
+func (c *responseCache) evictLocked() {
+	limit := c.maxEntries
+	if limit <= 0 {
+		limit = defaultCacheMaxEntries
+	}
+	if len(c.entries) <= limit {
+		return
+	}
+
+	// First pass: drop already-expired entries — that may be enough.
+	now := time.Now()
+	for k, e := range c.entries {
+		if now.After(e.expires) {
+			delete(c.entries, k)
+		}
+	}
+	if len(c.entries) <= limit {
+		return
+	}
+
+	// Still over: evict the entries with the smallest expires time until
+	// we drop ~10% under the cap to amortize future evictions.
+	target := limit - limit/10
+	excess := len(c.entries) - target
+	type kv struct {
+		key     string
+		expires time.Time
+	}
+	victims := make([]kv, 0, len(c.entries))
+	for k, e := range c.entries {
+		victims = append(victims, kv{k, e.expires})
+	}
+	sort.Slice(victims, func(i, j int) bool {
+		return victims[i].expires.Before(victims[j].expires)
 	})
+	for i := 0; i < excess && i < len(victims); i++ {
+		delete(c.entries, victims[i].key)
+	}
 }
 
 func (c *responseCache) invalidatePrefix(prefix string) {
-	c.entries.Range(func(key, _ any) bool {
-		if k, ok := key.(string); ok && strings.HasPrefix(k, prefix) {
-			c.entries.Delete(key)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k := range c.entries {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.entries, k)
 		}
-		return true
-	})
+	}
+}
+
+func (c *responseCache) len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.entries)
 }
 
 const maxCacheTTL = 30 * time.Minute

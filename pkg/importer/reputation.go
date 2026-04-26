@@ -15,8 +15,11 @@ import (
 // collectTokenPool mints installation tokens from all active tenants and
 // returns a round-robin TokenPool. Falls back to GITHUB_TOKEN env var.
 func collectTokenPool(ctx context.Context, db *sql.DB, ghAppConfig *tenant.GitHubAppConfig) (*ghutil.TokenPool, error) {
-	// 1. Explicit token (dev/testing)
+	// 1. Explicit token (dev/testing). This short-circuits the GitHub App
+	// installation token pool, so warn loudly to avoid silent fan-out loss
+	// in production when the env var leaks onto a Cloud Run task.
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		slog.Warn("GITHUB_TOKEN env set; bypassing installation token pool — intended for dev/testing only")
 		return ghutil.NewTokenPool(token), nil
 	}
 

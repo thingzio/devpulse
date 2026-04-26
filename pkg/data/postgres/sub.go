@@ -14,8 +14,20 @@ const (
 
 	selectSubSQL = `SELECT type, old, new FROM devpulse_sub`
 
-	updateDeveloperPropertySQL = `UPDATE devpulse_developer SET %s = $1 WHERE %s = $2`
+	updateDeveloperEntityBatchSQL = `UPDATE devpulse_developer SET entity = $1 WHERE entity = $2`
 )
+
+// developerSubSQL maps a substitution property to its constant SQL. Returning
+// a literal string (not built via fmt.Sprintf) makes SQL injection impossible
+// at this layer regardless of upstream whitelist mistakes.
+func developerSubSQL(prop string) (string, bool) {
+	switch prop {
+	case "entity":
+		return updateDeveloperEntityBatchSQL, true
+	default:
+		return "", false
+	}
+}
 
 func (s *Store) applyDeveloperSub(ctx context.Context, sub *data.Substitution) error {
 	if s.db == nil {
@@ -26,11 +38,12 @@ func (s *Store) applyDeveloperSub(ctx context.Context, sub *data.Substitution) e
 		return nil
 	}
 
-	if !data.Contains(data.UpdatableProperties, sub.Prop) {
+	query, ok := developerSubSQL(sub.Prop)
+	if !ok {
 		return fmt.Errorf("invalid property: %s (permitted options: %v)", sub.Prop, data.UpdatableProperties)
 	}
 
-	stmt, err := s.db.PrepareContext(ctx, fmt.Sprintf(updateDeveloperPropertySQL, sub.Prop, sub.Prop))
+	stmt, err := s.db.PrepareContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to prepare sql statement: %w", err)
 	}

@@ -339,6 +339,13 @@ func Run(ctx context.Context, opts Options) error {
 		slog.Error("shutdown failed", "error", err)
 	}
 
+	// Drain any async import triggers spawned by handlers so their
+	// Cloud Run RunJob calls are not abandoned mid-flight.
+	trigger.Wait()
+
+	// Drain other fire-and-forget background work (sample seeding, etc.).
+	bg.Wait()
+
 	select {
 	case listenErr := <-errCh:
 		return fmt.Errorf("server listen error during shutdown: %w", listenErr)
@@ -779,7 +786,13 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 
 		middleware.SetSessionCookie(w, sessionToken, int(sessionTTL.Seconds()))
 
-		seedSampleRepos(r.Context(), db, tn)
+		// Sample seeding does its own count-zero gate, so a missed run is
+		// recovered on the next login. Run it off the request path so the
+		// dashboard redirect is not blocked by extra DB round trips.
+		tnCopy := *tn
+		bg.Submit("seed_sample_repos", 30*time.Second, func(ctx context.Context) {
+			seedSampleRepos(ctx, db, &tnCopy)
+		})
 
 		if tn.ToSAcceptedAt == nil {
 			http.Redirect(w, r, "/tos", http.StatusFound)
@@ -947,13 +960,7 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger, ghAppID int64) http.Hand
 
 		apiCache.invalidatePrefix(tn.ID + "|/api/repos/overview")
 
-		go func() { //nolint:gosec // fire-and-forget: goroutine intentionally outlives the HTTP request
-			triggerCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ServerTriggerTimeout())*time.Second)
-			defer cancel()
-			if triggerErr := trigger.TriggerRepoImport(triggerCtx, org, repo); triggerErr != nil {
-				slog.Error("triggering on-demand import", "org", org, "repo", repo, "error", triggerErr)
-			}
-		}()
+		trigger.TriggerRepoImportAsync(org, repo, time.Duration(config.ServerTriggerTimeout())*time.Second)
 
 		w.WriteHeader(http.StatusCreated)
 	}
@@ -1014,7 +1021,7 @@ func repoOverviewHandler(db *sql.DB) http.HandlerFunc {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set(cacheControlHeaderKey, browserCacheMaxAge)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(cached) //nolint:gosec // cached bytes are from our own json.Marshal
+			_, _ = w.Write(cached)
 			return
 		}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v83/github"
@@ -35,20 +36,25 @@ const (
 		WHERE org = $1 AND repo = $2
 	`
 
-	// selectRepoMetaSQL: $1=org, $2=repo
-	selectRepoMetaSQL = `SELECT org, repo, stars, forks, open_issues, language, license, archived,
+	// selectRepoMetaTpl: %s = queryBuilder whereClause for org/repo.
+	// Replaces COALESCE($N, col) anti-pattern so the planner can use the
+	// (org, repo) primary key when both are provided.
+	selectRepoMetaTpl = `SELECT org, repo, stars, forks, open_issues, language, license, archived,
 			has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct,
 			updated_at
 		FROM devpulse_repo_meta
-		WHERE org = COALESCE($1, org)
-		  AND repo = COALESCE($2, repo)
+		WHERE 1=1
+		  %s
 		ORDER BY org, repo
 	`
 
-	// selectRepoOverviewSQL: $1=since, $2=org
-	// Contributors and Scored exclude fork events and bot accounts so the
-	// counts reflect real code/review/issue activity only.
-	selectRepoOverviewSQL = `SELECT
+	// selectRepoOverviewTpl: $1=since fixed; /*WHERE*/ marker is replaced
+	// via strings.Replace with queryBuilder whereClause for rm.org.
+	// fmt.Sprintf can't be used here because data.ContribExcludeSQL
+	// contains '%[bot]' which is mis-parsed as a format directive.
+	// Contributors and Scored exclude fork events and bot accounts so
+	// the counts reflect real code/review/issue activity only.
+	selectRepoOverviewTpl = `SELECT
 			rm.org, rm.repo, rm.stars, rm.forks, rm.open_issues,
 			COUNT(e.type),
 			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
@@ -58,7 +64,8 @@ const (
 		FROM devpulse_repo_meta rm
 		LEFT JOIN devpulse_event e ON rm.org = e.org AND rm.repo = e.repo AND e.date >= $1
 		LEFT JOIN devpulse_developer d ON e.username = d.username
-		WHERE rm.org = COALESCE($2, rm.org)
+		WHERE 1=1
+		  /*WHERE*/
 		GROUP BY rm.org, rm.repo, rm.stars, rm.forks, rm.open_issues,
 			rm.language, rm.license, rm.archived, rm.last_import_at
 		ORDER BY rm.org, rm.repo
@@ -216,7 +223,12 @@ func (s *Store) GetRepoMetas(ctx context.Context, org, repo *string) ([]*data.Re
 		return nil, data.ErrDBNotInitialized
 	}
 
-	rows, err := s.db.QueryContext(ctx, selectRepoMetaSQL, org, repo)
+	qb := newQueryBuilder(1)
+	qb.addOptional("org", org)
+	qb.addOptional("repo", repo)
+	query := fmt.Sprintf(selectRepoMetaTpl, qb.whereClause())
+
+	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo meta: %w", err)
 	}
@@ -255,7 +267,17 @@ func (s *Store) GetRepoOverview(ctx context.Context, org *string, days int) ([]*
 
 	since := sinceDate(days)
 
-	rows, err := s.db.QueryContext(ctx, selectRepoOverviewSQL, since, org)
+	// $1 = since fixed; queryBuilder starts at $2 for rm.org filter.
+	// strings.Replace (not fmt.Sprintf) — template embeds ContribExcludeSQL
+	// which contains '%[bot]' that fmt would mis-parse.
+	qb := newQueryBuilder(2)
+	qb.addOptional("rm.org", org)
+	query := strings.Replace(selectRepoOverviewTpl, "/*WHERE*/", qb.whereClause(), 1)
+
+	args := make([]any, 0, 1+len(qb.args))
+	args = append(args, since)
+	args = append(args, qb.args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query repo overview: %w", err)
 	}

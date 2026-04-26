@@ -3,11 +3,44 @@ package tenant
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSanitizeImportError(t *testing.T) {
+	t.Run("token redacted", func(t *testing.T) {
+		got := sanitizeImportError("auth fail: ghp_abcdefghijklmnopqrstuvwxyz1234567890")
+		assert.Contains(t, got, "[REDACTED]")
+		assert.NotContains(t, got, "ghp_abcdefghijklmnopqrstuvwxyz1234567890")
+	})
+	t.Run("installation token redacted", func(t *testing.T) {
+		got := sanitizeImportError("error: ghs_xyz1234567890abcdefghijklmnopqrstuv")
+		assert.NotContains(t, got, "ghs_xyz1234567890abcdefghijklmnopqrstuv")
+	})
+	t.Run("bearer token redacted", func(t *testing.T) {
+		got := sanitizeImportError("403: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig")
+		assert.Contains(t, got, "Bearer [REDACTED]")
+		assert.NotContains(t, got, "eyJhbGciOiJIUzI1NiJ9")
+	})
+	t.Run("authorization header redacted", func(t *testing.T) {
+		got := sanitizeImportError("Authorization: token abcdef123")
+		assert.Contains(t, got, "[REDACTED]")
+		assert.NotContains(t, got, "abcdef123")
+	})
+	t.Run("truncated when long", func(t *testing.T) {
+		long := strings.Repeat("x", 2048)
+		got := sanitizeImportError(long)
+		assert.LessOrEqual(t, len(got), importErrorMaxLen+len("...[truncated]"))
+		assert.True(t, strings.HasSuffix(got, "...[truncated]"))
+	})
+	t.Run("short message untouched", func(t *testing.T) {
+		got := sanitizeImportError("connection refused")
+		assert.Equal(t, "connection refused", got)
+	})
+}
 
 func TestIncrementImportErrors(t *testing.T) {
 	db := setupTestDB(t)

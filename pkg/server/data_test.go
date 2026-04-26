@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -210,13 +211,39 @@ func TestResponseCache_TTLExpiry(t *testing.T) {
 	c := &responseCache{}
 
 	// Insert with an already-expired entry.
-	c.entries.Store("old", &cacheEntry{
-		data:    []byte(`{}`),
-		expires: time.Now().Add(-1 * time.Second),
-	})
+	c.setWithTTL("old", []byte(`{}`), -1*time.Second)
 
 	_, ok := c.get("old")
 	assert.False(t, ok, "expired entry should not be returned")
+}
+
+func TestResponseCache_BoundedSize(t *testing.T) {
+	c := &responseCache{maxEntries: 10}
+
+	// Insert more than the cap.
+	for i := 0; i < 25; i++ {
+		c.set(strconv.Itoa(i), []byte("x"))
+	}
+
+	// Cache must not exceed cap (excess is target = limit - 10%).
+	assert.LessOrEqual(t, c.len(), 10, "cache should not exceed max")
+	assert.Greater(t, c.len(), 0, "eviction should not empty the cache")
+}
+
+func TestResponseCache_InvalidatePrefix(t *testing.T) {
+	c := &responseCache{}
+	c.set("tenant-a|/data/foo", []byte("1"))
+	c.set("tenant-a|/data/bar", []byte("2"))
+	c.set("tenant-b|/data/foo", []byte("3"))
+
+	c.invalidatePrefix("tenant-a|")
+
+	_, ok := c.get("tenant-a|/data/foo")
+	assert.False(t, ok)
+	_, ok = c.get("tenant-a|/data/bar")
+	assert.False(t, ok)
+	_, ok = c.get("tenant-b|/data/foo")
+	assert.True(t, ok, "other tenant must be unaffected")
 }
 
 func TestDataCacheKey(t *testing.T) {

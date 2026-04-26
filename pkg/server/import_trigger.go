@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	run "cloud.google.com/go/run/apiv2"
 	runpb "cloud.google.com/go/run/apiv2/runpb"
@@ -12,6 +14,7 @@ import (
 type importTrigger struct {
 	client  *run.JobsClient
 	jobName string
+	wg      sync.WaitGroup
 }
 
 func newImportTrigger(ctx context.Context, jobName string) (*importTrigger, error) {
@@ -23,6 +26,34 @@ func newImportTrigger(ctx context.Context, jobName string) (*importTrigger, erro
 		return nil, fmt.Errorf("creating Cloud Run jobs client: %w", err)
 	}
 	return &importTrigger{client: client, jobName: jobName}, nil
+}
+
+// TriggerRepoImportAsync schedules a trigger in the background and tracks it
+// via the trigger's WaitGroup so callers can drain in-flight work at shutdown.
+// The provided ctx is detached so server cancellation does not abort an
+// already-scheduled import; a separate timeout bounds the call.
+func (t *importTrigger) TriggerRepoImportAsync(org, repo string, timeout time.Duration) {
+	if t == nil {
+		return
+	}
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		if err := t.TriggerRepoImport(ctx, org, repo); err != nil {
+			slog.Error("triggering on-demand import", "org", org, "repo", repo, "error", err)
+		}
+	}()
+}
+
+// Wait blocks until all async triggers spawned via TriggerRepoImportAsync have
+// completed. Safe to call on a nil receiver.
+func (t *importTrigger) Wait() {
+	if t == nil {
+		return
+	}
+	t.wg.Wait()
 }
 
 // TriggerRepoImport triggers an on-demand import job for a single repo.
