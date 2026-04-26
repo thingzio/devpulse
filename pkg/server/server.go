@@ -654,6 +654,12 @@ func digestToggleHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		slog.Info("weekly digest toggled",
+			"username", tn.Username,
+			"tenant_id", tn.ID,
+			"enabled", enabled,
+		)
+
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 	}
 }
@@ -679,6 +685,8 @@ func digestUnsubscribeHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "failed to unsubscribe", http.StatusInternalServerError)
 			return
 		}
+
+		slog.Info("digest unsubscribed via email link", "tenant_id", tenantID)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Unsubscribed</title></head>
@@ -832,12 +840,18 @@ func seedSampleRepos(ctx context.Context, db *sql.DB, tn *tenant.Tenant) {
 
 func signoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var username, tenantID string
+		if tn := middleware.TenantFromContext(r.Context()); tn != nil {
+			username = tn.Username
+			tenantID = tn.ID
+		}
 		if cookie, err := r.Cookie(middleware.SessionCookieName()); err == nil {
 			if derr := tenant.DestroySession(r.Context(), db, cookie.Value); derr != nil {
 				slog.Debug("destroying session", "error", derr)
 			}
 		}
 		middleware.ClearSessionCookie(w)
+		slog.Info("user signed out", "username", username, "tenant_id", tenantID)
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }
@@ -962,6 +976,13 @@ func addRepoHandler(db *sql.DB, trigger *importTrigger, ghAppID int64) http.Hand
 
 		trigger.TriggerRepoImportAsync(org, repo, time.Duration(config.ServerTriggerTimeout())*time.Second)
 
+		slog.Info("repo added",
+			"username", tn.Username,
+			"tenant_id", tn.ID,
+			"org", org,
+			"repo", repo,
+		)
+
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -1073,6 +1094,14 @@ func deleteRepoHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		apiCache.invalidatePrefix(tn.ID + "|/api/repos/overview")
+
+		slog.Info("repo deleted",
+			"username", tn.Username,
+			"tenant_id", tn.ID,
+			"org", org,
+			"repo", repo,
+		)
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

@@ -65,6 +65,13 @@ func RequireAdmin(db *sql.DB) func(http.Handler) http.Handler {
 				return
 			}
 
+			slog.Info("admin access",
+				"username", tn.Username,
+				"path", r.URL.Path,
+				"method", r.Method,
+				"remote", r.RemoteAddr,
+			)
+
 			ctx := WithTenantContext(r.Context(), tn)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
