@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -712,6 +713,38 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	s := &Store{}
 	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+// TestGetAgingPRs_DistinctNumberDefense proves the COUNT(DISTINCT number)
+// hardening works as advertised: even when the events table contains
+// multiple stale 'open' rows for the same PR — exactly the corruption
+// migration 024 cleans up — the metric must count the PR once, not once
+// per row. Without the defensive count, a single open PR with five
+// snapshots would report total_open=5.
+func TestGetAgingPRs_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Recent created_at so the row falls inside the default since-window.
+	createdAt := time.Now().Add(-3 * 24 * time.Hour).UTC().Format("2006-01-02T15:04:05Z")
+	prDates := []string{"2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05"}
+	for _, d := range prDates {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at)
+			 VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://x', '', '', 'open', 42, $2)`,
+			d, createdAt)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetAgingPRs(ctx, nil, nil, nil, 180)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, 1, res.TotalOpen,
+		"five duplicate rows for one PR must count as one open PR, not five")
 }
 
 // TestGetUnansweredRate_SkipsClosedItems verifies that PRs/issues already in
