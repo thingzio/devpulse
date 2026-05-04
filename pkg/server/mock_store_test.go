@@ -131,6 +131,9 @@ func (m *mockStore) UpdateEvents(_ context.Context, _ string, _ int) (map[string
 func (m *mockStore) GetMaxEventTime(_ context.Context, _, _ string) (time.Time, error) {
 	return time.Time{}, nil
 }
+func (m *mockStore) HasForkEvents(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
 
 // --- InsightsStore ---
 func (m *mockStore) GetInsightsSummary(ctx context.Context, org, repo, entity *string, days int) (*data.InsightsSummary, error) {

@@ -386,7 +386,13 @@ func importMetaAndCheckSkip(ctx context.Context, store data.Store, retryRL func(
 		return true, false
 	}
 
-	if shouldSkipUnchangedRepo(pushedAt, maxEventTime) {
+	hasForkData, err := store.HasForkEvents(ctx, org, repo)
+	if err != nil {
+		slog.Warn("checking fork events", "org", org, "repo", repo, "error", err)
+		return true, false
+	}
+
+	if shouldSkipUnchangedRepo(pushedAt, maxEventTime, hasForkData) {
 		// Don't skip if backfill hasn't reached target depth.
 		targetDate := time.Now().AddDate(0, 0, -data.EventAgeDaysDefault).UTC()
 		backfillUntil, bErr := store.GetBackfillUntil(ctx, org, repo)
