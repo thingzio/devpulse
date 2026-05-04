@@ -111,9 +111,12 @@ const (
 
 	// selectForksAndActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
+	// COUNT(DISTINCT username) defends against any residual fork-row dups
+	// (one forker re-imported on multiple push-days). Each fork is one
+	// forker per parent repo, so DISTINCT username is the right unit.
 	selectForksAndActivityTpl = `SELECT
 			%[1]s AS period,
-			SUM(CASE WHEN e.type = 'fork' THEN 1 ELSE 0 END) AS forks,
+			COUNT(DISTINCT e.username) FILTER (WHERE e.type = 'fork') AS forks,
 			COUNT(*) AS events
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username

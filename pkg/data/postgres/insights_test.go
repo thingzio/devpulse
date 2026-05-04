@@ -715,6 +715,43 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
+// TestGetForksAndActivity_DistinctForkerDefense proves that the forks
+// aggregate counts unique forkers per period — even when the events table
+// contains multiple stale rows for one forker that exists due to push-day
+// shifts in the legacy UpdatedAt-keyed import. Without the COUNT(DISTINCT)
+// defense, one forker pushing on five different days within a period
+// would report as five forks for that period.
+func TestGetForksAndActivity_DistinctForkerDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Five duplicate fork rows for the same forker, dates within the past 14 days.
+	base := time.Now().Add(-7 * 24 * time.Hour).UTC()
+	for i := 0; i < 5; i++ {
+		d := base.Add(time.Duration(i) * 24 * time.Hour).Format("2006-01-02")
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+			 VALUES ('org1', 'repo1', 'alice', 'fork', $1, 'http://x', '', '')`,
+			d)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetForksAndActivity(ctx, nil, nil, nil, 90)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	totalForks := 0
+	for _, v := range res.Forks {
+		totalForks += v
+	}
+	assert.Equal(t, 1, totalForks,
+		"five rows for one forker must aggregate to a single fork across all periods")
+}
+
 // TestGetAgingPRs_DistinctNumberDefense proves the COUNT(DISTINCT number)
 // hardening works as advertised: even when the events table contains
 // multiple stale 'open' rows for the same PR — exactly the corruption
