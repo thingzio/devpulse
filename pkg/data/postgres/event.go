@@ -737,7 +737,11 @@ func (e *eventImporter) importPREvents(ctx context.Context) error {
 				Deletions: intPtr(items[i].GetDeletions()),
 				Title:     items[i].GetTitle(),
 			}
-			if err := e.add(ctx, data.EventTypePR, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].UpdatedAt), mentions,
+			// Use CreatedAt — not UpdatedAt — so the (org, repo, user, type, date)
+			// PK stays stable across re-imports. UpdatedAt shifts on every comment,
+			// review, or merge, producing duplicate rows that never converge to the
+			// latest state.
+			if err := e.add(ctx, data.EventTypePR, *items[i].HTMLURL, items[i].User, timestampToTime(items[i].CreatedAt), mentions,
 				ghutil.GetLabels(items[i].Labels), extra); err != nil {
 				return fmt.Errorf("error adding pr event: %s/%s: %w", e.owner, e.repo, err)
 			}
@@ -968,8 +972,9 @@ func (e *eventImporter) importIssueEvents(ctx context.Context) error {
 				ClosedAt:  timestampStr(items[i].ClosedAt),
 				Title:     items[i].GetTitle(),
 			}
+			// Use CreatedAt — see PR-import comment above.
 			if err := e.add(ctx, data.EventTypeIssue, *items[i].HTMLURL, items[i].User,
-				timestampToTime(items[i].UpdatedAt), mentions, ghutil.GetLabels(items[i].Labels), extra); err != nil {
+				timestampToTime(items[i].CreatedAt), mentions, ghutil.GetLabels(items[i].Labels), extra); err != nil {
 				return fmt.Errorf("error adding issue event: %s/%s: %w", e.owner, e.repo, err)
 			}
 		}
