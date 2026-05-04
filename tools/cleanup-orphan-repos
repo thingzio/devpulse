@@ -1,0 +1,116 @@
+#!/bin/bash
+# Cleans up data for repos no tenant actively owns. A repo is an "orphan"
+# when no row in devpulse_tenant_repo with active=TRUE references its
+# (org, repo) pair. This happens when sample repos are de-listed, every
+# owning tenant deactivates the repo, or a repo is renamed upstream.
+#
+# By default, lists what would be removed. With --delete, actually
+# removes rows from these tables (in a single transaction):
+#   devpulse_repo_meta
+#   devpulse_repo_metric_history
+#   devpulse_repo_insights
+#   devpulse_release_asset
+#   devpulse_release
+#   devpulse_container_version
+#
+# Events (devpulse_event) are LEFT ALONE — they're shared across tenants
+# and historical reports may still want them. If you need to purge events
+# too, that's a separate, more invasive operation.
+#
+# Usage:
+#   tools/cleanup-orphan-repos                  # report only
+#   tools/cleanup-orphan-repos --delete         # actually delete
+#
+# Requires: DATABASE_URL pointing at the target DB.
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools psql
+
+usage() {
+    cat <<USAGE
+Usage: $0 [--delete]
+
+Identifies devpulse_repo_meta rows with no active tenant_repo ownership
+and reports what would be removed. Pass --delete to actually delete
+the orphans (repo_meta + metric_history + repo_insights + releases +
+container_versions). Events are not touched.
+
+DATABASE_URL must be set.
+USAGE
+    exit 1
+}
+
+DELETE=0
+case "${1:-}" in
+    --delete) DELETE=1 ;;
+    -h|--help) usage ;;
+    "") ;;
+    *) err "unknown argument: $1" ;;
+esac
+
+[[ -n "${DATABASE_URL:-}" ]] || err "DATABASE_URL is not set"
+
+# Build the orphan-detection CTE once and reuse it for the report and the
+# delete. A row is orphan when no devpulse_tenant_repo with active=TRUE
+# references the same (org, repo).
+ORPHAN_CTE="
+WITH orphans AS (
+  SELECT rm.org, rm.repo, rm.last_import_at
+  FROM devpulse_repo_meta rm
+  WHERE NOT EXISTS (
+    SELECT 1 FROM devpulse_tenant_repo tr
+    WHERE tr.org = rm.org AND tr.repo = rm.repo AND tr.active = TRUE
+  )
+)
+"
+
+msg "Scanning for orphan repos..."
+
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<EOF
+\set QUIET on
+${ORPHAN_CTE}
+SELECT
+  (SELECT COUNT(*) FROM orphans)                                                            AS orphan_repos,
+  (SELECT COUNT(*) FROM devpulse_repo_meta            WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS meta_rows,
+  (SELECT COUNT(*) FROM devpulse_repo_metric_history  WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS metric_rows,
+  (SELECT COUNT(*) FROM devpulse_repo_insights        WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS insight_rows,
+  (SELECT COUNT(*) FROM devpulse_release              WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS release_rows,
+  (SELECT COUNT(*) FROM devpulse_release_asset        WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS asset_rows,
+  (SELECT COUNT(*) FROM devpulse_container_version    WHERE (org, repo) IN (SELECT org, repo FROM orphans))         AS container_rows;
+
+\echo ''
+\echo 'orphan repos (oldest 20):'
+${ORPHAN_CTE}
+SELECT org, repo, last_import_at FROM orphans ORDER BY last_import_at LIMIT 20;
+EOF
+
+if [[ "${DELETE}" -eq 0 ]]; then
+    msg "Dry run only. Re-run with --delete to remove the rows."
+    exit 0
+fi
+
+msg "Deleting orphan rows..."
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<EOF
+BEGIN;
+${ORPHAN_CTE},
+del_history  AS (DELETE FROM devpulse_repo_metric_history WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1),
+del_insights AS (DELETE FROM devpulse_repo_insights        WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1),
+del_assets   AS (DELETE FROM devpulse_release_asset        WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1),
+del_releases AS (DELETE FROM devpulse_release              WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1),
+del_versions AS (DELETE FROM devpulse_container_version    WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1),
+del_meta     AS (DELETE FROM devpulse_repo_meta            WHERE (org, repo) IN (SELECT org, repo FROM orphans) RETURNING 1)
+SELECT
+  (SELECT COUNT(*) FROM del_meta)     AS deleted_meta,
+  (SELECT COUNT(*) FROM del_history)  AS deleted_history,
+  (SELECT COUNT(*) FROM del_insights) AS deleted_insights,
+  (SELECT COUNT(*) FROM del_releases) AS deleted_releases,
+  (SELECT COUNT(*) FROM del_assets)   AS deleted_assets,
+  (SELECT COUNT(*) FROM del_versions) AS deleted_versions;
+COMMIT;
+EOF
+
+msg "Done."
