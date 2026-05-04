@@ -194,10 +194,10 @@ func TestGetTimeToMerge_WithData(t *testing.T) {
 	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, merged_at)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, merged_at)
 		VALUES
-		('org1', 'repo1', 'alice', 'pr', '2025-01-15', 'http://a', '', '', 'closed', '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
-		('org1', 'repo1', 'alice', 'pr', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-18T00:00:00Z', '2025-01-20T00:00:00Z')`)
+		('org1', 'repo1', 'alice', 'pr', '2025-01-15', 'http://a', '', '', 'closed', 1, '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
+		('org1', 'repo1', 'alice', 'pr', '2025-01-20', 'http://a2', '', '', 'closed', 2, '2025-01-18T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 730)
@@ -232,10 +232,10 @@ func TestGetTimeToClose_WithData(t *testing.T) {
 	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
 		VALUES
-		('org1', 'repo1', 'alice', 'issue', '2025-01-15', 'http://a', '', '', 'closed', '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
-		('org1', 'repo1', 'alice', 'issue', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-14T00:00:00Z', '2025-01-20T00:00:00Z')`)
+		('org1', 'repo1', 'alice', 'issue', '2025-01-15', 'http://a', '', '', 'closed', 1, '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
+		('org1', 'repo1', 'alice', 'issue', '2025-01-20', 'http://a2', '', '', 'closed', 2, '2025-01-14T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 730)
@@ -276,18 +276,18 @@ func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Bug issue near release, closed in 1 day
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'closed', '2025-01-17T10:00:00Z', '2025-01-18T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'closed', 1, '2025-01-17T10:00:00Z', '2025-01-18T10:00:00Z')`)
 	require.NoError(t, err)
 
 	// Non-bug issue, closed in 3 days (should NOT be included)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-18', 'http://b', '', 'enhancement', 'closed', '2025-01-18T10:00:00Z', '2025-01-21T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-18', 'http://b', '', 'enhancement', 'closed', 2, '2025-01-18T10:00:00Z', '2025-01-21T10:00:00Z')`)
 	require.NoError(t, err)
 
 	// Bug issue NOT near any release (30 days later), should NOT be included
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-02-17', 'http://c', '', 'bug', 'closed', '2025-02-17T10:00:00Z', '2025-02-20T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-02-17', 'http://c', '', 'bug', 'closed', 3, '2025-02-17T10:00:00Z', '2025-02-20T10:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 730)
@@ -328,13 +328,13 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert a bug issue within 7 days of release
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, title)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'open', '2025-01-17T10:00:00Z', 'Bug in feature')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, title)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'open', 1, '2025-01-17T10:00:00Z', 'Bug in feature')`)
 	require.NoError(t, err)
 
 	// Insert a revert PR in same month
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, title)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-16', 'http://b', '', '', 'merged', '2025-01-16T10:00:00Z', 'Revert "Add feature"')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, title)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-16', 'http://b', '', '', 'merged', 2, '2025-01-16T10:00:00Z', 'Revert "Add feature"')`)
 	require.NoError(t, err)
 
 	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 730)

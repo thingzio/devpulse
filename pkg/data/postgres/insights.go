@@ -43,13 +43,17 @@ const (
 
 	// selectTimeToMergeTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
+	// COUNT(DISTINCT number) is defensive against any residual duplicate
+	// rows for the same PR (the import path keys by created_at::date now,
+	// but the count must not double-count if dedupe drift ever returns).
 	selectTimeToMergeTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'pr'
+		  AND e.number IS NOT NULL
 		  AND e.merged_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.created_at >= $1
@@ -63,11 +67,12 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToRestoreBugsTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
+		  AND e.number IS NOT NULL
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
@@ -88,11 +93,12 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToCloseTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
+		  AND e.number IS NOT NULL
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
@@ -138,7 +144,7 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectChangeFailuresTpl = `SELECT
 		%[1]s AS period,
-		COUNT(*) AS failures
+		COUNT(DISTINCT (e.org, e.repo, e.type, e.number)) AS failures
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE (
@@ -151,6 +157,7 @@ const (
 	    OR
 	    (e.type = 'pr' AND LOWER(e.title) LIKE '%%revert%%')
 	)
+	  AND e.number IS NOT NULL
 	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
 	  %[2]s
@@ -466,14 +473,18 @@ const (
 	ORDER BY period
 `
 
-	// selectAgingPRsTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// selectAgingPRsTpl: $1=since, dynamic org/repo/entity via queryBuilder.
+	// COUNT(DISTINCT number) defends against duplicate event rows ever
+	// re-emerging (the original UpdatedAt-key bug counted each stale 'open'
+	// snapshot of a single PR separately).
 	selectAgingPRsTpl = `SELECT
-		COUNT(*) AS total_open,
-		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END), 0) AS over_30,
-		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END), 0) AS over_90
+		COUNT(DISTINCT e.number) AS total_open,
+		COUNT(DISTINCT e.number) FILTER (WHERE EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30) AS over_30,
+		COUNT(DISTINCT e.number) FILTER (WHERE EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90) AS over_90
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
+	  AND e.number IS NOT NULL
 	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
 	  AND e.created_at IS NOT NULL
 	  AND e.created_at >= $1
