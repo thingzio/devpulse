@@ -714,6 +714,48 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
 }
 
+// TestGetUnansweredRate_SkipsClosedItems verifies that PRs/issues already in
+// a terminal state (merged or closed) don't count toward "items requiring a
+// response" — counting them inflates the metric and produces misleading
+// "N items unanswered" claims in the AI summary.
+func TestGetUnansweredRate_SkipsClosedItems(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Each row uses a distinct date to keep the (user, type, date) PK
+	// unique. All ages exceed the 7-day filter. State values cover
+	// open / merged / closed.
+	rows := []struct {
+		number int
+		typ    string
+		state  string
+		date   string
+	}{
+		{number: 1, typ: "pr", state: "open", date: "2025-12-20"},      // counts
+		{number: 2, typ: "pr", state: "merged", date: "2025-12-21"},    // skip
+		{number: 3, typ: "issue", state: "open", date: "2025-12-22"},   // counts
+		{number: 4, typ: "issue", state: "closed", date: "2025-12-23"}, // skip
+	}
+	for _, r := range rows {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at)
+			 VALUES ('org1', 'repo1', 'alice', $1, $2, $3, '', '', $4, $5, $6)`,
+			r.typ, r.date, fmt.Sprintf("http://x/%s/%d", r.typ, r.number),
+			r.state, r.number, r.date+"T10:00:00Z")
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetUnansweredRate(ctx, nil, nil, nil, 365)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, 2, res.TotalItems, "merged/closed items must be excluded from total")
+	assert.Equal(t, 2, res.Unanswered, "both open items have no responder, so both count as unanswered")
+}
+
 func TestGetResponseSLO_NilDB(t *testing.T) {
 	s := &Store{}
 	_, err := s.GetResponseSLO(context.Background(), nil, nil, nil, 180)

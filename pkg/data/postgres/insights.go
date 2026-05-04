@@ -492,13 +492,18 @@ const (
 	  %s
 	`
 
-	// selectUnansweredRateTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// selectUnansweredRateTpl: $1=since, dynamic org/repo/entity via queryBuilder.
+	// Filters out merged/closed items — once a PR or issue reaches a terminal
+	// state it no longer "needs a response", so counting it inflates the
+	// metric and misleads the AI narrative ("N items requiring response"
+	// when most have already been resolved).
 	selectUnansweredRateTpl = `WITH items AS (
     SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
     FROM devpulse_event e
     JOIN devpulse_developer d ON e.username = d.username
     WHERE e.type IN ('issue', 'pr')
       AND e.number IS NOT NULL
+      AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
       AND e.created_at IS NOT NULL
       AND EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 7
       AND e.created_at >= $1
