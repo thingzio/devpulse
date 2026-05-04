@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/google/go-github/v83/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -258,4 +260,73 @@ func TestGetReleaseDownloadsByTag_Dedup(t *testing.T) {
 
 	// Only 3 entries -- no duplicate for v1.1.0
 	require.Len(t, series.Tags, 3)
+}
+
+// TestUpsertReleasePage_PreservesNewerOutOfOrderTags locks in the sort fix.
+// Under the previous alphabetical-by-tag sort + break-on-old logic, a page
+// containing a newer release whose tag sorts earlier than the latest stored
+// release would be silently skipped: the older tag was iterated first, hit
+// the break, and never reached the newer one.
+func TestUpsertReleasePage_PreservesNewerOutOfOrderTags(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	const (
+		owner = "ai-dynamo"
+		repo  = "dynamo"
+	)
+
+	// Seed the latest release we'd already have in the DB.
+	latestPublishedAt := "2026-03-17T14:43:12Z"
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_release(org, repo, tag, name, published_at, prerelease)
+		 VALUES ($1, $2, 'v1.1.0-dev.1', 'Dynamo v1.1.0-dev.1', $3, 1)`,
+		owner, repo, latestPublishedAt)
+	require.NoError(t, err)
+
+	stmt, err := store.db.PrepareContext(ctx, insertReleaseSQL)
+	require.NoError(t, err)
+	defer stmt.Close()
+	assetStmt, err := store.db.PrepareContext(ctx, insertReleaseAssetSQL)
+	require.NoError(t, err)
+	defer assetStmt.Close()
+
+	mkRelease := func(tag string, publishedAt time.Time, prerelease bool) *github.RepositoryRelease {
+		ts := github.Timestamp{Time: publishedAt}
+		return &github.RepositoryRelease{
+			TagName:     github.Ptr(tag),
+			Name:        github.Ptr("Dynamo " + tag),
+			PublishedAt: &ts,
+			Prerelease:  github.Ptr(prerelease),
+		}
+	}
+
+	// Page intentionally provided in arbitrary order. v1.0.2 (2026-04-27)
+	// is NEWER than the seeded latest, but its tag sorts BEFORE v1.1.0-dev.1
+	// alphabetically — exactly the scenario that broke the import.
+	page := []*github.RepositoryRelease{
+		mkRelease("v0.5.0", mustTime("2025-09-01T00:00:00Z"), false),
+		mkRelease("v0.7.0", mustTime("2025-11-26T00:00:00Z"), false),
+		mkRelease("v1.0.0", mustTime("2026-03-13T00:00:00Z"), false),
+		mkRelease("v1.0.1", mustTime("2026-03-16T00:00:00Z"), false),
+		mkRelease("v1.0.2", mustTime("2026-04-27T00:00:00Z"), false),
+	}
+
+	_, err = upsertReleasePage(ctx, store.db, stmt, assetStmt, owner, repo, page, latestPublishedAt)
+	require.NoError(t, err)
+
+	var got string
+	err = store.db.QueryRowContext(ctx,
+		`SELECT published_at FROM devpulse_release WHERE org=$1 AND repo=$2 AND tag='v1.0.2'`,
+		owner, repo).Scan(&got)
+	require.NoError(t, err, "v1.0.2 must be inserted even when it sorts before the latest tag alphabetically")
+	assert.Equal(t, "2026-04-27T00:00:00Z", got)
+}
+
+func mustTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

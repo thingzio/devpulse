@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v83/github"
 	"github.com/thingzio/devpulse/pkg/data"
@@ -182,8 +183,21 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 	txAssetStmt := tx.Stmt(assetStmt)
 	defer txAssetStmt.Close()
 
+	// Sort by published_at desc so the break-on-old short-circuit terminates
+	// only AFTER every newer release on the page has been considered. The
+	// previous alphabetical-by-tag sort scrambled chronology — once any
+	// release was in the DB, a tag like "v0.1.0" would sort first, look
+	// older than the latest stored published_at, trigger the break, and
+	// silently drop newer tags later in the alphabet.
 	slices.SortFunc(releases, func(a, b *github.RepositoryRelease) int {
-		return strings.Compare(a.GetTagName(), b.GetTagName())
+		var ap, bp time.Time
+		if a.PublishedAt != nil {
+			ap = a.PublishedAt.Time
+		}
+		if b.PublishedAt != nil {
+			bp = b.PublishedAt.Time
+		}
+		return bp.Compare(ap)
 	})
 
 	seenOld := false
