@@ -1160,7 +1160,14 @@ func (e *eventImporter) importForkEvents(ctx context.Context) error {
 		}
 
 		for i := range items {
-			if err := e.add(ctx, data.EventTypeFork, *items[i].HTMLURL, items[i].Owner, &items[i].UpdatedAt.Time, nil, items[i].Topics, nil); err != nil {
+			// Use CreatedAt — when the fork was actually made — not UpdatedAt,
+			// which shifts every time the forker pushes to their fork. Storing
+			// CreatedAt via eventExtra also lets future migrations key off it.
+			extra := &eventExtra{
+				CreatedAt: timestampStr(items[i].CreatedAt),
+			}
+			if err := e.add(ctx, data.EventTypeFork, *items[i].HTMLURL, items[i].Owner,
+				timestampToTime(items[i].CreatedAt), nil, items[i].Topics, extra); err != nil {
 				return fmt.Errorf("error adding fork event: %s/%s: %w", e.owner, e.repo, err)
 			}
 		}
