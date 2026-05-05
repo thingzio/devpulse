@@ -49,3 +49,46 @@ func TestGetMaxEventTime_NilDB(t *testing.T) {
 	_, err := store.GetMaxEventTime(ctx, "org", "repo")
 	assert.Error(t, err)
 }
+
+func TestHasForkEvents(t *testing.T) {
+	store := setupTestDB(t)
+	ctx := context.Background()
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer (username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Empty: no fork rows.
+	got, err := store.HasForkEvents(ctx, "org1", "repo1")
+	require.NoError(t, err)
+	assert.False(t, got, "no fork rows: HasForkEvents must return false")
+
+	// Add a non-fork event — still no forks.
+	_, err = store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, number, created_at)
+		 VALUES ('org1', 'repo1', 'alice', 'pr', '2026-04-01', 'http://x', '', '', 1, '2026-04-01T00:00:00Z')`)
+	require.NoError(t, err)
+	got, err = store.HasForkEvents(ctx, "org1", "repo1")
+	require.NoError(t, err)
+	assert.False(t, got, "PR rows alone must not count as fork data")
+
+	// Add a fork.
+	_, err = store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, created_at)
+		 VALUES ('org1', 'repo1', 'alice', 'fork', '2026-04-02', 'http://f', '', '', '2026-04-02T00:00:00Z')`)
+	require.NoError(t, err)
+	got, err = store.HasForkEvents(ctx, "org1", "repo1")
+	require.NoError(t, err)
+	assert.True(t, got, "fork row present: HasForkEvents must return true")
+
+	// Different repo with no forks should still return false.
+	got, err = store.HasForkEvents(ctx, "org1", "other-repo")
+	require.NoError(t, err)
+	assert.False(t, got)
+}
+
+func TestHasForkEvents_NilDB(t *testing.T) {
+	store := &Store{}
+	_, err := store.HasForkEvents(context.Background(), "org", "repo")
+	assert.Error(t, err)
+}

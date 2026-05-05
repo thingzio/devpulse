@@ -55,7 +55,12 @@ const listInstallationsSQL = `
 	SELECT id, tenant_id, installation_id, target_type, target_login, suspended_at, created_at
 	FROM devpulse_github_app_installation WHERE tenant_id = $1 ORDER BY created_at`
 
-const suspendInstallationSQL = `UPDATE devpulse_github_app_installation SET suspended_at = NOW() WHERE installation_id = $1`
+// Pinned to NULL so a retried suspend webhook (GitHub re-delivers on
+// transient 5xx) preserves the original suspension timestamp instead of
+// rewriting it on each retry.
+const suspendInstallationSQL = `UPDATE devpulse_github_app_installation
+	SET suspended_at = NOW()
+	WHERE installation_id = $1 AND suspended_at IS NULL`
 
 const addTenantRepoSQL = `
 	INSERT INTO devpulse_tenant_repo (tenant_id, org, repo)

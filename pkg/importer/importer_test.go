@@ -349,6 +349,9 @@ func (m *backfillMockStore) UpdateEvents(_ context.Context, _ string, _ int) (ma
 func (m *backfillMockStore) GetMaxEventTime(_ context.Context, _, _ string) (time.Time, error) {
 	return time.Time{}, nil
 }
+func (m *backfillMockStore) HasForkEvents(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
 
 // --- InsightsStore ---
 func (m *backfillMockStore) GetInsightsSummary(_ context.Context, _, _, _ *string, _ int) (*data.InsightsSummary, error) {

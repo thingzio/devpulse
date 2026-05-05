@@ -157,6 +157,13 @@ func buildInsightsPrompt(metrics *InsightsMetrics, weeks int) string {
 	b.WriteString("Provide exactly 5 observations and 3 recommended actions based on these metrics.\n")
 	b.WriteString("Use third-person tone (e.g. \"the project shows\", \"this repository has\").\n")
 	b.WriteString("Each observation and action must have a short headline and a 1-2 sentence detail.\n\n")
+	b.WriteString("## Grounding rules (CRITICAL)\n\n")
+	b.WriteString("Every claim MUST be directly supported by a specific number or array in the JSON metrics above.\n")
+	b.WriteString("- Do NOT infer that a pipeline is \"broken\", \"frozen\", or \"stalled\" unless the relevant metric is literally zero or empty for the entire window. Low ≠ zero.\n")
+	b.WriteString("- Do NOT claim \"no merged PRs\" if `time_to_merge.count` contains any non-zero entry. Do NOT claim \"no releases\" if `release_cadence.total` has any non-zero entry.\n")
+	b.WriteString("- Treat counts as the metric defines them: `aging_prs.total_open` is open PRs in the window, not lifetime open count. `unanswered.total` excludes already-resolved items.\n")
+	b.WriteString("- If a metric is missing or all zeros, say \"no data available\" instead of inferring a problem.\n")
+	b.WriteString("- Quote at least one specific value from the JSON in every observation's `detail` so the claim is auditable.\n\n")
 	b.WriteString("Respond with JSON only, no markdown, no explanation. Use this exact format:\n")
 	b.WriteString(`{"observations":[{"headline":"...","detail":"..."}],"actions":[{"headline":"...","detail":"..."}]}`)
 

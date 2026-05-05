@@ -9,7 +9,25 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
-const selectMaxEventTimeSQL = `SELECT MAX(created_at) FROM devpulse_event WHERE org = $1 AND repo = $2`
+const (
+	selectMaxEventTimeSQL  = `SELECT MAX(created_at) FROM devpulse_event WHERE org = $1 AND repo = $2`
+	selectHasForkEventsSQL = `SELECT EXISTS(SELECT 1 FROM devpulse_event WHERE org = $1 AND repo = $2 AND type = 'fork')`
+)
+
+// HasForkEvents reports whether the events table contains at least one
+// fork row for the repo. Used by the import skip-check so a repo whose
+// fork data is missing (e.g. just after the migration-025 wipe) gets
+// re-imported even when pushed_at hasn't moved.
+func (s *Store) HasForkEvents(ctx context.Context, org, repo string) (bool, error) {
+	if s.db == nil {
+		return false, data.ErrDBNotInitialized
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, selectHasForkEventsSQL, org, repo).Scan(&exists); err != nil {
+		return false, fmt.Errorf("checking fork events for %s/%s: %w", org, repo, err)
+	}
+	return exists, nil
+}
 
 func (s *Store) GetMaxEventTime(ctx context.Context, org, repo string) (time.Time, error) {
 	if s.db == nil {
