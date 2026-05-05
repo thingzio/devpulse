@@ -101,8 +101,13 @@ vulncheck: ## Scans for known vulnerabilities with govulncheck
 e2e: ## Runs end-to-end tests
 	tools/e2e
 
+.PHONY: integration
+integration: ## Runs integration tests against a real Postgres (testcontainers, no -short)
+	GOFLAGS="-mod=vendor" go test -count=1 -race -timeout=$(TEST_TIMEOUT) \
+		./pkg/data/postgres/... ./pkg/server/... ./pkg/tenant/...
+
 .PHONY: qualify
-qualify: test-coverage lint vulncheck e2e ## Qualifies the codebase (test, lint, vulncheck, e2e)
+qualify: test-coverage lint vulncheck integration e2e ## Qualifies the codebase (test, lint, vulncheck, integration, e2e)
 	@echo "Codebase qualification completed"
 
 DEV_DB := postgres://devpulse:devpulse@localhost:5432/devpulse?sslmode=disable
