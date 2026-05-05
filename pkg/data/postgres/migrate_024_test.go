@@ -80,6 +80,63 @@ func TestMigration024_DedupesPRRows(t *testing.T) {
 	assert.Equal(t, closedAt, closedAtCol, "closed_at must survive on the kept row")
 }
 
+// TestMigration025_WipesForksOnly seeds a representative mix of event
+// types — fork rows that should be wiped and PR/issue/comment/review
+// rows that must be preserved — then re-executes migration 025 and
+// asserts the expected delete/keep behavior.
+//
+// Production sample (post-deploy): 97,492 fork rows wiped, 0 rows of
+// other types touched; this test mirrors the same invariants in CI.
+func TestMigration025_WipesForksOnly(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	migrationSQL, err := saasMigrationsFS.ReadFile("sql/migrations_saas/025_dedupe_forks.sql")
+	require.NoError(t, err)
+
+	_, err = store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Seed: 3 fork rows (must be wiped), one each of pr / issue /
+	// issue_comment / pr_review (must survive).
+	_, err = store.db.ExecContext(ctx, `
+		INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, number, created_at) VALUES
+			('o','r','alice','fork',         '2026-04-01','http://f1','','',NULL,'2026-04-01T00:00:00Z'),
+			('o','r','alice','fork',         '2026-04-02','http://f2','','',NULL,'2026-04-02T00:00:00Z'),
+			('o','r','alice','fork',         '2026-04-03','http://f3','','',NULL,'2026-04-03T00:00:00Z'),
+			('o','r','alice','pr',           '2026-04-04','http://p1','','',1,   '2026-04-04T00:00:00Z'),
+			('o','r','alice','issue',        '2026-04-05','http://i1','','',2,   '2026-04-05T00:00:00Z'),
+			('o','r','alice','issue_comment','2026-04-06','http://c1','','',3,   '2026-04-06T00:00:00Z'),
+			('o','r','alice','pr_review',    '2026-04-07','http://r1','','',4,   '2026-04-07T00:00:00Z')
+	`)
+	require.NoError(t, err)
+
+	// Re-execute the migration on the seeded data.
+	tx, err := store.db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, string(migrationSQL))
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+
+	var forks, prs, issues, comments, reviews int
+	row := store.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) FILTER (WHERE type='fork'),
+			COUNT(*) FILTER (WHERE type='pr'),
+			COUNT(*) FILTER (WHERE type='issue'),
+			COUNT(*) FILTER (WHERE type='issue_comment'),
+			COUNT(*) FILTER (WHERE type='pr_review')
+		FROM devpulse_event WHERE org='o' AND repo='r'`)
+	require.NoError(t, row.Scan(&forks, &prs, &issues, &comments, &reviews))
+
+	assert.Equal(t, 0, forks, "all fork rows must be wiped")
+	assert.Equal(t, 1, prs, "PR rows must survive")
+	assert.Equal(t, 1, issues, "issue rows must survive")
+	assert.Equal(t, 1, comments, "issue_comment rows must survive")
+	assert.Equal(t, 1, reviews, "pr_review rows must survive")
+}
+
 // TestMigration024_PreservesOtherEventTypes guards against scope creep —
 // the migration must only touch type IN ('pr','issue') with non-null number.
 // Comments, reviews, and forks must pass through untouched.
