@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -311,4 +312,156 @@ func TestFlushSubBatching(t *testing.T) {
 
 	assert.Equal(t, numEvents, imp.flushed)
 	assert.Empty(t, imp.list, "event list should be empty after flush")
+}
+
+// TestPREventReimportConverges locks in the fix for the date-key bug: two
+// flushes of the same PR (open then closed) must yield ONE row whose state
+// reflects the latest import, not two divergent rows.
+func TestPREventReimportConverges(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	const (
+		org      = "testorg"
+		repo     = "testrepo"
+		username = "alice"
+		prNumber = 42
+		prURL    = "https://github.com/testorg/testrepo/pull/42"
+	)
+
+	user := &github.User{
+		Login:   github.Ptr(username),
+		Name:    github.Ptr("Alice"),
+		HTMLURL: github.Ptr("https://github.com/" + username),
+	}
+
+	createdAt := "2026-03-01T10:00:00Z"
+	closedAtStr := "2026-03-15T14:00:00Z"
+	mergedAtStr := "2026-03-15T14:00:00Z"
+	number := prNumber
+
+	// Date is derived from CreatedAt (post-fix), not UpdatedAt — so both
+	// flushes share the same composite PK and the second upserts the first.
+	prDate := "2026-03-01"
+
+	openState := "open"
+	closedState := "closed"
+
+	makeEvent := func(state *string, mergedAt, closedAt *string) *data.Event {
+		return &data.Event{
+			Org: org, Repo: repo, Username: username, Type: data.EventTypePR,
+			Date:      prDate,
+			URL:       prURL,
+			State:     state,
+			Number:    &number,
+			CreatedAt: &createdAt,
+			MergedAt:  mergedAt,
+			ClosedAt:  closedAt,
+			Title:     "Add feature X",
+		}
+	}
+
+	flushOnce := func(events []*data.Event) {
+		imp := &eventImporter{
+			store: store, owner: org, repo: repo,
+			list:  events,
+			users: map[string]*github.User{username: user},
+			state: map[string]*data.State{
+				data.EventTypePR: {Since: time.Now().Add(-24 * time.Hour), Page: 1},
+			},
+			counts: make(map[string]int),
+		}
+		require.NoError(t, imp.flush(ctx))
+	}
+
+	// First import: PR is open.
+	flushOnce([]*data.Event{makeEvent(&openState, nil, nil)})
+
+	// Second import: PR is now merged/closed.
+	flushOnce([]*data.Event{makeEvent(&closedState, &mergedAtStr, &closedAtStr)})
+
+	var rows int
+	err := store.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM devpulse_event WHERE org=$1 AND repo=$2 AND type='pr' AND number=$3`,
+		org, repo, prNumber).Scan(&rows)
+	require.NoError(t, err)
+	assert.Equal(t, 1, rows, "re-importing the same PR must converge to a single row")
+
+	var stateCol, mergedAtCol, closedAtCol sql.NullString
+	err = store.db.QueryRowContext(ctx,
+		`SELECT state, merged_at, closed_at FROM devpulse_event WHERE org=$1 AND repo=$2 AND type='pr' AND number=$3`,
+		org, repo, prNumber).Scan(&stateCol, &mergedAtCol, &closedAtCol)
+	require.NoError(t, err)
+	assert.Equal(t, "closed", stateCol.String, "state must reflect the latest import")
+	assert.Equal(t, mergedAtStr, mergedAtCol.String, "merged_at must be set after merge")
+	assert.Equal(t, closedAtStr, closedAtCol.String, "closed_at must be set after close")
+}
+
+// TestForkEventReimportConverges locks in the fork-side dedup fix: two
+// flushes of the same fork (mimicking the forker pushing to their fork on
+// different days, which shifts UpdatedAt) must yield ONE row keyed by the
+// fork's stable CreatedAt, not divergent rows per push-day.
+func TestForkEventReimportConverges(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	const (
+		parentOrg  = "ai-dynamo"
+		parentRepo = "dynamo"
+		forker     = "alice"
+		forkURL    = "https://github.com/alice/dynamo"
+	)
+
+	user := &github.User{
+		Login:   github.Ptr(forker),
+		Name:    github.Ptr("Alice"),
+		HTMLURL: github.Ptr("https://github.com/" + forker),
+	}
+
+	createdAt := "2026-03-01T10:00:00Z"
+	forkDate := "2026-03-01"
+
+	makeFork := func(topics string) *data.Event {
+		return &data.Event{
+			Org: parentOrg, Repo: parentRepo, Username: forker,
+			Type:      data.EventTypeFork,
+			Date:      forkDate,
+			URL:       forkURL,
+			Labels:    topics,
+			CreatedAt: &createdAt,
+		}
+	}
+
+	flushOnce := func(events []*data.Event) {
+		imp := &eventImporter{
+			store: store, owner: parentOrg, repo: parentRepo,
+			list:  events,
+			users: map[string]*github.User{forker: user},
+			state: map[string]*data.State{
+				data.EventTypeFork: {Since: time.Now().Add(-24 * time.Hour), Page: 1},
+			},
+			counts: make(map[string]int),
+		}
+		require.NoError(t, imp.flush(ctx))
+	}
+
+	// First import: fresh fork with one topic.
+	flushOnce([]*data.Event{makeFork("inference")})
+
+	// Second import days later: forker pushed and added topics.
+	flushOnce([]*data.Event{makeFork("inference,ml")})
+
+	var rows int
+	err := store.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM devpulse_event WHERE org=$1 AND repo=$2 AND type='fork' AND username=$3`,
+		parentOrg, parentRepo, forker).Scan(&rows)
+	require.NoError(t, err)
+	assert.Equal(t, 1, rows, "re-importing the same fork must converge to a single row")
+
+	var labels string
+	err = store.db.QueryRowContext(ctx,
+		`SELECT labels FROM devpulse_event WHERE org=$1 AND repo=$2 AND type='fork' AND username=$3`,
+		parentOrg, parentRepo, forker).Scan(&labels)
+	require.NoError(t, err)
+	assert.Equal(t, "inference,ml", labels, "labels must reflect the latest import")
 }

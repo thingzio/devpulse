@@ -20,6 +20,14 @@ func TestBuildInsightsPrompt(t *testing.T) {
 	assert.Contains(t, prompt, "bus_factor")
 	assert.Contains(t, prompt, "3 weeks")
 	assert.Contains(t, prompt, "DORA")
+	// Grounding rules must be present so the model doesn't hallucinate
+	// "frozen" / "no merged PRs" / "no releases" when the data shows
+	// non-zero values (the bug that motivated this prompt change).
+	assert.Contains(t, prompt, "Grounding rules")
+	assert.Contains(t, prompt, "broken")
+	assert.Contains(t, prompt, "no merged PRs")
+	assert.Contains(t, prompt, "no releases")
+	assert.Contains(t, prompt, "auditable")
 }
 
 func TestParseInsightsResponse_ValidJSON(t *testing.T) {

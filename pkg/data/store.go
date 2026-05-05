@@ -82,6 +82,7 @@ type EventStore interface {
 	ImportEvents(ctx context.Context, tokenFn TokenFunc, exhaustFn ExhaustFunc, owner, repo string, windowStart, windowEnd time.Time) (map[string]int, *ImportSummary, error)
 	UpdateEvents(ctx context.Context, token string, concurrency int) (map[string]int, error)
 	GetMaxEventTime(ctx context.Context, org, repo string) (time.Time, error)
+	HasForkEvents(ctx context.Context, org, repo string) (bool, error)
 }
 
 // InsightsStore provides analytics and insights queries.

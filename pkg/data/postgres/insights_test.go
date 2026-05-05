@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,10 +195,10 @@ func TestGetTimeToMerge_WithData(t *testing.T) {
 	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, merged_at)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, merged_at)
 		VALUES
-		('org1', 'repo1', 'alice', 'pr', '2025-01-15', 'http://a', '', '', 'closed', '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
-		('org1', 'repo1', 'alice', 'pr', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-18T00:00:00Z', '2025-01-20T00:00:00Z')`)
+		('org1', 'repo1', 'alice', 'pr', '2025-01-15', 'http://a', '', '', 'closed', 1, '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
+		('org1', 'repo1', 'alice', 'pr', '2025-01-20', 'http://a2', '', '', 'closed', 2, '2025-01-18T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToMerge(ctx, nil, nil, nil, 730)
@@ -232,10 +233,10 @@ func TestGetTimeToClose_WithData(t *testing.T) {
 	_, err := store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
 		VALUES
-		('org1', 'repo1', 'alice', 'issue', '2025-01-15', 'http://a', '', '', 'closed', '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
-		('org1', 'repo1', 'alice', 'issue', '2025-01-20', 'http://a2', '', '', 'closed', '2025-01-14T00:00:00Z', '2025-01-20T00:00:00Z')`)
+		('org1', 'repo1', 'alice', 'issue', '2025-01-15', 'http://a', '', '', 'closed', 1, '2025-01-10T00:00:00Z', '2025-01-15T00:00:00Z'),
+		('org1', 'repo1', 'alice', 'issue', '2025-01-20', 'http://a2', '', '', 'closed', 2, '2025-01-14T00:00:00Z', '2025-01-20T00:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToClose(ctx, nil, nil, nil, 730)
@@ -276,18 +277,18 @@ func TestGetTimeToRestoreBugs_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Bug issue near release, closed in 1 day
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'closed', '2025-01-17T10:00:00Z', '2025-01-18T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'closed', 1, '2025-01-17T10:00:00Z', '2025-01-18T10:00:00Z')`)
 	require.NoError(t, err)
 
 	// Non-bug issue, closed in 3 days (should NOT be included)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-18', 'http://b', '', 'enhancement', 'closed', '2025-01-18T10:00:00Z', '2025-01-21T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-18', 'http://b', '', 'enhancement', 'closed', 2, '2025-01-18T10:00:00Z', '2025-01-21T10:00:00Z')`)
 	require.NoError(t, err)
 
 	// Bug issue NOT near any release (30 days later), should NOT be included
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, closed_at)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-02-17', 'http://c', '', 'bug', 'closed', '2025-02-17T10:00:00Z', '2025-02-20T10:00:00Z')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-02-17', 'http://c', '', 'bug', 'closed', 3, '2025-02-17T10:00:00Z', '2025-02-20T10:00:00Z')`)
 	require.NoError(t, err)
 
 	series, err := store.GetTimeToRestoreBugs(ctx, nil, nil, nil, 730)
@@ -328,13 +329,13 @@ func TestGetChangeFailureRate_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert a bug issue within 7 days of release
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, title)
-		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'open', '2025-01-17T10:00:00Z', 'Bug in feature')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, title)
+		VALUES ('org1', 'repo1', 'alice', 'issue', '2025-01-17', 'http://a', '', 'bug', 'open', 1, '2025-01-17T10:00:00Z', 'Bug in feature')`)
 	require.NoError(t, err)
 
 	// Insert a revert PR in same month
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, title)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-16', 'http://b', '', '', 'merged', '2025-01-16T10:00:00Z', 'Revert "Add feature"')`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, title)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-16', 'http://b', '', '', 'merged', 2, '2025-01-16T10:00:00Z', 'Revert "Add feature"')`)
 	require.NoError(t, err)
 
 	series, err := store.GetChangeFailureRate(ctx, nil, nil, nil, 730)
@@ -429,23 +430,23 @@ func TestGetPRSizeDistribution_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Small PR (20 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-10', 'http://a', '', '', 'merged', '2025-01-10T10:00:00Z', 15, 5)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-10', 'http://a', '', '', 'merged', 1, '2025-01-10T10:00:00Z', 15, 5)`)
 	require.NoError(t, err)
 
 	// Medium PR (100 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-11', 'http://b', '', '', 'merged', '2025-01-11T10:00:00Z', 70, 30)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-11', 'http://b', '', '', 'merged', 2, '2025-01-11T10:00:00Z', 70, 30)`)
 	require.NoError(t, err)
 
 	// Large PR (500 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-12', 'http://c', '', '', 'merged', '2025-01-12T10:00:00Z', 400, 100)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-12', 'http://c', '', '', 'merged', 3, '2025-01-12T10:00:00Z', 400, 100)`)
 	require.NoError(t, err)
 
 	// XL PR (1500 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-13', 'http://d', '', '', 'merged', '2025-01-13T10:00:00Z', 1000, 500)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-13', 'http://d', '', '', 'merged', 4, '2025-01-13T10:00:00Z', 1000, 500)`)
 	require.NoError(t, err)
 
 	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 730)
@@ -712,6 +713,186 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	s := &Store{}
 	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+// TestGetPRSizeDistribution_DistinctNumberDefense proves the COUNT(DISTINCT
+// number) FILTER hardening works on the PR size buckets — duplicate rows
+// for the same PR must not double-count it across small/medium/large/xl.
+func TestGetPRSizeDistribution_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Same PR with five distinct dates (mimicking pre-fix duplicate rows).
+	createdAt := time.Now().Add(-3 * 24 * time.Hour).UTC().Format("2006-01-02T15:04:05Z")
+	for i := 0; i < 5; i++ {
+		d := time.Now().Add(time.Duration(i) * 24 * time.Hour).UTC().Format("2006-01-02")
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+			 VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://x', '', '', 'merged', 99, $2, 70, 30)`,
+			d, createdAt)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 90)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	totalMedium := 0
+	for _, v := range res.Medium {
+		totalMedium += v
+	}
+	assert.Equal(t, 1, totalMedium,
+		"five duplicate rows for one medium PR must aggregate to a single medium count")
+}
+
+// TestGetIssueOpenCloseRatio_DistinctNumberDefense proves the SELECT DISTINCT
+// guards inside selectIssueOpenCloseRatioTpl: duplicate rows for the same
+// issue must not inflate the opened or closed series.
+func TestGetIssueOpenCloseRatio_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Three duplicate rows for issue #5 (created 2025-02-10, closed 2025-02-20).
+	for _, d := range []string{"2025-02-10", "2025-02-12", "2025-02-15"} {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+			 VALUES ('org1', 'repo1', 'alice', 'issue', $1, 'http://x', '', '', 'closed', 5, '2025-02-10T10:00:00Z', '2025-02-20T10:00:00Z')`,
+			d)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetIssueOpenCloseRatio(ctx, nil, nil, nil, 730)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	openedTotal, closedTotal := 0, 0
+	for _, v := range res.Opened {
+		openedTotal += v
+	}
+	for _, v := range res.Closed {
+		closedTotal += v
+	}
+	assert.Equal(t, 1, openedTotal, "three duplicate rows for one issue must count as one open")
+	assert.Equal(t, 1, closedTotal, "three duplicate rows for one issue must count as one close")
+}
+
+// TestGetForksAndActivity_DistinctForkerDefense proves that the forks
+// aggregate counts unique forkers per period — even when the events table
+// contains multiple stale rows for one forker that exists due to push-day
+// shifts in the legacy UpdatedAt-keyed import. Without the COUNT(DISTINCT)
+// defense, one forker pushing on five different days within a period
+// would report as five forks for that period.
+func TestGetForksAndActivity_DistinctForkerDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Five duplicate fork rows for the same forker, dates within the past 14 days.
+	base := time.Now().Add(-7 * 24 * time.Hour).UTC()
+	for i := 0; i < 5; i++ {
+		d := base.Add(time.Duration(i) * 24 * time.Hour).Format("2006-01-02")
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+			 VALUES ('org1', 'repo1', 'alice', 'fork', $1, 'http://x', '', '')`,
+			d)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetForksAndActivity(ctx, nil, nil, nil, 90)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	totalForks := 0
+	for _, v := range res.Forks {
+		totalForks += v
+	}
+	assert.Equal(t, 1, totalForks,
+		"five rows for one forker must aggregate to a single fork across all periods")
+}
+
+// TestGetAgingPRs_DistinctNumberDefense proves the COUNT(DISTINCT number)
+// hardening works as advertised: even when the events table contains
+// multiple stale 'open' rows for the same PR — exactly the corruption
+// migration 024 cleans up — the metric must count the PR once, not once
+// per row. Without the defensive count, a single open PR with five
+// snapshots would report total_open=5.
+func TestGetAgingPRs_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Recent created_at so the row falls inside the default since-window.
+	createdAt := time.Now().Add(-3 * 24 * time.Hour).UTC().Format("2006-01-02T15:04:05Z")
+	prDates := []string{"2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05"}
+	for _, d := range prDates {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at)
+			 VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://x', '', '', 'open', 42, $2)`,
+			d, createdAt)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetAgingPRs(ctx, nil, nil, nil, 180)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, 1, res.TotalOpen,
+		"five duplicate rows for one PR must count as one open PR, not five")
+}
+
+// TestGetUnansweredRate_SkipsClosedItems verifies that PRs/issues already in
+// a terminal state (merged or closed) don't count toward "items requiring a
+// response" — counting them inflates the metric and produces misleading
+// "N items unanswered" claims in the AI summary.
+func TestGetUnansweredRate_SkipsClosedItems(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Each row uses a distinct date to keep the (user, type, date) PK
+	// unique. All ages exceed the 7-day filter. State values cover
+	// open / merged / closed.
+	rows := []struct {
+		number int
+		typ    string
+		state  string
+		date   string
+	}{
+		{number: 1, typ: "pr", state: "open", date: "2025-12-20"},      // counts
+		{number: 2, typ: "pr", state: "merged", date: "2025-12-21"},    // skip
+		{number: 3, typ: "issue", state: "open", date: "2025-12-22"},   // counts
+		{number: 4, typ: "issue", state: "closed", date: "2025-12-23"}, // skip
+	}
+	for _, r := range rows {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at)
+			 VALUES ('org1', 'repo1', 'alice', $1, $2, $3, '', '', $4, $5, $6)`,
+			r.typ, r.date, fmt.Sprintf("http://x/%s/%d", r.typ, r.number),
+			r.state, r.number, r.date+"T10:00:00Z")
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetUnansweredRate(ctx, nil, nil, nil, 365)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, 2, res.TotalItems, "merged/closed items must be excluded from total")
+	assert.Equal(t, 2, res.Unanswered, "both open items have no responder, so both count as unanswered")
 }
 
 func TestGetResponseSLO_NilDB(t *testing.T) {

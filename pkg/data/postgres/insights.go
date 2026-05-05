@@ -43,13 +43,17 @@ const (
 
 	// selectTimeToMergeTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
+	// COUNT(DISTINCT number) is defensive against any residual duplicate
+	// rows for the same PR (the import path keys by created_at::date now,
+	// but the count must not double-count if dedupe drift ever returns).
 	selectTimeToMergeTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.merged_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'pr'
+		  AND e.number IS NOT NULL
 		  AND e.merged_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.created_at >= $1
@@ -63,11 +67,12 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToRestoreBugsTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
+		  AND e.number IS NOT NULL
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
@@ -88,11 +93,12 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectTimeToCloseTpl = `SELECT
 			%[1]s AS period,
-			COUNT(*) AS cnt,
+			COUNT(DISTINCT e.number) AS cnt,
 			AVG(EXTRACT(EPOCH FROM (e.closed_at::timestamp - e.created_at::timestamp)) / 86400.0) AS avg_days
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.type = 'issue'
+		  AND e.number IS NOT NULL
 		  AND e.closed_at IS NOT NULL
 		  AND e.created_at IS NOT NULL
 		  AND e.state = 'closed'
@@ -105,9 +111,12 @@ const (
 
 	// selectForksAndActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
+	// COUNT(DISTINCT username) defends against any residual fork-row dups
+	// (one forker re-imported on multiple push-days). Each fork is one
+	// forker per parent repo, so DISTINCT username is the right unit.
 	selectForksAndActivityTpl = `SELECT
 			%[1]s AS period,
-			SUM(CASE WHEN e.type = 'fork' THEN 1 ELSE 0 END) AS forks,
+			COUNT(DISTINCT e.username) FILTER (WHERE e.type = 'fork') AS forks,
 			COUNT(*) AS events
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
@@ -138,7 +147,7 @@ const (
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
 	selectChangeFailuresTpl = `SELECT
 		%[1]s AS period,
-		COUNT(*) AS failures
+		COUNT(DISTINCT (e.org, e.repo, e.type, e.number)) AS failures
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE (
@@ -151,6 +160,7 @@ const (
 	    OR
 	    (e.type = 'pr' AND LOWER(e.title) LIKE '%%revert%%')
 	)
+	  AND e.number IS NOT NULL
 	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
 	  %[2]s
@@ -206,15 +216,18 @@ const (
 
 	// selectPRSizeDistributionTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
+	// COUNT(DISTINCT number) FILTER defends each size bucket against any
+	// residual duplicate PR rows — same defense pattern as selectAgingPRsTpl.
 	selectPRSizeDistributionTpl = `SELECT
 		%[1]s AS period,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS small,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS medium,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS large,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS xlarge
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50) AS small,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249) AS medium,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999) AS large,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000) AS xlarge
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
+	  AND e.number IS NOT NULL
 	  AND e.created_at IS NOT NULL
 	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
@@ -393,21 +406,26 @@ const (
 
 	// selectIssueOpenCloseRatioTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = GroupExpr(gran, "e.closed_at"), %[3]s = whereClause
+	// SELECT DISTINCT by (org, repo, number) inside each subquery so any
+	// residual duplicate issue rows count once per period — defense against
+	// the same dup-row class of bug we fixed for events.
 	selectIssueOpenCloseRatioTpl = `SELECT period, SUM(opened) AS opened, SUM(closed) AS closed
 		FROM (
-			SELECT %[1]s AS period, 1 AS opened, 0 AS closed
+			SELECT DISTINCT e.org, e.repo, e.number, %[1]s AS period, 1 AS opened, 0 AS closed
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
+			  AND e.number IS NOT NULL
 			  AND e.created_at IS NOT NULL
 			  AND e.created_at >= $1
 			  ` + botExcludeTpl + `
 			  %[3]s
 			UNION ALL
-			SELECT %[2]s AS period, 0 AS opened, 1 AS closed
+			SELECT DISTINCT e.org, e.repo, e.number, %[2]s AS period, 0 AS opened, 1 AS closed
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
+			  AND e.number IS NOT NULL
 			  AND e.closed_at IS NOT NULL
 			  AND e.closed_at >= $1
 			  ` + botExcludeTpl + `
@@ -466,14 +484,18 @@ const (
 	ORDER BY period
 `
 
-	// selectAgingPRsTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// selectAgingPRsTpl: $1=since, dynamic org/repo/entity via queryBuilder.
+	// COUNT(DISTINCT number) defends against duplicate event rows ever
+	// re-emerging (the original UpdatedAt-key bug counted each stale 'open'
+	// snapshot of a single PR separately).
 	selectAgingPRsTpl = `SELECT
-		COUNT(*) AS total_open,
-		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30 THEN 1 ELSE 0 END), 0) AS over_30,
-		COALESCE(SUM(CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90 THEN 1 ELSE 0 END), 0) AS over_90
+		COUNT(DISTINCT e.number) AS total_open,
+		COUNT(DISTINCT e.number) FILTER (WHERE EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 30) AS over_30,
+		COUNT(DISTINCT e.number) FILTER (WHERE EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 90) AS over_90
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
+	  AND e.number IS NOT NULL
 	  AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
 	  AND e.created_at IS NOT NULL
 	  AND e.created_at >= $1
@@ -481,13 +503,18 @@ const (
 	  %s
 	`
 
-	// selectUnansweredRateTpl: $1=since, dynamic org/repo/entity via queryBuilder
+	// selectUnansweredRateTpl: $1=since, dynamic org/repo/entity via queryBuilder.
+	// Filters out merged/closed items — once a PR or issue reaches a terminal
+	// state it no longer "needs a response", so counting it inflates the
+	// metric and misleads the AI narrative ("N items requiring response"
+	// when most have already been resolved).
 	selectUnansweredRateTpl = `WITH items AS (
     SELECT e.org, e.repo, e.number, e.type, e.username, e.created_at
     FROM devpulse_event e
     JOIN devpulse_developer d ON e.username = d.username
     WHERE e.type IN ('issue', 'pr')
       AND e.number IS NOT NULL
+      AND (e.state IS NULL OR e.state NOT IN ('merged', 'closed'))
       AND e.created_at IS NOT NULL
       AND EXTRACT(EPOCH FROM (NOW() - e.created_at::timestamp)) / 86400.0 > 7
       AND e.created_at >= $1

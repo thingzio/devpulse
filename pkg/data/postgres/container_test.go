@@ -45,6 +45,43 @@ func TestGetContainerActivity_WithData(t *testing.T) {
 	assert.Equal(t, 1, series.Versions[idx2])
 }
 
+// TestUpsertContainerVersion_Idempotent guards the container_version
+// upsert path against the dup-row class of bug we fixed for events. The
+// (org, repo, package, version_id) PK plus the ON CONFLICT DO UPDATE
+// clause must collapse repeated imports of the same GitHub-issued
+// version_id into a single row, with the latest tag/created_at winning.
+// Unlike PR/Issue/Fork events (which keyed on a drifting timestamp),
+// version_id is a stable GitHub identifier — but the test makes the
+// invariant explicit so future schema changes can't silently regress it.
+func TestUpsertContainerVersion_Idempotent(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	// First "import" of version_id=42 with tag v1.0.0.
+	_, err := store.db.ExecContext(ctx, upsertContainerVersionSQL,
+		"org1", "repo1", "pkg1", 42, "v1.0.0", "2025-01-15T10:00:00Z")
+	require.NoError(t, err)
+
+	// Second "import" of the SAME version_id with an updated tag (e.g.
+	// the registry retagged the underlying image — GitHub would surface
+	// the same ID with a new tag value).
+	_, err = store.db.ExecContext(ctx, upsertContainerVersionSQL,
+		"org1", "repo1", "pkg1", 42, "v1.0.0-fixed", "2025-01-15T10:00:00Z")
+	require.NoError(t, err)
+
+	var rows int
+	require.NoError(t, store.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM devpulse_container_version WHERE org='org1' AND repo='repo1' AND package='pkg1' AND version_id=42`,
+	).Scan(&rows))
+	assert.Equal(t, 1, rows, "re-importing the same version_id must converge to a single row")
+
+	var tag string
+	require.NoError(t, store.db.QueryRowContext(ctx,
+		`SELECT tag FROM devpulse_container_version WHERE org='org1' AND repo='repo1' AND package='pkg1' AND version_id=42`,
+	).Scan(&tag))
+	assert.Equal(t, "v1.0.0-fixed", tag, "tag must reflect the latest import")
+}
+
 func TestGetContainerActivity_FilterByOrg(t *testing.T) {
 	ctx := context.Background()
 	store := setupTestDB(t)

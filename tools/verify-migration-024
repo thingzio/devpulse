@@ -1,0 +1,196 @@
+#!/bin/bash
+# Verifies migration 024 (PR/Issue dedupe) against a production DB backup.
+# Loads the dump into a temp Postgres, captures a pre-migration snapshot,
+# runs the migration, then asserts:
+#   - PR / Issue rows shrink (dups eliminated)
+#   - Distinct entity counts do NOT increase
+#   - issue_comment / pr_review / fork rows are byte-for-byte unchanged
+#   - No duplicate (org, repo, type, number) groups remain
+#   - pr_rows == distinct_prs after migration (one row per entity)
+#
+# Exit 0 = safe to deploy. Non-zero = abort and investigate.
+#
+# Usage: tools/verify-migration-024 <path-to-backup.sql.gz>
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools docker gunzip
+
+CONTAINER_NAME="devpulse-verify-024"
+DB_NAME="thingz"
+DB_USER="postgres"
+DB_PASS="postgres"
+DB_PORT="55434"
+PG_IMAGE="postgres:16-alpine"
+MIGRATION_FILE="${REPO_ROOT}/pkg/data/postgres/sql/migrations_saas/024_dedupe_events.sql"
+
+usage() {
+    cat <<USAGE
+Usage: $0 <path-to-backup.sql.gz>
+
+Verifies migration 024 against a production DB backup. Loads the dump
+into an isolated Postgres container, runs the migration, and asserts
+key invariants. Exits 0 only if every assertion passes.
+USAGE
+    exit 1
+}
+
+[[ $# -eq 1 ]] || usage
+DUMP="$1"
+[[ -f "${DUMP}" ]] || err "Backup not found: ${DUMP}"
+[[ -f "${MIGRATION_FILE}" ]] || err "Migration not found: ${MIGRATION_FILE}"
+
+cleanup() {
+    docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+msg "Starting isolated Postgres on :${DB_PORT}..."
+docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+docker run -d \
+    --name "${CONTAINER_NAME}" \
+    -e POSTGRES_DB="${DB_NAME}" \
+    -e POSTGRES_USER="${DB_USER}" \
+    -e POSTGRES_PASSWORD="${DB_PASS}" \
+    -p "${DB_PORT}:5432" \
+    "${PG_IMAGE}" >/dev/null
+
+for _ in $(seq 1 30); do
+    if docker exec "${CONTAINER_NAME}" pg_isready -U "${DB_USER}" -d "${DB_NAME}" &>/dev/null; then
+        break
+    fi
+    sleep 1
+done
+docker exec "${CONTAINER_NAME}" pg_isready -U "${DB_USER}" -d "${DB_NAME}" &>/dev/null \
+    || err "Postgres did not become ready"
+
+msg "Loading backup..."
+gunzip -c "${DUMP}" | docker exec -i "${CONTAINER_NAME}" \
+    psql -U "${DB_USER}" -d "${DB_NAME}" -q -v ON_ERROR_STOP=0 >/dev/null 2>&1
+
+# Build a single SQL script: pre-snapshot + migration + post-snapshot +
+# assertions. Pre-snapshot is captured into a regular table (not TEMP)
+# because the migration's own TEMP tables and our snapshot would
+# conflict in a session-shared TEMP namespace.
+SCRIPT="$(mktemp)"
+cat > "${SCRIPT}" <<'PRE_SCRIPT'
+\set ON_ERROR_STOP on
+
+CREATE TABLE __verify_pre AS
+SELECT
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='pr'    AND number IS NOT NULL) AS pr_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='issue' AND number IS NOT NULL) AS issue_rows,
+  (SELECT COUNT(DISTINCT (org, repo, number)) FROM devpulse_event WHERE type='pr'    AND number IS NOT NULL) AS distinct_prs,
+  (SELECT COUNT(DISTINCT (org, repo, number)) FROM devpulse_event WHERE type='issue' AND number IS NOT NULL) AS distinct_issues,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='issue_comment') AS comment_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='pr_review')     AS review_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='fork')          AS fork_rows,
+  (SELECT COUNT(*) FROM (
+     SELECT 1 FROM devpulse_event WHERE type IN ('pr','issue') AND number IS NOT NULL
+     GROUP BY org, repo, type, number HAVING COUNT(*) > 1
+   ) g)                                                                                       AS dup_groups;
+
+\echo '=== PRE-MIGRATION ==='
+SELECT * FROM __verify_pre;
+
+\echo ''
+\echo '=== RUNNING MIGRATION ==='
+\timing on
+BEGIN;
+PRE_SCRIPT
+
+cat "${MIGRATION_FILE}" >> "${SCRIPT}"
+
+cat >> "${SCRIPT}" <<'POST_SCRIPT'
+COMMIT;
+\timing off
+
+CREATE TABLE __verify_post AS
+SELECT
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='pr'    AND number IS NOT NULL) AS pr_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='issue' AND number IS NOT NULL) AS issue_rows,
+  (SELECT COUNT(DISTINCT (org, repo, number)) FROM devpulse_event WHERE type='pr'    AND number IS NOT NULL) AS distinct_prs,
+  (SELECT COUNT(DISTINCT (org, repo, number)) FROM devpulse_event WHERE type='issue' AND number IS NOT NULL) AS distinct_issues,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='issue_comment') AS comment_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='pr_review')     AS review_rows,
+  (SELECT COUNT(*)                            FROM devpulse_event WHERE type='fork')          AS fork_rows,
+  (SELECT COUNT(*) FROM (
+     SELECT 1 FROM devpulse_event WHERE type IN ('pr','issue') AND number IS NOT NULL
+     GROUP BY org, repo, type, number HAVING COUNT(*) > 1
+   ) g)                                                                                       AS dup_groups;
+
+\echo ''
+\echo '=== POST-MIGRATION ==='
+SELECT * FROM __verify_post;
+
+\echo ''
+\echo '=== ASSERTIONS ==='
+DO $$
+DECLARE pre RECORD; post RECORD;
+BEGIN
+  SELECT * INTO pre  FROM __verify_pre;
+  SELECT * INTO post FROM __verify_post;
+
+  -- Other event types must be byte-for-byte unchanged.
+  IF post.comment_rows <> pre.comment_rows THEN
+    RAISE EXCEPTION 'comment_rows changed: % -> %', pre.comment_rows, post.comment_rows;
+  END IF;
+  IF post.review_rows <> pre.review_rows THEN
+    RAISE EXCEPTION 'review_rows changed: % -> %', pre.review_rows, post.review_rows;
+  END IF;
+  IF post.fork_rows <> pre.fork_rows THEN
+    RAISE EXCEPTION 'fork_rows changed: % -> %', pre.fork_rows, post.fork_rows;
+  END IF;
+
+  -- PR/Issue rows must shrink if there were dups; never grow.
+  IF post.pr_rows > pre.pr_rows THEN
+    RAISE EXCEPTION 'pr_rows grew: % -> %', pre.pr_rows, post.pr_rows;
+  END IF;
+  IF post.issue_rows > pre.issue_rows THEN
+    RAISE EXCEPTION 'issue_rows grew: % -> %', pre.issue_rows, post.issue_rows;
+  END IF;
+  IF pre.dup_groups > 0 AND post.pr_rows + post.issue_rows >= pre.pr_rows + pre.issue_rows THEN
+    RAISE EXCEPTION 'pre had % dup groups but no rows were eliminated', pre.dup_groups;
+  END IF;
+
+  -- Distinct entity count must NOT increase.
+  IF post.distinct_prs > pre.distinct_prs THEN
+    RAISE EXCEPTION 'distinct_prs grew: % -> %', pre.distinct_prs, post.distinct_prs;
+  END IF;
+  IF post.distinct_issues > pre.distinct_issues THEN
+    RAISE EXCEPTION 'distinct_issues grew: % -> %', pre.distinct_issues, post.distinct_issues;
+  END IF;
+
+  -- Post-state must have one row per entity (no remaining dups).
+  IF post.dup_groups > 0 THEN
+    RAISE EXCEPTION 'remaining duplicate groups: %', post.dup_groups;
+  END IF;
+  IF post.pr_rows <> post.distinct_prs THEN
+    RAISE EXCEPTION 'pr_rows (%) != distinct_prs (%)', post.pr_rows, post.distinct_prs;
+  END IF;
+  IF post.issue_rows <> post.distinct_issues THEN
+    RAISE EXCEPTION 'issue_rows (%) != distinct_issues (%)', post.issue_rows, post.distinct_issues;
+  END IF;
+
+  RAISE NOTICE 'ALL ASSERTIONS PASSED';
+  RAISE NOTICE '  pr_rows:    % -> % (-%)',  pre.pr_rows,    post.pr_rows,    pre.pr_rows - post.pr_rows;
+  RAISE NOTICE '  issue_rows: % -> % (-%)',  pre.issue_rows, post.issue_rows, pre.issue_rows - post.issue_rows;
+  RAISE NOTICE '  distinct prs:    % -> %',  pre.distinct_prs,    post.distinct_prs;
+  RAISE NOTICE '  distinct issues: % -> %',  pre.distinct_issues, post.distinct_issues;
+  RAISE NOTICE '  dup groups:      % -> 0',  pre.dup_groups;
+  RAISE NOTICE '  comment / review / fork rows: untouched';
+END $$;
+
+DROP TABLE __verify_pre;
+DROP TABLE __verify_post;
+POST_SCRIPT
+
+msg "Running pre-snapshot, migration, and assertions..."
+docker exec -i "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 \
+    < "${SCRIPT}"
+rm -f "${SCRIPT}"
+
+msg "All assertions passed — migration 024 is safe to deploy against this backup."

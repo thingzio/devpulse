@@ -1,0 +1,99 @@
+#!/bin/bash
+# Cleans up devpulse_developer rows with no referencing event. These
+# accumulate when fork events are wiped (migration 025) or when a
+# developer's only events are deleted by other migrations — the
+# developer row stays behind because there's no cascade FROM event TO
+# developer (only the reverse).
+#
+# Production sample (post-migration-025): 75,800 of 83,553 developer
+# rows were orphans (90.7%). Cleaning them shrinks devpulse_developer
+# from ~16 MB to ~1.5 MB and speeds up the JOIN that nearly every
+# insight query performs.
+#
+# By default lists what would be removed. With --delete, runs the
+# DELETE in a single transaction.
+#
+# Usage:
+#   tools/cleanup-orphan-developers              # report only
+#   tools/cleanup-orphan-developers --delete     # actually delete
+#
+# Requires: DATABASE_URL pointing at the target DB.
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${DIR}/common"
+
+has_tools psql
+
+usage() {
+    cat <<USAGE
+Usage: $0 [--delete]
+
+Identifies devpulse_developer rows with no referencing devpulse_event
+row. Pass --delete to actually remove them. Safe to re-run; subsequent
+imports re-insert any developer that gets new events via the upsert
+path.
+
+DATABASE_URL must be set.
+USAGE
+    exit 1
+}
+
+DELETE=0
+case "${1:-}" in
+    --delete) DELETE=1 ;;
+    -h|--help) usage ;;
+    "") ;;
+    *) err "unknown argument: $1" ;;
+esac
+
+[[ -n "${DATABASE_URL:-}" ]] || err "DATABASE_URL is not set"
+
+ORPHAN_CTE="
+WITH orphans AS (
+  SELECT d.username
+  FROM devpulse_developer d
+  WHERE NOT EXISTS (
+    SELECT 1 FROM devpulse_event e WHERE e.username = d.username
+  )
+)
+"
+
+msg "Scanning for orphan developers..."
+
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<EOF
+\set QUIET on
+${ORPHAN_CTE}
+SELECT
+  (SELECT COUNT(*) FROM orphans)              AS orphan_developers,
+  (SELECT COUNT(*) FROM devpulse_developer)   AS total_developers,
+  ROUND(100.0 * (SELECT COUNT(*) FROM orphans)::numeric / NULLIF((SELECT COUNT(*) FROM devpulse_developer), 0), 1) AS pct_orphan,
+  pg_size_pretty(pg_total_relation_size('devpulse_developer')) AS table_size;
+
+\echo ''
+\echo 'sample of 10 orphan usernames:'
+${ORPHAN_CTE}
+SELECT username FROM orphans LIMIT 10;
+EOF
+
+if [[ "${DELETE}" -eq 0 ]]; then
+    msg "Dry run only. Re-run with --delete to remove the rows."
+    exit 0
+fi
+
+msg "Deleting orphan developers..."
+psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 <<EOF
+BEGIN;
+${ORPHAN_CTE}
+DELETE FROM devpulse_developer
+ WHERE username IN (SELECT username FROM orphans);
+COMMIT;
+
+\echo 'post-delete state:'
+SELECT
+  (SELECT COUNT(*) FROM devpulse_developer)   AS total_developers,
+  pg_size_pretty(pg_total_relation_size('devpulse_developer')) AS table_size;
+EOF
+
+msg "Done."

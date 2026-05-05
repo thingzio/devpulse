@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,6 +69,41 @@ func TestSuspendInstallation(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.NotNil(t, list[0].SuspendedAt)
+}
+
+// TestSuspendInstallation_RetryPreservesTimestamp guards the webhook
+// idempotency fix: GitHub retries failed suspend webhook deliveries, so
+// repeated SuspendInstallation calls must keep the ORIGINAL suspended_at
+// instead of rewriting it on each retry.
+func TestSuspendInstallation_RetryPreservesTimestamp(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 60013, "retrysuspend", "", "", "", "", "", "")
+	require.NoError(t, err)
+	require.NoError(t, SaveInstallation(ctx, db, tn.ID, 3013, "Organization", "org13", nil, 100))
+
+	// First suspend.
+	require.NoError(t, SuspendInstallation(ctx, db, 3013))
+	first, err := ListInstallations(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	require.NotNil(t, first[0].SuspendedAt)
+	originalSuspendedAt := *first[0].SuspendedAt
+
+	// Wait long enough that NOW() would advance noticeably if the SQL
+	// reset it on every retry.
+	time.Sleep(50 * time.Millisecond)
+
+	// Retry the suspend (mimics GitHub's redelivery).
+	require.NoError(t, SuspendInstallation(ctx, db, 3013))
+	second, err := ListInstallations(ctx, db, tn.ID)
+	require.NoError(t, err)
+	require.Len(t, second, 1)
+	require.NotNil(t, second[0].SuspendedAt)
+
+	assert.Equal(t, originalSuspendedAt.UnixNano(), second[0].SuspendedAt.UnixNano(),
+		"suspended_at must be pinned to the first suspension; retry must not rewrite it")
 }
 
 func TestGetInstallationForOrg(t *testing.T) {
