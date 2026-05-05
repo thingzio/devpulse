@@ -430,23 +430,23 @@ func TestGetPRSizeDistribution_WithData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Small PR (20 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-10', 'http://a', '', '', 'merged', '2025-01-10T10:00:00Z', 15, 5)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-10', 'http://a', '', '', 'merged', 1, '2025-01-10T10:00:00Z', 15, 5)`)
 	require.NoError(t, err)
 
 	// Medium PR (100 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-11', 'http://b', '', '', 'merged', '2025-01-11T10:00:00Z', 70, 30)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-11', 'http://b', '', '', 'merged', 2, '2025-01-11T10:00:00Z', 70, 30)`)
 	require.NoError(t, err)
 
 	// Large PR (500 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-12', 'http://c', '', '', 'merged', '2025-01-12T10:00:00Z', 400, 100)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-12', 'http://c', '', '', 'merged', 3, '2025-01-12T10:00:00Z', 400, 100)`)
 	require.NoError(t, err)
 
 	// XL PR (1500 lines)
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, created_at, additions, deletions)
-		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-13', 'http://d', '', '', 'merged', '2025-01-13T10:00:00Z', 1000, 500)`)
+	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+		VALUES ('org1', 'repo1', 'alice', 'pr', '2025-01-13', 'http://d', '', '', 'merged', 4, '2025-01-13T10:00:00Z', 1000, 500)`)
 	require.NoError(t, err)
 
 	series, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 730)
@@ -713,6 +713,75 @@ func TestGetUnansweredRate_NilDB(t *testing.T) {
 	s := &Store{}
 	_, err := s.GetUnansweredRate(context.Background(), nil, nil, nil, 180)
 	require.ErrorIs(t, err, data.ErrDBNotInitialized)
+}
+
+// TestGetPRSizeDistribution_DistinctNumberDefense proves the COUNT(DISTINCT
+// number) FILTER hardening works on the PR size buckets — duplicate rows
+// for the same PR must not double-count it across small/medium/large/xl.
+func TestGetPRSizeDistribution_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Same PR with five distinct dates (mimicking pre-fix duplicate rows).
+	createdAt := time.Now().Add(-3 * 24 * time.Hour).UTC().Format("2006-01-02T15:04:05Z")
+	for i := 0; i < 5; i++ {
+		d := time.Now().Add(time.Duration(i) * 24 * time.Hour).UTC().Format("2006-01-02")
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, additions, deletions)
+			 VALUES ('org1', 'repo1', 'alice', 'pr', $1, 'http://x', '', '', 'merged', 99, $2, 70, 30)`,
+			d, createdAt)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetPRSizeDistribution(ctx, nil, nil, nil, 90)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	totalMedium := 0
+	for _, v := range res.Medium {
+		totalMedium += v
+	}
+	assert.Equal(t, 1, totalMedium,
+		"five duplicate rows for one medium PR must aggregate to a single medium count")
+}
+
+// TestGetIssueOpenCloseRatio_DistinctNumberDefense proves the SELECT DISTINCT
+// guards inside selectIssueOpenCloseRatioTpl: duplicate rows for the same
+// issue must not inflate the opened or closed series.
+func TestGetIssueOpenCloseRatio_DistinctNumberDefense(t *testing.T) {
+	ctx := context.Background()
+	store := setupTestDB(t)
+
+	_, err := store.db.ExecContext(ctx,
+		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
+	require.NoError(t, err)
+
+	// Three duplicate rows for issue #5 (created 2025-02-10, closed 2025-02-20).
+	for _, d := range []string{"2025-02-10", "2025-02-12", "2025-02-15"} {
+		_, err = store.db.ExecContext(ctx,
+			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels, state, number, created_at, closed_at)
+			 VALUES ('org1', 'repo1', 'alice', 'issue', $1, 'http://x', '', '', 'closed', 5, '2025-02-10T10:00:00Z', '2025-02-20T10:00:00Z')`,
+			d)
+		require.NoError(t, err)
+	}
+
+	res, err := store.GetIssueOpenCloseRatio(ctx, nil, nil, nil, 730)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	openedTotal, closedTotal := 0, 0
+	for _, v := range res.Opened {
+		openedTotal += v
+	}
+	for _, v := range res.Closed {
+		closedTotal += v
+	}
+	assert.Equal(t, 1, openedTotal, "three duplicate rows for one issue must count as one open")
+	assert.Equal(t, 1, closedTotal, "three duplicate rows for one issue must count as one close")
 }
 
 // TestGetForksAndActivity_DistinctForkerDefense proves that the forks

@@ -216,15 +216,18 @@ const (
 
 	// selectPRSizeDistributionTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = whereClause
+	// COUNT(DISTINCT number) FILTER defends each size bucket against any
+	// residual duplicate PR rows — same defense pattern as selectAgingPRsTpl.
 	selectPRSizeDistributionTpl = `SELECT
 		%[1]s AS period,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50 THEN 1 ELSE 0 END) AS small,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249 THEN 1 ELSE 0 END) AS medium,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999 THEN 1 ELSE 0 END) AS large,
-		SUM(CASE WHEN COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000 THEN 1 ELSE 0 END) AS xlarge
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) < 50) AS small,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 50 AND 249) AS medium,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) BETWEEN 250 AND 999) AS large,
+		COUNT(DISTINCT e.number) FILTER (WHERE COALESCE(e.additions, 0) + COALESCE(e.deletions, 0) >= 1000) AS xlarge
 	FROM devpulse_event e
 	JOIN devpulse_developer d ON e.username = d.username
 	WHERE e.type = 'pr'
+	  AND e.number IS NOT NULL
 	  AND e.created_at IS NOT NULL
 	  AND e.created_at >= $1
 	  ` + botExcludeTpl + `
@@ -403,21 +406,26 @@ const (
 
 	// selectIssueOpenCloseRatioTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.created_at"), %[2]s = GroupExpr(gran, "e.closed_at"), %[3]s = whereClause
+	// SELECT DISTINCT by (org, repo, number) inside each subquery so any
+	// residual duplicate issue rows count once per period — defense against
+	// the same dup-row class of bug we fixed for events.
 	selectIssueOpenCloseRatioTpl = `SELECT period, SUM(opened) AS opened, SUM(closed) AS closed
 		FROM (
-			SELECT %[1]s AS period, 1 AS opened, 0 AS closed
+			SELECT DISTINCT e.org, e.repo, e.number, %[1]s AS period, 1 AS opened, 0 AS closed
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
+			  AND e.number IS NOT NULL
 			  AND e.created_at IS NOT NULL
 			  AND e.created_at >= $1
 			  ` + botExcludeTpl + `
 			  %[3]s
 			UNION ALL
-			SELECT %[2]s AS period, 0 AS opened, 1 AS closed
+			SELECT DISTINCT e.org, e.repo, e.number, %[2]s AS period, 0 AS opened, 1 AS closed
 			FROM devpulse_event e
 			JOIN devpulse_developer d ON e.username = d.username
 			WHERE e.type = 'issue'
+			  AND e.number IS NOT NULL
 			  AND e.closed_at IS NOT NULL
 			  AND e.closed_at >= $1
 			  ` + botExcludeTpl + `
