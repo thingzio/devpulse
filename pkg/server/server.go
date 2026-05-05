@@ -413,7 +413,7 @@ func makeRouter(
 	// Authenticated routes
 	mux.Handle("GET /tos", wrap(tosPageHandler()))
 	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
-	mux.Handle("GET /dashboard", wrap(dashboardHandler(opts)))
+	mux.Handle("GET /dashboard", wrap(dashboardHandler(db, opts, ghAppID)))
 	mux.Handle("GET /settings", wrap(settingsHandler(db)))
 	mux.Handle("POST /settings/digest", wrap(digestToggleHandler(db)))
 	mux.Handle("POST /auth/signout", wrap(signoutHandler(db)))
@@ -580,7 +580,7 @@ func landingHandler(opts Options) http.HandlerFunc {
 	}
 }
 
-func dashboardHandler(opts Options) http.HandlerFunc {
+func dashboardHandler(db *sql.DB, opts Options, ghAppID int64) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tn := middleware.TenantFromContext(r.Context())
 		if tn == nil {
@@ -588,6 +588,20 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			return
 		}
 		limits, _ := plan.Get(tn.Plan)
+
+		// Surface a banner when the tenant has no active GitHub App
+		// installation — they can sign in and see sample-repo data, but
+		// adding a real repo will fail until they install the App. The
+		// banner gives them a one-click path; the JS handles dismissal.
+		needsInstall := false
+		if ghAppID != 0 {
+			installs, err := tenant.GetActiveInstallations(r.Context(), db, tn.ID, ghAppID)
+			if err != nil {
+				slog.Warn("dashboard: checking installations", "tenant_id", tn.ID, "error", err)
+			} else {
+				needsInstall = len(installs) == 0
+			}
+		}
 
 		renderTemplate(w, "home.html", map[string]any{
 			"Title":         "Dashboard",
@@ -604,6 +618,7 @@ func dashboardHandler(opts Options) http.HandlerFunc {
 			"csv_export":    limits.CSVExport,
 			"max_data_days": limits.MaxDataRangeMonths * 30,
 			"ai_level":      limits.AILevel,
+			"needs_install": needsInstall,
 		})
 	}
 }

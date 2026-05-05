@@ -338,6 +338,7 @@ $(function () {
         initSearchFilters();
         initPeriodSelector();
         initTabs();
+        initInstallBanner();
         $("#export-btn").on("click", function () {
             $("#export-modal").addClass("open");
         });
@@ -374,6 +375,17 @@ $(function () {
         });
     }
 });
+
+function initInstallBanner() {
+    var $banner = $("#install-banner");
+    if ($banner.length === 0) { return; } // server didn't render the banner
+    if (localStorage.getItem('installBannerDismissed') === '1') { return; }
+    $banner.removeAttr('hidden');
+    $("#install-banner-dismiss").on("click", function () {
+        localStorage.setItem('installBannerDismissed', '1');
+        $banner.attr('hidden', 'hidden');
+    });
+}
 
 function initTabs() {
     var hash = window.location.hash.replace('#', '');

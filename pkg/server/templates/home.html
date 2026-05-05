@@ -91,6 +91,19 @@
         </div>
     {{ end }}
 
+    {{ if .needs_install }}
+        <div id="install-banner" class="install-banner" hidden>
+            <div class="install-banner-content">
+                <strong>Install the DevPulse GitHub App</strong>
+                <span>You can sign in and explore sample data, but adding your own repos requires the GitHub App.</span>
+            </div>
+            <div class="install-banner-actions">
+                <a class="install-banner-cta" href="https://github.com/apps/DevPulseThingz" target="_blank" rel="noopener">Install</a>
+                <button id="install-banner-dismiss" class="install-banner-dismiss" type="button" aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+    {{ end }}
+
     <section class="search-and-user">
         <form id="home-search-form">
             <input type="search" placeholder="Search orgs and repos (or org:name, repo:name)" id="search-bar" autocomplete="off">
