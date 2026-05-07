@@ -798,10 +798,15 @@ func TestGetForksAndActivity_DistinctForkerDefense(t *testing.T) {
 		`INSERT INTO devpulse_developer(username, full_name) VALUES ('alice', 'Alice')`)
 	require.NoError(t, err)
 
-	// Five duplicate fork rows for the same forker, dates within the past 14 days.
-	base := time.Now().Add(-7 * 24 * time.Hour).UTC()
+	// Five duplicate fork rows for the same forker, all pinned to last
+	// week's Mon-Fri so they share a single ISO weekly bucket. Without
+	// the anchor the dates straddle a Monday boundary on Thu-Sun and the
+	// per-period DISTINCT count legitimately yields one per week.
+	nowUTC := time.Now().UTC()
+	daysSinceMonday := (int(nowUTC.Weekday()) + 6) % 7
+	lastWeekMonday := nowUTC.AddDate(0, 0, -daysSinceMonday-7)
 	for i := 0; i < 5; i++ {
-		d := base.Add(time.Duration(i) * 24 * time.Hour).Format("2006-01-02")
+		d := lastWeekMonday.AddDate(0, 0, i).Format("2006-01-02")
 		_, err = store.db.ExecContext(ctx,
 			`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
 			 VALUES ('org1', 'repo1', 'alice', 'fork', $1, 'http://x', '', '')`,
