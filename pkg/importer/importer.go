@@ -15,6 +15,7 @@ import (
 	"github.com/thingzio/devpulse/pkg/data/postgres"
 	"github.com/thingzio/devpulse/pkg/digest"
 	"github.com/thingzio/devpulse/pkg/plan"
+	"github.com/thingzio/devpulse/pkg/platformstats"
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
@@ -127,6 +128,7 @@ func dispatchAndFinalize(
 
 	if taskIndex == 0 && taskCtx.Err() == nil {
 		sendDigests(taskCtx, db)
+		snapshotPlatformStats(taskCtx, db)
 	}
 
 	logImportComplete(repos, errs, skippedN, start)
@@ -247,6 +249,16 @@ func postImport(ctx context.Context, store data.Store, pool *ghutil.TokenPool) {
 	slog.Info("phase: entity normalization")
 	if cleanErr := store.CleanEntities(ctx); cleanErr != nil {
 		slog.Warn("cleaning entity names", "error", cleanErr)
+	}
+}
+
+// snapshotPlatformStats writes a daily admin-dashboard rollup so DoD/WoW/MoM
+// deltas survive days when no admin visits /admin. Failures are logged but
+// never returned — the import job's success must not depend on this.
+func snapshotPlatformStats(ctx context.Context, db *sql.DB) {
+	slog.Info("phase: platform stats snapshot")
+	if err := platformstats.Snapshot(ctx, db); err != nil {
+		slog.Error("platform stats snapshot failed", "error", err)
 	}
 }
 
