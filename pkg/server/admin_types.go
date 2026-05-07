@@ -1,5 +1,12 @@
 package server
 
+import "github.com/thingzio/devpulse/pkg/platformstats"
+
+// platformStats is an alias so existing call sites and tests stay short.
+// The canonical type lives in pkg/platformstats — both the admin handler
+// and the import job snapshot through that package.
+type platformStats = platformstats.Stats
+
 type tenantSummary struct {
 	Username         string `json:"username"`
 	Email            string `json:"email"`
@@ -51,19 +58,6 @@ type tokenStatus struct {
 	Remaining      int    `json:"remaining"`
 	ResetAt        string `json:"reset_at,omitempty"`
 	Error          string `json:"error,omitempty"`
-}
-
-type platformStats struct {
-	Tenants           int   `json:"tenants"`
-	TenantsFree       int   `json:"tenants_free"`
-	TenantsStarter    int   `json:"tenants_starter"`
-	TenantsPro        int   `json:"tenants_pro"`
-	TenantsEnterprise int   `json:"tenants_enterprise"`
-	Repos             int   `json:"repos"`
-	Events            int64 `json:"events"`
-	Contributors      int   `json:"contributors"`
-	Installations     int   `json:"installations"`
-	ReposWithErrors   int   `json:"repos_with_errors"`
 }
 
 type statsDelta struct {
