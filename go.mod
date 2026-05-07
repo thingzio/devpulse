@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.26.2
 
 require (
-	cloud.google.com/go/run v1.19.0
+	cloud.google.com/go/run v1.20.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-github/v83 v83.0.0
 	github.com/lib/pq v1.12.3
