@@ -123,8 +123,8 @@ func TestUpsertAndGetTenant(t *testing.T) {
 	assert.Equal(t, int64(12345), tn.GitHubID)
 	assert.Equal(t, "testuser", tn.Username)
 	assert.Equal(t, "test@example.com", tn.Email)
-	assert.Equal(t, 3, tn.MaxRepos)
-	assert.Equal(t, "free", tn.Plan)
+	assert.Equal(t, 25, tn.MaxRepos)
+	assert.Equal(t, "pro", tn.Plan)
 	// Profile fields empty when not provided.
 	assert.Empty(t, tn.Name)
 	assert.Empty(t, tn.Company)
@@ -190,9 +190,9 @@ func TestUpdatePlan(t *testing.T) {
 
 	tn, err := UpsertTenant(ctx, db, 44444, "planuser", "", "", "", "", "", "")
 	require.NoError(t, err)
-	assert.Equal(t, "free", tn.Plan)
-	assert.Equal(t, 3, tn.MaxRepos)
-	assert.Equal(t, 1000, tn.MaxEventsPerWeek)
+	assert.Equal(t, "pro", tn.Plan)
+	assert.Equal(t, 25, tn.MaxRepos)
+	assert.Equal(t, 15000, tn.MaxEventsPerWeek)
 
 	err = UpdatePlan(ctx, db, tn.ID, "pro", 25, 20000)
 	require.NoError(t, err)

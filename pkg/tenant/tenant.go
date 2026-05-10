@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/thingzio/devpulse/pkg/plan"
 )
 
 // Tenant status values.
@@ -36,9 +38,12 @@ type Tenant struct {
 	UpdatedAt          time.Time
 }
 
+// upsertTenantSQL inserts a new tenant with the Pro plan defaults, or updates
+// an existing tenant's profile fields. Plan/limits are set on INSERT only —
+// existing tenants keep whatever plan they currently have.
 const upsertTenantSQL = `
-	INSERT INTO devpulse_tenant (github_id, username, email, avatar_url, name, company, location, bio)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	INSERT INTO devpulse_tenant (github_id, username, email, avatar_url, name, company, location, bio, plan, max_repos, max_events_per_week)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	ON CONFLICT (github_id) DO UPDATE SET
 		username = EXCLUDED.username,
 		email = EXCLUDED.email,
@@ -100,9 +105,14 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	return &t, nil
 }
 
-// UpsertTenant creates or updates a tenant by GitHub ID.
+// UpsertTenant creates or updates a tenant by GitHub ID. New tenants are
+// auto-enrolled in the Pro plan during the beta preview; existing tenants
+// keep their current plan.
 func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string) (*Tenant, error) {
-	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
+	pro, _ := plan.Get(plan.Pro)
+	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL,
+		githubID, username, email, avatarURL, name, company, location, bio,
+		plan.Pro, pro.MaxRepos, pro.MaxEventsPerWeek))
 	if err != nil {
 		return nil, fmt.Errorf("upserting tenant: %w", err)
 	}

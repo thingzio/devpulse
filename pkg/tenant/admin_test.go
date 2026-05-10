@@ -138,7 +138,7 @@ func TestInsertMinimalTenant(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "minimaluser", got.Username)
 	assert.Equal(t, int64(80006), got.GitHubID)
-	assert.Equal(t, "free", got.Plan)
+	assert.Equal(t, "pro", got.Plan)
 }
 
 func TestInsertMinimalTenant_Upsert(t *testing.T) {
@@ -191,7 +191,7 @@ func TestRequestUpgrade(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, req)
 	assert.Equal(t, "requpgrade", req.Username)
-	assert.Equal(t, "free", req.Plan)
+	assert.Equal(t, "pro", req.Plan)
 
 	// Second request is idempotent — returns nil
 	req2, err := RequestUpgrade(ctx, db, tn.ID)

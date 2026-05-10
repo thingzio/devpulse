@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/data"
+	"github.com/thingzio/devpulse/pkg/plan"
 )
 
 // adminConn acquires a dedicated DB connection and explicitly clears
@@ -88,8 +89,8 @@ const (
 		WHERE id = $1`
 
 	insertMinimalTenantSQL = `
-		INSERT INTO devpulse_tenant (github_id, username)
-		VALUES ($1, $2)
+		INSERT INTO devpulse_tenant (github_id, username, plan, max_repos, max_events_per_week)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (github_id) DO UPDATE SET updated_at = NOW()
 		RETURNING id`
 
@@ -189,8 +190,10 @@ func InsertMinimalTenant(ctx context.Context, db *sql.DB, githubID int64, userna
 	}
 	defer conn.Close()
 
+	pro, _ := plan.Get(plan.Pro)
 	var id string
-	if err := conn.QueryRowContext(ctx, insertMinimalTenantSQL, githubID, username).Scan(&id); err != nil {
+	if err := conn.QueryRowContext(ctx, insertMinimalTenantSQL,
+		githubID, username, plan.Pro, pro.MaxRepos, pro.MaxEventsPerWeek).Scan(&id); err != nil {
 		return "", fmt.Errorf("inserting minimal tenant %q: %w", username, err)
 	}
 	return id, nil

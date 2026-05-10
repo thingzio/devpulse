@@ -85,8 +85,7 @@ func adminDashboardHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		csrfToken := middleware.GenerateCSRFToken()
-		middleware.SetCSRFCookie(w, csrfToken)
+		csrfToken := middleware.EnsureCSRFToken(w, r)
 		renderTemplate(w, "admin.html", adminDashboardData{
 			Title:     "Admin",
 			Summary:   summary,
@@ -138,8 +137,7 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 			totalPages = 1
 		}
 
-		csrfToken := middleware.GenerateCSRFToken()
-		middleware.SetCSRFCookie(w, csrfToken)
+		csrfToken := middleware.EnsureCSRFToken(w, r)
 		renderTemplate(w, "admin_tenants.html", adminTenantsData{
 			Title:      "Tenants",
 			Tenants:    out,
@@ -222,8 +220,7 @@ func adminTenantDetailHandler(db *sql.DB) http.HandlerFunc {
 			out.Repos = append(out.Repos, d)
 		}
 
-		csrfToken := middleware.GenerateCSRFToken()
-		middleware.SetCSRFCookie(w, csrfToken)
+		csrfToken := middleware.EnsureCSRFToken(w, r)
 		renderTemplate(w, "admin_tenant.html", adminTenantDetailData{
 			Title:     "Tenant: " + username,
 			Detail:    out,
@@ -313,8 +310,7 @@ func adminTokensHandler(db *sql.DB) http.HandlerFunc {
 			})
 		}
 
-		csrfToken := middleware.GenerateCSRFToken()
-		middleware.SetCSRFCookie(w, csrfToken)
+		csrfToken := middleware.EnsureCSRFToken(w, r)
 
 		renderTemplate(w, "admin_tokens.html", adminTokensData{
 			Title:            "Token Status",

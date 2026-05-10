@@ -241,8 +241,8 @@ func TestAddTenantRepos_RepoLimitExceeded(t *testing.T) {
 	tn, err := UpsertTenant(ctx, db, 60008, "limituser", "", "", "", "", "", "")
 	require.NoError(t, err)
 
-	// Default free plan has max_repos=3 (from DB default after migration).
-	// Read actual limit.
+	// New tenants are auto-enrolled in Pro during the beta preview;
+	// read the actual limit.
 	got, err := GetTenantByID(ctx, db, tn.ID)
 	require.NoError(t, err)
 	maxRepos := got.MaxRepos

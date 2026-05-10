@@ -103,6 +103,20 @@ func GenerateCSRFToken() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
+// EnsureCSRFToken returns the request's existing CSRF cookie value if present,
+// otherwise generates a new token and writes the cookie. Reusing the cookie
+// across admin page renders prevents stale form tokens from desyncing with
+// the cookie when the user navigates between admin pages.
+func EnsureCSRFToken(w http.ResponseWriter, r *http.Request) string {
+	if cookie, err := r.Cookie(csrfCookieName); err == nil && cookie.Value != "" {
+		SetCSRFCookie(w, cookie.Value)
+		return cookie.Value
+	}
+	token := GenerateCSRFToken()
+	SetCSRFCookie(w, token)
+	return token
+}
+
 // SetCSRFCookie writes the CSRF token cookie for the double-submit pattern.
 // The form value is injected server-side into a hidden field.
 func SetCSRFCookie(w http.ResponseWriter, token string) {
