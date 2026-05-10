@@ -105,18 +105,32 @@ func scanTenant(row interface{ Scan(...any) error }) (*Tenant, error) {
 	return &t, nil
 }
 
-// UpsertTenant creates or updates a tenant by GitHub ID. New tenants are
-// auto-enrolled in the Pro plan during the beta preview; existing tenants
-// keep their current plan.
-func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string) (*Tenant, error) {
+// upsertQuerier is the subset of *sql.DB and *sql.Conn used by upsertTenantOn.
+// Both UpsertTenant (shared pool) and AuthenticateUser (dedicated conn) go
+// through this so the parameter list stays in lock-step with upsertTenantSQL.
+type upsertQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// upsertTenantOn executes upsertTenantSQL against the given querier with the
+// Pro-plan defaults applied to new rows. All call sites that upsert a tenant
+// MUST go through this helper.
+func upsertTenantOn(ctx context.Context, q upsertQuerier, githubID int64, username, email, avatarURL, name, company, location, bio string) (*Tenant, error) {
 	pro, _ := plan.Get(plan.Pro)
-	t, err := scanTenant(db.QueryRowContext(ctx, upsertTenantSQL,
+	t, err := scanTenant(q.QueryRowContext(ctx, upsertTenantSQL,
 		githubID, username, email, avatarURL, name, company, location, bio,
 		plan.Pro, pro.MaxRepos, pro.MaxEventsPerWeek))
 	if err != nil {
 		return nil, fmt.Errorf("upserting tenant: %w", err)
 	}
 	return t, nil
+}
+
+// UpsertTenant creates or updates a tenant by GitHub ID. New tenants are
+// auto-enrolled in the Pro plan during the beta preview; existing tenants
+// keep their current plan.
+func UpsertTenant(ctx context.Context, db *sql.DB, githubID int64, username, email, avatarURL, name, company, location, bio string) (*Tenant, error) {
+	return upsertTenantOn(ctx, db, githubID, username, email, avatarURL, name, company, location, bio)
 }
 
 // GetTenantByGitHubID returns a tenant by their GitHub user ID.

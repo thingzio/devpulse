@@ -48,9 +48,9 @@ func AuthenticateUser(ctx context.Context, db *sql.DB, githubID int64, username,
 		return nil, "", fmt.Errorf("clearing tenant scope for auth: %w", err)
 	}
 
-	t, err := scanTenant(conn.QueryRowContext(ctx, upsertTenantSQL, githubID, username, email, avatarURL, name, company, location, bio))
+	t, err := upsertTenantOn(ctx, conn, githubID, username, email, avatarURL, name, company, location, bio)
 	if err != nil {
-		return nil, "", fmt.Errorf("upserting tenant: %w", err)
+		return nil, "", err
 	}
 
 	raw := make([]byte, 32)
