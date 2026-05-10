@@ -1965,6 +1965,20 @@ a.link {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
+/* Emphasize the featured plan (Pro = 4th column: label, Free, Starter, Pro, Enterprise). */
+.plans-table thead th:nth-child(4) {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-color));
+  color: var(--accent);
+}
+
+.plans-table tbody td:nth-child(4) {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.plans-table tbody tr:hover td:nth-child(4) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
 .landing-footer {
   text-align: center;
   color: var(--gray);
