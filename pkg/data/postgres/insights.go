@@ -10,6 +10,13 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
+// Event-table column names used as positional arguments to GroupExpr and
+// time-series template formatters across this file.
+const (
+	colEventDate      = "e.date"
+	colEventCreatedAt = "e.created_at"
+)
+
 const (
 	// selectRetentionTpl: $1=since, dynamic org/repo/entity via queryBuilder
 	// %[1]s = GroupExpr(gran, "e.date"), %[2]s = whereClause
@@ -763,7 +770,7 @@ func getDualSeries[T int | float64](ctx context.Context, db DBTX, queryTpl strin
 }
 
 func (s *Store) GetContributorRetention(ctx context.Context, org, repo, entity *string, days int) (*data.RetentionSeries, error) {
-	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionTpl, []string{"e.date"}, org, repo, entity, days)
+	ms, newC, retC, err := getDualSeries[int](ctx, s.db, selectRetentionTpl, []string{colEventDate}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
@@ -781,7 +788,7 @@ func (s *Store) GetPRReviewRatio(ctx context.Context, org, repo, entity *string,
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
 	qb.addOptional("d.entity", entity)
-	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, "e.date"), qb.whereClause())
+	query := fmt.Sprintf(selectPRReviewRatioTpl, GroupExpr(gran, colEventDate), qb.whereClause())
 	args := append([]any{data.EventTypePR, data.EventTypePRReview, since}, qb.args...)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -840,7 +847,7 @@ func (s *Store) GetChangeFailureRate(ctx context.Context, org, repo, entity *str
 	failQB.addOptional("e.org", org)
 	failQB.addOptional("e.repo", repo)
 	failQB.addOptional("d.entity", entity)
-	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, "e.created_at"), failQB.whereClause())
+	failQuery := fmt.Sprintf(selectChangeFailuresTpl, GroupExpr(gran, colEventCreatedAt), failQB.whereClause())
 	failArgs := append([]any{since}, failQB.args...)
 
 	failureMap := make(map[string]int)
@@ -1036,15 +1043,15 @@ func (s *Store) getVelocitySeries(ctx context.Context, queryTpl, col string, org
 }
 
 func (s *Store) GetTimeToMerge(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToMergeTpl, "e.created_at", org, repo, entity, days)
+	return s.getVelocitySeries(ctx, selectTimeToMergeTpl, colEventCreatedAt, org, repo, entity, days)
 }
 
 func (s *Store) GetTimeToClose(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToCloseTpl, "e.created_at", org, repo, entity, days)
+	return s.getVelocitySeries(ctx, selectTimeToCloseTpl, colEventCreatedAt, org, repo, entity, days)
 }
 
 func (s *Store) GetTimeToRestoreBugs(ctx context.Context, org, repo, entity *string, days int) (*data.VelocitySeries, error) {
-	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsTpl, "e.created_at", org, repo, entity, days)
+	return s.getVelocitySeries(ctx, selectTimeToRestoreBugsTpl, colEventCreatedAt, org, repo, entity, days)
 }
 
 func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *string, days int) (*data.PRSizeSeries, error) {
@@ -1058,7 +1065,7 @@ func (s *Store) GetPRSizeDistribution(ctx context.Context, org, repo, entity *st
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
 	qb.addOptional("d.entity", entity)
-	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, "e.created_at"), qb.whereClause())
+	query := fmt.Sprintf(selectPRSizeDistributionTpl, GroupExpr(gran, colEventCreatedAt), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -1113,7 +1120,7 @@ func (s *Store) GetForksAndActivity(ctx context.Context, org, repo, entity *stri
 	qb.addOptional("e.org", org)
 	qb.addOptional("e.repo", repo)
 	qb.addOptional("d.entity", entity)
-	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, "e.date"), qb.whereClause())
+	query := fmt.Sprintf(selectForksAndActivityTpl, GroupExpr(gran, colEventDate), qb.whereClause())
 	args := append([]any{since}, qb.args...)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -1312,7 +1319,7 @@ func (s *Store) GetContributorProfile(ctx context.Context, username string, org,
 }
 
 func (s *Store) GetTimeToFirstResponse(ctx context.Context, org, repo, entity *string, days int) (*data.FirstResponseSeries, error) {
-	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseTpl, []string{"e.created_at"}, org, repo, entity, days)
+	ms, issueAvg, prAvg, err := getDualSeries[float64](ctx, s.db, selectTimeToFirstResponseTpl, []string{colEventCreatedAt}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}
@@ -1352,7 +1359,7 @@ func (s *Store) GetAgingPRs(ctx context.Context, org, repo, entity *string, days
 }
 
 func (s *Store) GetIssueOpenCloseRatio(ctx context.Context, org, repo, entity *string, days int) (*data.IssueRatioSeries, error) {
-	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioTpl, []string{"e.created_at", "e.closed_at"}, org, repo, entity, days)
+	ms, opened, closed, err := getDualSeries[int](ctx, s.db, selectIssueOpenCloseRatioTpl, []string{colEventCreatedAt, "e.closed_at"}, org, repo, entity, days)
 	if err != nil {
 		return nil, err
 	}

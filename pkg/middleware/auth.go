@@ -100,6 +100,7 @@ func SetSessionCookie(w http.ResponseWriter, token string, maxAge int) {
 	// Lax is required for OAuth redirects (cross-site GET from github.com).
 	// Strict would block the cookie on the callback redirect.
 	sameSite := http.SameSiteLaxMode
+	//nolint:gosec // G124: Secure/HttpOnly/SameSite are set; gosec can't trace 'secure' package var
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName(),
 		Value:    token,

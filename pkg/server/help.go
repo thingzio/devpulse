@@ -16,6 +16,8 @@ import (
 	"github.com/thingzio/devpulse/pkg/tenant"
 )
 
+const helpPageTitle = "Help"
+
 type helpData struct {
 	Title    string
 	PlanMap  map[string]plan.Plan
@@ -48,7 +50,7 @@ func tryGetTenant(r *http.Request, db *sql.DB) *tenant.Tenant {
 func helpPageHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		d := helpData{
-			Title:   "Help",
+			Title:   helpPageTitle,
 			PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
 		}
 		if tn := tryGetTenant(r, db); tn != nil {
@@ -116,7 +118,7 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 		slog.Info("support email sent", "from", tn.Email, "username", tn.Username)
 
 		d := helpData{
-			Title:   "Help",
+			Title:   helpPageTitle,
 			PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
 			Sent: true,
 		}
@@ -127,7 +129,7 @@ func helpContactHandler(db *sql.DB) http.HandlerFunc {
 
 func renderHelpWithError(w http.ResponseWriter, r *http.Request, db *sql.DB, tn *tenant.Tenant, msg string) {
 	d := helpData{
-		Title:   "Help",
+		Title:   helpPageTitle,
 		PlanMap: plan.All, Plans: plan.DisplayPlans(), Features: plan.DisplayFeatures(),
 		Error: msg,
 	}

@@ -737,6 +737,7 @@ func oauthStartHandler(cfg *oauth.Config) http.HandlerFunc {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		//nolint:gosec // G124: Secure/HttpOnly/SameSite are set; gosec can't trace middleware.IsSecure()
 		http.SetCookie(w, &http.Cookie{
 			Name:     middleware.OAuthStateCookieName(),
 			Value:    state,
@@ -753,6 +754,7 @@ func oauthStartHandler(cfg *oauth.Config) http.HandlerFunc {
 func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 	clearAndRedirect := func(w http.ResponseWriter, r *http.Request, msg string) {
 		// Clear all auth cookies so the user can retry cleanly.
+		//nolint:gosec // G124: Secure/HttpOnly/SameSite are set; gosec can't trace middleware.IsSecure()
 		http.SetCookie(w, &http.Cookie{
 			Name: middleware.OAuthStateCookieName(), Value: "", MaxAge: -1, Path: "/",
 			HttpOnly: true, Secure: middleware.IsSecure(), SameSite: http.SameSiteLaxMode,
@@ -772,6 +774,7 @@ func oauthCallbackHandler(db *sql.DB, cfg *oauth.Config) http.HandlerFunc {
 			return
 		}
 
+		//nolint:gosec // G124: Secure/HttpOnly/SameSite are set; gosec can't trace middleware.IsSecure()
 		http.SetCookie(w, &http.Cookie{
 			Name:     middleware.OAuthStateCookieName(),
 			Value:    "",
@@ -1050,13 +1053,13 @@ func upgradeRequestHandler(db *sql.DB) http.HandlerFunc {
 func isPublicRepo(ctx context.Context, org, repo string) bool {
 	ghURL := fmt.Sprintf("https://api.github.com/repos/%s/%s",
 		url.PathEscape(org), url.PathEscape(repo))
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, ghURL, nil) //nolint:gosec // constant base URL
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, ghURL, nil)
 	if err != nil {
 		return false
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := net.GitHubClient.Do(req) //nolint:gosec // constant base URL
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return false
 	}

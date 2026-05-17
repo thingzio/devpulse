@@ -21,6 +21,8 @@ import (
 
 // Template data structs for admin pages.
 
+const pageTitleTenants = "Tenants"
+
 type adminDashboardData struct {
 	Title     string
 	Summary   summaryResponse
@@ -139,7 +141,7 @@ func adminTenantsHandler(db *sql.DB) http.HandlerFunc {
 
 		csrfToken := middleware.EnsureCSRFToken(w, r)
 		renderTemplate(w, "admin_tenants.html", adminTenantsData{
-			Title:      "Tenants",
+			Title:      pageTitleTenants,
 			Tenants:    out,
 			Plans:      plan.All,
 			CSRFToken:  csrfToken,
@@ -682,13 +684,13 @@ func adminDigestSendHandler(db *sql.DB) http.HandlerFunc {
 // resolveGitHubUserID resolves a GitHub username to their numeric user ID.
 func resolveGitHubUserID(ctx context.Context, username string) (int64, error) {
 	apiURL := "https://api.github.com/users/" + url.PathEscape(username)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil) //nolint:gosec // trusted GitHub API URL
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return 0, fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Accept", net.GitHubAccept)
 
-	resp, err := net.GitHubClient.Do(req) //nolint:gosec // trusted GitHub API URL
+	resp, err := net.GitHubClient.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("calling GitHub API: %w", err)
 	}

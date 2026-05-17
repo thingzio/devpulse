@@ -120,6 +120,7 @@ func EnsureCSRFToken(w http.ResponseWriter, r *http.Request) string {
 // SetCSRFCookie writes the CSRF token cookie for the double-submit pattern.
 // The form value is injected server-side into a hidden field.
 func SetCSRFCookie(w http.ResponseWriter, token string) {
+	//nolint:gosec // G124: Secure/HttpOnly/SameSite are set; gosec can't trace 'secure' package var
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookieName,
 		Value:    token,
