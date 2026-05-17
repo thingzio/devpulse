@@ -82,6 +82,21 @@ type errorRepo struct {
 	LastError string `json:"last_error"`
 }
 
+// stuckInsightsRepo flags a repo whose insights should have regenerated under
+// the importer's staleness gates (age > 7 days, event delta > 10%) but haven't —
+// either because insights are missing entirely or the last regeneration was
+// over two weeks ago despite enough new activity to qualify.
+type stuckInsightsRepo struct {
+	Org           string  `json:"org"`
+	Repo          string  `json:"repo"`
+	GeneratedAt   string  `json:"generated_at"`
+	AgeDays       float64 `json:"age_days"`
+	SavedEvents   int     `json:"saved_events"`
+	CurrentEvents int     `json:"current_events"`
+	DeltaPct      float64 `json:"delta_pct"`
+	HasNoInsights bool    `json:"has_no_insights"`
+}
+
 type opsMetrics struct {
 	ActiveTenants7d    int `json:"active_tenants_7d"`
 	Onboarded          int `json:"onboarded"`
@@ -91,12 +106,13 @@ type opsMetrics struct {
 }
 
 type summaryResponse struct {
-	Date       string        `json:"date"`
-	Current    platformStats `json:"current"`
-	Ops        opsMetrics    `json:"ops"`
-	DoD        *statsDelta   `json:"dod,omitempty"`
-	WoW        *statsDelta   `json:"wow,omitempty"`
-	MoM        *statsDelta   `json:"mom,omitempty"`
-	ErrorRepos []errorRepo   `json:"error_repos"`
-	UpdatedAt  string        `json:"updated_at"`
+	Date               string              `json:"date"`
+	Current            platformStats       `json:"current"`
+	Ops                opsMetrics          `json:"ops"`
+	DoD                *statsDelta         `json:"dod,omitempty"`
+	WoW                *statsDelta         `json:"wow,omitempty"`
+	MoM                *statsDelta         `json:"mom,omitempty"`
+	ErrorRepos         []errorRepo         `json:"error_repos"`
+	StuckInsightsRepos []stuckInsightsRepo `json:"stuck_insights_repos"`
+	UpdatedAt          string              `json:"updated_at"`
 }

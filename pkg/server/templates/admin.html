@@ -151,5 +151,38 @@
     </tbody>
   </table>
   {{end}}
+
+  {{if .Summary.StuckInsightsRepos}}
+  <h3 style="margin-top:24px;margin-bottom:6px">Stuck Insights</h3>
+  <p style="color:var(--gray);font-size:0.85em;margin-bottom:12px">
+    Repos with insights older than 14 days <em>and</em> &gt;10% event-count change (both importer gates would pass) but no regeneration on file.
+  </p>
+  <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color)">
+    <thead>
+      <tr style="background:var(--table-header)">
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Org</th>
+        <th style="text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-color)">Repo</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Age (d)</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Saved Events</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Current Events</th>
+        <th style="text-align:right;padding:10px 12px;border-bottom:1px solid var(--border-color)">Delta %</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Summary.StuckInsightsRepos}}
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Org}}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.Repo}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">
+          {{if .HasNoInsights}}<span style="color:#ef4444">never</span>{{else}}{{printf "%.0f" .AgeDays}}{{end}}
+        </td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.SavedEvents}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{.CurrentEvents}}</td>
+        <td style="text-align:right;padding:8px 12px;border-bottom:1px solid var(--border-color)">{{printf "%.1f" .DeltaPct}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
 </div>
 {{end}}
