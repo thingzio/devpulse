@@ -87,7 +87,9 @@ func setupE2EDB(t *testing.T) *sql.DB {
 		t.Skip("skipping postgres integration test in short mode")
 	}
 
-	schema := fmt.Sprintf("test_%d", e2eSchemaSeq.Add(1))
+	// PID prefix prevents schema-name collisions when CI runs pkg/data/postgres,
+	// pkg/server, and pkg/tenant in parallel against the shared DEVPULSE_TEST_DSN.
+	schema := fmt.Sprintf("test_%d_%d", os.Getpid(), e2eSchemaSeq.Add(1))
 	_, err := e2eSharedPool.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
 	require.NoError(t, err)
 

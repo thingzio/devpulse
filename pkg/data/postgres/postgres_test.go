@@ -86,7 +86,11 @@ func setupTestDB(t *testing.T) *Store {
 		t.Skip("skipping postgres integration test in short mode")
 	}
 
-	schema := fmt.Sprintf("test_%d", schemaSeq.Add(1))
+	// PID prefix prevents schema-name collisions when CI runs pkg/data/postgres,
+	// pkg/server, and pkg/tenant in parallel against the shared DEVPULSE_TEST_DSN
+	// — each package's counter is process-local and would otherwise produce
+	// overlapping "test_N" names across the three test binaries.
+	schema := fmt.Sprintf("test_%d_%d", os.Getpid(), schemaSeq.Add(1))
 
 	// Create an isolated schema using the shared pool.
 	_, err := sharedPool.Exec(fmt.Sprintf("CREATE SCHEMA %s", schema))
