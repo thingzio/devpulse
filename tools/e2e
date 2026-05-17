@@ -121,11 +121,62 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:$SITE_
 
 # ==========================================================================
 # Import smoke test (with DB, empty — exits 0 with no tenants)
+# Truncate devpulse_* tables first: docker compose reuses the pgdata
+# volume across runs, so without this the test would pick up the dev
+# DB's tenant_repo rows and try to import real repos from GitHub.
+# Schema-version tables are preserved so migrations don't re-run.
+# Bounded with a hard timeout so a hung worker fails the run instead of
+# blocking make qualify indefinitely.
 # ==========================================================================
-if output=$(DATABASE_URL="$DEV_DB" "$IMPORT" 2>&1); then
-  echo "$output" | grep -qi "import worker complete" && pass "import-empty-db (completes with 0 tenants)" || err "import-empty-db (expected 'import worker complete' in output)"
+echo "==> Truncating devpulse_* tables for clean-slate import test..."
+docker compose exec -T db psql -U devpulse -d devpulse -v ON_ERROR_STOP=1 <<'SQL' >/dev/null || { echo "FAIL: truncate failed"; exit 1; }
+DO $$
+DECLARE
+  stmt text;
+BEGIN
+  SELECT 'TRUNCATE TABLE ' || string_agg(format('%I.%I', schemaname, tablename), ', ') || ' RESTART IDENTITY CASCADE'
+  INTO stmt
+  FROM pg_tables
+  WHERE schemaname = 'public' AND tablename LIKE 'devpulse_%';
+  IF stmt IS NOT NULL THEN
+    EXECUTE stmt;
+  END IF;
+END $$;
+SQL
+
+IMPORT_LOG="$TMPDIR_E2E/import.log"
+IMPORT_TIMEOUT="${E2E_IMPORT_TIMEOUT:-60}"
+echo "==> Running import worker against empty DB (timeout: ${IMPORT_TIMEOUT}s)..."
+(
+  # Unset GITHUB_TOKEN/GITHUB_APP_* so the smoke test can never make real
+  # GitHub calls even if the user's shell has credentials exported.
+  unset GITHUB_TOKEN GITHUB_APP_ID GITHUB_APP_KEY_PATH
+  DATABASE_URL="$DEV_DB" DEVPULSE_DEBUG=true "$IMPORT"
+) >"$IMPORT_LOG" 2>&1 &
+IMPORT_PID=$!
+
+for _ in $(seq 1 "$IMPORT_TIMEOUT"); do
+  kill -0 "$IMPORT_PID" 2>/dev/null || break
+  sleep 1
+done
+
+if kill -0 "$IMPORT_PID" 2>/dev/null; then
+  kill -9 "$IMPORT_PID" 2>/dev/null || true
+  wait "$IMPORT_PID" 2>/dev/null || true
+  err "import-empty-db (timed out after ${IMPORT_TIMEOUT}s — partial log below)"
+  echo "----- import.log (truncated, last 50 lines) -----" >&2
+  tail -n 50 "$IMPORT_LOG" >&2
+  echo "----- end import.log -----" >&2
 else
-  err "import-empty-db (unexpected non-zero exit)"
+  wait "$IMPORT_PID"; IMPORT_RC=$?
+  if [[ $IMPORT_RC -eq 0 ]]; then
+    grep -qi "import worker complete" "$IMPORT_LOG" && \
+      pass "import-empty-db (completes with 0 tenants)" || \
+      err "import-empty-db (expected 'import worker complete' in output)"
+  else
+    err "import-empty-db (unexpected non-zero exit: $IMPORT_RC)"
+    tail -n 30 "$IMPORT_LOG" >&2
+  fi
 fi
 
 # ==========================================================================
