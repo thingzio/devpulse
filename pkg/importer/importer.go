@@ -463,6 +463,15 @@ func importRepo(ctx context.Context, store data.Store, pool *ghutil.TokenPool, o
 		errs++
 	}
 	if skip {
+		// The "repo unchanged" shortcut bypasses every later phase including
+		// insights. That hides a real failure mode: historical events can
+		// shift without pushed_at moving (e.g. migration 025 wiping legacy
+		// fork rows), so repo_insights.event_count diverges from the live
+		// 9-week count and nothing ever regenerates. Run the insights phase
+		// here unconditionally for AI-enabled plans — generateRepoInsights
+		// re-applies its own age + delta gates and is a cheap two-query
+		// no-op when nothing has diverged.
+		runCatchUpInsights(ctx, store, llmCfg, planName, org, repo)
 		return true, nil
 	}
 
@@ -808,6 +817,27 @@ func checkInsightStaleness(generatedAt string, savedEventCount, currentEventCoun
 	}
 
 	return true, fmt.Sprintf("event delta %.1f%% exceeds threshold (%.0f%%)", pct, insightsEventDeltaPct*100)
+}
+
+// runCatchUpInsights re-runs the insights phase for a repo the importer is
+// about to skip as "unchanged". The insights phase has its own staleness
+// gates (checkInsightStaleness), so this is a cheap no-op when everything
+// is consistent — it only does work when the saved event_count has
+// diverged from the live count, which happens when a migration mutates
+// historical events without bumping pushed_at. Errors are logged but
+// never propagated since this is best-effort catch-up.
+func runCatchUpInsights(ctx context.Context, store data.Store, llmCfg *data.LLMConfig, planName, org, repo string) {
+	if llmCfg == nil {
+		return
+	}
+	limits, _ := plan.Get(planName)
+	if limits.AILevel == 0 {
+		return
+	}
+	if err := generateRepoInsights(ctx, store, llmCfg, org, repo); err != nil {
+		slog.Error("catch-up insights on unchanged repo failed",
+			"org", org, "repo", repo, "error", err)
+	}
 }
 
 func generateRepoInsights(ctx context.Context, store data.Store, cfg *data.LLMConfig, org, repo string) error {

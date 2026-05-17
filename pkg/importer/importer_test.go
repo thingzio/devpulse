@@ -229,6 +229,13 @@ type backfillMockStore struct {
 
 	saveBackfillCalled bool
 	saveBackfillUntil  time.Time
+
+	// Insights catch-up test hooks. When set, override the corresponding
+	// stub returns; SaveRepoInsights records the call for assertion.
+	insightsSummary     *data.InsightsSummary
+	insightsGeneratedAt string
+	insightsSavedCount  int
+	saveInsightsCalled  bool
 }
 
 func (m *backfillMockStore) Close() error { return nil }
@@ -355,7 +362,10 @@ func (m *backfillMockStore) HasForkEvents(_ context.Context, _, _ string) (bool,
 
 // --- InsightsStore ---
 func (m *backfillMockStore) GetInsightsSummary(_ context.Context, _, _, _ *string, _ int) (*data.InsightsSummary, error) {
-	return nil, nil
+	if m.insightsSummary != nil {
+		return m.insightsSummary, nil
+	}
+	return &data.InsightsSummary{}, nil
 }
 func (m *backfillMockStore) GetDailyActivity(_ context.Context, _, _, _ *string, _ int) (*data.DailyActivitySeries, error) {
 	return nil, nil
@@ -478,13 +488,14 @@ func (m *backfillMockStore) GetRepoInsights(_ context.Context, _, _ *string) ([]
 	return nil, nil
 }
 func (m *backfillMockStore) SaveRepoInsights(_ context.Context, _, _ string, _ *data.RepoInsights) error {
+	m.saveInsightsCalled = true
 	return nil
 }
 func (m *backfillMockStore) GetRepoInsightsGeneratedAt(_ context.Context, _, _ string) (string, error) {
-	return "", nil
+	return m.insightsGeneratedAt, nil
 }
 func (m *backfillMockStore) GetRepoInsightsEventCount(_ context.Context, _, _ string) (int, error) {
-	return 0, nil
+	return m.insightsSavedCount, nil
 }
 
 func TestRunBackfillPass(t *testing.T) {
