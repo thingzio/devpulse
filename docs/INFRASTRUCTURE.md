@@ -77,20 +77,21 @@ Each call sends ~2-4K input tokens (JSON metrics payload + DORA benchmarks + ins
 
 ## Current Cost (Actual)
 
-Current production setup: `db-g1-small`, 2 Cloud Run deployments, ~5 tenants.
+> Authoritative source: `thingz.io/tco.md` (refreshed 2026-06-06) — pulls live actuals from GCP billing export, GitHub billing API, and Anthropic Admin API. This section is a DevPulse-scoped subset of that doc; if numbers here diverge, `tco.md` wins.
 
-| Service | Details | Estimate |
-|---------|---------|----------|
-| Cloud SQL | db-g1-small, shared vCPU, 1.7GB RAM, 10GB storage | $27/mo |
-| Cloud Run Service (serve) | scale-to-zero (min=0), 1 vCPU/512MB | $5/mo |
-| Cloud Run Job (import) | every 2 hours, ~3 tasks, ~10 min/run | $3.50/mo |
-| Anthropic API | Claude Haiku 4.5, ~15 repos (cached, weekly regen) | $0.30/mo |
-| Cloud Scheduler | 1 job every 2 hours | free (3 free) |
-| Secret Manager | 5 secrets, ~2K accesses/mo | free tier |
-| Artifact Registry | standard repo, <1GB, 7-day untagged cleanup | $0.10/mo |
-| Cloud DNS | 1 hosted zone | $0.20/mo |
-| Cloud Monitoring | log-based metrics, 11 alert policies, email | free tier |
-| **Total** | | **~$36/mo** |
+Current production setup: shared `thingzio-pg` Cloud SQL instance (`db-custom-1-3840`, 1 vCPU / 3.75 GB), two DevPulse Cloud Run deployments, ~5 tenants. DB is shared with DevTrace (`devtrace` DB user, separate tables prefixed `devtrace_`).
+
+DevPulse-attributable June 2026 MTD-pace (day 6):
+
+| Service | Resource | Jun projected | Notes |
+|---------|----------|--------------:|-------|
+| Cloud Run Service (serve) | `devpulse-saas-serve` | ~$0.05/mo | min=0, max=3, CPU throttling on, uptime check on `/health` @ 600s. Fix verified 2026-05-17 (rev `00087-2wz`). Watch for `cpu-throttling: false` annotation drift. |
+| Cloud Run Job (import) | `devpulse-saas-import` | ~$1.05/mo | `0 */2 * * *`, parallelism=3, avg ~18.6 min/run. April was heavier ($11.05 partial) — has since calmed. |
+| Cloud SQL (DevPulse share) | `thingzio-pg` (shared) | portion of ~$42/mo | Instance total projected ~$42/mo; DevPulse and DevTrace share the same instance. No per-service split today — track at the instance level. |
+| Anthropic API | DevPulse Repo Insights (Haiku 4.5) | **$0/mo ⚠️** | DevPulse API key has been silent for May and June MTD. Investigate Repo Insights gating, stale-repo predicate, or key rotation before banking the savings. See `tco.md` §3.1. |
+| Supporting services | Scheduler, Secret Manager, Artifact Registry, Cloud DNS, Cloud Monitoring | <$0.50/mo (DevPulse share) | Most line items free tier; total supporting cost across both services is ~$0.95/mo. |
+
+> Note: the historical "~$36/mo at 5 tenants" estimate assumed an unshared `db-g1-small`. The instance has since been upgraded to `db-custom-1-3840` and is now shared with DevTrace — so the DevPulse-only number is lower (compute is tiny once serve is at $0), but the shared DB allocation absorbs more of the spend. The scaling-curve model below is what to use for forward-looking estimates; for current actuals always defer to `tco.md`.
 
 ## Cost by Tenant Scale
 
@@ -161,13 +162,17 @@ Total repos: ~3,600. Paid repos with AI: ~3,000.
 
 ### Cost Scaling Summary
 
+These are forward-looking model estimates assuming the DB tier listed and the plan-mix assumptions above. Actual current spend is in the "Current Cost" section and authoritatively in `tco.md`.
+
 | Tenants | DB Tier | Repos (est) | Anthropic | Total |
 |---------|---------|-------------|-----------|-------|
-| 5 (current) | db-g1-small | ~15 | $0.30 | ~$36 |
+| 5 (current model) | db-g1-small (modeled) | ~15 | $0.30 | ~$36 |
 | 25 | db-g1-small | ~93 | $1.50 | ~$52 |
 | 100 | db-g1-small | ~360 | $6 | ~$67 |
 | 300 | db-custom-1-3840 | ~1,080 | $18 | ~$133 |
 | 1,000 | AlloyDB | ~3,600 | $60 | ~$489 |
+
+> The "current model" row above is the legacy single-tenant-instance estimate. Production reality is already on `db-custom-1-3840` (shared with DevTrace) — the curve from 25 tenants up is the right one to use; the 5-tenant row is kept for historical continuity.
 
 With insight caching, the Anthropic API drops from the dominant cost to a minor line item (~12% at 1K tenants vs ~55% without caching). The database and compute are now the primary cost drivers at scale. Key cost levers:
 1. **AI gating by plan** — Free tenants generate zero LLM cost
