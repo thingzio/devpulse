@@ -85,6 +85,31 @@ resource "google_logging_metric" "event_limit_reached" {
   }
 }
 
+# User-facing request latency, excluding the /admin dashboard. The built-in
+# run.googleapis.com/request_latencies metric has no path label, so the admin
+# metrics page (a synchronous ~25s GCP+LLM call) would otherwise dominate the
+# service p99 and trip the latency alert on operator activity, not user impact.
+resource "google_logging_metric" "serve_latency" {
+  name    = "${var.prefix}-serve-latency"
+  project = var.project_id
+  filter  = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${var.prefix}-serve\" httpRequest.requestUrl!~\"/admin\" httpRequest.latency!=\"\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
+    unit        = "s"
+  }
+
+  # httpRequest.latency serializes as a string like "0.0015s"; strip the unit.
+  value_extractor = "REGEXP_EXTRACT(httpRequest.latency, \"([0-9.]+)s\")"
+
+  bucket_options {
+    explicit_buckets {
+      bounds = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30]
+    }
+  }
+}
+
 # Alert policies
 
 resource "google_monitoring_notification_channel" "email" {
@@ -287,11 +312,13 @@ resource "google_monitoring_alert_policy" "high_latency" {
   notification_channels = [google_monitoring_notification_channel.email.name]
 
   conditions {
-    display_name = "Request latency p99 > 1s"
+    display_name = "Request latency p99 > 1s (excludes /admin)"
     condition_threshold {
-      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"${google_cloud_run_v2_service.serve.name}\" AND metric.type = \"run.googleapis.com/request_latencies\" AND metric.labels.response_code_class = \"2xx\""
+      # Log-based distribution metric excludes the /admin dashboard so operator
+      # activity does not trip the user-facing latency SLO. Units are seconds.
+      filter          = "resource.type = \"cloud_run_revision\" AND metric.type = \"logging.googleapis.com/user/${google_logging_metric.serve_latency.name}\""
       comparison      = "COMPARISON_GT"
-      threshold_value = 1000
+      threshold_value = 1
       duration        = "600s"
 
       aggregations {

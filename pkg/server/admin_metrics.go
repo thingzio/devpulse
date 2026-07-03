@@ -8,11 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/thingzio/devpulse/pkg/config"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -88,13 +90,13 @@ func queryTimeSeries(ctx context.Context, projectID, token, filter, params strin
 		monitoringBaseURL, projectID, encoded,
 		start.Format(time.RFC3339), end.Format(time.RFC3339), params)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil) //nolint:gosec // URL from trusted config
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := metricsClient.Do(req) //nolint:gosec // URL from trusted config
+	resp, err := metricsClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("querying metrics: %w", err)
 	}
@@ -293,8 +295,17 @@ func trendQueries(cfg *metricsConfig) []metricQuery {
 	}
 }
 
+// metricsQueryConcurrency bounds simultaneous Monitoring API calls. GCP allows
+// far more, but a modest cap keeps a single admin page from bursting quota.
+const metricsQueryConcurrency = 8
+
+// collectAllMetrics fetches every metric query concurrently and renders them in
+// a stable order. The window end is truncated to the hour so GCP's backward
+// bucket alignment labels points on clean :00 boundaries — an un-truncated end
+// (e.g. 11:48) shifts every hourly bucket to :48, which previously caused the
+// analysis to misread import execution timing as a scheduler double-fire.
 func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, days int) string {
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Hour)
 	start := now.Add(-time.Duration(days) * 24 * time.Hour)
 
 	hourlyAlign := "aggregation.alignmentPeriod=3600s"
@@ -304,30 +315,40 @@ func collectAllMetrics(ctx context.Context, cfg *metricsConfig, token string, da
 	fmt.Fprintf(&b, "DevPulse Metrics — Last %d day(s), Project: %s, %s\n\n",
 		days, cfg.projectID, now.Format("2006-01-02 15:04 UTC"))
 
-	for _, q := range metricQueries(cfg, hourlyAlign, dailyAlign) {
-		raw, err := queryTimeSeries(ctx, cfg.projectID, token, q.filter, q.params, start, now)
-		if err != nil {
-			fmt.Fprintf(&b, "--- %s ---\n  (error: %s)\n\n", q.label, err)
-			continue
-		}
-		fmt.Fprintf(&b, "--- %s ---\n%s\n\n", q.label, formatTimeSeries(raw))
-	}
+	b.WriteString(renderQueries(ctx, cfg, token, metricQueries(cfg, hourlyAlign, dailyAlign), start, now))
 
 	// Append 7-day trend data when the primary window is shorter.
 	if days < trendDays {
 		trendStart := now.Add(-time.Duration(trendDays) * 24 * time.Hour)
 		fmt.Fprintf(&b, "=== 7-Day Trend Baseline ===\n\n")
-		for _, q := range trendQueries(cfg) {
-			raw, err := queryTimeSeries(ctx, cfg.projectID, token, q.filter, q.params, trendStart, now)
-			if err != nil {
-				fmt.Fprintf(&b, "--- %s ---\n  (error: %s)\n\n", q.label, err)
-				continue
-			}
-			fmt.Fprintf(&b, "--- %s ---\n%s\n\n", q.label, formatTimeSeries(raw))
-		}
+		b.WriteString(renderQueries(ctx, cfg, token, trendQueries(cfg), trendStart, now))
 	}
 
 	return b.String()
+}
+
+// renderQueries executes queries concurrently (bounded) and returns their
+// formatted output in the original slice order, so parallelism never reorders
+// the report or interleaves a query's error with another's data.
+func renderQueries(ctx context.Context, cfg *metricsConfig, token string, queries []metricQuery, start, end time.Time) string {
+	rendered := make([]string, len(queries))
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(metricsQueryConcurrency)
+	for i, q := range queries {
+		g.Go(func() error {
+			raw, err := queryTimeSeries(gctx, cfg.projectID, token, q.filter, q.params, start, end)
+			if err != nil {
+				rendered[i] = fmt.Sprintf("--- %s ---\n  (error: %s)\n\n", q.label, err)
+				return nil // one failed metric must not blank the whole report
+			}
+			rendered[i] = fmt.Sprintf("--- %s ---\n%s\n\n", q.label, formatTimeSeries(raw))
+			return nil
+		})
+	}
+	_ = g.Wait() // all goroutines return nil; errors are captured per-query above
+
+	return strings.Join(rendered, "")
 }
 
 // formatTimeSeries extracts data points from the monitoring API JSON response.
@@ -361,9 +382,16 @@ func formatTimeSeries(raw string) string {
 	for _, ts := range resp.TimeSeries {
 		var prefix string
 		if len(ts.Metric.Labels) > 0 {
-			var parts []string
-			for _, v := range ts.Metric.Labels {
-				parts = append(parts, v)
+			// Sort by key so multi-label series (e.g. org+repo) render in a
+			// stable order; Go map iteration is otherwise randomized per call.
+			keys := make([]string, 0, len(ts.Metric.Labels))
+			for k := range ts.Metric.Labels {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			parts := make([]string, 0, len(keys))
+			for _, k := range keys {
+				parts = append(parts, ts.Metric.Labels[k])
 			}
 			prefix = strings.Join(parts, " ") + ": "
 		}
