@@ -47,6 +47,20 @@ type OverviewResponse struct {
 	Repos []RepoOverview `json:"repos"`
 }
 
+// tenantRepoOverviewSQL: $1=tenant_id, $2=since, $3=week start.
+//
+// The per-repo counts come from a single grouped pass over the tenant's events
+// rather than a LATERAL evaluated once per repo. The earlier form used a
+// correlated EXISTS against devpulse_developer inside COUNT(DISTINCT CASE ...),
+// which the planner cannot flatten into a semi-join: measured against
+// production data it executed 94,022 times for a 25-repo tenant and touched
+// ~2.9 GB of buffers to return 25 rows. On a shared instance that does not stay
+// resident in cache, which is what made this endpoint take ~15-20s.
+//
+// Joining devpulse_developer once and grouping instead costs ~27 MB of buffers
+// for the same result -- a ~108x reduction. The join to devpulse_tenant_repo
+// inside the subquery keeps the scan limited to this tenant's repos; it cannot
+// fan out because (tenant_id, org, repo) is unique.
 const tenantRepoOverviewSQL = `
 	SELECT tr.org, tr.repo,
 		COALESCE(rm.stars, 0),
@@ -64,17 +78,21 @@ const tenantRepoOverviewSQL = `
 		COALESCE(tr.import_last_error, '')
 	FROM devpulse_tenant_repo tr
 	LEFT JOIN devpulse_repo_meta rm ON rm.org = tr.org AND rm.repo = tr.repo
-	LEFT JOIN LATERAL (
-		SELECT
+	LEFT JOIN (
+		SELECT e.org, e.repo,
 			COUNT(*) AS events,
-			COUNT(CASE WHEN e.date >= $3 THEN 1 END) AS weekly,
-			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END) AS contribs,
-			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + `
-				AND EXISTS (SELECT 1 FROM devpulse_developer d WHERE d.username = e.username AND d.reputation IS NOT NULL)
-				THEN e.username END) AS scored
+			COUNT(*) FILTER (WHERE e.date >= $3) AS weekly,
+			COUNT(DISTINCT e.username) FILTER (WHERE ` + data.ContribExcludeSQL + `) AS contribs,
+			COUNT(DISTINCT e.username) FILTER (WHERE ` + data.ContribExcludeSQL + `
+				AND d.reputation IS NOT NULL) AS scored
 		FROM devpulse_event e
-		WHERE e.org = tr.org AND e.repo = tr.repo AND e.date >= $2
-	) ec ON true
+		JOIN devpulse_tenant_repo etr
+			ON etr.org = e.org AND etr.repo = e.repo
+			AND etr.tenant_id = $1 AND etr.active = TRUE
+		LEFT JOIN devpulse_developer d ON d.username = e.username
+		WHERE e.date >= $2
+		GROUP BY e.org, e.repo
+	) ec ON ec.org = tr.org AND ec.repo = tr.repo
 	WHERE tr.tenant_id = $1 AND tr.active = TRUE
 	ORDER BY tr.org, tr.repo`
 

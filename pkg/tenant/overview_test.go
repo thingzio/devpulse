@@ -181,3 +181,83 @@ func TestGetWeeklyEventCount_ExcludesSampleRepos(t *testing.T) {
 	// Only regular repo events should be counted
 	assert.Equal(t, 5, count)
 }
+
+// The contributor counts in tenantRepoOverviewSQL are computed by a grouped
+// join rather than a per-repo LATERAL with a correlated EXISTS. These are the
+// semantics that rewrite has to preserve: fork events and bot accounts are
+// excluded from both counts, and "scored" additionally requires the developer
+// to carry a reputation.
+func TestGetOverview_ContributorAndScoredCounts(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 80007, "countsuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "corg", Repo: "crepo"}}))
+
+	// scoreddev has a reputation, plaindev does not, dependabot[bot] is a bot.
+	for _, d := range []struct {
+		name string
+		rep  any
+	}{
+		{"scoreddev", 4.2},
+		{"plaindev", nil},
+		{"dependabot[bot]", 3.0},
+		{"copilot", 3.0},
+	} {
+		_, err = db.ExecContext(ctx,
+			`INSERT INTO devpulse_developer (username, full_name, reputation) VALUES ($1, $1, $2)`,
+			d.name, d.rep)
+		require.NoError(t, err)
+	}
+
+	today := time.Now().UTC().Format("2006-01-02")
+	// (username, type) pairs — type varies to satisfy the event primary key.
+	events := []struct{ user, typ string }{
+		{"scoreddev", "pr"},       // counts toward contribs and scored
+		{"plaindev", "pr"},        // contribs only: no reputation
+		{"scoreddev", "fork"},     // excluded: fork
+		{"dependabot[bot]", "pr"}, // excluded: bot suffix
+		{"copilot", "pr"},         // excluded: known bot name
+	}
+	for _, e := range events {
+		_, err = db.ExecContext(ctx,
+			`INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels, title)
+			 VALUES ('corg', 'crepo', $1, $2, $3, '', '', '', '')`,
+			e.user, e.typ, today)
+		require.NoError(t, err)
+	}
+
+	resp, err := GetOverview(ctx, db, tn.ID, 30)
+	require.NoError(t, err)
+	require.Len(t, resp.Repos, 1)
+	r := resp.Repos[0]
+
+	assert.Equal(t, 5, r.Events, "Events counts every row, including forks and bots")
+	assert.Equal(t, 5, r.WeeklyEvents, "all events are dated today")
+	assert.Equal(t, 2, r.Contributors, "scoreddev + plaindev; forks and bots excluded")
+	assert.Equal(t, 1, r.Scored, "only scoreddev has a reputation")
+}
+
+// A repo with no events at all must still appear, with zeroed counts -- the
+// grouped subquery produces no row for it, so the LEFT JOIN + COALESCE has to
+// carry it.
+func TestGetOverview_RepoWithNoEvents(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	tn, err := UpsertTenant(ctx, db, 80008, "noeventsuser", "", "", "", "", "", "")
+	require.NoError(t, err)
+	require.NoError(t, AddTenantRepos(ctx, db, tn.ID, []OrgRepo{{Org: "eorg", Repo: "erepo"}}))
+
+	resp, err := GetOverview(ctx, db, tn.ID, 30)
+	require.NoError(t, err)
+	require.Len(t, resp.Repos, 1)
+
+	r := resp.Repos[0]
+	assert.Equal(t, "eorg", r.Org)
+	assert.Zero(t, r.Events)
+	assert.Zero(t, r.WeeklyEvents)
+	assert.Zero(t, r.Contributors)
+	assert.Zero(t, r.Scored)
+}
