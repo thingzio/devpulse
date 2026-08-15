@@ -151,13 +151,19 @@ resource "google_cloud_run_v2_service" "serve" {
         mount_path = "/cloudsql"
       }
 
+      # The container applies schema migrations during startup, before it
+      # begins answering /health. A DDL migration against a large table can
+      # take tens of seconds on this instance size, so the probe budget has to
+      # exceed the slowest expected migration or Cloud Run kills the container
+      # mid-startup and the revision never goes ready.
+      # 2s + (30 x 3s) = ~92s.
       startup_probe {
         http_get {
           path = "/health"
         }
         initial_delay_seconds = 2
         period_seconds        = 3
-        failure_threshold     = 5
+        failure_threshold     = 30
       }
     }
 
