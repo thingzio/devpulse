@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,20 +27,23 @@ func TestGetMaxEventTime_WithEvents(t *testing.T) {
 		`INSERT INTO devpulse_developer (username, full_name) VALUES ('user1', 'User One')`)
 	require.NoError(t, err)
 
-	// Insert test events with known created_at timestamps.
-	// PK is (org, repo, username, type, date) — vary date for uniqueness.
-	// Mix date-only and full RFC3339 formats to match real data.
-	for _, ts := range []string{"2025-01-15", "2025-03-20T21:14:12Z", "2025-02-10"} {
+	// Insert test events with known created_at timestamps. created_at drives
+	// the result; date is bound separately because the two columns are now
+	// distinct types (DATE vs TIMESTAMPTZ) and only needs to vary to satisfy
+	// the (org, repo, username, type, date) primary key.
+	for _, ts := range []string{"2025-01-15T08:00:00Z", "2025-03-20T21:14:12Z", "2025-02-10T12:30:00Z"} {
 		_, insertErr := store.db.ExecContext(ctx,
 			`INSERT INTO devpulse_event (org, repo, username, type, date, url, mentions, labels, created_at)
-			 VALUES ($1, $2, 'user1', 'pr', $3, '', '', '', $3)`,
-			"testorg", "testrepo", ts)
+			 VALUES ($1, $2, 'user1', 'pr', $3, '', '', '', $4)`,
+			"testorg", "testrepo", ts[:10], ts)
 		require.NoError(t, insertErr)
 	}
 
 	got, err := store.GetMaxEventTime(ctx, "testorg", "testrepo")
 	require.NoError(t, err)
-	assert.Equal(t, "2025-03-20", got.Format("2006-01-02"))
+	// Full instant, not just the day — the time component must survive the
+	// TIMESTAMPTZ round-trip.
+	assert.Equal(t, "2025-03-20T21:14:12Z", got.Format(time.RFC3339))
 }
 
 func TestGetMaxEventTime_NilDB(t *testing.T) {

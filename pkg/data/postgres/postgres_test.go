@@ -153,6 +153,25 @@ func TestApplyAppName(t *testing.T) {
 	}
 }
 
+func TestApplyTimeZoneUTC(t *testing.T) {
+	tests := []struct {
+		name string
+		dsn  string
+		want string
+	}{
+		{"already set", "postgres://host/db?timezone=UTC", "postgres://host/db?timezone=UTC"},
+		{"uri no params", "postgres://host/db", "postgres://host/db?timezone=UTC"},
+		{"uri with params", "postgres://host/db?sslmode=disable", "postgres://host/db?sslmode=disable&timezone=UTC"},
+		{"postgresql scheme", "postgresql://host/db", "postgresql://host/db?timezone=UTC"},
+		{"keyword format", "host=localhost dbname=thingz", "host=localhost dbname=thingz timezone=UTC"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, applyTimeZoneUTC(tc.dsn))
+		})
+	}
+}
+
 func TestNew_EmptyDSN(t *testing.T) {
 	_, err := New("")
 	assert.Error(t, err)

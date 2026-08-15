@@ -8,8 +8,18 @@ import (
 	"github.com/thingzio/devpulse/pkg/data"
 )
 
+// Temporal columns are stored as native DATE/TIMESTAMPTZ but exposed by the
+// JSON/YAML/CSV APIs as strings. Rendering happens in SQL rather than by
+// scanning into a Go string, so the wire format stays fixed regardless of the
+// driver's time.Time rendering, the session TimeZone, or any sub-second
+// precision that may appear in future data:
+//
+//	DATE        -> col::text                                  "2006-01-02"
+//	TIMESTAMPTZ -> TO_CHAR(col AT TIME ZONE 'UTC', tsLayout)   "2006-01-02T15:04:05Z"
+const tsLayout = `'YYYY-MM-DD"T"HH24:MI:SS"Z"'`
+
 const (
-	selectMinEventDateTpl = `SELECT COALESCE(MIN(date), '') FROM devpulse_event
+	selectMinEventDateTpl = `SELECT COALESCE(MIN(date)::text, '') FROM devpulse_event
 		WHERE 1=1%s
 	`
 
@@ -46,16 +56,16 @@ const (
 	selectEventTpl = `SELECT
 			e.org,
 			e.repo,
-			e.date,
+			e.date::text,
 			e.type,
 			e.url,
 			e.mentions,
 			e.labels,
 			e.state,
 			e.number,
-			e.created_at,
-			e.closed_at,
-			e.merged_at,
+			TO_CHAR(e.created_at AT TIME ZONE 'UTC', ` + tsLayout + `),
+			TO_CHAR(e.closed_at  AT TIME ZONE 'UTC', ` + tsLayout + `),
+			TO_CHAR(e.merged_at  AT TIME ZONE 'UTC', ` + tsLayout + `),
 			e.additions,
 			e.deletions,
 			e.changed_files,

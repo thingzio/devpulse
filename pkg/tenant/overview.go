@@ -58,7 +58,7 @@ const tenantRepoOverviewSQL = `
 		COALESCE(ec.scored, 0),
 		COALESCE(rm.language, ''),
 		COALESCE(rm.license, ''),
-		COALESCE(rm.last_import_at, ''),
+		COALESCE(TO_CHAR(rm.last_import_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
 		tr.sample,
 		tr.import_errors,
 		COALESCE(tr.import_last_error, '')

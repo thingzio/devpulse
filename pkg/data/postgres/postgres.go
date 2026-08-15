@@ -94,6 +94,24 @@ func applyAppName(dsn, appName string) string {
 	return dsn + " application_name=" + appName
 }
 
+// applyTimeZoneUTC appends timezone=UTC to a DSN if not already present.
+// Supports both URI and keyword/value connection strings. Casting a
+// TIMESTAMPTZ to date or text depends on the session TimeZone, so pinning it
+// makes those conversions deterministic instead of inheriting whatever the
+// server happens to default to.
+func applyTimeZoneUTC(dsn string) string {
+	if strings.Contains(dsn, "timezone") {
+		return dsn
+	}
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if strings.Contains(dsn, "?") {
+			return dsn + "&timezone=UTC"
+		}
+		return dsn + "?timezone=UTC"
+	}
+	return dsn + " timezone=UTC"
+}
+
 // New creates a new PostgreSQL Store, running migrations automatically.
 // Uses DefaultPoolConfig if no config is provided.
 // DB_MAX_OPEN_CONNS and DB_MAX_IDLE_CONNS env vars override code defaults.
@@ -108,7 +126,7 @@ func New(dsn string, cfgs ...PoolConfig) (*Store, error) {
 	}
 	cfg.applyEnvOverrides()
 
-	db, err := sql.Open("postgres", applyAppName(dsn, cfg.AppName))
+	db, err := sql.Open("postgres", applyTimeZoneUTC(applyAppName(dsn, cfg.AppName)))
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

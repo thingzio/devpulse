@@ -220,13 +220,16 @@ func AutoGranularity(days int) Granularity {
 }
 
 // GroupExpr returns the SQL expression that buckets a column by granularity.
-//   - GranMonth: "SUBSTRING(col, 1, 7)"          → "2024-03"
+//   - GranMonth: "TO_CHAR(col::date, 'YYYY-MM')" → "2024-03"
 //   - GranWeek:  "TO_CHAR(date_trunc(...))"       → "2024-03-04" (Monday)
+//
+// Both branches cast to date first so the expression works against DATE,
+// TIMESTAMPTZ, and text columns alike.
 func GroupExpr(g Granularity, col string) string {
 	if g == GranWeek {
 		return fmt.Sprintf("TO_CHAR(date_trunc('week', %s::date), 'YYYY-MM-DD')", col)
 	}
-	return fmt.Sprintf("SUBSTRING(%s, 1, 7)", col)
+	return fmt.Sprintf("TO_CHAR(%s::date, 'YYYY-MM')", col)
 }
 
 // MomentumInterval returns the SQL interval for the rolling momentum window.

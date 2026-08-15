@@ -407,7 +407,7 @@ const (
 		COUNT(DISTINCT org || '/' || repo),
 		COUNT(*),
 		COUNT(DISTINCT username),
-		COALESCE((SELECT MAX(last_import_at) FROM devpulse_repo_meta), '')
+		COALESCE((SELECT TO_CHAR(MAX(last_import_at) AT TIME ZONE 'UTC', ` + tsLayout + `) FROM devpulse_repo_meta), '')
 	FROM base
 	`
 
@@ -646,7 +646,7 @@ LIMIT $3
 `
 
 	// selectDailyActivityTpl: $1=since, dynamic org/repo/entity via queryBuilder
-	selectDailyActivityTpl = `SELECT e.date, COUNT(*) AS cnt
+	selectDailyActivityTpl = `SELECT e.date::text, COUNT(*) AS cnt
 		FROM devpulse_event e
 		JOIN devpulse_developer d ON e.username = d.username
 		WHERE e.date >= $1

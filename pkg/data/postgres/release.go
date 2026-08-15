@@ -76,7 +76,7 @@ const (
 	`
 
 	// selectLatestReleaseSQL: $1=org, $2=repo
-	selectLatestReleaseSQL = `SELECT COALESCE(MAX(published_at), '')
+	selectLatestReleaseSQL = `SELECT COALESCE(TO_CHAR(MAX(published_at) AT TIME ZONE 'UTC', ` + tsLayout + `), '')
 		FROM devpulse_release
 		WHERE org = $1 AND repo = $2
 	`
@@ -218,9 +218,14 @@ func upsertReleasePage(ctx context.Context, db DBTX, stmt, assetStmt *sql.Stmt, 
 			break
 		}
 
+		var publishedAtParam any
+		if publishedAt != "" {
+			publishedAtParam = publishedAt
+		}
+
 		if _, execErr := txStmt.ExecContext(ctx,
-			owner, repo, tag, name, publishedAt, pre,
-			name, publishedAt, pre,
+			owner, repo, tag, name, publishedAtParam, pre,
+			name, publishedAtParam, pre,
 		); execErr != nil {
 			rollbackTransaction(tx)
 			return false, fmt.Errorf("error inserting release %s: %w", tag, execErr)

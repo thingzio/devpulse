@@ -245,14 +245,12 @@ func (s *Store) gatherLocalSignals(ctx context.Context, username, since string, 
 	sig.TotalCommits = stats.totalCommits
 	sig.TotalContributors = stats.totalContributors
 
-	var lastDate sql.NullString
+	var lastDate sql.NullTime
 	if err := s.db.QueryRowContext(ctx, selectLastCommitDateSQL, username).Scan(&lastDate); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Debug("error getting last commit date", "username", username, "error", err)
 	}
-	if lastDate.Valid && lastDate.String != "" {
-		if t, parseErr := time.Parse("2006-01-02", lastDate.String); parseErr == nil {
-			sig.LastCommitDays = int64(time.Since(t).Hours() / 24)
-		}
+	if lastDate.Valid {
+		sig.LastCommitDays = int64(time.Since(lastDate.Time).Hours() / 24)
 	}
 
 	return sig

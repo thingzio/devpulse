@@ -30,8 +30,10 @@ const (
 
 	updateLastImportAtSQL = `UPDATE devpulse_repo_meta SET last_import_at = $1 WHERE org = $2 AND repo = $3`
 
-	// selectRepoMetaUpdatedAtSQL: $1=org, $2=repo
-	selectRepoMetaUpdatedAtSQL = `SELECT COALESCE(updated_at, ''), COALESCE(community_health_pct, 0), COALESCE(pushed_at, '')
+	// selectRepoMetaUpdatedAtSQL: $1=org, $2=repo. updated_at/pushed_at are
+	// scanned as timestamps (not rendered strings) because callers compare
+	// them rather than serialize them.
+	selectRepoMetaUpdatedAtSQL = `SELECT updated_at, COALESCE(community_health_pct, 0), pushed_at
 		FROM devpulse_repo_meta
 		WHERE org = $1 AND repo = $2
 	`
@@ -41,7 +43,7 @@ const (
 	// (org, repo) primary key when both are provided.
 	selectRepoMetaTpl = `SELECT org, repo, stars, forks, open_issues, language, license, archived,
 			has_coc, has_contributing, has_readme, has_issue_template, has_pr_template, community_health_pct,
-			updated_at
+			COALESCE(TO_CHAR(updated_at AT TIME ZONE 'UTC', ` + tsLayout + `), '')
 		FROM devpulse_repo_meta
 		WHERE 1=1
 		  %s
@@ -60,7 +62,7 @@ const (
 			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` THEN e.username END),
 			COUNT(DISTINCT CASE WHEN ` + data.ContribExcludeSQL + ` AND d.reputation IS NOT NULL THEN e.username END),
 			rm.language, rm.license, rm.archived,
-			rm.last_import_at
+			COALESCE(TO_CHAR(rm.last_import_at AT TIME ZONE 'UTC', ` + tsLayout + `), '')
 		FROM devpulse_repo_meta rm
 		LEFT JOIN devpulse_event e ON rm.org = e.org AND rm.repo = e.repo AND e.date >= $1
 		LEFT JOIN devpulse_developer d ON e.username = d.username
@@ -77,24 +79,19 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) (
 		return time.Time{}, data.ErrDBNotInitialized
 	}
 
-	var lastUpdated string
+	var lastUpdated sql.NullTime
 	var healthPct int
-	var pushedAtStr string
-	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct, &pushedAtStr); scanErr != nil && !errors.Is(scanErr, sql.ErrNoRows) {
+	var pushedAt sql.NullTime
+	if scanErr := s.db.QueryRowContext(ctx, selectRepoMetaUpdatedAtSQL, owner, repo).Scan(&lastUpdated, &healthPct, &pushedAt); scanErr != nil && !errors.Is(scanErr, sql.ErrNoRows) {
 		return time.Time{}, fmt.Errorf("querying repo meta updated_at for %s/%s: %w", owner, repo, scanErr)
 	}
-	if lastUpdated != "" && healthPct > 0 {
-		if t, parseErr := time.Parse("2006-01-02T15:04:05Z", lastUpdated); parseErr == nil {
-			if time.Since(t) < 24*time.Hour {
-				slog.Debug("metadata fresh, skipping", "org", owner, "repo", repo, "updated_at", lastUpdated)
-				now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-				if _, err := s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo); err != nil {
-					slog.Warn("failed to update last import time", "owner", owner, "repo", repo, "error", err)
-				}
-				pushedAt, _ := time.Parse("2006-01-02T15:04:05Z", pushedAtStr)
-				return pushedAt, nil
-			}
+	if lastUpdated.Valid && healthPct > 0 && time.Since(lastUpdated.Time) < 24*time.Hour {
+		slog.Debug("metadata fresh, skipping", "org", owner, "repo", repo, "updated_at", lastUpdated.Time)
+		now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+		if _, err := s.db.ExecContext(ctx, updateLastImportAtSQL, now, owner, repo); err != nil {
+			slog.Warn("failed to update last import time", "owner", owner, "repo", repo, "error", err)
 		}
+		return pushedAt.Time, nil
 	}
 
 	client := github.NewClient(net.GetOAuthClient(ctx, token))
@@ -126,16 +123,20 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) (
 		archived = 1
 	}
 
-	pushedAtVal := ""
+	// pushed_at is nullable: bind nil rather than "" when GitHub reports no
+	// timestamp, since "" is not a valid TIMESTAMPTZ literal.
+	var newPushedAt time.Time
+	var pushedAtParam any
 	if r.PushedAt != nil {
-		pushedAtVal = r.PushedAt.Time.UTC().Format("2006-01-02T15:04:05Z")
+		newPushedAt = r.PushedAt.Time.UTC()
+		pushedAtParam = newPushedAt.Format("2006-01-02T15:04:05Z")
 	}
 
 	_, err = s.db.ExecContext(ctx, upsertRepoMetaSQL,
 		owner, repo, r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
-		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtVal,
+		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtParam,
 		r.GetStargazersCount(), r.GetForksCount(), r.GetOpenIssuesCount(),
-		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtVal,
+		lang, license, archived, cp.coc, cp.contributing, cp.readme, cp.issueTmpl, cp.prTmpl, cp.healthPct, now, now, pushedAtParam,
 	)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("error upserting repo meta %s/%s: %w", owner, repo, err)
@@ -151,8 +152,7 @@ func (s *Store) ImportRepoMeta(ctx context.Context, token, owner, repo string) (
 	}
 
 	slog.Debug("metadata done", "org", owner, "repo", repo)
-	pushedAt, _ := time.Parse("2006-01-02T15:04:05Z", pushedAtVal)
-	return pushedAt, nil
+	return newPushedAt, nil
 }
 
 type communityProfile struct {

@@ -52,10 +52,10 @@ joined AS (
         ar.repo,
         COALESCE(ec.current_events, 0) AS current_events,
         COALESCE(ri.event_count, 0) AS saved_events,
-        COALESCE(ri.generated_at, '') AS generated_at,
+        COALESCE(TO_CHAR(ri.generated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS generated_at,
         CASE
-            WHEN ri.generated_at IS NULL OR ri.generated_at = '' THEN NULL
-            ELSE EXTRACT(EPOCH FROM (NOW() - to_timestamp(ri.generated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))) / 86400.0
+            WHEN ri.generated_at IS NULL THEN NULL
+            ELSE EXTRACT(EPOCH FROM (NOW() - ri.generated_at)) / 86400.0
         END AS age_days,
         ri.generated_at IS NULL AS has_no_insights
     FROM active_repos ar

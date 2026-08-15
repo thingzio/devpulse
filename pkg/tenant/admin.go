@@ -134,7 +134,7 @@ const (
 		SELECT tr.org, tr.repo,
 		       COUNT(e.type),
 		       COUNT(CASE WHEN e.date >= $3 THEN 1 END),
-		       COALESCE(rm.last_import_at, ''),
+		       COALESCE(TO_CHAR(rm.last_import_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0
 		                   AND e.created_at::date >= $4 THEN 1 END),
 		       COUNT(CASE WHEN e.type = 'pr' AND e.number IS NOT NULL AND e.number > 0

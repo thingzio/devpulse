@@ -27,7 +27,7 @@ const (
 	// selectRepoMetricHistoryTpl: $1=since fixed; %s = queryBuilder for org/repo.
 	// Replaces COALESCE($N, col) anti-pattern so the planner can use the
 	// (org, repo, date) primary key when org/repo are provided.
-	selectRepoMetricHistoryTpl = `SELECT org, repo, date, stars, forks
+	selectRepoMetricHistoryTpl = `SELECT org, repo, date::text, stars, forks
 		FROM devpulse_repo_metric_history
 		WHERE date >= $1
 		  %s
@@ -38,7 +38,7 @@ const (
 	// $2=since fixed; %s = queryBuilder for the org filter. Splitting the
 	// projection from the filter lets the planner use the org index when an
 	// org is provided.
-	selectRepoMetricHistoryAggTpl = `SELECT COALESCE($1, '') AS org, '' AS repo, date,
+	selectRepoMetricHistoryAggTpl = `SELECT COALESCE($1, '') AS org, '' AS repo, date::text,
 			SUM(stars) AS stars, SUM(forks) AS forks
 		FROM devpulse_repo_metric_history
 		WHERE date >= $2

@@ -9,7 +9,10 @@
 CREATE TEMP TABLE event_entity_winners ON COMMIT DROP AS
 SELECT DISTINCT ON (org, repo, type, number)
     org, repo, username, type,
-    COALESCE(TO_CHAR(created_at::timestamp, 'YYYY-MM-DD'), date) AS date,
+    -- Both branches cast to date so the expression types match whether
+    -- created_at/date are still TEXT or already native (base migrations
+    -- 003/004). Equivalent to the previous TO_CHAR(...,'YYYY-MM-DD') form.
+    COALESCE(created_at::date, date::date) AS date,
     url, mentions, labels, state, number, created_at, closed_at, merged_at,
     additions, deletions, changed_files, commits, title
 FROM devpulse_event

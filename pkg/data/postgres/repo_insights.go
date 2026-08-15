@@ -20,14 +20,15 @@ const (
 	// selectRepoInsightsTpl: %s = queryBuilder whereClause for org/repo.
 	// Replaces COALESCE($1, org) anti-pattern which prevents the planner
 	// from using the (org, repo) primary key when both are NULL.
-	selectRepoInsightsTpl = `SELECT org, repo, insights_json, period_months, model, generated_at, event_count
+	selectRepoInsightsTpl = `SELECT org, repo, insights_json, period_months, model,
+			TO_CHAR(generated_at AT TIME ZONE 'UTC', ` + tsLayout + `), event_count
 		FROM devpulse_repo_insights
 		WHERE 1=1
 		  %s
 		ORDER BY org, repo
 	`
 
-	selectRepoInsightsGeneratedAtSQL = `SELECT COALESCE(generated_at, '')
+	selectRepoInsightsGeneratedAtSQL = `SELECT COALESCE(TO_CHAR(generated_at AT TIME ZONE 'UTC', ` + tsLayout + `), '')
 		FROM devpulse_repo_insights
 		WHERE org = $1 AND repo = $2
 	`

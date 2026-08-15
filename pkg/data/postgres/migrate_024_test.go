@@ -71,7 +71,9 @@ func TestMigration024_DedupesPRRows(t *testing.T) {
 
 	var state, date, mergedAt, closedAtCol string
 	err = store.db.QueryRowContext(ctx,
-		`SELECT state, date, COALESCE(merged_at, ''), COALESCE(closed_at, '')
+		`SELECT state, date::text,
+		        COALESCE(TO_CHAR(merged_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), ''),
+		        COALESCE(TO_CHAR(closed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')
 		 FROM devpulse_event WHERE org='ai-dynamo' AND repo='dynamo' AND number=7544`,
 	).Scan(&state, &date, &mergedAt, &closedAtCol)
 	require.NoError(t, err)

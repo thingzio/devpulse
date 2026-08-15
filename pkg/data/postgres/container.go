@@ -24,7 +24,7 @@ const (
 	`
 
 	// selectLatestContainerVersionSQL: $1=org, $2=repo, $3=package
-	selectLatestContainerVersionSQL = `SELECT COALESCE(MAX(created_at), '')
+	selectLatestContainerVersionSQL = `SELECT COALESCE(TO_CHAR(MAX(created_at) AT TIME ZONE 'UTC', ` + tsLayout + `), '')
 		FROM devpulse_container_version
 		WHERE org = $1 AND repo = $2 AND package = $3
 	`
@@ -176,7 +176,12 @@ func fetchAndStoreVersions(ctx context.Context, client *github.Client, stmt *sql
 				break
 			}
 
-			if _, execErr := stmt.ExecContext(ctx, org, repo, pkgName, v.GetID(), tag, createdAt); execErr != nil {
+			var createdAtParam any
+			if createdAt != "" {
+				createdAtParam = createdAt
+			}
+
+			if _, execErr := stmt.ExecContext(ctx, org, repo, pkgName, v.GetID(), tag, createdAtParam); execErr != nil {
 				return 0, fmt.Errorf("inserting container version %d: %w", v.GetID(), execErr)
 			}
 			count++

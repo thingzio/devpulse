@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS devpulse_developer (
     url TEXT,
     entity TEXT,
     reputation REAL,
-    reputation_updated_at TEXT,
+    reputation_updated_at TIMESTAMPTZ,
     PRIMARY KEY (username)
 );
 
@@ -17,15 +17,15 @@ CREATE TABLE IF NOT EXISTS devpulse_event (
     repo TEXT NOT NULL,
     username TEXT NOT NULL,
     type TEXT NOT NULL,
-    date TEXT NOT NULL,
+    date DATE NOT NULL,
     url TEXT NOT NULL,
     mentions TEXT NOT NULL,
     labels TEXT NOT NULL,
     state TEXT,
     number INTEGER,
-    created_at TEXT,
-    closed_at TEXT,
-    merged_at TEXT,
+    created_at TIMESTAMPTZ,
+    closed_at TIMESTAMPTZ,
+    merged_at TIMESTAMPTZ,
     additions INTEGER,
     deletions INTEGER,
     title TEXT NOT NULL DEFAULT '',
@@ -44,15 +44,15 @@ CREATE TABLE IF NOT EXISTS devpulse_repo_meta (
     language TEXT,
     license TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT '',
-    last_import_at TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ,
+    last_import_at TIMESTAMPTZ,
     has_coc INTEGER NOT NULL DEFAULT 0,
     has_contributing INTEGER NOT NULL DEFAULT 0,
     has_readme INTEGER NOT NULL DEFAULT 0,
     has_issue_template INTEGER NOT NULL DEFAULT 0,
     has_pr_template INTEGER NOT NULL DEFAULT 0,
     community_health_pct INTEGER NOT NULL DEFAULT 0,
-    pushed_at TEXT NOT NULL DEFAULT '',
+    pushed_at TIMESTAMPTZ,
     PRIMARY KEY (org, repo)
 );
 
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS devpulse_release (
     repo TEXT NOT NULL,
     tag TEXT NOT NULL,
     name TEXT,
-    published_at TEXT,
+    published_at TIMESTAMPTZ,
     prerelease INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (org, repo, tag)
 );
@@ -83,14 +83,14 @@ CREATE TABLE IF NOT EXISTS devpulse_container_version (
     package TEXT NOT NULL,
     version_id INTEGER NOT NULL,
     tag TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
+    created_at TIMESTAMPTZ,
     PRIMARY KEY (org, repo, package, version_id)
 );
 
 CREATE TABLE IF NOT EXISTS devpulse_repo_metric_history (
     org TEXT NOT NULL,
     repo TEXT NOT NULL,
-    date TEXT NOT NULL,
+    date DATE NOT NULL,
     stars INTEGER NOT NULL DEFAULT 0,
     forks INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (org, repo, date)
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS devpulse_repo_insights (
     insights_json TEXT NOT NULL,
     period_months INTEGER NOT NULL DEFAULT 3,
     model TEXT NOT NULL DEFAULT '',
-    generated_at TEXT NOT NULL,
+    generated_at TIMESTAMPTZ NOT NULL,
     event_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (org, repo)
 );

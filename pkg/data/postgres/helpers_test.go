@@ -239,9 +239,9 @@ func TestGroupExpr(t *testing.T) {
 		col  string
 		want string
 	}{
-		{GranMonth, "e.created_at", "SUBSTRING(e.created_at, 1, 7)"},
+		{GranMonth, "e.created_at", "TO_CHAR(e.created_at::date, 'YYYY-MM')"},
 		{GranWeek, "e.created_at", "TO_CHAR(date_trunc('week', e.created_at::date), 'YYYY-MM-DD')"},
-		{GranMonth, "e.date", "SUBSTRING(e.date, 1, 7)"},
+		{GranMonth, "e.date", "TO_CHAR(e.date::date, 'YYYY-MM')"},
 		{GranWeek, "e.date", "TO_CHAR(date_trunc('week', e.date::date), 'YYYY-MM-DD')"},
 	}
 	for _, tc := range tests {
