@@ -59,10 +59,18 @@ Tool versions and quality thresholds are centralized in `.settings.yaml` (single
   - Migration in `pkg/data/postgres/sql/migrations_saas/001_initial.sql`
 
 **Schema migrations (CRITICAL):**
-- `001_initial.sql` is a squashed file — production `saas_schema_version` is at version 22
-- New migrations MUST be numbered above the current high-water mark (e.g. `023_*.sql`, `024_*.sql`)
+- There are **two independent chains**, each with its own version table and advisory lock:
+
+  | Chain | Directory | Version table | Prod high-water mark |
+  |---|---|---|---|
+  | base | `sql/migrations/` | `schema_version` | **14** |
+  | saas | `sql/migrations_saas/` | `saas_schema_version` | **25** |
+
+- Both `001_initial.sql` files are squashed. **The directory listing does NOT tell you the high-water mark** — the base chain contains only `001_initial.sql` but its version table holds `1,2,3,4,12,13,14` from the migrations that were squashed into it. Verify with `SELECT MAX(version) FROM schema_version` before numbering anything
+- New migrations MUST be numbered above that mark. `applyMigrations` silently skips any file where `version <= MAX(version)` — a mis-numbered migration does not error, it just never runs, and code that assumes the new schema ships anyway
+- A fresh test container starts at version 0 and applies everything, so **CI cannot catch a mis-numbered migration**. `migrate_legacy_test.go` reconstructs production's version history to cover that gap — extend it when adding migrations
 - Never rely on editing `001_initial.sql` for production schema changes — it only affects fresh databases
-- Always use `IF NOT EXISTS` / `IF EXISTS` for idempotent DDL
+- Always use `IF NOT EXISTS` / `IF EXISTS` or an `information_schema` guard for idempotent DDL, so the same file is safe against both legacy and fresh databases
 
 **Error handling:**
 - Use `fmt.Errorf("context: %w", err)` for wrapping — never bare `return err`
