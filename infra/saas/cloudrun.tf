@@ -186,6 +186,16 @@ resource "google_cloud_run_v2_service" "serve" {
     }
   }
 
+  # The release workflow deploys pinned version tags (devpulse-site:vX.Y.Z),
+  # while this config names :latest as the bootstrap value. Without this,
+  # every plan reports the deployed version as drift and a subsequent apply
+  # would roll the service back to whatever :latest currently points at --
+  # discarding the released version and any traffic pin along with it.
+  # The deploy pipeline owns the image tag; Terraform owns everything else.
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image]
+  }
+
   depends_on = [google_project_service.default]
 }
 
@@ -338,6 +348,12 @@ resource "google_cloud_run_v2_job" "import" {
         }
       }
     }
+  }
+
+  # See the note on google_cloud_run_v2_service.serve -- the release workflow
+  # owns the image tag for the job as well.
+  lifecycle {
+    ignore_changes = [template[0].template[0].containers[0].image]
   }
 
   depends_on = [google_project_service.default]
