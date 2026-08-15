@@ -129,7 +129,6 @@ CREATE TABLE IF NOT EXISTS devpulse_sub (
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_date ON devpulse_event (org, repo, date);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_type_date ON devpulse_event (org, repo, type, date);
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_created_at ON devpulse_event (org, repo, created_at);
-CREATE INDEX IF NOT EXISTS idx_devpulse_event_username ON devpulse_event (username);
 CREATE INDEX IF NOT EXISTS idx_devpulse_developer_reputation ON devpulse_developer (reputation);
 
 CREATE INDEX IF NOT EXISTS idx_devpulse_event_org_repo_number ON devpulse_event (org, repo, number);
