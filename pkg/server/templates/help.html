@@ -143,8 +143,8 @@
     <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Data Export</h3>
       <ul>
-        <li><strong>PDF report</strong> &mdash; click the PDF button in the toolbar to generate a downloadable report of the current dashboard view. Available on Starter plans and above.</li>
-        <li><strong>CSV/ZIP export</strong> &mdash; click the CSV button to download a ZIP archive containing summary, events, developers, insights, and reputation data for the selected scope. Available on Pro plans and above.</li>
+        <li><strong>PDF report</strong> &mdash; click the PDF button in the toolbar to generate a downloadable report of the current dashboard view.</li>
+        <li><strong>CSV/ZIP export</strong> &mdash; click the CSV button to download a ZIP archive containing summary, events, developers, insights, and reputation data for the selected scope.</li>
         <li><strong>Portfolio CSV</strong> &mdash; on the Portfolio view, use the "Export All (CSV)" link in the Repository Overview panel to export all repo metrics.</li>
         <li><strong>Event search CSV</strong> &mdash; on the Events tab, use the "Export CSV" button to download filtered search results.</li>
       </ul>
@@ -154,7 +154,7 @@
       <h3>Settings</h3>
       <ul>
         <li><strong>Profile</strong> &mdash; view your GitHub username, name, and email as imported from your GitHub profile.</li>
-        <li><strong>Plan &amp; usage</strong> &mdash; see your current plan, repo count vs limit, weekly event limit, account creation date, and last login.</li>
+        <li><strong>Usage</strong> &mdash; see your repo count vs limit, weekly event limit, account creation date, and last login.</li>
         <li><strong>Theme</strong> &mdash; switch between Light, Dark, or System theme. Your preference is saved in the browser.</li>
       </ul>
     </div>
@@ -162,13 +162,10 @@
     <div class="landing-feature help-section" style="margin-bottom:20px">
       <h3>Usage Limits</h3>
       <ul>
-        <li><strong>Free</strong> &mdash; {{(index .PlanMap "free").MaxRepos}} repo, {{comma (index .PlanMap "free").MaxEventsPerWeek}} events/week, 3 months data retention, no AI insights, no exports</li>
-        <li><strong>Starter</strong> &mdash; {{(index .PlanMap "starter").MaxRepos}} repos, {{comma (index .PlanMap "starter").MaxEventsPerWeek}} events/week, 6 months retention, AI insights, PDF export</li>
-        <li><strong>Pro</strong> &mdash; {{(index .PlanMap "pro").MaxRepos}} repos, {{comma (index .PlanMap "pro").MaxEventsPerWeek}} events/week, 12 months retention, AI insights, deep reputation, PDF + CSV export</li>
-        <li><strong>Enterprise</strong> &mdash; unlimited repos, unlimited events/week, unlimited retention, AI insights, deep reputation, PDF + CSV export, on-demand imports</li>
-        <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your plan limits</li>
+        <li><strong>Why limits exist</strong> &mdash; DevPulse is a shared, best-effort service. Per-account limits on repos, weekly events, and data retention keep it responsive for everyone. They are not a paid upsell &mdash; there is nothing to buy.</li>
+        <li><strong>Usage banner</strong> &mdash; the dashboard displays your current weekly event consumption and repo count against your account limits</li>
         <li><strong>Import pauses</strong> &mdash; when the weekly event limit is reached, imports pause automatically until the following week. Existing data remains fully accessible.</li>
-        <li><strong>Upgrading</strong> &mdash; click "Request Upgrade" when you hit a limit, or email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a> to discuss plan options</li>
+        <li><strong>Need more headroom?</strong> &mdash; email <a href="mailto:devpulse@thingz.io">devpulse@thingz.io</a>. Limits are adjusted case by case, at no cost, subject to what the shared instance can carry.</li>
       </ul>
     </div>
 
@@ -211,7 +208,7 @@
   </div>
 
     <div class="landing-feature help-section" style="margin-bottom:20px">
-      <h3>Plans</h3>
+      <h3>How this service is run</h3>
       {{template "plans_table" .}}
     </div>
   </div>

@@ -6,6 +6,8 @@
 
 Multi-tenant SaaS for GitHub project health analytics. Users sign in with GitHub OAuth, install a GitHub App on their repos, and get a hosted dashboard at [devpulse.thingz.io](https://devpulse.thingz.io).
 
+The hosted instance is a **reference implementation** operated on a best-effort basis &mdash; free to use, no plans or pricing, no SLA.
+
 Two binaries: `devpulse-site` (HTTP server + integrated admin dashboard), `devpulse-import` (batch worker). PostgreSQL with Row-Level Security for tenant isolation.
 
 ## Development
@@ -27,7 +29,7 @@ make qualify    # test-coverage + lint + govulncheck + e2e
 | [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | GCP tiers, scaling, costs, API throughput |
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Query tuning method, endpoint baselines, findings |
 | [BOOTSTRAP.md](docs/BOOTSTRAP.md) | One-time GCP deployment guide |
-| [PLANS.md](docs/PLANS.md) | Plan feature gating (Free, Starter, Pro, Enterprise) |
+| [PLANS.md](docs/PLANS.md) | Per-account limit enforcement |
 | [VIEWS.md](docs/VIEWS.md) | Dashboard tabs and chart guide |
 | [GITLAB.md](docs/GITLAB.md) | GitLab support feasibility assessment |
 
