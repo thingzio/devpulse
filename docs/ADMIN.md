@@ -19,7 +19,7 @@ gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
 ### Infrastructure Changes
 
 ```shell
-cd infra/saas
+cd infra/run
 terraform plan   # review changes
 terraform apply  # zero downtime upgrade
 ```
@@ -82,7 +82,7 @@ Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 
 ### Log-Based Metrics
 
-Created by Terraform (`infra/saas/monitoring.tf`). These are free.
+Created by Terraform (`infra/run/monitoring.tf`). These are free.
 
 | Metric | Filter | Type |
 |--------|--------|------|
@@ -101,7 +101,7 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 
 ### Dashboard
 
-22 widgets in `infra/saas/dashboard.json`:
+22 widgets in `infra/run/dashboard.json`:
 
 #### Service Widgets (Cloud Run)
 

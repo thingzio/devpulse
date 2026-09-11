@@ -60,7 +60,7 @@ lint-go: ## Lints Go code with go vet and golangci-lint
 lint-yaml: ## Lints YAML files with yamllint
 	yamllint -c .yamllint.yaml $(YAML_FILES)
 
-TF_DIR := infra/saas
+TF_DIR := infra/run
 export TF_CLI_CONFIG_FILE := $(TF_DIR)/terraformrc
 
 .PHONY: lint-tf
@@ -190,8 +190,8 @@ bump-patch: ## Bumps patch version (1.2.3 → 1.2.4)
 
 .PHONY: email-report
 email-report: ## Sends daily report email via admin service
-	@ADMIN_URL=$$(cd infra/saas && terraform output -raw admin_url 2>/dev/null) || \
-		{ echo "ERROR: Failed to get admin URL. Run 'terraform apply' in infra/saas first."; exit 1; }; \
+	@ADMIN_URL=$$(cd infra/run && terraform output -raw admin_url 2>/dev/null) || \
+		{ echo "ERROR: Failed to get admin URL. Run 'terraform apply' in infra/run first."; exit 1; }; \
 	TOKEN=$$(gcloud auth print-identity-token 2>/dev/null) || \
 		{ echo "ERROR: Failed to get identity token. Run 'gcloud auth login' first."; exit 1; }; \
 	echo "Sending daily report email..."; \

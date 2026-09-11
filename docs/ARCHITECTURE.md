@@ -44,7 +44,7 @@ devpulse/
 │   ├── plan/               Plan limits (Free, Starter, Pro, Enterprise) and feature gating
 │   ├── logging/            JSON structured logging setup
 │   └── net/                HTTP client utilities with rate limit handling
-├── infra/saas/             Terraform for GCP infrastructure
+├── infra/run/              Terraform for GCP infrastructure
 ├── tools/                  Dev scripts (version bump, shared helpers)
 ├── docs/                   Documentation
 ├── .github/                CI/CD workflows, composite actions, CODEOWNERS

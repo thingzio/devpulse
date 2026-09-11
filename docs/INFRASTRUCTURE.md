@@ -344,7 +344,7 @@ Performance indexes beyond primary keys, defined in migration files:
 
 ## Terraform
 
-All infrastructure is defined in `infra/saas/`:
+All infrastructure is defined in `infra/run/`:
 
 | File | Resources |
 |------|-----------|

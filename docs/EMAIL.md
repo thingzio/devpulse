@@ -18,7 +18,7 @@ DevPulse sends a weekly digest email to opted-in tenants summarizing their portf
 | `DEVPULSE_ADMIN_USERS` | Yes | import + site | Comma-separated admin usernames |
 | `DIGEST_ADMIN_ONLY` | No | import | `true` (default) = admin only, `false` = all users |
 
-All variables are managed via Terraform in `infra/saas/`.
+All variables are managed via Terraform in `infra/run/`.
 
 ## Rollout Steps
 

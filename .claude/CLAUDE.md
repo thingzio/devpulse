@@ -163,7 +163,7 @@ pkg/tenant/             Tenant CRUD, sessions, GitHub App JWT, installations, ov
 pkg/middleware/         Auth (session cookie), tenant scope (dedicated conn + set_config)
 pkg/oauth/              GitHub OAuth web flow
 pkg/net/                HTTP client utilities
-infra/saas/             Terraform for GCP infrastructure
+infra/run/              Terraform for GCP infrastructure
 tools/                  Dev scripts (version bump, shared helpers)
 ```
 

@@ -110,7 +110,7 @@ gcloud secrets versions add devpulse-saas-anthropic-api-key \
 ## 7. Run Terraform
 
 ```shell
-cd infra/saas
+cd infra/run
 terraform init
 
 terraform apply
@@ -154,7 +154,7 @@ gcloud beta run domain-mappings create \
 ```shell
 gcloud monitoring dashboards create \
     --project=$PROJECT_ID \
-    --config-from-file=infra/saas/dashboard.json
+    --config-from-file=infra/run/dashboard.json
 ```
 
 ## 11. First Release
@@ -213,8 +213,8 @@ gcloud run jobs update devpulse-saas-import --region=$REGION \
 
 After verifying everything works:
 ```shell
-# Edit infra/saas/cloudrun.tf — set deletion_protection = true on both resources (serve, import)
-cd infra/saas && terraform apply
+# Edit infra/run/cloudrun.tf — set deletion_protection = true on both resources (serve, import)
+cd infra/run && terraform apply
 ```
 
 ### Rotate secrets
