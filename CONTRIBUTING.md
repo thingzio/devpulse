@@ -5,6 +5,8 @@ Thank you for your interest in contributing to devpulse! We welcome contribution
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
+- [Project governance](#project-governance)
+- [Developer Certificate of Origin](#developer-certificate-of-origin)
 - [Getting Started](#getting-started)
 - [How to Contribute](#how-to-contribute)
 - [Design Principles](#design-principles)
@@ -14,6 +16,51 @@ Thank you for your interest in contributing to devpulse! We welcome contribution
 ## Code of Conduct
 
 This project follows a commitment to fostering an open and welcoming environment. Please be respectful and professional in all interactions. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details.
+
+## Project governance
+
+This is a single-maintainer project. Decisions — what gets merged, what ships, what is in scope — are the maintainer's, and the maintainer is listed in [MAINTAINERS.md](MAINTAINERS.md). There is no steering committee and no vote, because there are not enough people for either to mean anything.
+
+**There is no review-time commitment.** A pull request may be reviewed the same day or may sit for weeks. The project is maintained on a best-effort basis, and pretending otherwise would set an expectation that gets broken. If something is urgent for you, say so in the pull request — it helps with ordering, though it is not a guarantee.
+
+What this means in practice:
+
+- **Small, focused pull requests get reviewed fastest.** A large change touching many packages is not refused, but it will wait longer.
+- **Open an issue before a large change.** Finding out that a direction is wrong after a week of work is worse for you than for the project.
+- **A closed pull request is not a judgment on you.** Scope is the most common reason; this is a reference implementation, not a product trying to satisfy everyone.
+
+Adding a second maintainer is described in [MAINTAINERS.md](MAINTAINERS.md). Short version: sustained, substantive contribution plus a willingness to take the responsibility.
+
+## Developer Certificate of Origin
+
+This project requires the [Developer Certificate of Origin](https://developercertificate.org) (DCO). It is not a CLA — you keep your copyright, and you are not assigning anything. You are certifying that you wrote the contribution or otherwise have the right to submit it under the project's license.
+
+Certify it by adding a `Signed-off-by` trailer to every commit:
+
+```shell
+git commit -s -m "feat: add network stats"
+```
+
+which appends:
+
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+The name and email must be real and must match your Git configuration. The DCO bot checks every commit in a pull request and will fail the check if any commit is missing the trailer.
+
+**`-s` and `-S` are different flags and this project wants both.** `-s` adds the sign-off trailer described above. `-S` cryptographically signs the commit with your key. Together:
+
+```shell
+git commit -S -s -m "feat: add network stats"
+```
+
+**If you forgot to sign off**, rewrite the commits on your branch and force-push:
+
+```shell
+git rebase --signoff main
+git push --force-with-lease
+```
 
 ## Getting Started
 
@@ -26,6 +73,8 @@ Before contributing:
 ## How to Contribute
 
 ### Reporting Bugs
+
+> **Security vulnerabilities do not go here.** Report them privately through [GitHub Security Advisories](https://github.com/thingzio/devpulse/security/advisories/new). See [SECURITY.md](SECURITY.md) for scope and expected response times.
 
 - Use [GitHub Issues](https://github.com/thingzio/devpulse/issues/new) to report bugs
 - Describe the issue clearly with steps to reproduce
@@ -105,9 +154,9 @@ Every released artifact carries verifiable proof of origin and build process.
    - README.md for user-facing changes
    - docs/DEVELOPMENT.md for developer workflow changes
 
-3. **Sign your commits:**
+3. **Sign off your commits** (required — see [Developer Certificate of Origin](#developer-certificate-of-origin)):
    ```bash
-   git commit -S -m "feat: add network stats"
+   git commit -S -s -m "feat: add network stats"
    ```
 
 ### Creating the Pull Request
