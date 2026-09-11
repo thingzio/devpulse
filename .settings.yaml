@@ -17,6 +17,9 @@ linting:
 
 # Quality Thresholds
 quality:
+  # Set from measured coverage (34.6% on 2026-09-11, excluding data/postgres)
+  # with ~2 points of slack. Raise it when coverage rises; a gate that fails on
+  # a clean checkout is worse than an honest lower number.
   coverage_threshold: '32'
   lint_timeout: '5m'
   test_timeout: '10m'
