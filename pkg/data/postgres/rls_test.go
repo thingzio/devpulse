@@ -245,8 +245,20 @@ func TestRLS_ForceRowLevelSecurityEnabled(t *testing.T) {
 
 	for _, table := range tables {
 		var rlsEnabled, rlsForced bool
-		err := db.QueryRowContext(ctx,
-			"SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = $1", table,
+		// Qualify by schema. Every test in this file creates its own rls_N
+		// schema and the job runs several packages in parallel, so the same
+		// table name exists in many schemas at once. An unqualified
+		// `WHERE relname = $1` matches all of them and QueryRow takes an
+		// arbitrary one — often a schema whose migrations have not reached the
+		// ALTER TABLE ... ENABLE ROW LEVEL SECURITY step yet, which reports a
+		// correctly-configured table as unprotected. saas_test.go and
+		// migrate_legacy_test.go already filter on current_schema(); this did
+		// not.
+		err := db.QueryRowContext(ctx, `
+			SELECT c.relrowsecurity, c.relforcerowsecurity
+			FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.relname = $1 AND n.nspname = current_schema()`, table,
 		).Scan(&rlsEnabled, &rlsForced)
 		require.NoError(t, err, "querying pg_class for %s", table)
 		assert.True(t, rlsEnabled, "%s should have RLS enabled", table)

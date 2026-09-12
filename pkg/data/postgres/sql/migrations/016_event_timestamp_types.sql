@@ -22,6 +22,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_event'
+          AND table_schema = current_schema()
           AND column_name = 'date'
           AND data_type = 'text'
     ) THEN

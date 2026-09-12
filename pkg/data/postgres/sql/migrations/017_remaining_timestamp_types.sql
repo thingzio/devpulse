@@ -22,6 +22,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_repo_meta'
+          AND table_schema = current_schema()
           AND column_name = 'updated_at'
           AND data_type = 'text'
     ) THEN
@@ -40,6 +41,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_developer'
+          AND table_schema = current_schema()
           AND column_name = 'reputation_updated_at'
           AND data_type = 'text'
     ) THEN
@@ -51,6 +53,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_release'
+          AND table_schema = current_schema()
           AND column_name = 'published_at'
           AND data_type = 'text'
     ) THEN
@@ -62,6 +65,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_container_version'
+          AND table_schema = current_schema()
           AND column_name = 'created_at'
           AND data_type = 'text'
     ) THEN
@@ -73,6 +77,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_repo_metric_history'
+          AND table_schema = current_schema()
           AND column_name = 'date'
           AND data_type = 'text'
     ) THEN
@@ -83,6 +88,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'devpulse_repo_insights'
+          AND table_schema = current_schema()
           AND column_name = 'generated_at'
           AND data_type = 'text'
     ) THEN
