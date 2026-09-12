@@ -37,7 +37,7 @@ resource "google_cloud_run_v2_service" "serve" {
     }
 
     containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-site:latest"
+      image = var.bootstrap_image
 
       ports {
         container_port = 8080
@@ -246,7 +246,7 @@ resource "google_cloud_run_v2_job" "import" {
       }
 
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}/devpulse-import:latest"
+        image = var.bootstrap_image
 
         env {
           name = "DATABASE_URL"
