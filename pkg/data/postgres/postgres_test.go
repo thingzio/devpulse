@@ -184,3 +184,20 @@ func TestNew_BadDSN(t *testing.T) {
 	_, err := New("postgres://invalid:invalid@localhost:1/nonexistent?sslmode=disable&connect_timeout=1")
 	assert.Error(t, err)
 }
+
+// daysAgo returns a date literal N days before now, formatted for SQL DATE
+// columns.
+//
+// Test fixtures must not hardcode absolute dates. Every query in this package
+// that takes a `days` argument filters through sinceDate(), which is relative
+// to time.Now(), so a fixture pinned to a literal date silently ages out of the
+// window and the test starts failing on a calendar boundary rather than on a
+// code change. That is exactly what happened to the metric-history and
+// repo-overview tests, which began failing in September 2026 for rows written
+// in March.
+//
+// Uses the same clock and the same UTC basis as sinceDate, so fixtures and the
+// window they are selected by can never disagree.
+func daysAgo(n int) string {
+	return time.Now().UTC().AddDate(0, 0, -n).Format("2006-01-02")
+}

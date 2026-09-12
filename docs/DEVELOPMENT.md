@@ -158,10 +158,46 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | Build failures | Run `make tidy` to update dependencies |
 | Import hits rate limit | Re-run; the importer uses jitter backoff automatically |
 | `make server` fails | Ensure Postgres is running (`make db-up`) and `DATABASE_URL` is set |
+| `make integration` fails with `rootless Docker not found` | You are not on Docker Desktop — see [Docker runtimes other than Docker Desktop](#docker-runtimes-other-than-docker-desktop) |
+| `make tidy` fails with `inconsistent vendoring` | Run `go mod vendor` first. `make tidy` starts with `go fmt ./...`, which refuses to run while `go.mod` and `vendor/modules.txt` disagree, so it cannot recover from that state on its own |
+
+### Docker runtimes other than Docker Desktop
+
+`make integration` uses [testcontainers-go], which starts a throwaway Postgres per
+package. Unlike the `docker` CLI, testcontainers does **not** read Docker
+contexts — it probes a fixed set of socket paths. On Colima, Podman, Rancher
+Desktop, or anything else that puts the socket elsewhere, it fails with an
+error that does not mention the real problem:
+
+```
+failed to start postgres container: ... rootless Docker not found,
+failed to create Docker provider
+```
+
+Point it at your socket and disable the reaper, which tries to bind-mount the
+host socket path into a container and cannot on a VM-backed runtime:
+
+```shell
+export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"   # adjust for your runtime
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export TESTCONTAINERS_RYUK_DISABLED=true
+```
+
+`docker context inspect --format '{{.Endpoints.docker.Host}}'` prints the socket
+path to use. `make e2e` and `make db-up` are unaffected — they go through
+`docker compose`, which does read contexts.
+
+[testcontainers-go]: https://golang.testcontainers.org
 
 ### Testing Patterns
 
 - **Integration tests** use `setupTestDB(t)` which creates a temporary Postgres container with all migrations applied. These require Docker.
+- **Never hardcode dates in fixtures.** Every query taking a `days` argument
+  filters through `sinceDate()`, which is relative to `time.Now()`. A fixture
+  pinned to a literal date silently ages out of the window and the test starts
+  failing on a calendar boundary rather than on a code change. Use the
+  `daysAgo(n)` helper in `postgres_test.go`, which shares `sinceDate`'s clock
+  and UTC basis so a fixture and the window selecting it cannot disagree.
 - **All test functions** must create `ctx := context.Background()` and pass it to Store methods — never use a bare `nil` context.
 - **Table-driven tests** are preferred. Test both nil DB and empty DB cases for query functions.
 - **Assertions** via `github.com/stretchr/testify` (`assert` for non-fatal, `require` for fatal).

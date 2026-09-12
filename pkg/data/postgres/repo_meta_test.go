@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,10 +84,10 @@ func TestGetRepoOverview_WithData(t *testing.T) {
 	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_developer(username, full_name) VALUES ('user1', 'User One'), ('user2', 'User Two')`)
 	require.NoError(t, err)
 
-	_, err = store.db.ExecContext(ctx, `INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
+	_, err = store.db.ExecContext(ctx, fmt.Sprintf(`INSERT INTO devpulse_event(org, repo, username, type, date, url, mentions, labels)
 		VALUES
-		('org1', 'repo1', 'user1', 'push', '2026-03-01', '', '', ''),
-		('org1', 'repo1', 'user2', 'issue', '2026-03-02', '', '', '')`)
+		('org1', 'repo1', 'user1', 'push', '%s', '', '', ''),
+		('org1', 'repo1', 'user2', 'issue', '%s', '', '', '')`, daysAgo(2), daysAgo(1)))
 	require.NoError(t, err)
 
 	list, err := store.GetRepoOverview(ctx, nil, 180)
