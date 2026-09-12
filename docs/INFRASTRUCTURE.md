@@ -342,25 +342,16 @@ Performance indexes beyond primary keys, defined in migration files:
 | `idx_github_app_installation_tenant` | `(tenant_id)` | Installation token minting |
 | `idx_tenant_repo_rls` | `(tenant_id, org, repo) WHERE active` | RLS policy performance |
 
-## Terraform
+## Infrastructure as code
 
-All infrastructure is defined in `infra/run/`:
+The Cloud Run stack — service, import job, scheduler, IAM, secrets, database
+user and monitoring — is defined in the private
+[`thingzio/infra`](https://github.com/thingzio/infra) repository under
+`run/devpulse`, alongside the shared VPC and Cloud SQL instance it depends on.
 
-| File | Resources |
-|------|-----------|
-| `providers.tf` | Terraform + Google provider config, partial GCS state backend (bucket and prefix come from the gitignored `backend.hcl`) |
-| `variables.tf` | Project ID, region, domain, import parallelism, shared infra refs (VPC, subnet, DB) |
-| `main.tf` | GCP API enablement, locals for shared infra references |
-| `database.tf` | DB user (`devpulse`) in shared Cloud SQL instance |
-| `secrets.tf` | Secret Manager secrets + IAM bindings |
-| `iam.tf` | Service accounts (serve, import, deployer), WIF for GitHub Actions |
-| `cloudrun.tf` | Cloud Run service (serve) + job (import) |
-| `scheduler.tf` | Import job trigger (every 2 hours) |
-| `monitoring.tf` | Uptime checks, log-based metrics, service-level alert policies, email notifications |
-| `registry.tf` | Artifact Registry standard repo (direct push from CI) |
-| `outputs.tf` | Service URL, deployer SA, WIF provider |
-
-Shared infrastructure (VPC, Cloud SQL instance, DB monitoring) is owned by the `thingzio/infra` repo.
+It moved there when this repository went public. Terraform that names every
+service account, secret and resource in production is a map of the deployment,
+and unlike a credential it cannot be rotated out of a public history.
 
 ## Cost Optimization
 

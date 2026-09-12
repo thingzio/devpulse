@@ -1,6 +1,6 @@
 # Administration
 
-Day-2 operations for a running DevPulse deployment. For initial setup, see [BOOTSTRAP.md](BOOTSTRAP.md).
+Day-2 operations for a running DevPulse deployment.
 
 ## Releases
 
@@ -18,10 +18,12 @@ gh workflow run deploy-saas.yaml -f image_tag=v1.2.3
 
 ### Infrastructure Changes
 
+Infrastructure is Terraform in the private `thingzio/infra` repository, under
+`run/devpulse`:
+
 ```shell
-cd infra/run
-terraform plan   # review changes
-terraform apply  # zero downtime upgrade
+make tf-plan  STACK=run/devpulse   # review changes
+make tf-apply STACK=run/devpulse   # zero downtime upgrade
 ```
 
 For DB tier upgrades, change the `db_tier` variable in Terraform:
@@ -88,7 +90,7 @@ Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 
 ### Log-Based Metrics
 
-Created by Terraform (`infra/run/monitoring.tf`). These are free.
+Created by Terraform (`run/devpulse/monitoring.tf` in `thingzio/infra`). These are free.
 
 | Metric | Filter | Type |
 |--------|--------|------|
@@ -107,7 +109,7 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 
 ### Dashboard
 
-22 widgets in `infra/run/dashboard.json`:
+22 widgets, defined in `thingzio/infra`:
 
 #### Service Widgets (Cloud Run)
 
@@ -215,7 +217,6 @@ Supply chain: container images built via ko, pushed to Artifact Registry (`us-we
 
 ## Related Documentation
 
-- [BOOTSTRAP.md](BOOTSTRAP.md) — initial GCP deployment (one-time)
 - [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — scaling plan, costs, API throughput
 - [DEVELOPMENT.md](DEVELOPMENT.md) — local dev, testing, debugging
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design and data flow

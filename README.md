@@ -58,7 +58,6 @@ pkg/importer/          Sharded import pipeline with goroutine workers
 pkg/plan/              Per-account limits, to keep a shared instance responsive
 pkg/data/postgres/     PostgreSQL store, migrations, row-level security
 pkg/tenant/            Accounts, sessions, GitHub App installations
-infra/run/             Terraform for the Cloud Run reference deployment
 ```
 
 Tenant isolation is enforced in the database with PostgreSQL row-level security
@@ -86,16 +85,20 @@ Self-hosters bring their own keys, so AI cost scales to whoever runs the
 instance. The full list is in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 **Running a full instance requires registering your own GitHub App** — App
-private keys are per-instance and cannot be shared. See
-[docs/BOOTSTRAP.md](docs/BOOTSTRAP.md). A plain `GITHUB_TOKEN` is enough to
-exercise the import worker without one.
+private keys are per-instance and cannot be shared. A plain `GITHUB_TOKEN` is
+enough to exercise the import worker without one.
 
 ## Deploying
 
-[docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) walks through the Terraform in
-`infra/run/`, which provisions the whole stack on Google Cloud — Cloud Run,
-Cloud SQL, Secret Manager, scheduling. It is turnkey but opinionated toward GCP;
-it is the maintainer's reference deployment, not the only way to run this.
+The maintainer's deployment runs on Google Cloud — Cloud Run, Cloud SQL,
+Secret Manager, Cloud Scheduler — provisioned by Terraform that lives in a
+private repository, because it names every service account, secret and resource
+in production.
+
+[docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) describes that architecture,
+its scaling behaviour and its actual costs. It is a reference for how this is
+run, not a turnkey installer: the application itself is a plain Go binary and a
+Postgres database, and nothing here is specific to GCP.
 
 ## Documentation
 
@@ -103,7 +106,6 @@ it is the maintainer's reference deployment, not the only way to run this.
 |---|---|
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local setup, make targets, debugging |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data model, tenant isolation |
-| [BOOTSTRAP.md](docs/BOOTSTRAP.md) | Deploying your own instance |
 | [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | Scaling, running costs, API throughput |
 | [ADMIN.md](docs/ADMIN.md) | Day-2 operations, monitoring, account management |
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Query tuning method and endpoint baselines |

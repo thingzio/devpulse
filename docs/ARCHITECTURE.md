@@ -44,7 +44,6 @@ devpulse/
 │   ├── plan/               Per-account limits, to keep a shared instance responsive
 │   ├── logging/            JSON structured logging setup
 │   └── net/                HTTP client utilities with rate limit handling
-├── infra/run/              Terraform for GCP infrastructure
 ├── tools/                  Dev scripts (version bump, shared helpers)
 ├── docs/                   Documentation
 ├── .github/                CI/CD workflows, composite actions, CODEOWNERS

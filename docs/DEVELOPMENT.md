@@ -233,5 +233,4 @@ make server 2>&1 | jq 'select(.level=="ERROR")'
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and design
 - [ADMIN.md](ADMIN.md) — day-2 operations, monitoring, tenant management
 - [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — GCP scaling, costs, API throughput
-- [BOOTSTRAP.md](BOOTSTRAP.md) — one-time GCP deployment guide
 - [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) — coding conventions, anti-patterns, decision framework

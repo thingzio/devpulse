@@ -52,7 +52,7 @@ upgrade: ## Upgrades all dependencies to latest versions
 # =============================================================================
 
 .PHONY: lint
-lint: lint-go lint-yaml lint-tf ## Lints Go code, YAML files, and Terraform
+lint: lint-go lint-yaml ## Lints Go code and YAML files
 
 .PHONY: lint-go
 lint-go: ## Lints Go code with go vet and golangci-lint
@@ -65,25 +65,6 @@ lint-go: ## Lints Go code with go vet and golangci-lint
 .PHONY: lint-yaml
 lint-yaml: ## Lints YAML files with yamllint
 	yamllint -c .yamllint.yaml $(YAML_FILES)
-
-TF_DIR := infra/run
-export TF_CLI_CONFIG_FILE := $(TF_DIR)/terraformrc
-
-.PHONY: lint-tf
-lint-tf: ## Scans Terraform for security misconfigurations
-	trivy config $(TF_DIR) --severity HIGH,CRITICAL
-
-.PHONY: tf-init
-tf-init: ## Initializes Terraform
-	terraform -chdir=$(TF_DIR) init -backend-config=backend.hcl
-
-.PHONY: tf-plan
-tf-plan: ## Plans Terraform changes
-	terraform -chdir=$(TF_DIR) plan
-
-.PHONY: tf-apply
-tf-apply: ## Applies Terraform changes
-	terraform -chdir=$(TF_DIR) apply
 
 .PHONY: test
 test: tidy ## Runs unit tests with race detector and coverage
@@ -196,8 +177,9 @@ bump-patch: ## Bumps patch version (1.2.3 → 1.2.4)
 
 .PHONY: email-report
 email-report: ## Sends daily report email via admin service
-	@ADMIN_URL=$$(cd infra/run && terraform output -raw admin_url 2>/dev/null) || \
-		{ echo "ERROR: Failed to get admin URL. Run 'terraform apply' in infra/run first."; exit 1; }; \
+	@ADMIN_URL=$$(gcloud run services describe devpulse-saas-admin --region us-west1 \
+		--format='value(status.url)' 2>/dev/null) || \
+		{ echo "ERROR: Failed to get admin URL. Run 'gcloud auth login' first."; exit 1; }; \
 	TOKEN=$$(gcloud auth print-identity-token 2>/dev/null) || \
 		{ echo "ERROR: Failed to get identity token. Run 'gcloud auth login' first."; exit 1; }; \
 	echo "Sending daily report email..."; \
