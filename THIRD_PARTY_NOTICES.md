@@ -8,12 +8,12 @@ directory. Their licenses and attributions are reproduced here as required.
 > run `make notices` after changing dependencies.
 
 
-## Dependencies (79)
+## Dependencies (77)
 
 | Module | Version | License |
 |---|---|---|
 | `cloud.google.com/go` | v0.123.0 | Apache-2.0 |
-| `cloud.google.com/go/auth` | v0.23.1 | Apache-2.0 |
+| `cloud.google.com/go/auth` | v0.23.2 | Apache-2.0 |
 | `cloud.google.com/go/auth/oauth2adapt` | v0.2.8 | Apache-2.0 |
 | `cloud.google.com/go/compute/metadata` | v0.9.0 | Apache-2.0 |
 | `cloud.google.com/go/iam` | v1.13.0 | Apache-2.0 |
@@ -29,7 +29,6 @@ directory. Their licenses and attributions are reproduced here as required.
 | `github.com/containerd/log` | v0.1.0 | Apache-2.0 |
 | `github.com/containerd/platforms` | v0.2.1 | Apache-2.0 |
 | `github.com/cpuguy83/dockercfg` | v0.3.2 | MIT |
-| `github.com/davecgh/go-spew` | v1.1.2-0.20180830191138-d8f796af33cc | ISC |
 | `github.com/distribution/reference` | v0.6.0 | Apache-2.0 |
 | `github.com/docker/go-connections` | v0.6.0 | Apache-2.0 |
 | `github.com/docker/go-units` | v0.5.0 | Apache-2.0 |
@@ -43,8 +42,8 @@ directory. Their licenses and attributions are reproduced here as required.
 | `github.com/google/go-querystring` | v1.2.0 | BSD-3-Clause |
 | `github.com/google/s2a-go` | v0.1.9 | Apache-2.0 |
 | `github.com/google/uuid` | v1.6.0 | BSD-3-Clause |
-| `github.com/googleapis/enterprise-certificate-proxy` | v0.3.21 | Apache-2.0 |
-| `github.com/googleapis/gax-go/v2` | v2.23.0 | BSD-3-Clause |
+| `github.com/googleapis/enterprise-certificate-proxy` | v0.3.22 | Apache-2.0 |
+| `github.com/googleapis/gax-go/v2` | v2.24.1 | BSD-3-Clause |
 | `github.com/klauspost/compress` | v1.18.5 | Apache-2.0 |
 | `github.com/lib/pq` | v1.12.3 | MIT |
 | `github.com/lufia/plan9stats` | v0.0.0-20211012122336-39d0f177ccd0 | BSD-3-Clause |
@@ -61,36 +60,35 @@ directory. Their licenses and attributions are reproduced here as required.
 | `github.com/moby/term` | v0.5.2 | Apache-2.0 |
 | `github.com/opencontainers/go-digest` | v1.0.0 | Apache-2.0 |
 | `github.com/opencontainers/image-spec` | v1.1.1 | Apache-2.0 |
-| `github.com/pmezard/go-difflib` | v1.0.1-0.20181226105442-5d4384ee4fb2 | BSD-2-Clause |
 | `github.com/power-devops/perfstat` | v0.0.0-20240221224432-82ca36839d55 | MIT |
 | `github.com/shirou/gopsutil/v4` | v4.26.5 | BSD-3-Clause |
 | `github.com/sirupsen/logrus` | v1.9.4 | MIT |
-| `github.com/stretchr/testify` | v1.11.1 | MIT |
+| `github.com/stretchr/testify` | v1.12.1 | MIT |
 | `github.com/testcontainers/testcontainers-go` | v0.43.0 | MIT |
 | `github.com/testcontainers/testcontainers-go/modules/postgres` | v0.43.0 | MIT |
 | `github.com/tklauser/go-sysconf` | v0.3.16 | BSD-3-Clause |
 | `github.com/tklauser/numcpus` | v0.11.0 | Apache-2.0 |
 | `github.com/yusufpapurcu/wmi` | v1.2.4 | MIT |
 | `go.opentelemetry.io/auto/sdk` | v1.2.1 | Apache-2.0 |
-| `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | v0.70.0 | Apache-2.0 |
-| `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` | v0.70.0 | Apache-2.0 |
-| `go.opentelemetry.io/otel` | v1.45.0 | Apache-2.0 |
-| `go.opentelemetry.io/otel/metric` | v1.45.0 | Apache-2.0 |
-| `go.opentelemetry.io/otel/trace` | v1.45.0 | Apache-2.0 |
-| `golang.org/x/crypto` | v0.56.0 | BSD-3-Clause |
-| `golang.org/x/net` | v0.58.0 | BSD-3-Clause |
-| `golang.org/x/oauth2` | v0.36.0 | BSD-3-Clause |
-| `golang.org/x/sync` | v0.22.0 | BSD-3-Clause |
-| `golang.org/x/sys` | v0.47.0 | BSD-3-Clause |
-| `golang.org/x/text` | v0.41.0 | BSD-3-Clause |
-| `golang.org/x/time` | v0.15.0 | BSD-3-Clause |
-| `google.golang.org/api` | v0.293.0 | BSD-3-Clause |
-| `google.golang.org/genproto` | v0.0.0-20260810153831-ec0a7760b754 | Apache-2.0 |
-| `google.golang.org/genproto/googleapis/api` | v0.0.0-20260810153831-ec0a7760b754 | Apache-2.0 |
-| `google.golang.org/genproto/googleapis/rpc` | v0.0.0-20260810153831-ec0a7760b754 | Apache-2.0 |
-| `google.golang.org/grpc` | v1.83.0 | Apache-2.0 |
+| `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | v0.71.0 | Apache-2.0 |
+| `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` | v0.71.0 | Apache-2.0 |
+| `go.opentelemetry.io/otel` | v1.46.0 | Apache-2.0 |
+| `go.opentelemetry.io/otel/metric` | v1.46.0 | Apache-2.0 |
+| `go.opentelemetry.io/otel/trace` | v1.46.0 | Apache-2.0 |
+| `go.yaml.in/yaml/v3` | v3.0.5 | MIT |
+| `golang.org/x/crypto` | v0.57.0 | BSD-3-Clause |
+| `golang.org/x/net` | v0.59.0 | BSD-3-Clause |
+| `golang.org/x/oauth2` | v0.37.0 | BSD-3-Clause |
+| `golang.org/x/sync` | v0.23.0 | BSD-3-Clause |
+| `golang.org/x/sys` | v0.48.0 | BSD-3-Clause |
+| `golang.org/x/text` | v0.42.0 | BSD-3-Clause |
+| `golang.org/x/time` | v0.16.0 | BSD-3-Clause |
+| `google.golang.org/api` | v0.297.0 | BSD-3-Clause |
+| `google.golang.org/genproto` | v0.0.0-20260911204522-f61a6ca850bd | Apache-2.0 |
+| `google.golang.org/genproto/googleapis/api` | v0.0.0-20260911204522-f61a6ca850bd | Apache-2.0 |
+| `google.golang.org/genproto/googleapis/rpc` | v0.0.0-20260911204522-f61a6ca850bd | Apache-2.0 |
+| `google.golang.org/grpc` | v1.83.2 | Apache-2.0 |
 | `google.golang.org/protobuf` | v1.36.12 | BSD-3-Clause |
-| `gopkg.in/yaml.v3` | v3.0.1 | MIT |
 
 ## NOTICE files
 
@@ -118,10 +116,10 @@ For more information, please see https://www.bis.doc.gov
 See also https://www.apache.org/dev/crypto.html and/or seek legal counsel.
 ```
 
-### `google.golang.org/grpc`
+### `go.yaml.in/yaml/v3`
 
 ```
-Copyright 2014 gRPC authors.
+Copyright 2011-2016 Canonical Ltd.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -136,10 +134,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### `gopkg.in/yaml.v3`
+### `google.golang.org/grpc`
 
 ```
-Copyright 2011-2016 Canonical Ltd.
+Copyright 2014 gRPC authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -432,28 +430,6 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-```
-
-### ISC
-
-Representative module: `github.com/davecgh/go-spew`
-
-```
-ISC License
-
-Copyright (c) 2012-2016 Dave Collins <dave@davec.name>
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### MIT
