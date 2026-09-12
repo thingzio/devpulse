@@ -3,8 +3,16 @@ name: deploy-cloud-run
 on:
   workflow_call:
     inputs:
-      image_tag:
-        description: 'Container image tag to deploy'
+      site_image_ref:
+        description: >-
+          Immutable reference for the site image, as
+          ghcr.io/<org>/<image>@sha256:<digest>. A tag is deliberately not
+          accepted: a tag can move between the build and the deploy, and then
+          the thing that was tested is not the thing that ships.
+        required: true
+        type: string
+      import_image_ref:
+        description: Immutable reference for the import worker image
         required: true
         type: string
 
@@ -33,19 +41,41 @@ jobs:
       - name: Deploy to Cloud Run
         shell: bash
         env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          SITE_IMAGE_REF: ${{ inputs.site_image_ref }}
+          IMPORT_IMAGE_REF: ${{ inputs.import_image_ref }}
           REGION: ${{ vars.REGION }}
           PROJECT_ID: ${{ vars.PROJECT_ID }}
-          AR_REPO: ${{ vars.AR_REPO }}
+          REMOTE_REPO: gh
           SERVICE_NAME: ${{ vars.SERVICE_NAME }}
           JOB_NAME: ${{ vars.JOB_NAME }}
         run: |
           set -euo pipefail
-          AR="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}"
-          echo "Deploying ${IMAGE_TAG} via ${AR}..."
+
+          # Cloud Run will only pull from Artifact Registry or GCR, so images are
+          # fetched through the AR remote repository that fronts ghcr.io. This is
+          # a path rewrite, not a copy: the remote repository is a pull-through
+          # cache and the digest is unchanged on the far side, which is what
+          # keeps the deployed bytes identical to the built ones.
+          AR_HOST="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REMOTE_REPO}"
+
+          to_ar() {
+            local ref="$1" name="$2"
+            [[ "$ref" == ghcr.io/*@sha256:* ]] || {
+              echo "::error::${name}: expected ghcr.io/<org>/<image>@sha256:<digest>, got ${ref}" >&2
+              return 1
+            }
+            printf '%s/%s' "$AR_HOST" "${ref#ghcr.io/}"
+          }
+
+          SITE_IMAGE="$(to_ar "$SITE_IMAGE_REF" site)"
+          IMPORT_IMAGE="$(to_ar "$IMPORT_IMAGE_REF" import)"
+
+          echo "Deploying service ${SITE_IMAGE}"
           gcloud run services update "${SERVICE_NAME}" \
             --region="${REGION}" \
-            --image="${AR}/devpulse-site:${IMAGE_TAG}"
+            --image="${SITE_IMAGE}"
+
+          echo "Deploying job ${IMPORT_IMAGE}"
           gcloud run jobs update "${JOB_NAME}" \
             --region="${REGION}" \
-            --image="${AR}/devpulse-import:${IMAGE_TAG}"
+            --image="${IMPORT_IMAGE}"

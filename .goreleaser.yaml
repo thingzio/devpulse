@@ -1,5 +1,9 @@
 version: 2
 
+# Image building lives in .github/workflows/release-on-tag.yaml, which calls the
+# shared thingzio/actions build-ko workflow. goreleaser here builds binaries,
+# archives, and checksums only -- it no longer pushes containers.
+
 project_name: devpulse
 
 builds:
@@ -45,33 +49,6 @@ release:
     name: devpulse
   prerelease: auto
   draft: true
-
-kos:
-  - id: devpulse-site
-    build: devpulse-site
-    repositories:
-      - us-west1-docker.pkg.dev/thingzio/devpulse-saas-images/devpulse-site
-    platforms:
-      - linux/amd64
-      - linux/arm64
-    tags:
-      - latest
-      - "{{.Tag}}"
-    preserve_import_paths: false
-    bare: true
-
-  - id: devpulse-import
-    build: devpulse-import
-    repositories:
-      - us-west1-docker.pkg.dev/thingzio/devpulse-saas-images/devpulse-import
-    platforms:
-      - linux/amd64
-      - linux/arm64
-    tags:
-      - latest
-      - "{{.Tag}}"
-    preserve_import_paths: false
-    bare: true
 
 report_sizes: true
 
