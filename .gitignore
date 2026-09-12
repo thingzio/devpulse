@@ -49,3 +49,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .claude/worktrees/
+
+# Terraform partial backend config (deployment-specific)
+backend.hcl

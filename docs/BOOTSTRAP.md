@@ -23,7 +23,9 @@ export DOMAIN="devpulse.thingz.io"
 
 ## 2. Terraform State Bucket
 
-DevPulse uses the shared state bucket `gs://thingzio-infra-state` with prefix `devpulse`. This bucket is created by the `thingzio/infra` repo — no action needed here.
+The Terraform backend is a *partial* configuration: `providers.tf` declares `backend "gcs" {}` with no bucket, and the bucket is supplied at init time from a gitignored `infra/run/backend.hcl` (start from `backend.hcl.example`). `make tf-init` passes it.
+
+The maintainer's reference instance uses `gs://thingzio-infra-state` with prefix `devpulse`; that bucket is created by the private `thingzio/infra` repo. A self-hoster points `backend.hcl` at their own versioned bucket instead — state is keyed by `prefix` within it, so one bucket can hold all three services without collision.
 
 ## 3. Register GitHub OAuth App
 

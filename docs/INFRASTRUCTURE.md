@@ -348,7 +348,7 @@ All infrastructure is defined in `infra/run/`:
 
 | File | Resources |
 |------|-----------|
-| `providers.tf` | Terraform + Google provider config, GCS state backend (`thingzio-infra-state/devpulse`) |
+| `providers.tf` | Terraform + Google provider config, partial GCS state backend (bucket and prefix come from the gitignored `backend.hcl`) |
 | `variables.tf` | Project ID, region, domain, import parallelism, shared infra refs (VPC, subnet, DB) |
 | `main.tf` | GCP API enablement, locals for shared infra references |
 | `database.tf` | DB user (`devpulse`) in shared Cloud SQL instance |
