@@ -206,7 +206,7 @@ GitHub Actions workflows in `.github/workflows/`:
 |----------|---------|---------|
 | `test-on-push.yaml` | push to main, PRs (paths-ignore: md, docs, .claude) | Calls reusable test workflow |
 | `test-on-call.yaml` | reusable (workflow_call) | tidy, lint, test with race detector |
-| `tfsec-on-push.yaml` | push to main, PRs (paths: infra/**, .settings.yaml) | Terraform security scanning |
+| `terraform-scan-on-push.yaml` | push to main, PRs (paths: infra/**) | Terraform security scanning, via `thingzio/actions` |
 | `release-on-tag.yaml` | version tags (`v*.*.*`) | goreleaser build, image push, Cloud Run deploy |
 | `deploy-cloud-run.yaml` | reusable (workflow_call) | Cloud Run deployment (called by release and deploy-saas) |
 | `deploy-saas.yaml` | manual (workflow_dispatch) | Deploy devpulse to Cloud Run |

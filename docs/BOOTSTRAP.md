@@ -166,7 +166,7 @@ make bump-minor
 ```
 
 This triggers the release pipeline:
-1. Tests (unit, lint, tfsec, e2e)
+1. Tests (unit, lint, trivy, e2e)
 2. Builds `devpulse-site` and `devpulse-import` images via goreleaser + ko
 3. Pushes directly to Artifact Registry (`us-west1-docker.pkg.dev/thingzio/devpulse-saas-images`)
 4. Deploys to Cloud Run

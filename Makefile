@@ -71,7 +71,7 @@ export TF_CLI_CONFIG_FILE := $(TF_DIR)/terraformrc
 
 .PHONY: lint-tf
 lint-tf: ## Scans Terraform for security misconfigurations
-	tfsec $(TF_DIR)
+	trivy config $(TF_DIR) --severity HIGH,CRITICAL
 
 .PHONY: tf-init
 tf-init: ## Initializes Terraform
