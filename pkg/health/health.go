@@ -110,3 +110,6 @@ func clamp(v float64) float64 {
 	}
 	return v
 }
+
+// Trivial comment added to exercise CI on a pull request from a fork.
+// Safe to revert; this branch exists only to validate the Codecov fork guard.
