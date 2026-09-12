@@ -158,6 +158,7 @@ Pushing a version tag triggers the CI release workflow (goreleaser build, contai
 | Build failures | Run `make tidy` to update dependencies |
 | Import hits rate limit | Re-run; the importer uses jitter backoff automatically |
 | `make server` fails | Ensure Postgres is running (`make db-up`) and `DATABASE_URL` is set |
+| Postgres fails to bind port 5432 | A sibling stack is already up. DevPulse, DevTrace, and DevRadar all bind 5432 in their own compose files, so only one can run at a time. `docker compose down` in whichever is running. The bind error does not say which project holds the port |
 | `make integration` fails with `rootless Docker not found` | You are not on Docker Desktop — see [Docker runtimes other than Docker Desktop](#docker-runtimes-other-than-docker-desktop) |
 | `make tidy` fails with `inconsistent vendoring` | Run `go mod vendor` first. `make tidy` starts with `go fmt ./...`, which refuses to run while `go.mod` and `vendor/modules.txt` disagree, so it cannot recover from that state on its own |
 
