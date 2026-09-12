@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: ./.github/actions/setup-go-env
+        uses: thingzio/actions/.github/actions/setup-go@ff1417093cf175d18c6b78266245a7f35fbe995a  # v1.3.0
 
       - name: Unit Test
         run: make test
@@ -37,9 +37,17 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
 
+  # gofmt, go vet and golangci-lint, at the org-pinned linter version.
   lint:
+    permissions:
+      contents: read
+    uses: thingzio/actions/.github/workflows/lint-go.yaml@ff1417093cf175d18c6b78266245a7f35fbe995a  # v1.3.0
+
+  # Kept here rather than in lint-go: that workflow is Go-only, and a YAML
+  # linter belongs with the repository's own .yamllint.yaml.
+  lint-yaml:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -47,20 +55,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Setup Go Environment
-        uses: ./.github/actions/setup-go-env
-
-      - name: Load Settings
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "GOLANGCI_LINT_VERSION=$(yq -r '.linting.golangci_lint' .settings.yaml)" >> "$GITHUB_ENV"
-
-      - name: Lint Go
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
-        with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: Lint YAML
         uses: karancode/yamllint-github-action@4052d365f09b8d34eb552c363d1141fd60e2aeb2  # v3.0.0
@@ -93,7 +87,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: ./.github/actions/setup-go-env
+        uses: thingzio/actions/.github/actions/setup-go@ff1417093cf175d18c6b78266245a7f35fbe995a  # v1.3.0
 
       - name: Postgres Integration Tests
         env:
@@ -112,7 +106,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: ./.github/actions/setup-go-env
+        uses: thingzio/actions/.github/actions/setup-go@ff1417093cf175d18c6b78266245a7f35fbe995a  # v1.3.0
 
       - name: E2E Test
         run: make e2e
