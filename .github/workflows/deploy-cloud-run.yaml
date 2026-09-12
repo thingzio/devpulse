@@ -1,4 +1,11 @@
+---
 name: deploy-cloud-run
+
+# Thin wrapper over the shared thingzio/actions deploy workflow. All this repo
+# contributes is which resource gets which image; the validation, the Artifact
+# Registry rewrite and the rollout live there.
+#
+# https://github.com/thingzio/actions/blob/main/.github/workflows/deploy-cloud-run.md
 
 on:
   workflow_call:
@@ -18,64 +25,21 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: saas
     permissions:
       contents: read
       id-token: write
-    steps:
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.DEPLOYER_SA }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db  # v3.0.1
-
-      - name: Deploy to Cloud Run
-        shell: bash
-        env:
-          SITE_IMAGE_REF: ${{ inputs.site_image_ref }}
-          IMPORT_IMAGE_REF: ${{ inputs.import_image_ref }}
-          REGION: ${{ vars.REGION }}
-          PROJECT_ID: ${{ vars.PROJECT_ID }}
-          REMOTE_REPO: gh
-          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
-          JOB_NAME: ${{ vars.JOB_NAME }}
-        run: |
-          set -euo pipefail
-
-          # Cloud Run will only pull from Artifact Registry or GCR, so images are
-          # fetched through the AR remote repository that fronts ghcr.io. This is
-          # a path rewrite, not a copy: the remote repository is a pull-through
-          # cache and the digest is unchanged on the far side, which is what
-          # keeps the deployed bytes identical to the built ones.
-          AR_HOST="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REMOTE_REPO}"
-
-          to_ar() {
-            local ref="$1" name="$2"
-            [[ "$ref" == ghcr.io/*@sha256:* ]] || {
-              echo "::error::${name}: expected ghcr.io/<org>/<image>@sha256:<digest>, got ${ref}" >&2
-              return 1
-            }
-            printf '%s/%s' "$AR_HOST" "${ref#ghcr.io/}"
-          }
-
-          SITE_IMAGE="$(to_ar "$SITE_IMAGE_REF" site)"
-          IMPORT_IMAGE="$(to_ar "$IMPORT_IMAGE_REF" import)"
-
-          echo "Deploying service ${SITE_IMAGE}"
-          gcloud run services update "${SERVICE_NAME}" \
-            --region="${REGION}" \
-            --image="${SITE_IMAGE}"
-
-          echo "Deploying job ${IMPORT_IMAGE}"
-          gcloud run jobs update "${JOB_NAME}" \
-            --region="${REGION}" \
-            --image="${IMPORT_IMAGE}"
+    uses: thingzio/actions/.github/workflows/deploy-cloud-run.yaml@a3528128e23e3bbc03b3982a9a9dc771bcf3e13f  # v1.5.0
+    with:
+      # Named here rather than read from vars.SERVICE_NAME / vars.JOB_NAME: a
+      # job that calls a reusable workflow cannot see environment-scoped
+      # variables, and these names are not secrets.
+      #
+      # The service first, then the import job. They are independent -- the job
+      # is a scheduled worker, not a consumer of the service -- so the order
+      # carries no meaning here beyond deploying the user-facing thing first.
+      targets: |
+        service=devpulse-saas-serve=${{ inputs.site_image_ref }}
+        job=devpulse-saas-import=${{ inputs.import_image_ref }}
