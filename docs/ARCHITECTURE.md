@@ -41,7 +41,7 @@ devpulse/
 │   ├── health/             Health check endpoint
 │   ├── middleware/         Auth middleware, tenant scope (RLS via dedicated conn)
 │   ├── oauth/              GitHub OAuth web flow
-│   ├── plan/               Plan limits (Free, Starter, Pro, Enterprise) and feature gating
+│   ├── plan/               Per-account limits, to keep a shared instance responsive
 │   ├── logging/            JSON structured logging setup
 │   └── net/                HTTP client utilities with rate limit handling
 ├── infra/run/              Terraform for GCP infrastructure

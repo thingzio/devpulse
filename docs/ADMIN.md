@@ -78,6 +78,12 @@ Plan limits are defined in `pkg/plan/plan.go` (single source of truth):
 | pro | 25 | 15,000 | 12 months | full | PDF+CSV |
 | enterprise | unlimited | unlimited | unlimited | full | PDF+CSV |
 
+> These names are stored values in the `tenant.plan` column, not product tiers.
+> DevPulse has no plans and no pricing; every feature is available to every
+> account. The limits exist only to keep a shared instance responsive, and the
+> names are retained because renaming them means migrating live rows. See
+> `pkg/plan/plan.go`.
+
 ## Monitoring
 
 ### Log-Based Metrics
@@ -129,7 +135,6 @@ Metrics appear in Cloud Monitoring as `logging.googleapis.com/user/<metric_name>
 |--------|--------------|
 | Sign-ins | New tenant growth rate |
 | ToS Accepted | Conversion from sign-in to active user |
-| Upgrade Requests | Demand for paid plans |
 | Webhook: Installation Events | GitHub App install/uninstall activity |
 | Event Limit Reached | Tenants hitting weekly caps |
 

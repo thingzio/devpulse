@@ -32,17 +32,14 @@
   </div>
 
   <div class="settings-section">
-    <h2>Plan</h2>
+    <h2>Limits</h2>
     <div class="settings-grid">
-      <div class="settings-label">Current plan</div>
-      <div class="settings-value"><span class="plan-badge">{{ .plan }}</span></div>
       <div class="settings-label">Repos</div>
       <div class="settings-value">{{ .repo_count }} / {{ .max_repos }}</div>
       <div class="settings-label">Events/week</div>
       <div class="settings-value">{{ .max_events }}</div>
     </div>
-    <button class="settings-btn settings-btn-accent" disabled title="Coming soon">Change Plan</button>
-    <p class="hint">Plan changes are not available yet. <a href="/help#help-contact">Request a complementary upgrade</a>.</p>
+    <p class="hint">DevPulse is a reference implementation, not a commercial product &mdash; there are no plans and nothing to upgrade to. These limits exist only to keep the shared instance responsive. <a href="/help#help-contact">Get in touch</a> if they are in your way, or <a href="https://github.com/thingzio/devpulse">run your own instance</a>.</p>
   </div>
 
   <div class="settings-section">
