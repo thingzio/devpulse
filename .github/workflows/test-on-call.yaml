@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: thingzio/actions/.github/actions/setup-go@bb66805bb85b2d5cdf8cbae68b67ebe9bf059892  # v1.7.0
+        uses: thingzio/actions/.github/actions/setup-go@368b3e12df4c41d9079b26e41a03efcd90461d56  # v1.7.1
 
       - name: Unit Test
         run: make test
@@ -41,7 +41,7 @@ jobs:
   lint:
     permissions:
       contents: read
-    uses: thingzio/actions/.github/workflows/lint-go.yaml@bb66805bb85b2d5cdf8cbae68b67ebe9bf059892  # v1.7.0
+    uses: thingzio/actions/.github/workflows/lint-go.yaml@368b3e12df4c41d9079b26e41a03efcd90461d56  # v1.7.1
 
   # Kept here rather than in lint-go: that workflow is Go-only, and a YAML
   # linter belongs with the repository's own .yamllint.yaml.
@@ -87,7 +87,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: thingzio/actions/.github/actions/setup-go@bb66805bb85b2d5cdf8cbae68b67ebe9bf059892  # v1.7.0
+        uses: thingzio/actions/.github/actions/setup-go@368b3e12df4c41d9079b26e41a03efcd90461d56  # v1.7.1
 
       - name: Postgres Integration Tests
         env:
@@ -106,7 +106,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go Environment
-        uses: thingzio/actions/.github/actions/setup-go@bb66805bb85b2d5cdf8cbae68b67ebe9bf059892  # v1.7.0
+        uses: thingzio/actions/.github/actions/setup-go@368b3e12df4c41d9079b26e41a03efcd90461d56  # v1.7.1
 
       - name: E2E Test
         run: make e2e
