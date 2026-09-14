@@ -1429,6 +1429,10 @@ a.link {
   font-weight: 600;
 }
 
+.page-footer a:hover {
+  text-decoration: underline;
+}
+
 /* INSIGHT CARDS */
 .insights-summary {
   display: flex;
