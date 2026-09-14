@@ -1414,6 +1414,7 @@ a.link {
   padding: 1.5rem 30px;
   border-top: 1px solid var(--border-color);
   text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--gray);
   background: var(--page-content-bgColor);
   font-size: 0.8rem;
