@@ -36,18 +36,18 @@
   :root:not([data-theme="light"]) {
     --page-header-bgColor: #171a22;
     --page-header-bgColor-hover: #1f2330;
-    --page-header-txtColor: #f0f0f0;
-    --page-header-headingColor: #999999;
+    --page-header-txtColor: #e6edf3;
+    --page-header-headingColor: #8b949e;
     --page-content-bgColor: #0c1017;
-    --page-content-txtColor: #f0f0f0;
+    --page-content-txtColor: #e6edf3;
     --page-content-blockColor: #171a22;
     --white: #171a22;
-    --black: #f0f0f0;
-    --gray: #999999;
+    --black: #e6edf3;
+    --gray: #8b949e;
     --blue: #4a9eff;
-    --red: #ef4444;
-    --dark-color: #f0f0f0;
-    --medium-color: #999999;
+    --red: #f85149;
+    --dark-color: #e6edf3;
+    --medium-color: #8b949e;
     --light-color: #171a22;
     --border-color: #242836;
     --box-shadow: none;
@@ -56,7 +56,7 @@
     --link-color: #4a9eff;
     --accent: #4a9eff;
     --focus-ring: 0 0 0 3px rgba(74,158,255,0.22);
-    --chart-text: #f0f0f0;
+    --chart-text: #e6edf3;
     --chart-grid: rgba(240,240,240,0.1);
     --overlay-bg: rgba(0,0,0,0.6);
     --logo-filter: invert(1);
@@ -66,18 +66,18 @@
 [data-theme="dark"] {
   --page-header-bgColor: #171a22;
   --page-header-bgColor-hover: #1f2330;
-  --page-header-txtColor: #f0f0f0;
-  --page-header-headingColor: #999999;
+  --page-header-txtColor: #e6edf3;
+  --page-header-headingColor: #8b949e;
   --page-content-bgColor: #0c1017;
-  --page-content-txtColor: #f0f0f0;
+  --page-content-txtColor: #e6edf3;
   --page-content-blockColor: #171a22;
   --white: #171a22;
-  --black: #f0f0f0;
-  --gray: #999999;
+  --black: #e6edf3;
+  --gray: #8b949e;
   --blue: #4a9eff;
-  --red: #ef4444;
-  --dark-color: #f0f0f0;
-  --medium-color: #999999;
+  --red: #f85149;
+  --dark-color: #e6edf3;
+  --medium-color: #8b949e;
   --light-color: #171a22;
   --border-color: #242836;
   --box-shadow: none;
@@ -86,7 +86,7 @@
   --link-color: #4a9eff;
   --accent: #4a9eff;
   --focus-ring: 0 0 0 3px rgba(74,158,255,0.22);
-  --chart-text: #f0f0f0;
+  --chart-text: #e6edf3;
   --chart-grid: rgba(240,240,240,0.1);
   --overlay-bg: rgba(0,0,0,0.6);
   --logo-filter: invert(1);
@@ -1094,19 +1094,9 @@ fieldset {
     padding: 7px 10px;
   }
 
-  .page-footer {
-    font-size: 10px;
-    letter-spacing: 0;
-    padding: 10px 10px 20px;
-  }
 }
 
 @media screen and (min-width: 900px) {
-  .page-footer {
-    font-size: 14px;
-    letter-spacing: 0.1em;
-  }
-
   .story-content a {
     color: var(--link-color);
   }
