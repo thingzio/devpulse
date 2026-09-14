@@ -396,6 +396,7 @@ func makeRouter(
 	mux.HandleFunc("GET /changelog", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "changelog.html", pageData{Title: "Changelog"})
 	})
+	mux.HandleFunc("GET /tos", tosPageHandler())
 	mux.HandleFunc("GET /suspended", func(w http.ResponseWriter, _ *http.Request) {
 		renderTemplate(w, "suspended.html", pageData{Title: "Account Suspended"})
 	})
@@ -427,7 +428,6 @@ func makeRouter(
 	}
 
 	// Authenticated routes
-	mux.Handle("GET /tos", wrap(tosPageHandler()))
 	mux.Handle("POST /tos/accept", wrap(tosAcceptHandler(db)))
 	mux.Handle("GET /dashboard", wrap(dashboardHandler(db, opts, ghAppID)))
 	mux.Handle("GET /settings", wrap(settingsHandler(db)))
