@@ -1415,19 +1415,27 @@ a.link {
 /* FOOTER */
 .page-footer {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-top: 0;
-  padding: 20px 30px 32px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  max-width: 76rem;
+  margin: 2rem auto 0;
+  padding: 1.5rem 30px;
+  border-top: 1px solid var(--border-color);
   text-transform: uppercase;
-  color: var(--page-header-headingColor);
+  color: var(--gray);
   background: var(--page-content-bgColor);
   font-size: 0.8rem;
 }
 
+.page-footer .footer-links {
+  margin-left: auto;
+}
+
 .page-footer a {
   margin: 4px;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 /* INSIGHT CARDS */

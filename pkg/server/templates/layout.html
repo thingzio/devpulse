@@ -26,8 +26,8 @@
 {{end}}
 {{template "content" .}}
   <footer class="page-footer">
-    <span>Version {{ appVersion }} ({{ appCommit }} - {{ appBuildDate }})</span>
-    <span><a href="/changelog">Changelog</a> &middot; <a href="/help">Help</a> &middot; <a href="/tos">Terms</a></span>
+    {{if appVersion}}<span>VERSION {{ appVersion }}{{if appCommit}} ({{ appCommit }}){{end}}</span>{{end}}
+    <span class="footer-links"><a href="/help">HELP</a> &middot; <a href="/tos">TERMS</a> &middot; <a href="https://github.com/thingzio/devpulse" rel="noopener">SOURCE</a></span>
   </footer>
 </body>
 </html>
