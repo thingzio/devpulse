@@ -22,9 +22,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-        -X main.version={{.Version}}
-        -X main.commit={{.ShortCommit}}
-        -X main.date={{.CommitDate}}
+        -X github.com/thingzio/devpulse/pkg/version.version={{.Version}}
+        -X github.com/thingzio/devpulse/pkg/version.commit={{.ShortCommit}}
+        -X github.com/thingzio/devpulse/pkg/version.date={{.CommitDate}}
     goos:
       - linux
     goarch:
@@ -40,9 +40,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-        -X main.version={{.Version}}
-        -X main.commit={{.ShortCommit}}
-        -X main.date={{.CommitDate}}
+        -X github.com/thingzio/devpulse/pkg/version.version={{.Version}}
+        -X github.com/thingzio/devpulse/pkg/version.commit={{.ShortCommit}}
+        -X github.com/thingzio/devpulse/pkg/version.date={{.CommitDate}}
     goos:
       - linux
     goarch:

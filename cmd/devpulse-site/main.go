@@ -25,28 +25,25 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/logging"
 	"github.com/thingzio/devpulse/pkg/server"
-)
-
-var (
-	version = "v0.0.1-default"
-	commit  = ""
-	date    = ""
+	"github.com/thingzio/devpulse/pkg/version"
 )
 
 func main() {
-	logging.SetupLogger(version, "serve")
+	v := version.Get()
+	logging.SetupLogger(v.Version, "serve")
 
 	slog.Info("starting devpulse-site",
-		"commit", commit,
-		"date", date,
+		"version", v.Version,
+		"commit", v.Commit,
+		"date", v.Date,
 	)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	err := server.Run(ctx, server.Options{
-		Version: version,
-		Commit:  commit,
-		Date:    date,
+		Version: v.Version,
+		Commit:  v.Commit,
+		Date:    v.Date,
 	})
 	stop()
 

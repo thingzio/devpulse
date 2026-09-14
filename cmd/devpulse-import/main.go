@@ -25,20 +25,17 @@ import (
 
 	"github.com/thingzio/devpulse/pkg/importer"
 	"github.com/thingzio/devpulse/pkg/logging"
-)
-
-var (
-	version = "v0.0.1-default"
-	commit  = ""
-	date    = ""
+	"github.com/thingzio/devpulse/pkg/version"
 )
 
 func main() {
-	logging.SetupLogger(version, "import")
+	v := version.Get()
+	logging.SetupLogger(v.Version, "import")
 
 	slog.Info("starting devpulse-import",
-		"commit", commit,
-		"date", date,
+		"version", v.Version,
+		"commit", v.Commit,
+		"date", v.Date,
 	)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
