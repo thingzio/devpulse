@@ -3,7 +3,7 @@ module github.com/thingzio/devpulse
 go 1.27.1
 
 require (
-	cloud.google.com/go/run v1.22.0
+	cloud.google.com/go/run v1.23.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-github/v83 v83.0.0
 	github.com/lib/pq v1.12.3
